@@ -38,31 +38,31 @@ HOUSES = {
     "vashara": {
         "name": "Vashara",
         "color": 0x4C9A7D,
-        "emoji": "\U0001F33F",  # herb
+        "emoji": "\U0001F418",  # elephant
         "motto": "The first house. Medicine, patience, and care for the fragile.",
     },
     "moonveil": {
         "name": "Moonveil",
         "color": 0x8B5FBF,
-        "emoji": "\U0001F319",  # crescent moon
+        "emoji": "\U0001F315",  # full moon
         "motto": "Curiosity without a leash. For research purposes, of course.",
     },
     "veyren": {
         "name": "Veyren",
         "color": 0xD9A441,
-        "emoji": "\U0001F517",  # link
+        "emoji": "\U0001F98C",  # deer
         "motto": "Some bonds need no words.",
     },
     "caldrin": {
         "name": "Caldrin",
         "color": 0x3FA9A0,
-        "emoji": "⚙️",  # gear
+        "emoji": "\U0001F52D",  # telescope
         "motto": "Build it anyway. Ask forgiveness of the blueprint later.",
     },
     "thornmere": {
         "name": "Thornmere",
         "color": 0xB8434F,
-        "emoji": "\U0001F339",  # rose
+        "emoji": "\U0001F43A",  # wolf
         "motto": "Think it through. Then think it through again.",
     },
 }
@@ -71,7 +71,7 @@ HOUSE_KEYS = tuple(HOUSES.keys())
 
 
 def house_display(key: str) -> str:
-    """'Moonveil' -> '🌙 House Moonveil' for embeds and lists."""
+    """'moonveil' -> '🌕 House Moonveil' for embeds and lists."""
     h = HOUSES.get(key)
     if not h:
         return key.title()
