@@ -70,6 +70,48 @@ async def _leave_if_unauthorized(guild: discord.Guild) -> bool:
     return False
 
 
+_synced = False
+
+
+async def sync_commands():
+    """Register slash commands where they'll appear fastest.
+
+    Commands registered for all of Discord ("global") can take a long time
+    to show up in people's apps, so a brand-new command may not pop up when
+    someone types /. This bot only ever lives in Velmora, so it registers
+    straight to the server instead - those appear immediately.
+
+    The old global copies are then cleared, otherwise every command would
+    show up twice in the list.
+    """
+    # on_ready fires again after every reconnect; syncing once per start is
+    # enough, and avoids hammering Discord's rate limits.
+    global _synced
+    if _synced:
+        return
+    _synced = True
+
+    targets = set(ALLOWED_GUILD_IDS or ())
+    if DEV_GUILD_ID:
+        targets.add(int(DEV_GUILD_ID))
+
+    if not targets:
+        synced = await bot.tree.sync()
+        log.info("Synced %d global commands (no server set, so registered globally)",
+                 len(synced))
+        return
+
+    for guild_id in targets:
+        guild = discord.Object(id=guild_id)
+        bot.tree.copy_global_to(guild=guild)
+        synced = await bot.tree.sync(guild=guild)
+        log.info("Synced %d commands to server %s", len(synced), guild_id)
+
+    bot.tree.clear_commands(guild=None)
+    await bot.tree.sync()
+    log.info("Cleared global commands so nothing appears twice")
+
+
 @bot.event
 async def on_guild_join(guild: discord.Guild):
     await _leave_if_unauthorized(guild)
@@ -83,14 +125,7 @@ async def on_ready():
         await _leave_if_unauthorized(guild)
 
     try:
-        if DEV_GUILD_ID:
-            guild = discord.Object(id=int(DEV_GUILD_ID))
-            bot.tree.copy_global_to(guild=guild)
-            synced = await bot.tree.sync(guild=guild)
-            log.info("Synced %d commands to dev guild %s", len(synced), DEV_GUILD_ID)
-        else:
-            synced = await bot.tree.sync()
-            log.info("Synced %d global commands", len(synced))
+        await sync_commands()
     except Exception:
         log.exception("Slash command sync failed")
 
