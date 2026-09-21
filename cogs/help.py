@@ -97,20 +97,27 @@ def all_help_commands() -> set[str]:
 class Help(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._ids: dict[str, int] | None = None
+        self._ids: dict = {}   # server id (or None for global) -> {name: id}
 
-    async def _command_ids(self) -> dict[str, int]:
+    async def _command_ids(self, guild=None) -> dict[str, int]:
         """Top-level command name -> Discord ID, needed for clickable
-        mentions. Fetched once and cached; if it fails, help still works
-        with plain /names."""
-        if self._ids is None:
-            try:
+        mentions. Commands are registered to the server, so look there
+        first; fall back to the global list. Cached per server; if it
+        fails, help still works with plain /names."""
+        key = getattr(guild, "id", None)
+        if key in self._ids:
+            return self._ids[key]
+        try:
+            fetched = await self.bot.tree.fetch_commands(guild=guild) if guild else []
+            if not fetched:
                 fetched = await self.bot.tree.fetch_commands()
-                self._ids = {c.name: c.id for c in fetched}
-            except Exception:
-                log.exception("Couldn't fetch command IDs - showing plain names.")
-                return {}
-        return self._ids
+            ids = {c.name: c.id for c in fetched}
+        except Exception:
+            log.exception("Couldn't fetch command IDs - showing plain names.")
+            return {}
+        if ids:
+            self._ids[key] = ids
+        return ids
 
     @staticmethod
     def mention(path: str, ids: dict[str, int]) -> str:
@@ -142,7 +149,7 @@ class Help(commands.Cog):
     async def help(self, interaction: discord.Interaction):
         store = self.bot.get_cog("Store")
         is_staff = bool(store and store.is_staff(interaction.user))
-        ids = await self._command_ids()
+        ids = await self._command_ids(interaction.guild)
         await interaction.response.send_message(embed=self.build(ids, is_staff), ephemeral=True)
 
 
