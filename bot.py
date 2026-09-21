@@ -55,6 +55,7 @@ INITIAL_COGS = (
     "cogs.wands",
     "cogs.duels",
     "cogs.beans",
+    "cogs.profile",
     "cogs.help",
 )
 
