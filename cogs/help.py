@@ -28,6 +28,7 @@ HELP = {
             ("bean", "Spend 1 point on a mystery bean. Might pay 5. Might be Mordy's socks."),
             ("wand", "Give any three words and a wand chooses you. Yours for good."),
             ("patronus", "Your patronus, cast from the same three words as your wand."),
+            ("rumor", "Start a rumor about someone in Velmora. Believe nothing."),
         ],
     },
     "explore": {
