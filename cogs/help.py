@@ -30,6 +30,19 @@ HELP = {
             ("patronus", "Your patronus, cast from the same three words as your wand."),
         ],
     },
+    "explore": {
+        "title": "Explore Velmora",
+        "staff": False,
+        "note": "Places remember how you treat them. Not everything you can do is listed here.",
+        "entries": [
+            ("places", "Where you can go, and what's happening there."),
+            ("explore", "Go somewhere and see what you find."),
+            ("forage", "Search for ingredients and strange things."),
+            ("satchel", "What you're carrying. Only you can see it."),
+            ("use", "Try something from your satchel where you are."),
+            ("offer", "Leave an offering where you are."),
+        ],
+    },
     "challenges": {
         "title": "Challenges",
         "staff": False,
@@ -70,6 +83,20 @@ HELP = {
             ("season rename", "Rename the current season."),
             ("triwizard crown", "Record a Tri-Wizard Tournament winner."),
             ("triwizard remove", "Undo a Tri-Wizard entry made by mistake."),
+        ],
+    },
+    "staff_world": {
+        "title": "Staff — places",
+        "staff": True,
+        "entries": [
+            ("world eventstart", "Start an event in a place (the Garden...)."),
+            ("world eventend", "End a place's event."),
+            ("world eventstatus", "What's happening around Velmora."),
+            ("world academy", "Switch an academy event on or off, e.g. tournament."),
+            ("world rep", "How a place feels about someone."),
+            ("world give", "Put an item in someone's satchel."),
+            ("world channel", "Set the channel a place lives in."),
+            ("world reload", "Reload the places' writing without restarting."),
         ],
     },
     "staff_setup": {
