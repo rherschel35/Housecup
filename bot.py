@@ -61,6 +61,7 @@ INITIAL_COGS = (
     "cogs.profile",
     "cogs.help",
     "cogs.world",
+    "cogs.rumors",
 )
 
 
