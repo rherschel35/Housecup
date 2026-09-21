@@ -1,10 +1,11 @@
 """
 /profile [member] - one player's whole story at Velmora.
 
-    House and honours     - House Cup Champion titles, cups won
+    House and honours     - House Cup and Tri-Wizard titles, cups won
     Points                - this season and all time, with rank
     Duelling              - ladder rank, title, record
     Wand                  - what chose them, and why
+    Patronus              - the shape their protection takes
 
 House Cup honours come in two kinds:
 
@@ -77,6 +78,11 @@ class Profile(commands.Cog):
         if honours["champion_of"]:
             n = len(honours["champion_of"])
             header.append(f"\U0001F3C6 **House Cup Champion**" + (f" ×{n}" if n > 1 else ""))
+        triwizard = self.bot.get_cog("TriWizard")
+        tw_titles = triwizard.titles_of(member.id) if triwizard else []
+        if tw_titles:
+            n = len(tw_titles)
+            header.append(f"\U0001F3C5 **Tri-Wizard Champion**" + (f" ×{n}" if n > 1 else ""))
 
         embed = discord.Embed(
             title=member.display_name,
@@ -129,6 +135,15 @@ class Profile(commands.Cog):
             inline=False,
         )
 
+        # --------------------------------------------------------- Tri-Wizard
+        # Only shown to those who've won one - it's rare, and an empty
+        # section on everyone else's card would just be noise.
+        if tw_titles:
+            shown = "\n".join(f"Champion of the **{r['name']}**" for r in tw_titles[-4:])
+            if len(tw_titles) > 4:
+                shown += f"\n…and {len(tw_titles) - 4} more"
+            embed.add_field(name="Tri-Wizard Tournament", value=shown, inline=False)
+
         # -------------------------------------------------------------- wand
         wand = wands.wand_of(member.id) if wands else None
         if wand:
@@ -142,6 +157,20 @@ class Profile(commands.Cog):
             )
         else:
             embed.add_field(name="Wand", value="Not chosen yet — `/wand` to find out.",
+                            inline=False)
+
+        # ---------------------------------------------------------- patronus
+        # Only once they have a wand - without one there's nothing to cast from.
+        patronus_cog = self.bot.get_cog("Patronus")
+        patronus = patronus_cog.patronus_of(member.id) if patronus_cog else None
+        if patronus:
+            embed.add_field(
+                name="Patronus",
+                value=f"**A silver {patronus['animal'].lower()}**\n*{patronus['form']}*",
+                inline=False,
+            )
+        elif wand:
+            embed.add_field(name="Patronus", value="Not cast yet \u2014 `/patronus`.",
                             inline=False)
         return embed
 
