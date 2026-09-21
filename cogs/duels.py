@@ -156,6 +156,12 @@ class Duels(commands.Cog):
     @app_commands.describe(opponent="Who you're challenging")
     async def duel(self, interaction: discord.Interaction, opponent: discord.Member):
         me = interaction.user
+        arena = os.getenv("DUEL_CHANNEL_ID", "")
+        if arena.isdigit() and interaction.channel_id != int(arena):
+            await interaction.response.send_message(
+                f"⚔️ Duels are fought in <#{arena}>.", ephemeral=True
+            )
+            return
         if opponent.id == me.id:
             await interaction.response.send_message("You can't duel yourself.", ephemeral=True)
             return
