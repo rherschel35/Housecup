@@ -42,6 +42,7 @@ ALLOWED_GUILD_IDS = _parse_guild_ids(os.getenv("ALLOWED_GUILD_IDS"))
 
 intents = discord.Intents.default()
 intents.members = True  # needed to read house roles and resolve members
+intents.message_content = True  # needed for secrets typed in a place's channel (e.g. #gardens)
 
 bot = commands.Bot(command_prefix="!velmora-points-unused-", intents=intents, help_command=None)
 
@@ -59,6 +60,7 @@ INITIAL_COGS = (
     "cogs.triwizard",
     "cogs.profile",
     "cogs.help",
+    "cogs.world",
 )
 
 
