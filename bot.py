@@ -53,8 +53,10 @@ INITIAL_COGS = (
     "cogs.countdown",
     "cogs.quests",
     "cogs.wands",
+    "cogs.patronus",
     "cogs.duels",
     "cogs.beans",
+    "cogs.triwizard",
     "cogs.profile",
     "cogs.help",
 )
