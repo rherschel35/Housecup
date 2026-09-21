@@ -83,7 +83,7 @@ def _blank_state() -> dict:
         "version": 1,
         "season": {"number": 1, "name": "Season 1", "started_at": time.time()},
         "totals": {
-            "season": {"houses": {}, "members": {}},
+            "season": {"houses": {}, "members": {}, "house_members": {}},
             "alltime": {"houses": {}, "members": {}},
         },
         "ledger": [],
@@ -98,6 +98,23 @@ def _blank_state() -> dict:
             "last_announced_week": None,
         },
     }
+
+
+def _rebuild_house_members(state: dict) -> dict:
+    """Reconstruct this season's per-house member totals from the ledger.
+    Exact as long as the ledger still holds the whole season, which it does
+    for any season shorter than the ledger limit."""
+    season = state.get("season", {}).get("number")
+    rebuilt: dict = {}
+    for entry in state.get("ledger", []):
+        if entry.get("undone") or not entry.get("target_id"):
+            continue
+        if entry.get("season") != season:
+            continue
+        bucket = rebuilt.setdefault(entry["house"], {})
+        key = str(entry["target_id"])
+        bucket[key] = bucket.get(key, 0) + entry["delta"]
+    return rebuilt
 
 
 class Store(commands.Cog):
@@ -124,6 +141,8 @@ class Store(commands.Cog):
                 state["totals"].setdefault(scope, {"houses": {}, "members": {}})
                 state["totals"][scope].setdefault("houses", {})
                 state["totals"][scope].setdefault("members", {})
+            if "house_members" not in state["totals"]["season"]:
+                state["totals"]["season"]["house_members"] = _rebuild_house_members(state)
             log.info(
                 "Loaded ledger from %s (%d entries, season %s)",
                 STORE_PATH,
@@ -248,6 +267,13 @@ class Store(commands.Cog):
                 members = self.state["totals"][scope]["members"]
                 key = str(entry["target_id"])
                 members[key] = members.get(key, 0) + delta
+        # Who earned what FOR WHICH HOUSE this season - needed to crown the
+        # champion, since a member's points are only credited to one house.
+        if entry.get("target_id"):
+            by_house = self.state["totals"]["season"].setdefault("house_members", {})
+            bucket = by_house.setdefault(entry["house"], {})
+            key = str(entry["target_id"])
+            bucket[key] = bucket.get(key, 0) + delta
 
     def undo_last(self, *, actor_id: int | None = None) -> dict | None:
         """Reverse the most recent entry that hasn't already been undone."""
@@ -305,17 +331,34 @@ class Store(commands.Cog):
         top = standings[0] if standings else (None, 0)
         # A tie at the top means nobody is crowned outright.
         tied = [k for k, p in standings if p == top[1] and p != 0]
+        winner = tied[0] if len(tied) == 1 else None
+
+        # The champion is the highest point earner in the winning house.
+        # Level at the top means co-champions; no outright house, no champion.
+        champions, winning_members = [], {}
+        if winner:
+            winning_members = dict(
+                self.state["totals"]["season"].get("house_members", {}).get(winner, {})
+            )
+            best = max(winning_members.values(), default=0)
+            if best > 0:
+                champions = [{"id": int(uid), "points": pts}
+                             for uid, pts in winning_members.items() if pts == best]
+
         record = {
             "number": self.state["season"]["number"],
             "name": self.state["season"]["name"],
             "started_at": self.state["season"]["started_at"],
             "ended_at": time.time(),
             "standings": standings,
-            "winner": tied[0] if len(tied) == 1 else None,
+            "winner": winner,
             "tied": tied if len(tied) > 1 else [],
+            "champions": champions,
+            # Everyone who earned for the winning house - they share the cup.
+            "winning_members": {uid: pts for uid, pts in winning_members.items() if pts > 0},
         }
         self.state["archive"].append(record)
-        self.state["totals"]["season"] = {"houses": {}, "members": {}}
+        self.state["totals"]["season"] = {"houses": {}, "members": {}, "house_members": {}}
         self.state["season"] = {
             "number": record["number"] + 1,
             "name": f"Season {record['number'] + 1}",
@@ -323,6 +366,17 @@ class Store(commands.Cog):
         }
         self.save()
         return record
+
+    def honours(self, user_id: int) -> dict:
+        """A member's House Cup record across every finished season."""
+        uid = str(user_id)
+        champion_of, cups = [], []
+        for record in self.state.get("archive", []):
+            if any(c["id"] == user_id for c in record.get("champions", [])):
+                champion_of.append(record["name"])
+            if uid in record.get("winning_members", {}):
+                cups.append(record["name"])
+        return {"champion_of": champion_of, "cups": cups}
 
     def rename_season(self, name: str) -> None:
         self.state["season"]["name"] = name.strip() or self.state["season"]["name"]

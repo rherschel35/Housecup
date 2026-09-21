@@ -157,7 +157,10 @@ class Board(commands.Cog):
                 result = "shared by " + " & ".join(HOUSES[k]["name"] for k in record["tied"])
             else:
                 result = "no champion"
-            lines.append(f"**{record['name']}** ({ended:%b %Y}) — {result}")
+            champs = record.get("champions", [])
+            if champs:
+                result += " \u2022 \U0001F3C6 " + " & ".join(f"<@{c['id']}>" for c in champs)
+            lines.append(f"**{record['name']}** ({ended:%b %Y}) \u2014 {result}")
 
         embed = discord.Embed(
             title="The House Cup — past champions",

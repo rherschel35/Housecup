@@ -222,6 +222,17 @@ class Admin(commands.Cog):
             f"{HOUSES[k]['emoji']} **{HOUSES[k]['name']}** — `{p:,}`" for k, p in rows
         )
         embed = discord.Embed(title=title, description=f"*{blurb}*\n\n{table}", color=color)
+
+        champions = record.get("champions", [])
+        if champions:
+            names = " & ".join(f"<@{c['id']}>" for c in champions)
+            label = "House Cup Champion" if len(champions) == 1 else "House Cup Co-Champions"
+            embed.add_field(
+                name=f"\U0001F3C6 {label}",
+                value=f"{names} \u2014 top earner for the winning house with "
+                      f"**{champions[0]['points']:,}** points.",
+                inline=False,
+            )
         embed.set_footer(text=f"{store.current_season()['name']} begins now. All-time totals carry over.")
         await interaction.response.send_message(embed=embed)
 

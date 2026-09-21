@@ -42,6 +42,7 @@ HELP = {
         "title": "Your standing",
         "staff": False,
         "entries": [
+            ("profile", "Your wand, points, duel rank and House Cup honours - or anyone's."),
             ("points", "Your points (or anyone's), this season and all time."),
             ("standings", "The House Cup table."),
             ("leaderboard", "The top earners."),
