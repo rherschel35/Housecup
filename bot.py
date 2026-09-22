@@ -63,6 +63,7 @@ INITIAL_COGS = (
     "cogs.world",
     "cogs.rumors",
     "cogs.dementors",
+    "cogs.familiars",
 )
 
 
