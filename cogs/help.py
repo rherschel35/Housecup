@@ -30,6 +30,11 @@ HELP = {
             ("patronus", "Your patronus, cast from the same three words as your wand."),
             ("rumor", "Start a rumor about someone in Velmora. Believe nothing."),
             ("cast", "Banish whatever's in this channel. Needs a patronus already cast."),
+            ("familiar", "Adopt a familiar (once, for good), name it, or see the one you have."),
+            ("feed", "Feed your familiar. Once a day."),
+            ("pet", "Pet your familiar. Once a day."),
+            ("play", "Play with your familiar. Once a day."),
+            ("scout", "Send your familiar out to bring something back. Once a day."),
         ],
     },
     "explore": {

@@ -166,12 +166,29 @@ class Profile(commands.Cog):
         if patronus:
             embed.add_field(
                 name="Patronus",
-                value=f"**A silver {patronus['animal'].lower()}**\n*{patronus['form']}*",
-                inline=False,
+                value=f"**A silver {patronus['animal'].lower()}**",
+                inline=True,
             )
         elif wand:
             embed.add_field(name="Patronus", value="Not cast yet \u2014 `/patronus`.",
-                            inline=False)
+                            inline=True)
+
+        # --------------------------------------------------------- familiar
+        familiars_cog = self.bot.get_cog("Familiars")
+        fam = familiars_cog.familiar_of(member.id) if familiars_cog else None
+        if fam:
+            from cogs.familiars import FAMILIARS, _tier
+            meta = FAMILIARS[fam["species"]]
+            _, tier_name, _, _ = _tier(fam["friendship"])
+            label = f"**{fam['name']}** the {meta['label']}" if fam.get("name") else f"{meta['article']} {meta['label']}"
+            embed.add_field(
+                name="Familiar",
+                value=f"{meta['emoji']} {label}\n{tier_name}",
+                inline=True,
+            )
+        else:
+            embed.add_field(name="Familiar", value="Not adopted yet \u2014 `/familiar`.",
+                            inline=True)
         return embed
 
     @app_commands.command(name="profile", description="A player's wand, points, duels and honours.")
