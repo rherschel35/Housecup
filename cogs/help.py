@@ -29,6 +29,7 @@ HELP = {
             ("wand", "Give any three words and a wand chooses you. Yours for good."),
             ("patronus", "Your patronus, cast from the same three words as your wand."),
             ("rumor", "Start a rumor about someone in Velmora. Believe nothing."),
+            ("cast", "Banish whatever's in this channel. Needs a patronus already cast."),
         ],
     },
     "explore": {
@@ -98,6 +99,9 @@ HELP = {
             ("world give", "Put an item in someone's satchel."),
             ("world channel", "Set the channel a place lives in."),
             ("world reload", "Reload the places' writing without restarting."),
+            ("dementor channels", "Set the 4 channels a dementor can appear in."),
+            ("dementor summon", "Make a dementor appear right now."),
+            ("dementor status", "What's configured and what's active."),
         ],
     },
     "staff_setup": {
