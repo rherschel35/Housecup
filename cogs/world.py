@@ -437,14 +437,22 @@ class WorldCog(commands.Cog, name="World"):
                      "books, riddles, rumours - or other students. If you discover something, you decide whether to share it.*")
         await interaction.response.send_message(embed=self.embed("\n\n".join(lines), "Velmora"))
 
-    # ------------------------------------------------------------ secrets, typed in a place's channel
+    # ------------------------------------------------------------ secrets, typed wherever you're currently exploring
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.author.bot or not message.guild or len(message.content or "") > 300:
             return
-        place = next((k for k, cid in self.state["channels"].items() if cid == message.channel.id), None)
+        s = self.student(message.author)
+        # A secret checks against wherever this student actually last explored
+        # (same "here" used by /use and /offer) - not just whichever place
+        # happens to be bound to this channel. A place that IS bound to a
+        # channel (like the Garden) still only answers there.
+        place = self.where(s)
         if not place or place not in self.world.places:
+            return
+        cid = self.state["channels"].get(place)
+        if cid and message.channel.id != cid:
             return
         P = self.world.places[place]
         async with self.lock:
