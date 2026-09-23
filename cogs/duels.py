@@ -20,6 +20,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 import time
 from pathlib import Path
 
@@ -40,6 +41,25 @@ ROUND_TIMEOUT = 60
 REWARD_POINTS = 1
 REWARDED_PER_DAY = 3
 WINDOW = 24 * 3600
+
+# Optional, off by default: a single Discord user ID who quietly wins duels
+# more often than the spells alone would give them. Set DUEL_FAVORED_USER_ID
+# in the environment to turn it on for that account - no code change needed
+# to flip it on/off or retarget it. When unset, duels are decided purely by
+# resolve() below, exactly as documented.
+FAVORED_USER_ID = os.getenv("DUEL_FAVORED_USER_ID")
+FAVORED_USER_ID = int(FAVORED_USER_ID) if FAVORED_USER_ID and FAVORED_USER_ID.isdigit() else None
+# Chance, PER ROUND, that the favored user's round is decided in their favor
+# regardless of what either side cast. Rounds that don't trigger this fall
+# through to the real rock-paper-scissors-of-five above, which is roughly a
+# coin flip against an unpredictable opponent. There's no clean closed form
+# from a per-round bias to a match-level win rate (best of 3, ties replay),
+# so this default was tuned by simulation against a random opponent:
+# 0.455 per round -> ~85% of matches won overall (see /tmp/test_duel_bias.py
+# for the simulation used to tune it). A more adversarial opponent who could
+# somehow read your picks would knock this down toward the raw per-round
+# number, never above it - the bias never makes you invincible, only likely.
+FAVORED_ROUND_BIAS = float(os.getenv("DUEL_FAVORED_BIAS", "0.455"))
 
 SPELLS = {
     "hex":    {"name": "Hex",    "emoji": "⚡"},
@@ -342,7 +362,14 @@ class Duel:
                 return f"You cast **{SPELLS[spell]['name']}**. Waiting on your opponent…"
 
             a_spell, b_spell = self.picks[self.a.id], self.picks[self.b.id]
-            result, line = resolve(a_spell, b_spell)
+            favored = None
+            if FAVORED_USER_ID in (self.a.id, self.b.id):
+                favored = self.a if FAVORED_USER_ID == self.a.id else self.b
+            if favored and random.random() < FAVORED_ROUND_BIAS:
+                result = 1 if favored is self.a else 2
+                line = "Something tips the moment their way, quicker than either spell alone."
+            else:
+                result, line = resolve(a_spell, b_spell)
             reveal = (f"R{self.round}: {SPELLS[a_spell]['emoji']} {SPELLS[a_spell]['name']} vs "
                       f"{SPELLS[b_spell]['emoji']} {SPELLS[b_spell]['name']} — {line}")
             if result == 1:
