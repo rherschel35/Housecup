@@ -263,7 +263,7 @@ class WorldCog(commands.Cog, name="World"):
         P = self.world.places[place]
         async with self.lock:
             ctx = self.ctx(interaction.user, place)
-            key = f"{place}_explore"
+            key = "explore"
             if self.world.count(ctx.student, key) >= self.limit(place, "explore"):
                 return await interaction.response.send_message(
                     "🌙 The way in won't open for you again today. Come back tomorrow.", ephemeral=True)
@@ -325,7 +325,7 @@ class WorldCog(commands.Cog, name="World"):
         P = self.world.places[place]
         async with self.lock:
             ctx = self.ctx(interaction.user, place)
-            key = f"{place}_forage"
+            key = "forage"
             if self.world.count(ctx.student, key) >= self.limit(place, "forage"):
                 return await interaction.response.send_message(
                     "🍂 You've searched it bare for today. It will grow back. Probably.", ephemeral=True)
