@@ -22,6 +22,18 @@ right hit shares in the reward once it's down.
 
 A Storm Sprite is rarer and skittish - leave it too long and it bolts to
 another configured channel rather than wait to be caught.
+
+    /dementor eventstart [minutes] [name]  - staff, start "Attack on Velmora"
+    /dementor eventend                     - staff, end it early
+    /dementor eventstatus                  - staff, how it's going
+
+For a limited time (5 minutes by default), a fresh wave of monsters floods
+ALL FOUR configured channels every 15 seconds - whatever was still standing
+gets swept aside for the new wave. Kills earn personal "rep" during the
+event instead of house points right away; when the clock runs out (or
+staff end it early), every contributor's rep is converted into points for
+their house all at once, and whoever racked up the most rep gets a bonus
+on top. One big scoreboard reveal at the end, in every channel that fought.
 """
 
 import json
@@ -53,6 +65,19 @@ WANDER_MINUTES = 10   # how long a creature that can wander waits before it bolt
 REWARD_POINTS = 3   # kept for backward compatibility; see CREATURES["dementor"]["points"]
 DARK = 0x0B0B12
 
+EVENT_WAVE_SECONDS = 15
+EVENT_DEFAULT_MINUTES = 5
+EVENT_MAX_MINUTES = 60
+EVENT_MVP_BONUS = 5
+EVENT_COLOR = 0x8A2F2F
+
+ATTACK_INTRO = [
+    "Something has broken through the wards. Fight back - every monster you put down counts "
+    "toward the tally. Nobody's told which spell beats which. Work it out, or find someone who knows.",
+    "The castle's defenses are down, all at once, everywhere. Hold the line - Velmora will "
+    "remember who answered the call, and by how much.",
+]
+
 ARRIVALS = [
     "The room goes cold. Every candle nearby gutters at once, and something that isn't "
     "quite shadow settles into the corner.",
@@ -81,8 +106,11 @@ BANISHED = [
 #   actually gone. 1 means one clean hit does it.
 # "points": awarded to the house of EVERY contributor once it's defeated
 #   (not split - a pack of 2 means two people each get the full amount).
+#   During an event, this same number is what's earned as personal rep
+#   instead, and only gets converted to house points at the very end.
 # "wander": if true, an uncaught one relocates to another configured
-#   channel after WANDER_MINUTES instead of waiting to be found.
+#   channel after WANDER_MINUTES instead of waiting to be found. (Outside
+#   an event only - during an event, waves already replace it every 15s.)
 
 CREATURES = {
     "dementor": {
@@ -193,14 +221,17 @@ class Dementors(commands.Cog):
         self.state.setdefault("active", None)
         self.state.setdefault("day_key", "")
         self.state.setdefault("spawns_today", 0)
+        self.state.setdefault("event", None)
 
     async def cog_load(self):
         import asyncio
         self.lock = asyncio.Lock()
         self.tick.start()
+        self.event_tick.start()
 
     async def cog_unload(self):
         self.tick.cancel()
+        self.event_tick.cancel()
 
     def _load(self) -> dict:
         try:
@@ -228,6 +259,16 @@ class Dementors(commands.Cog):
             self.state["day_key"] = key
             self.state["spawns_today"] = 0
 
+    async def _get_channel(self, channel_id: int):
+        channel = self.bot.get_channel(channel_id)
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(channel_id)
+            except discord.HTTPException:
+                log.warning("Threat channel %s not reachable", channel_id)
+                return None
+        return channel
+
     # ------------------------------------------------------------ spawning
 
     def embed_arrival(self, creature_id: str) -> discord.Embed:
@@ -247,13 +288,9 @@ class Dementors(commands.Cog):
             if not pool:
                 return None
             channel_id = self.rng.choice(pool)
-        channel = self.bot.get_channel(channel_id)
+        channel = await self._get_channel(channel_id)
         if channel is None:
-            try:
-                channel = await self.bot.fetch_channel(channel_id)
-            except discord.HTTPException:
-                log.warning("Threat channel %s not reachable", channel_id)
-                return None
+            return None
         if creature_id is None:
             creature_id = "dementor"
         try:
@@ -288,12 +325,9 @@ class Dementors(commands.Cog):
                 await old_channel.send(self.rng.choice(c["wander_lines"]))
             except discord.HTTPException:
                 pass
-        new_channel = self.bot.get_channel(new_id)
+        new_channel = await self._get_channel(new_id)
         if new_channel is None:
-            try:
-                new_channel = await self.bot.fetch_channel(new_id)
-            except discord.HTTPException:
-                return
+            return
         try:
             msg = await new_channel.send(embed=self.embed_arrival(active["creature"]))
         except discord.HTTPException:
@@ -308,6 +342,8 @@ class Dementors(commands.Cog):
     async def tick(self):
         async with self.lock:
             self._roll_day()
+            if self.state.get("event"):
+                return  # an event is running - it owns spawning right now
             active = self.state.get("active")
             if active:
                 c = CREATURES.get(active["creature"], {})
@@ -333,6 +369,12 @@ class Dementors(commands.Cog):
     @app_commands.choices(spell=CAST_CHOICES)
     async def cast(self, interaction: discord.Interaction, spell: app_commands.Choice[str]):
         async with self.lock:
+            event = self.state.get("event")
+            key = str(interaction.channel_id)
+            if event and key in event.get("channels", {}):
+                await self._cast_event(interaction, spell, event, key)
+                return
+
             active = self.state.get("active")
             if not active or active["channel_id"] != interaction.channel_id:
                 await interaction.response.send_message(
@@ -447,6 +489,192 @@ class Dementors(commands.Cog):
             embed.set_footer(text=f"+{awarded} points for House {HOUSES[house]['name']}")
         await interaction.response.send_message(embed=embed)
 
+    # ------------------------------------------------------- event: /cast
+
+    def _credit_event(self, event: dict, uids: list, creature: dict) -> None:
+        tally = event.setdefault("tally", {})
+        for uid in uids:
+            entry = tally.setdefault(str(uid), {"rep": 0, "kills": 0})
+            entry["rep"] += creature["points"]
+            entry["kills"] += 1
+
+    async def _cast_event(self, interaction: discord.Interaction, spell, event: dict, key: str):
+        """Resolving a hit during a Wild Threats event. Everything happens
+        here (state check, tally update, response) while still holding the
+        lock - there's no store write to wait on, unlike the normal path,
+        so there's no reason to release it early."""
+        wave = event["channels"][key]
+        creature_id = wave["creature"]
+        creature = CREATURES[creature_id]
+
+        if creature_id == "dementor":
+            if spell.value != "patronus":
+                await interaction.response.send_message("Nothing happens.", ephemeral=True)
+                return
+            patronus_cog = self.bot.get_cog("Patronus")
+            mine = patronus_cog.patronus_of(interaction.user.id) if patronus_cog else None
+            if not mine:
+                await interaction.response.send_message(
+                    "You have no patronus to send against it yet - cast one with `/patronus` first.",
+                    ephemeral=True,
+                )
+                return
+            del event["channels"][key]
+            self._credit_event(event, [interaction.user.id], creature)
+            self.save()
+            animal = mine["animal"].lower()
+            line = self.rng.choice(BANISHED).format(
+                patronus=f"{_article(animal)} silver {animal}", animal=animal, member=interaction.user.mention,
+            )
+            embed = discord.Embed(title="✨ The Dementor is banished", description=line, color=0xC4CCD6)
+            embed.set_footer(text=f"+{creature['points']} rep - ⚔️ {event['name']}")
+            await interaction.response.send_message(embed=embed)
+            return
+
+        if spell.value != creature["weak"]:
+            await interaction.response.send_message("Nothing happens.", ephemeral=True)
+            return
+
+        if interaction.user.id in wave.get("hits", []):
+            await interaction.response.send_message(
+                "You've already struck this one - it'll take someone else to finish it.", ephemeral=True
+            )
+            return
+
+        wave.setdefault("hits", []).append(interaction.user.id)
+
+        if len(wave["hits"]) < creature["pack"]:
+            self.save()
+            line = self.rng.choice(creature["progress"]).format(member=interaction.user.mention)
+            await interaction.response.send_message(
+                embed=discord.Embed(description=line, color=creature["color"])
+            )
+            return
+
+        contributors = wave["hits"]
+        del event["channels"][key]
+        self._credit_event(event, contributors, creature)
+        self.save()
+
+        if creature["pack"] > 1:
+            others = ", ".join(f"<@{uid}>" for uid in contributors[:-1]) or "someone else"
+            line = self.rng.choice(creature["victory"]).format(member=interaction.user.mention, other=others)
+        else:
+            line = self.rng.choice(creature["victory"]).format(member=interaction.user.mention)
+
+        embed = discord.Embed(title=f"✨ The {creature['name']} is defeated", description=line, color=creature["color"])
+        embed.set_footer(text=f"+{creature['points']} rep each - ⚔️ {event['name']}")
+        await interaction.response.send_message(embed=embed)
+
+    # ------------------------------------------------------- event: spawns
+
+    async def _spawn_wave(self, event: dict) -> None:
+        """One wave: every configured channel gets a fresh, randomly rolled
+        creature, replacing whatever was still standing there."""
+        for cid in self.state.get("channel_ids", []):
+            channel = await self._get_channel(cid)
+            if channel is None:
+                continue
+            creature_id = self._roll_creature()
+            embed = self.embed_arrival(creature_id)
+            embed.set_footer(text=f"⚔️ {event['name']}")
+            try:
+                msg = await channel.send(embed=embed)
+            except discord.HTTPException:
+                continue
+            event["channels"][str(cid)] = {
+                "creature": creature_id, "message_id": msg.id, "spawned_at": time.time(), "hits": [],
+            }
+        self.save()
+
+    def _clear_event(self) -> dict | None:
+        """Must be called while holding self.lock. Pops the running event
+        (if any) out of state and returns it, so the caller can finalize it
+        - awarding points, posting the recap - without holding the lock for
+        all of that."""
+        event = self.state.get("event")
+        self.state["event"] = None
+        if event:
+            self.save()
+        return event
+
+    async def _finalize_event(self, event: dict) -> None:
+        tally = event.get("tally", {})
+        store = self.bot.get_cog("Store")
+        guild = self.bot.get_guild(event["guild_id"]) if event.get("guild_id") else None
+        from cogs.store import HOUSES
+
+        rows = []
+        for uid_str, entry in tally.items():
+            uid = int(uid_str)
+            member = guild.get_member(uid) if guild else None
+            house = store.member_house(member) if (store and member) else None
+            rows.append([uid, entry.get("rep", 0), entry.get("kills", 0), house])
+        rows.sort(key=lambda r: r[1], reverse=True)
+
+        top_rep = rows[0][1] if rows else 0
+        mvp_uids = {uid for uid, rep, kills, house in rows if rep == top_rep and rep > 0}
+
+        house_totals: dict[str, int] = {}
+        for uid, rep, kills, house in rows:
+            if not (store and house):
+                continue
+            bonus = EVENT_MVP_BONUS if uid in mvp_uids else 0
+            store.record(
+                house=house, delta=rep + bonus,
+                actor_id=self.bot.user.id if self.bot.user else 0,
+                target_id=uid, reason=f"{event['name']} - final tally",
+            )
+            house_totals[house] = house_totals.get(house, 0) + rep + bonus
+
+        total_kills = sum(r[2] for r in rows)
+        lines = [f"**{total_kills}** monster(s) put down by **{len(rows)}** wizard(s)."]
+        if rows:
+            lines.append("")
+            for uid, rep, kills, house in rows[:10]:
+                crown = "👑 " if uid in mvp_uids else ""
+                bonus_note = f" (+{EVENT_MVP_BONUS} MVP bonus)" if uid in mvp_uids else ""
+                house_note = f" - House {HOUSES[house]['name']}" if house else " - no house, no points"
+                lines.append(f"{crown}<@{uid}>: **{rep}** rep, {kills} kill(s){house_note}{bonus_note}")
+        if house_totals:
+            lines.append("")
+            lines.append(" • ".join(
+                f"House {HOUSES[h]['name']}: +{p}"
+                for h, p in sorted(house_totals.items(), key=lambda kv: -kv[1])
+            ))
+
+        embed = discord.Embed(
+            title=f"🏳️ {event['name']} has ended",
+            description="\n".join(lines) if rows else "Nobody landed a hit. The grounds are quiet again.",
+            color=EVENT_COLOR,
+        )
+        for cid in self.state.get("channel_ids", []):
+            channel = self.bot.get_channel(cid)
+            if channel is None:
+                continue
+            try:
+                await channel.send(embed=embed)
+            except discord.HTTPException:
+                continue
+
+    @tasks.loop(seconds=EVENT_WAVE_SECONDS)
+    async def event_tick(self):
+        finished = None
+        async with self.lock:
+            event = self.state.get("event")
+            if not event:
+                return
+            if time.time() >= event["ends_at"]:
+                finished = self._clear_event()
+            else:
+                await self._spawn_wave(event)
+        if finished:
+            await self._finalize_event(finished)
+
+    @event_tick.before_loop
+    async def before_event_tick(self):
+        await self.bot.wait_until_ready()
+
     # ------------------------------------------------------------ staff
 
     async def _staff(self, interaction) -> bool:
@@ -478,6 +706,11 @@ class Dementors(commands.Cog):
         if not await self._staff(interaction):
             return
         async with self.lock:
+            if self.state.get("event"):
+                await interaction.response.send_message(
+                    f"**{self.state['event']['name']}** is running right now - wait for it to finish, "
+                    "or `/dementor eventend` it first.", ephemeral=True)
+                return
             if self.state.get("active"):
                 await interaction.response.send_message(
                     "One's already loose somewhere. Let it get dealt with first.", ephemeral=True)
@@ -515,7 +748,98 @@ class Dementors(commands.Cog):
             lines.append(f"Active now: {c['name']} in <#{active['channel_id']}>, {age} minute(s) ago{progress}.")
         else:
             lines.append("Nothing active right now.")
+        if self.state.get("event"):
+            lines.append(f"⚔️ An event is running - see `/dementor eventstatus`.")
         embed = discord.Embed(title="Wild Threats", description="\n".join(lines), color=DARK)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    # -------------------------------------------------------- staff: event
+
+    @group.command(name="eventstart", description="(staff) Start 'Attack on Velmora' - monsters flood every channel.")
+    @app_commands.describe(minutes=f"How long it runs, in minutes (default {EVENT_DEFAULT_MINUTES})",
+                            name="What to call it")
+    async def eventstart(self, interaction: discord.Interaction,
+                          minutes: int = EVENT_DEFAULT_MINUTES, name: str = "Attack on Velmora"):
+        if not await self._staff(interaction):
+            return
+        async with self.lock:
+            if self.state.get("event"):
+                await interaction.response.send_message(
+                    f"**{self.state['event']['name']}** is already running.", ephemeral=True)
+                return
+            pool = self.state.get("channel_ids", [])
+            if not pool:
+                await interaction.response.send_message(
+                    "No channels configured yet - run `/dementor channels` first.", ephemeral=True)
+                return
+            if not (1 <= minutes <= EVENT_MAX_MINUTES):
+                await interaction.response.send_message(
+                    f"Pick a length between 1 and {EVENT_MAX_MINUTES} minutes.", ephemeral=True)
+                return
+
+            clean_name = name.strip() or "Attack on Velmora"
+            now = time.time()
+            self.state["active"] = None   # the event takes over every configured channel
+            event = {
+                "name": clean_name, "started_at": now, "ends_at": now + minutes * 60,
+                "guild_id": interaction.guild_id, "channels": {}, "tally": {},
+            }
+            self.state["event"] = event
+            self.save()
+
+            await interaction.response.send_message(
+                f"**{clean_name}** begins now, for {minutes} minute(s).", ephemeral=True)
+
+            intro = discord.Embed(
+                title=f"⚔️ {clean_name}",
+                description=self.rng.choice(ATTACK_INTRO) +
+                            f"\n\nWaves keep coming for the next {minutes} minute(s).",
+                color=EVENT_COLOR,
+            )
+            for cid in pool:
+                channel = await self._get_channel(cid)
+                if channel is None:
+                    continue
+                try:
+                    await channel.send(embed=intro)
+                except discord.HTTPException:
+                    continue
+
+            await self._spawn_wave(event)
+
+    @group.command(name="eventend", description="(staff) End the running event early and tally it up.")
+    async def eventend(self, interaction: discord.Interaction):
+        if not await self._staff(interaction):
+            return
+        async with self.lock:
+            event = self._clear_event()
+        if not event:
+            await interaction.response.send_message("Nothing is running right now.", ephemeral=True)
+            return
+        await interaction.response.send_message(f"**{event['name']}** ended early.", ephemeral=True)
+        await self._finalize_event(event)
+
+    @group.command(name="eventstatus", description="(staff) How the current event is going.")
+    async def eventstatus(self, interaction: discord.Interaction):
+        if not await self._staff(interaction):
+            return
+        event = self.state.get("event")
+        if not event:
+            await interaction.response.send_message("Nothing running right now.", ephemeral=True)
+            return
+        remaining = max(0, int(event["ends_at"] - time.time()))
+        mins, secs = divmod(remaining, 60)
+        tally = sorted(event.get("tally", {}).items(), key=lambda kv: -kv[1].get("rep", 0))
+        lines = [
+            f"**{event['name']}** - {mins}m {secs}s left.",
+            f"{len(event.get('channels', {}))} monster(s) out right now.",
+        ]
+        if tally:
+            lines.append("")
+            lines += [f"<@{uid}>: **{e['rep']}** rep, {e['kills']} kill(s)" for uid, e in tally[:10]]
+        else:
+            lines.append("Nobody's landed a hit yet.")
+        embed = discord.Embed(title="⚔️ Event status", description="\n".join(lines), color=EVENT_COLOR)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 

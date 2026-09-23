@@ -104,9 +104,18 @@ HELP = {
             ("world give", "Put an item in someone's satchel."),
             ("world channel", "Set the channel a place lives in."),
             ("world reload", "Reload the places' writing without restarting."),
-            ("dementor channels", "Set the 4 channels a dementor can appear in."),
-            ("dementor summon", "Make a dementor appear right now."),
+        ],
+    },
+    "staff_threats": {
+        "title": "Staff — wild threats",
+        "staff": True,
+        "entries": [
+            ("dementor channels", "Set the 4 channels a wild threat can appear in."),
+            ("dementor summon", "Make one appear right now (any creature, or a dementor)."),
             ("dementor status", "What's configured and what's active."),
+            ("dementor eventstart", "Start 'Attack on Velmora' - monsters flood every channel."),
+            ("dementor eventend", "End the running event early and tally it up."),
+            ("dementor eventstatus", "How the current event is going."),
         ],
     },
     "staff_reactionroles": {
