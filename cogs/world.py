@@ -55,7 +55,7 @@ PLACE_CHOICES = [
 DANGEROUS_PLACES = {"dungeons", "forbidden_woods"}
 MONSTER_CHANCE = 0.20
 
-DEFAULT_LIMITS = {"explore": 5, "forage": 3}
+DEFAULT_LIMITS = {"explore": 10, "forage": 5}
 HERE_MINUTES = 60          # how long you count as "in" a place after exploring it
 GREEN, NIGHT_COLOR = 0x3E8E5A, 0x2B3A2E
 EVENT_CHOICES = [
