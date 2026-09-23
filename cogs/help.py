@@ -109,6 +109,19 @@ HELP = {
             ("dementor status", "What's configured and what's active."),
         ],
     },
+    "staff_reactionroles": {
+        "title": "Staff — reaction roles",
+        "staff": True,
+        "note": "Reacting to the sign-up post hands out a role. One pick per row.",
+        "entries": [
+            ("reactionroles addstatus", "Add a Champion/Alumni-style reaction role."),
+            ("reactionroles addhouse", "Add a house to the sign-up (reuses /sethouserole)."),
+            ("reactionroles remove", "Drop an emoji from the sign-up."),
+            ("reactionroles post", "Publish the sign-up message and react to it."),
+            ("reactionroles config", "What's configured for the sign-up."),
+            ("reactionroles setmember", "Set someone's role by hand."),
+        ],
+    },
     "staff_setup": {
         "title": "Staff — setup",
         "staff": True,
