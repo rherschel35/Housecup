@@ -307,6 +307,21 @@ class Dementors(commands.Cog):
         log.info("A %s appeared in channel %s", creature_id, channel_id)
         return channel
 
+    async def try_ambient_spawn(self, channel_id: int, creature_id: str = None) -> bool:
+        """Let another cog (right now: searching the Dungeons or the
+        Forbidden Woods) try to drop a Wild Threat into a specific channel
+        on the spot. Refuses quietly - no error, just nothing happens - if
+        something's already loose or an event is running, so it never
+        steals the encounter out from under another channel."""
+        async with self.lock:
+            if self.state.get("active") or self.state.get("event"):
+                return False
+            # Unlike a manual /dementor summon, an ambient trigger like this
+            # should draw from the whole weighted roster, not default to a
+            # plain Dementor.
+            landed = await self.spawn(channel_id, creature_id or self._roll_creature())
+        return bool(landed)
+
     def _roll_creature(self) -> str:
         keys = list(SPAWN_WEIGHTS.keys())
         weights = [SPAWN_WEIGHTS[k] for k in keys]

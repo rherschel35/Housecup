@@ -36,8 +36,24 @@ STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "world_state.json"
 
 # Places that exist. Add a line here when a new place is written.
-PLACES = {"garden": "garden.json"}
-PLACE_CHOICES = [app_commands.Choice(name="🌿 The Garden", value="garden")]
+PLACES = {
+    "garden": "garden.json",
+    "library": "library.json",
+    "dungeons": "dungeons.json",
+    "observatory": "observatory.json",
+    "forbidden_woods": "forbidden_woods.json",
+}
+PLACE_CHOICES = [
+    app_commands.Choice(name="🌿 The Garden", value="garden"),
+    app_commands.Choice(name="📚 The Library", value="library"),
+    app_commands.Choice(name="🕯️ The Dungeons", value="dungeons"),
+    app_commands.Choice(name="🔭 The Observatory", value="observatory"),
+    app_commands.Choice(name="🌲 The Forbidden Woods", value="forbidden_woods"),
+]
+
+# Places where searching around risks a Wild Threat showing up right there.
+DANGEROUS_PLACES = {"dungeons", "forbidden_woods"}
+MONSTER_CHANCE = 0.20
 
 DEFAULT_LIMITS = {"explore": 5, "forage": 3}
 HERE_MINUTES = 60          # how long you count as "in" a place after exploring it
@@ -224,6 +240,18 @@ class WorldCog(commands.Cog, name="World"):
             return f"\n\n✨ **+{delta}** for {h['emoji']} {h['name']}."
         return f"\n\n🥀 **{delta}** from {h['emoji']} {h['name']}. It was noticed."
 
+    async def maybe_spawn_monster(self, place: str, channel_id: int) -> bool:
+        """Searching somewhere dangerous risks a Wild Threat turning up right
+        there. Quietly does nothing if that place isn't dangerous, the roll
+        misses, the Dementors cog isn't loaded, or something's already loose
+        (never steals an encounter out from under another channel)."""
+        if place not in DANGEROUS_PLACES or self.world.rng.random() >= MONSTER_CHANCE:
+            return False
+        dementors = self.bot.get_cog("Dementors")
+        if not dementors:
+            return False
+        return await dementors.try_ambient_spawn(channel_id)
+
     # ------------------------------------------------------------ player commands
 
     @app_commands.command(name="explore", description="Go somewhere in Velmora and see what you find.")
@@ -252,6 +280,9 @@ class WorldCog(commands.Cog, name="World"):
                                   f"🌿 found something rare in {P.name}")
         if reveal:
             text += f"\n\n{reveal}"
+        monster = await self.maybe_spawn_monster(place, interaction.channel_id)
+        if monster:
+            text += "\n\n⚠️ Something else was already here. Better have a spell ready."
         embed = self.embed(text, f"{interaction.user.display_name} explores {P.name}"
                            + (" by moonlight" if enc["night"] else ""), enc["night"])
         embed.set_footer(text=f"Visits left today: {left}")
@@ -308,6 +339,9 @@ class WorldCog(commands.Cog, name="World"):
             text += f"\n*{RARITY_LABEL[it['rarity']]}* - {it['desc']}"
         text += await self.points(ctx.student, interaction.user, self.world.reward_points(res["item"]),
                                   f"🌱 foraged something rare in {P.name}")
+        monster = await self.maybe_spawn_monster(place, interaction.channel_id)
+        if monster:
+            text += "\n\n⚠️ Something else was already here. Better have a spell ready."
         embed = self.embed(text, f"{interaction.user.display_name} forages in {P.name}")
         embed.set_footer(text=f"Searches left today: {left}")
         await interaction.response.send_message(embed=embed)
