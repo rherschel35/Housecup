@@ -1,242 +1,416 @@
 {
- "moonbloom_petal": {
-  "name": "Moonbloom Petal",
-  "emoji": "🌸",
-  "rarity": "uncommon",
-  "desc": "Glows faintly when nobody is looking at it."
- },
- "silverleaf": {
-  "name": "Silverleaf",
-  "emoji": "🌿",
-  "rarity": "common",
-  "desc": "Leaves that ring like tiny bells when shaken."
- },
- "dewmint": {
-  "name": "Dewmint",
-  "emoji": "🌿",
-  "rarity": "common",
-  "desc": "Always damp, even in a drought."
- },
- "whisperwort": {
-  "name": "Whisperwort",
-  "emoji": "🌿",
-  "rarity": "uncommon",
-  "desc": "Hold it to your ear and it repeats the last thing said nearby."
- },
- "starthistle": {
-  "name": "Starthistle",
-  "emoji": "✨",
-  "rarity": "rare",
-  "desc": "Its spines point north at night."
- },
- "hushroot": {
-  "name": "Hushroot",
-  "emoji": "🌱",
-  "rarity": "uncommon",
-  "desc": "Muffles every sound around it for a heartbeat."
- },
- "emberleaf": {
-  "name": "Emberleaf",
-  "emoji": "🍂",
-  "rarity": "common",
-  "desc": "Warm to the touch, like it remembers summer."
- },
- "thornsalt": {
-  "name": "Thornsalt",
-  "emoji": "🧂",
-  "rarity": "uncommon",
-  "desc": "Crystals scraped from the old rose thorns."
- },
- "fairy_ring_cap": {
-  "name": "Fairy-Ring Cap",
-  "emoji": "🍄",
-  "rarity": "common",
-  "desc": "Grows in circles. Never step inside the circle."
- },
- "glowshroom": {
-  "name": "Glowshroom",
-  "emoji": "🍄",
-  "rarity": "uncommon",
-  "desc": "A soft blue lantern that sprouted from the dark."
- },
- "inkcap": {
-  "name": "Weeping Inkcap",
-  "emoji": "🍄",
-  "rarity": "uncommon",
-  "desc": "Drips ink that writes on its own if you leave it."
- },
- "hollow_morel": {
-  "name": "Hollow Morel",
-  "emoji": "🍄",
-  "rarity": "rare",
-  "desc": "Blow through it and it plays one note, always the same one."
- },
- "cracked_crystal": {
-  "name": "Cracked Crystal",
-  "emoji": "💎",
-  "rarity": "common",
-  "desc": "Something inside it moved once. Probably."
- },
- "moonstone_chip": {
-  "name": "Moonstone Chip",
-  "emoji": "💎",
-  "rarity": "uncommon",
-  "desc": "Cold at noon, warm at midnight."
- },
- "dew_diamond": {
-  "name": "Dew Diamond",
-  "emoji": "💎",
-  "rarity": "rare",
-  "desc": "A single drop of morning dew that refused to fall."
- },
- "tree_amber": {
-  "name": "Heart-Amber",
-  "emoji": "🟠",
-  "rarity": "very_rare",
-  "desc": "Sap from the Ancient Tree. There's something tiny caught inside."
- },
- "black_rose": {
-  "name": "Black Rose",
-  "emoji": "🥀",
-  "rarity": "rare",
-  "desc": "Only blooms when every other flower goes dark."
- },
- "sunbell": {
-  "name": "Sunbell",
-  "emoji": "🌼",
-  "rarity": "common",
-  "desc": "Rings once at sunrise. Loudly."
- },
- "veil_lily": {
-  "name": "Veil Lily",
-  "emoji": "🌷",
-  "rarity": "uncommon",
-  "desc": "Its petals are see-through if you squint."
- },
- "ghost_orchid": {
-  "name": "Ghost Orchid",
-  "emoji": "🤍",
-  "rarity": "very_rare",
-  "desc": "Appears in your hand. You don't remember picking it."
- },
- "wandering_seed": {
-  "name": "Wandering Seed",
-  "emoji": "🌱",
-  "rarity": "common",
-  "desc": "Never where you left it."
- },
- "starseed": {
-  "name": "Starseed",
-  "emoji": "🌟",
-  "rarity": "rare",
-  "desc": "Planted, it would grow toward the stars instead of the sun."
- },
- "sleeping_acorn": {
-  "name": "Sleeping Acorn",
-  "emoji": "🌰",
-  "rarity": "uncommon",
-  "desc": "Snores, very softly."
- },
- "moth_dust": {
-  "name": "Moth Dust",
-  "emoji": "🦋",
-  "rarity": "common",
-  "desc": "Silver powder from a moon moth's wings."
- },
- "sprite_thread": {
-  "name": "Sprite Thread",
-  "emoji": "🧵",
-  "rarity": "uncommon",
-  "desc": "Finer than hair, stronger than rope."
- },
- "dragon_scale": {
-  "name": "Tiny Dragon Scale",
-  "emoji": "🐉",
-  "rarity": "rare",
-  "desc": "Warm, and slightly smug."
- },
- "frog_gold": {
-  "name": "Golden Frog Scale",
-  "emoji": "🐸",
-  "rarity": "very_rare",
-  "desc": "Worth a fortune to the right frog."
- },
- "owl_feather": {
-  "name": "Barn-Owl Feather",
-  "emoji": "🪶",
-  "rarity": "common",
-  "desc": "Makes no sound at all when it falls."
- },
- "heron_plume": {
-  "name": "Grey Heron Plume",
-  "emoji": "🪶",
-  "rarity": "uncommon",
-  "desc": "Points toward still water."
- },
- "phoenix_down": {
-  "name": "Phoenix Down",
-  "emoji": "🔥",
-  "rarity": "legendary",
-  "desc": "Nobody has seen a phoenix in the Garden. Nobody."
- },
- "hare_whisker": {
-  "name": "Moon-Hare Whisker",
-  "emoji": "🐇",
-  "rarity": "uncommon",
-  "desc": "Twitches when rain is coming."
- },
- "snail_pearl": {
-  "name": "Snail Pearl",
-  "emoji": "⚪",
-  "rarity": "rare",
-  "desc": "The snail was very reluctant to give this up."
- },
- "unknown_husk": {
-  "name": "Unidentified Husk",
-  "emoji": "👀",
-  "rarity": "rare",
-  "desc": "Whatever wore this is bigger now."
- },
- "strange_key": {
-  "name": "Strange Key",
-  "emoji": "🗝️",
-  "rarity": "very_rare",
-  "desc": "It fits nothing. Yet."
- },
- "pressed_letter": {
-  "name": "Pressed Letter",
-  "emoji": "📜",
-  "rarity": "uncommon",
-  "desc": "A love letter pressed flat in an old book. The names are smudged."
- },
- "pool_water": {
-  "name": "Vial of Pool Water",
-  "emoji": "💧",
-  "rarity": "uncommon",
-  "desc": "Your reflection in it is a second late."
- },
- "tree_bark": {
-  "name": "Heartwood Bark",
-  "emoji": "🪵",
-  "rarity": "uncommon",
-  "desc": "Still has a pulse, if you listen."
- },
- "lost_button": {
-  "name": "Somebody's Button",
-  "emoji": "🔘",
-  "rarity": "common",
-  "desc": "Brass. Engraved with a V."
- },
- "map_scrap": {
-  "name": "Map Scrap",
-  "emoji": "🗺️",
-  "rarity": "rare",
-  "desc": "Shows a path in the Garden nobody has walked."
- },
- "prophecy_leaf": {
-  "name": "Prophecy Leaf",
-  "emoji": "🍃",
-  "rarity": "rare",
-  "desc": "There are words in the veins. They change."
- }
+  "moonbloom_petal": {
+    "name": "Moonbloom Petal",
+    "emoji": "🌸",
+    "rarity": "uncommon",
+    "desc": "Glows faintly when nobody is looking at it."
+  },
+  "silverleaf": {
+    "name": "Silverleaf",
+    "emoji": "🌿",
+    "rarity": "common",
+    "desc": "Leaves that ring like tiny bells when shaken."
+  },
+  "dewmint": {
+    "name": "Dewmint",
+    "emoji": "🌿",
+    "rarity": "common",
+    "desc": "Always damp, even in a drought."
+  },
+  "whisperwort": {
+    "name": "Whisperwort",
+    "emoji": "🌿",
+    "rarity": "uncommon",
+    "desc": "Hold it to your ear and it repeats the last thing said nearby."
+  },
+  "starthistle": {
+    "name": "Starthistle",
+    "emoji": "✨",
+    "rarity": "rare",
+    "desc": "Its spines point north at night."
+  },
+  "hushroot": {
+    "name": "Hushroot",
+    "emoji": "🌱",
+    "rarity": "uncommon",
+    "desc": "Muffles every sound around it for a heartbeat."
+  },
+  "emberleaf": {
+    "name": "Emberleaf",
+    "emoji": "🍂",
+    "rarity": "common",
+    "desc": "Warm to the touch, like it remembers summer."
+  },
+  "thornsalt": {
+    "name": "Thornsalt",
+    "emoji": "🧂",
+    "rarity": "uncommon",
+    "desc": "Crystals scraped from the old rose thorns."
+  },
+  "fairy_ring_cap": {
+    "name": "Fairy-Ring Cap",
+    "emoji": "🍄",
+    "rarity": "common",
+    "desc": "Grows in circles. Never step inside the circle."
+  },
+  "glowshroom": {
+    "name": "Glowshroom",
+    "emoji": "🍄",
+    "rarity": "uncommon",
+    "desc": "A soft blue lantern that sprouted from the dark."
+  },
+  "inkcap": {
+    "name": "Weeping Inkcap",
+    "emoji": "🍄",
+    "rarity": "uncommon",
+    "desc": "Drips ink that writes on its own if you leave it."
+  },
+  "hollow_morel": {
+    "name": "Hollow Morel",
+    "emoji": "🍄",
+    "rarity": "rare",
+    "desc": "Blow through it and it plays one note, always the same one."
+  },
+  "cracked_crystal": {
+    "name": "Cracked Crystal",
+    "emoji": "💎",
+    "rarity": "common",
+    "desc": "Something inside it moved once. Probably."
+  },
+  "moonstone_chip": {
+    "name": "Moonstone Chip",
+    "emoji": "💎",
+    "rarity": "uncommon",
+    "desc": "Cold at noon, warm at midnight."
+  },
+  "dew_diamond": {
+    "name": "Dew Diamond",
+    "emoji": "💎",
+    "rarity": "rare",
+    "desc": "A single drop of morning dew that refused to fall."
+  },
+  "tree_amber": {
+    "name": "Heart-Amber",
+    "emoji": "🟠",
+    "rarity": "very_rare",
+    "desc": "Sap from the Ancient Tree. There's something tiny caught inside."
+  },
+  "black_rose": {
+    "name": "Black Rose",
+    "emoji": "🥀",
+    "rarity": "rare",
+    "desc": "Only blooms when every other flower goes dark."
+  },
+  "sunbell": {
+    "name": "Sunbell",
+    "emoji": "🌼",
+    "rarity": "common",
+    "desc": "Rings once at sunrise. Loudly."
+  },
+  "veil_lily": {
+    "name": "Veil Lily",
+    "emoji": "🌷",
+    "rarity": "uncommon",
+    "desc": "Its petals are see-through if you squint."
+  },
+  "ghost_orchid": {
+    "name": "Ghost Orchid",
+    "emoji": "🤍",
+    "rarity": "very_rare",
+    "desc": "Appears in your hand. You don't remember picking it."
+  },
+  "wandering_seed": {
+    "name": "Wandering Seed",
+    "emoji": "🌱",
+    "rarity": "common",
+    "desc": "Never where you left it."
+  },
+  "starseed": {
+    "name": "Starseed",
+    "emoji": "🌟",
+    "rarity": "rare",
+    "desc": "Planted, it would grow toward the stars instead of the sun."
+  },
+  "sleeping_acorn": {
+    "name": "Sleeping Acorn",
+    "emoji": "🌰",
+    "rarity": "uncommon",
+    "desc": "Snores, very softly."
+  },
+  "moth_dust": {
+    "name": "Moth Dust",
+    "emoji": "🦋",
+    "rarity": "common",
+    "desc": "Silver powder from a moon moth's wings."
+  },
+  "sprite_thread": {
+    "name": "Sprite Thread",
+    "emoji": "🧵",
+    "rarity": "uncommon",
+    "desc": "Finer than hair, stronger than rope."
+  },
+  "dragon_scale": {
+    "name": "Tiny Dragon Scale",
+    "emoji": "🐉",
+    "rarity": "rare",
+    "desc": "Warm, and slightly smug."
+  },
+  "frog_gold": {
+    "name": "Golden Frog Scale",
+    "emoji": "🐸",
+    "rarity": "very_rare",
+    "desc": "Worth a fortune to the right frog."
+  },
+  "owl_feather": {
+    "name": "Barn-Owl Feather",
+    "emoji": "🪶",
+    "rarity": "common",
+    "desc": "Makes no sound at all when it falls."
+  },
+  "heron_plume": {
+    "name": "Grey Heron Plume",
+    "emoji": "🪶",
+    "rarity": "uncommon",
+    "desc": "Points toward still water."
+  },
+  "phoenix_down": {
+    "name": "Phoenix Down",
+    "emoji": "🔥",
+    "rarity": "legendary",
+    "desc": "Nobody has seen a phoenix in the Garden. Nobody."
+  },
+  "hare_whisker": {
+    "name": "Moon-Hare Whisker",
+    "emoji": "🐇",
+    "rarity": "uncommon",
+    "desc": "Twitches when rain is coming."
+  },
+  "snail_pearl": {
+    "name": "Snail Pearl",
+    "emoji": "⚪",
+    "rarity": "rare",
+    "desc": "The snail was very reluctant to give this up."
+  },
+  "unknown_husk": {
+    "name": "Unidentified Husk",
+    "emoji": "👀",
+    "rarity": "rare",
+    "desc": "Whatever wore this is bigger now."
+  },
+  "strange_key": {
+    "name": "Strange Key",
+    "emoji": "🗝️",
+    "rarity": "very_rare",
+    "desc": "It fits nothing. Yet."
+  },
+  "pressed_letter": {
+    "name": "Pressed Letter",
+    "emoji": "📜",
+    "rarity": "uncommon",
+    "desc": "A love letter pressed flat in an old book. The names are smudged."
+  },
+  "pool_water": {
+    "name": "Vial of Pool Water",
+    "emoji": "💧",
+    "rarity": "uncommon",
+    "desc": "Your reflection in it is a second late."
+  },
+  "tree_bark": {
+    "name": "Heartwood Bark",
+    "emoji": "🪵",
+    "rarity": "uncommon",
+    "desc": "Still has a pulse, if you listen."
+  },
+  "lost_button": {
+    "name": "Somebody's Button",
+    "emoji": "🔘",
+    "rarity": "common",
+    "desc": "Brass. Engraved with a V."
+  },
+  "map_scrap": {
+    "name": "Map Scrap",
+    "emoji": "🗺️",
+    "rarity": "rare",
+    "desc": "Shows a path in the Garden nobody has walked."
+  },
+  "prophecy_leaf": {
+    "name": "Prophecy Leaf",
+    "emoji": "🍃",
+    "rarity": "rare",
+    "desc": "There are words in the veins. They change."
+  },
+  "overdue_slip": {
+    "name": "Overdue Slip",
+    "emoji": "🧾",
+    "rarity": "common",
+    "desc": "A notice for a book that was due back before you were born."
+  },
+  "marginalia_scrap": {
+    "name": "Marginalia Scrap",
+    "emoji": "📄",
+    "rarity": "common",
+    "desc": "A torn page corner, scribbled with someone else's homework answers."
+  },
+  "pressed_violet": {
+    "name": "Pressed Violet",
+    "emoji": "🌸",
+    "rarity": "common",
+    "desc": "Found between two pages of something nobody's checked out in years."
+  },
+  "dust_of_forgotten_words": {
+    "name": "Dust of Forgotten Words",
+    "emoji": "✨",
+    "rarity": "common",
+    "desc": "Swept from a shelf nobody dusts. Smells like old paper."
+  },
+  "inkmoth_wing": {
+    "name": "Inkmoth Wing",
+    "emoji": "🦋",
+    "rarity": "uncommon",
+    "desc": "Feeds on spilled ink instead of light. Still faintly warm."
+  },
+  "self_inking_nib": {
+    "name": "Self-Inking Nib",
+    "emoji": "🖋️",
+    "rarity": "uncommon",
+    "desc": "Writes on its own if you're not paying attention."
+  },
+  "memory_bookmark": {
+    "name": "Memory Bookmark",
+    "emoji": "🔖",
+    "rarity": "rare",
+    "desc": "Remembers the last page you meant to return to, even if you don't."
+  },
+  "locked_diary": {
+    "name": "Locked Diary",
+    "emoji": "📔",
+    "rarity": "very_rare",
+    "desc": "It won't open for you. It won't open for anyone, probably."
+  },
+  "rusted_key": {
+    "name": "Rusted Key",
+    "emoji": "🗝️",
+    "rarity": "common",
+    "desc": "Fits a lock that isn't here anymore."
+  },
+  "manacle_link": {
+    "name": "Manacle Link",
+    "emoji": "⛓️",
+    "rarity": "common",
+    "desc": "A single link, worn smooth by something that pulled at it for a long time."
+  },
+  "cellar_moss": {
+    "name": "Cellar Moss",
+    "emoji": "🍀",
+    "rarity": "common",
+    "desc": "Glows faintly green in the dark. Cold to the touch."
+  },
+  "dead_currency_coin": {
+    "name": "Dead Currency Coin",
+    "emoji": "🪙",
+    "rarity": "uncommon",
+    "desc": "A coin from a kingdom that doesn't exist anymore."
+  },
+  "chalk_of_shadows": {
+    "name": "Chalk of Shadows",
+    "emoji": "🩶",
+    "rarity": "uncommon",
+    "desc": "Only writes where the light doesn't reach."
+  },
+  "shackle_dust": {
+    "name": "Shackle Dust",
+    "emoji": "⚙️",
+    "rarity": "rare",
+    "desc": "Scraped from a cell wall. Something was counting the days here."
+  },
+  "forgotten_shrine_ash": {
+    "name": "Forgotten Shrine Ash",
+    "emoji": "🕯️",
+    "rarity": "very_rare",
+    "desc": "Cold ash from an altar nobody remembers building."
+  },
+  "star_chart_fragment": {
+    "name": "Star Chart Fragment",
+    "emoji": "🗺️",
+    "rarity": "common",
+    "desc": "A torn corner of a chart, pointing at nothing you recognize."
+  },
+  "broken_compass": {
+    "name": "Broken Compass",
+    "emoji": "🧭",
+    "rarity": "common",
+    "desc": "Every needle it's ever had points somewhere different."
+  },
+  "orrery_gear": {
+    "name": "Orrery Gear",
+    "emoji": "⚙️",
+    "rarity": "common",
+    "desc": "A single brass gear from a model of the sky that no longer turns."
+  },
+  "meteorite_sliver": {
+    "name": "Meteorite Sliver",
+    "emoji": "☄️",
+    "rarity": "uncommon",
+    "desc": "Still faintly warm, years later."
+  },
+  "moonglass_lens": {
+    "name": "Moonglass Lens",
+    "emoji": "🔭",
+    "rarity": "uncommon",
+    "desc": "Looking through it, the stars seem a little closer."
+  },
+  "comet_dust_vial": {
+    "name": "Comet Dust Vial",
+    "emoji": "🌠",
+    "rarity": "rare",
+    "desc": "Collected mid-fall. Nobody's quite sure how."
+  },
+  "stardust_ledger_page": {
+    "name": "Stardust Ledger Page",
+    "emoji": "📜",
+    "rarity": "very_rare",
+    "desc": "A page of handwritten star positions that don't match any known sky."
+  },
+  "raven_feather": {
+    "name": "Raven Feather",
+    "emoji": "🪶",
+    "rarity": "common",
+    "desc": "Still faintly warm. The raven that dropped it was watching you."
+  },
+  "blackened_acorn": {
+    "name": "Blackened Acorn",
+    "emoji": "🌰",
+    "rarity": "common",
+    "desc": "Never sprouted. Never will. Still, something planted it here on purpose."
+  },
+  "standing_stone_chip": {
+    "name": "Standing Stone Chip",
+    "emoji": "🪨",
+    "rarity": "common",
+    "desc": "A flake from one of the stones nobody remembers arranging."
+  },
+  "shed_fang": {
+    "name": "Shed Fang",
+    "emoji": "🦷",
+    "rarity": "uncommon",
+    "desc": "Long, curved, and definitely not from anything you'd want to meet."
+  },
+  "root_charm": {
+    "name": "Root Charm",
+    "emoji": "🪢",
+    "rarity": "uncommon",
+    "desc": "A knot of roots tied by hand - or something with hands."
+  },
+  "witchlight_oil": {
+    "name": "Witchlight Oil",
+    "emoji": "🔵",
+    "rarity": "rare",
+    "desc": "Burns with a cold blue flame that casts no heat."
+  },
+  "moss_of_silence": {
+    "name": "Moss of Silence",
+    "emoji": "🌫️",
+    "rarity": "very_rare",
+    "desc": "Sound doesn't seem to travel near it."
+  }
 }

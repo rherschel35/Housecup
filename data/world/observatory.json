@@ -1,0 +1,672 @@
+{
+  "name": "the Observatory",
+  "title": "🔭 The Observatory",
+  "blurb": "The tallest tower on the grounds, full of star charts, broken instruments, and a sky that doesn't always match the one printed in the atlases.",
+  "item_ids": [
+    "star_chart_fragment",
+    "meteorite_sliver",
+    "orrery_gear",
+    "comet_dust_vial",
+    "broken_compass",
+    "stardust_ledger_page",
+    "moonglass_lens"
+  ],
+  "areas": [
+    {
+      "id": "main_deck",
+      "at": "on the main viewing deck",
+      "zones": [
+        "any",
+        "deck"
+      ],
+      "time": "any",
+      "drops": [
+        "star_chart_fragment",
+        "broken_compass"
+      ]
+    },
+    {
+      "id": "star_charts",
+      "at": "among the hanging star charts",
+      "zones": [
+        "any",
+        "charts"
+      ],
+      "time": "any",
+      "drops": [
+        "star_chart_fragment",
+        "stardust_ledger_page"
+      ]
+    },
+    {
+      "id": "broken_orrery",
+      "at": "beside the broken orrery",
+      "zones": [
+        "any",
+        "instruments"
+      ],
+      "time": "any",
+      "drops": [
+        "orrery_gear",
+        "broken_compass"
+      ]
+    },
+    {
+      "id": "comet_balcony",
+      "at": "on the comet-watching balcony",
+      "zones": [
+        "any",
+        "deck"
+      ],
+      "time": "night",
+      "drops": [
+        "comet_dust_vial",
+        "meteorite_sliver"
+      ]
+    },
+    {
+      "id": "lens_workshop",
+      "at": "in the lens-grinding workshop",
+      "zones": [
+        "any",
+        "instruments"
+      ],
+      "time": "any",
+      "drops": [
+        "moonglass_lens",
+        "orrery_gear"
+      ]
+    },
+    {
+      "id": "dusty_atlas_shelf",
+      "at": "beside the shelf of dusty star atlases",
+      "zones": [
+        "any",
+        "charts"
+      ],
+      "time": "any",
+      "drops": [
+        "star_chart_fragment",
+        "stardust_ledger_page"
+      ]
+    },
+    {
+      "id": "meteor_catcher",
+      "at": "under the meteor-dust catchers on the roof",
+      "zones": [
+        "any",
+        "deck"
+      ],
+      "time": "night",
+      "drops": [
+        "meteorite_sliver",
+        "comet_dust_vial"
+      ]
+    },
+    {
+      "id": "spiral_stair",
+      "at": "on the spiral stair up to the dome",
+      "zones": [
+        "any",
+        "instruments"
+      ],
+      "time": "any",
+      "drops": [
+        "broken_compass",
+        "orrery_gear"
+      ]
+    },
+    {
+      "id": "old_telescope",
+      "at": "beside the oldest telescope in the tower",
+      "zones": [
+        "any",
+        "instruments"
+      ],
+      "time": "any",
+      "drops": [
+        "moonglass_lens",
+        "meteorite_sliver"
+      ]
+    }
+  ],
+  "atmospheres": [
+    {
+      "id": "atm0",
+      "text": "The dome overhead is open to a sky absolutely full of stars.",
+      "mood": "bright",
+      "time": "night",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm1",
+      "text": "It's quiet up here, above whatever's happening in the rest of the castle.",
+      "mood": "calm",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm2",
+      "text": "A telescope somewhere nearby adjusts its own focus with a soft click.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm3",
+      "text": "The wind up here carries farther than it should, and colder.",
+      "mood": "eerie",
+      "time": "night",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm4",
+      "text": "Dust motes drift past, lit gold by a lamp that shouldn't reach this far.",
+      "mood": "calm",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm5",
+      "text": "Somewhere a chart rustles, though every window is closed.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm6",
+      "text": "The stars overhead seem, just slightly, not quite in their usual places.",
+      "mood": "eerie",
+      "time": "night",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm7",
+      "text": "A comfortable hush fills the tower, like the sky itself is listening.",
+      "mood": "quiet",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    }
+  ],
+  "creatures": [
+    {
+      "id": "stray_owl",
+      "a": "a stray owl, perched and watching you work",
+      "the": "the owl",
+      "kind": "flier",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "moods": [
+        "calm",
+        "quiet"
+      ],
+      "drops": [
+        "star_chart_fragment"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "falling_star_wisp",
+      "a": "a wisp shaped exactly like a falling star, drifting rather than falling",
+      "the": "the wisp",
+      "kind": "flier",
+      "zones": [
+        "any"
+      ],
+      "time": "night",
+      "moods": [
+        "bright",
+        "eerie"
+      ],
+      "drops": [
+        "comet_dust_vial"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "redrawing_chart",
+      "a": "a star chart quietly redrawing its own lines",
+      "the": "the chart",
+      "kind": "reader",
+      "zones": [
+        "charts",
+        "any"
+      ],
+      "time": "any",
+      "moods": [
+        "eerie"
+      ],
+      "drops": [
+        "stardust_ledger_page"
+      ],
+      "rarity": "rare"
+    },
+    {
+      "id": "cleaning_ghost",
+      "a": "a sleepy shape polishing a telescope lens that's already spotless",
+      "the": "the shape",
+      "kind": "mover",
+      "zones": [
+        "instruments",
+        "any"
+      ],
+      "time": "night",
+      "moods": [
+        "eerie",
+        "calm"
+      ],
+      "drops": [
+        "moonglass_lens"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "orrery_moth",
+      "a": "a moth circling the broken orrery like it still turns",
+      "the": "the moth",
+      "kind": "flier",
+      "zones": [
+        "instruments",
+        "any"
+      ],
+      "time": "any",
+      "moods": [
+        "calm"
+      ],
+      "drops": [
+        "orrery_gear"
+      ],
+      "rarity": "common"
+    }
+  ],
+  "actions": [
+    {
+      "id": "act0",
+      "text": "perched above",
+      "kinds": [
+        "flier"
+      ]
+    },
+    {
+      "id": "act1",
+      "text": "circling",
+      "kinds": [
+        "flier"
+      ]
+    },
+    {
+      "id": "act2",
+      "text": "leafing through",
+      "kinds": [
+        "reader"
+      ]
+    },
+    {
+      "id": "act3",
+      "text": "polishing",
+      "kinds": [
+        "mover"
+      ]
+    },
+    {
+      "id": "act4",
+      "text": "drifting near",
+      "kinds": [
+        "flier",
+        "mover"
+      ]
+    }
+  ],
+  "objects": [
+    {
+      "id": "loose_gear",
+      "a": "a loose brass gear, still faintly warm",
+      "the": "the gear",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "orrery_gear"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "torn_chart",
+      "a": "a torn star chart pinned crookedly to the wall",
+      "the": "the chart",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "star_chart_fragment"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "cracked_lens",
+      "a": "a cracked lens, set aside but not thrown out",
+      "the": "the lens",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "moonglass_lens"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "dust_catcher_tray",
+      "a": "a tray of collected meteor dust, forgotten on a shelf",
+      "the": "the tray",
+      "zones": [
+        "deck",
+        "any"
+      ],
+      "drops": [
+        "meteorite_sliver"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "sealed_vial",
+      "a": "a sealed glass vial of something that glitters faintly",
+      "the": "the vial",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "comet_dust_vial"
+      ],
+      "rarity": "rare"
+    }
+  ],
+  "discoveries": [
+    {
+      "id": "dis0",
+      "text": "a page of star positions that don't match any chart in the tower",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "stardust_ledger_page"
+      ],
+      "the": "the page"
+    },
+    {
+      "id": "dis1",
+      "text": "a compass needle spinning steadily, pointing at nothing in particular",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "broken_compass"
+      ],
+      "the": "the compass"
+    },
+    {
+      "id": "dis2",
+      "text": "a small potted star-flower, blooming out of season",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "star_chart_fragment"
+      ],
+      "plant": true,
+      "the": "the plant"
+    },
+    {
+      "id": "dis3",
+      "text": "a telescope already aimed at something, focused and waiting",
+      "zones": [
+        "instruments",
+        "any"
+      ],
+      "time": "night",
+      "drops": [
+        "moonglass_lens"
+      ],
+      "the": "the telescope"
+    },
+    {
+      "id": "dis4",
+      "text": "a gear from the orrery, spinning gently on its own on the floor",
+      "zones": [
+        "instruments",
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "orrery_gear"
+      ],
+      "the": "the gear"
+    },
+    {
+      "id": "dis5",
+      "text": "handwriting on the wall in a script nobody currently teaches",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "stardust_ledger_page"
+      ],
+      "the": "the writing"
+    }
+  ],
+  "outcomes": [
+    {
+      "id": "out0",
+      "text": "The sky overhead seems to arrange itself a little more clearly for you.",
+      "tones": [
+        "beloved",
+        "friendly"
+      ]
+    },
+    {
+      "id": "out1",
+      "text": "A telescope swings gently to point exactly where you were about to look.",
+      "tones": [
+        "beloved"
+      ]
+    },
+    {
+      "id": "out2",
+      "text": "The night stays calm and the stars stay put. Nothing unusual, tonight.",
+      "tones": [
+        "neutral",
+        "friendly"
+      ]
+    },
+    {
+      "id": "out3",
+      "text": "The wind settles, just for a moment, like the tower itself exhaled.",
+      "tones": [
+        "friendly"
+      ]
+    },
+    {
+      "id": "out4",
+      "text": "A chart flutters shut on its own as you approach.",
+      "tones": [
+        "wary"
+      ]
+    },
+    {
+      "id": "out5",
+      "text": "The compass needle spins hard, once, and then stills pointed straight at you.",
+      "tones": [
+        "wary",
+        "hostile"
+      ]
+    },
+    {
+      "id": "out6",
+      "text": "Every telescope in the room turns, very slightly, to follow you.",
+      "tones": [
+        "hostile"
+      ]
+    },
+    {
+      "id": "out7",
+      "text": "The stars overhead seem to dim, just for you, just for a second.",
+      "tones": [
+        "hostile"
+      ]
+    },
+    {
+      "id": "out8",
+      "text": "A cold gust rolls through the open dome, carrying no particular warning.",
+      "tones": [
+        "wary"
+      ]
+    },
+    {
+      "id": "out9",
+      "text": "You feel distinctly like something up there is taking notes on you.",
+      "tones": [
+        "wary"
+      ]
+    }
+  ],
+  "templates": [
+    {
+      "id": "tpl0",
+      "kind": "creature",
+      "text": "{Loc}, you notice {creature} {action} {object}.\n\n{atmos} {outcome}"
+    },
+    {
+      "id": "tpl1",
+      "kind": "creature",
+      "text": "{atmos}\n\n{Loc}, {creature} is {action} {object}. {outcome}"
+    },
+    {
+      "id": "tpl2",
+      "kind": "discovery",
+      "text": "{Loc}, you find {discovery}.\n\n{atmos} {outcome}"
+    },
+    {
+      "id": "tpl3",
+      "kind": "discovery",
+      "text": "{atmos}\n\n{Loc} you come across {discovery}. {outcome}"
+    },
+    {
+      "id": "tpl4",
+      "kind": "quiet",
+      "text": "{atmos}\n\n{Loc}, nothing else stirs. {outcome}"
+    }
+  ],
+  "forage_lines": [
+    "You search {loc} and turn up {item}.",
+    "Tucked {loc}, you find {item}.",
+    "{Loc}, half-buried in old star charts, is {item}.",
+    "You check a dusty shelf {loc} and come away with {item}.",
+    "Something glints faintly {loc} - {item}."
+  ],
+  "forage_empty": [
+    "You search {loc} and find nothing but old charts and cold air.",
+    "{Loc}, whatever was here has long since been catalogued and taken elsewhere.",
+    "You come away from {loc} empty-handed, staring at the sky instead."
+  ],
+  "choices": {
+    "feed": {
+      "label": "Feed it",
+      "emoji": "🍃"
+    },
+    "follow": {
+      "label": "Follow it",
+      "emoji": "👣"
+    },
+    "steal": {
+      "label": "Steal from it",
+      "emoji": "🫳"
+    },
+    "leave": {
+      "label": "Leave it be",
+      "emoji": "🕯️"
+    }
+  },
+  "plant_choices": {
+    "tend": {
+      "label": "Tend it",
+      "emoji": "🕯️"
+    },
+    "uproot": {
+      "label": "Uproot it",
+      "emoji": "🪓"
+    },
+    "leave": {
+      "label": "Leave it be",
+      "emoji": "🕯️"
+    }
+  },
+  "choice_lines": {
+    "feed_good": [
+      "{The} takes it with what might be gratitude, and leaves something in exchange."
+    ],
+    "feed_meh": [
+      "{The} isn't interested and goes back to what it was doing."
+    ],
+    "follow_good": [
+      "You follow {the} up a stair you didn't know was there, and it's worth the climb.",
+      "{The} leads you to a view of the sky you've never seen from here - then it's gone."
+    ],
+    "follow_lost": [
+      "You follow {the} in circles around the dome before giving up."
+    ],
+    "steal_good": [
+      "You take it quickly. {The} doesn't react at all. Somehow that's unsettling."
+    ],
+    "steal_caught": [
+      "{The} notices at once. You leave with nothing and a strange, watched feeling."
+    ],
+    "leave": [
+      "You leave {the} to its work and step back quietly.",
+      "You decide not to disturb it. The sky feels like it's watching either way."
+    ],
+    "tend": [
+      "You water the little star-flower and turn its pot toward the open dome."
+    ],
+    "uproot": [
+      "You pull it up. The soil beneath is oddly cold, like it remembers the sky."
+    ]
+  },
+  "offer_lines": {
+    "full": "The tower has had enough offerings left on its shelves for one day. Yours sits there, untouched.",
+    "warm": [
+      "Your offering catches starlight and seems, briefly, to glow.",
+      "The tower feels a little warmer toward you as you leave your offering."
+    ],
+    "cold": [
+      "Your offering just sits there under the open dome. Nothing comes for it.",
+      "The night takes it without any particular notice."
+    ]
+  },
+  "uses": [],
+  "rare_boost_events": [],
+  "event_drop_boost": {},
+  "reveals": {},
+  "events": [],
+  "secrets": []
+}

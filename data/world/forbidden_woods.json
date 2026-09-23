@@ -1,0 +1,699 @@
+{
+  "name": "the Forbidden Woods",
+  "title": "🌲 The Forbidden Woods",
+  "blurb": "Dense, tangled, and technically off the school grounds - which is exactly why half the school has been out here at least once. Not everything that lives out here is glad you came.",
+  "item_ids": [
+    "moss_of_silence",
+    "shed_fang",
+    "raven_feather",
+    "root_charm",
+    "blackened_acorn",
+    "standing_stone_chip",
+    "witchlight_oil"
+  ],
+  "areas": [
+    {
+      "id": "gnarled_treeline",
+      "at": "at the gnarled edge of the treeline",
+      "zones": [
+        "any",
+        "trees"
+      ],
+      "time": "any",
+      "drops": [
+        "blackened_acorn",
+        "raven_feather"
+      ]
+    },
+    {
+      "id": "misty_clearing",
+      "at": "in a clearing choked with low mist",
+      "zones": [
+        "any",
+        "clearing"
+      ],
+      "time": "any",
+      "drops": [
+        "root_charm",
+        "moss_of_silence"
+      ]
+    },
+    {
+      "id": "hunting_blind",
+      "at": "beside an old, half-collapsed hunting blind",
+      "zones": [
+        "any",
+        "trees"
+      ],
+      "time": "any",
+      "drops": [
+        "shed_fang",
+        "raven_feather"
+      ]
+    },
+    {
+      "id": "frozen_stream",
+      "at": "along a stream that's frozen despite the season",
+      "zones": [
+        "any",
+        "water"
+      ],
+      "time": "any",
+      "drops": [
+        "witchlight_oil",
+        "standing_stone_chip"
+      ]
+    },
+    {
+      "id": "standing_stones",
+      "at": "among a ring of standing stones",
+      "zones": [
+        "any",
+        "stones"
+      ],
+      "time": "any",
+      "drops": [
+        "standing_stone_chip",
+        "root_charm"
+      ]
+    },
+    {
+      "id": "hollow_log",
+      "at": "beside a hollow log big enough to crawl into",
+      "zones": [
+        "any",
+        "trees"
+      ],
+      "time": "any",
+      "drops": [
+        "blackened_acorn",
+        "shed_fang"
+      ]
+    },
+    {
+      "id": "deep_thicket",
+      "at": "pushing through a deep thicket of brambles",
+      "zones": [
+        "any",
+        "clearing"
+      ],
+      "time": "any",
+      "drops": [
+        "root_charm",
+        "raven_feather"
+      ]
+    },
+    {
+      "id": "old_shrine_stones",
+      "at": "at a cairn of old, mossy stones",
+      "zones": [
+        "any",
+        "stones"
+      ],
+      "time": "any",
+      "drops": [
+        "moss_of_silence",
+        "standing_stone_chip"
+      ]
+    },
+    {
+      "id": "wolf_trail",
+      "at": "along a trail of tracks too large to be a fox",
+      "zones": [
+        "any",
+        "trees"
+      ],
+      "time": "night",
+      "drops": [
+        "shed_fang",
+        "witchlight_oil"
+      ]
+    },
+    {
+      "id": "moonlit_pond",
+      "at": "at a black, still pond that reflects too many stars",
+      "zones": [
+        "any",
+        "water"
+      ],
+      "time": "night",
+      "drops": [
+        "witchlight_oil",
+        "moss_of_silence"
+      ]
+    }
+  ],
+  "atmospheres": [
+    {
+      "id": "atm0",
+      "text": "The trees here grow close enough to block out most of the sky.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm1",
+      "text": "Something rustles in the brambles and then goes still, deliberately.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm2",
+      "text": "The quiet out here has a different quality than the quiet at school.",
+      "mood": "quiet",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm3",
+      "text": "A cold mist clings to the ground, no higher than your knees.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm4",
+      "text": "Somewhere far off, something that might be a bird calls twice and stops.",
+      "mood": "eerie",
+      "time": "night",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm5",
+      "text": "Moonlight makes it down through the branches in thin, uneven strips.",
+      "mood": "calm",
+      "time": "night",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm6",
+      "text": "The wind moves the leaves in a pattern that isn't quite the wind.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm7",
+      "text": "For a moment, everything - insects, wind, birds - goes completely silent.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    }
+  ],
+  "creatures": [
+    {
+      "id": "many_tailed_fox",
+      "a": "a fox with, unmistakably, too many tails",
+      "the": "the fox",
+      "kind": "runner",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "moods": [
+        "eerie",
+        "calm"
+      ],
+      "drops": [
+        "shed_fang"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "whispering_brambles",
+      "a": "a thicket of brambles that seems to lean in as you pass",
+      "the": "the brambles",
+      "kind": "still",
+      "zones": [
+        "clearing",
+        "any"
+      ],
+      "time": "any",
+      "moods": [
+        "eerie"
+      ],
+      "drops": [
+        "root_charm"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "repeating_raven",
+      "a": "a raven repeating the last thing you said, badly",
+      "the": "the raven",
+      "kind": "flier",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "moods": [
+        "eerie",
+        "calm"
+      ],
+      "drops": [
+        "raven_feather"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "fungus_ring_lights",
+      "a": "a ring of glowing fungus, pulsing very slightly",
+      "the": "the ring",
+      "kind": "still",
+      "zones": [
+        "any"
+      ],
+      "time": "night",
+      "moods": [
+        "eerie",
+        "bright"
+      ],
+      "drops": [
+        "moss_of_silence"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "wolf_shape",
+      "a": "something wolf-shaped, watching from just beyond the treeline",
+      "the": "the shape",
+      "kind": "runner",
+      "zones": [
+        "trees",
+        "any"
+      ],
+      "time": "night",
+      "moods": [
+        "eerie"
+      ],
+      "drops": [
+        "shed_fang"
+      ],
+      "rarity": "rare"
+    }
+  ],
+  "actions": [
+    {
+      "id": "act0",
+      "text": "darting behind",
+      "kinds": [
+        "runner"
+      ]
+    },
+    {
+      "id": "act1",
+      "text": "leaning toward",
+      "kinds": [
+        "still"
+      ]
+    },
+    {
+      "id": "act2",
+      "text": "circling",
+      "kinds": [
+        "flier",
+        "runner"
+      ]
+    },
+    {
+      "id": "act3",
+      "text": "pulsing beside",
+      "kinds": [
+        "still"
+      ]
+    },
+    {
+      "id": "act4",
+      "text": "watching from beyond",
+      "kinds": [
+        "runner",
+        "still"
+      ]
+    }
+  ],
+  "objects": [
+    {
+      "id": "carved_bark",
+      "a": "bark carved with symbols you don't recognize",
+      "the": "the carving",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "root_charm"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "old_snare",
+      "a": "an old snare, long since rusted and empty",
+      "the": "the snare",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "shed_fang"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "cracked_stone",
+      "a": "a standing stone, cracked clean down the middle",
+      "the": "the stone",
+      "zones": [
+        "stones",
+        "any"
+      ],
+      "drops": [
+        "standing_stone_chip"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "frozen_puddle",
+      "a": "a puddle frozen despite the mild weather",
+      "the": "the puddle",
+      "zones": [
+        "water",
+        "any"
+      ],
+      "drops": [
+        "witchlight_oil"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "abandoned_lantern",
+      "a": "an old lantern, unlit, hanging from a low branch",
+      "the": "the lantern",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "witchlight_oil"
+      ],
+      "rarity": "rare"
+    }
+  ],
+  "discoveries": [
+    {
+      "id": "dis0",
+      "text": "a perfect ring of dark mushrooms nobody planted",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "moss_of_silence"
+      ],
+      "plant": true,
+      "the": "the ring"
+    },
+    {
+      "id": "dis1",
+      "text": "claw marks on a tree trunk, high enough that you have to look up to find the top of them",
+      "zones": [
+        "trees",
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "shed_fang"
+      ],
+      "the": "the marks"
+    },
+    {
+      "id": "dis2",
+      "text": "a small cairn of stones that definitely wasn't there last time",
+      "zones": [
+        "stones",
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "standing_stone_chip"
+      ],
+      "the": "the cairn"
+    },
+    {
+      "id": "dis3",
+      "text": "a raven feather stuck upright in the ground like it was placed there",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "raven_feather"
+      ],
+      "the": "the feather"
+    },
+    {
+      "id": "dis4",
+      "text": "a patch of blackened acorns that never sprouted, arranged in a neat line",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "blackened_acorn"
+      ],
+      "plant": true,
+      "the": "the acorns"
+    },
+    {
+      "id": "dis5",
+      "text": "footprints that stop, mid-stride, and simply don't continue",
+      "zones": [
+        "any"
+      ],
+      "time": "night",
+      "drops": [
+        "shed_fang"
+      ],
+      "the": "the footprints"
+    },
+    {
+      "id": "dis6",
+      "text": "a knot of roots tied deliberately, like a charm someone hung and forgot",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "root_charm"
+      ],
+      "the": "the charm"
+    }
+  ],
+  "outcomes": [
+    {
+      "id": "out0",
+      "text": "The path ahead seems to clear itself, just slightly, for you.",
+      "tones": [
+        "beloved",
+        "friendly"
+      ]
+    },
+    {
+      "id": "out1",
+      "text": "The mist parts and, for a moment, the whole clearing feels almost welcoming.",
+      "tones": [
+        "beloved"
+      ]
+    },
+    {
+      "id": "out2",
+      "text": "Nothing troubles you tonight. The woods, for once, feel like just woods.",
+      "tones": [
+        "neutral",
+        "friendly"
+      ]
+    },
+    {
+      "id": "out3",
+      "text": "A branch bends out of your way as you pass, like it meant to.",
+      "tones": [
+        "friendly"
+      ]
+    },
+    {
+      "id": "out4",
+      "text": "Something watches from the treeline. It doesn't follow. This time.",
+      "tones": [
+        "wary"
+      ]
+    },
+    {
+      "id": "out5",
+      "text": "The brambles snag at your sleeve, once, hard, and then let go.",
+      "tones": [
+        "wary",
+        "hostile"
+      ]
+    },
+    {
+      "id": "out6",
+      "text": "The trees seem to close in a little tighter around the path behind you.",
+      "tones": [
+        "hostile"
+      ]
+    },
+    {
+      "id": "out7",
+      "text": "You leave faster than you meant to. Something out there noticed you leaving.",
+      "tones": [
+        "hostile"
+      ]
+    },
+    {
+      "id": "out8",
+      "text": "The cold deepens the moment you stop walking.",
+      "tones": [
+        "wary"
+      ]
+    },
+    {
+      "id": "out9",
+      "text": "Every sound in the woods pauses, all at once, like it's listening to you instead.",
+      "tones": [
+        "wary"
+      ]
+    }
+  ],
+  "templates": [
+    {
+      "id": "tpl0",
+      "kind": "creature",
+      "text": "{Loc}, you notice {creature} {action} {object}.\n\n{atmos} {outcome}"
+    },
+    {
+      "id": "tpl1",
+      "kind": "creature",
+      "text": "{atmos}\n\n{Loc}, {creature} is {action} {object}. {outcome}"
+    },
+    {
+      "id": "tpl2",
+      "kind": "discovery",
+      "text": "{Loc}, you find {discovery}.\n\n{atmos} {outcome}"
+    },
+    {
+      "id": "tpl3",
+      "kind": "discovery",
+      "text": "{atmos}\n\n{Loc} you come across {discovery}. {outcome}"
+    },
+    {
+      "id": "tpl4",
+      "kind": "quiet",
+      "text": "{atmos}\n\n{Loc}, nothing else stirs. {outcome}"
+    }
+  ],
+  "forage_lines": [
+    "You search {loc} and turn up {item}.",
+    "Half-buried in leaf litter {loc}, you find {item}.",
+    "{Loc}, tucked under a root, is {item}.",
+    "You dig through the underbrush {loc} and come away with {item}.",
+    "Something catches your eye {loc} - {item}."
+  ],
+  "forage_empty": [
+    "You search {loc} and find nothing but cold dirt and dead leaves.",
+    "{Loc}, whatever was here has already been carried off.",
+    "You come away from {loc} empty-handed, glad to head back toward the lights of the castle."
+  ],
+  "choices": {
+    "feed": {
+      "label": "Feed it",
+      "emoji": "🍃"
+    },
+    "follow": {
+      "label": "Follow it",
+      "emoji": "👣"
+    },
+    "steal": {
+      "label": "Steal from it",
+      "emoji": "🫳"
+    },
+    "leave": {
+      "label": "Leave it be",
+      "emoji": "🕯️"
+    }
+  },
+  "plant_choices": {
+    "tend": {
+      "label": "Tend it",
+      "emoji": "🕯️"
+    },
+    "uproot": {
+      "label": "Uproot it",
+      "emoji": "🪓"
+    },
+    "leave": {
+      "label": "Leave it be",
+      "emoji": "🕯️"
+    }
+  },
+  "choice_lines": {
+    "feed_good": [
+      "{The} takes it cautiously, then seems to relax, and leaves something behind."
+    ],
+    "feed_meh": [
+      "{The} sniffs the offering and simply walks off with it, unimpressed."
+    ],
+    "follow_good": [
+      "You follow {the} deeper than you meant to go, and it shows you something worth the risk.",
+      "{The} leads you somewhere you've never been - and then, quite suddenly, vanishes."
+    ],
+    "follow_lost": [
+      "You follow {the} until you realize you've lost the path entirely. You find your own way back, eventually."
+    ],
+    "steal_good": [
+      "You take it and back away slowly. {The} doesn't react. Somehow that's worse."
+    ],
+    "steal_caught": [
+      "{The} reacts immediately, and not kindly. You leave with a fright and nothing else."
+    ],
+    "leave": [
+      "You leave {the} well alone and head back toward the lights of the castle.",
+      "You decide some things in these woods aren't yours to disturb."
+    ],
+    "tend": [
+      "You clear a little space around the ring and leave it be, tidier than before."
+    ],
+    "uproot": [
+      "You tear it out of the ground. The woods go very quiet around you."
+    ]
+  },
+  "offer_lines": {
+    "full": "Whatever's out here has had enough offerings for one night. Your gift sits there, untouched.",
+    "warm": [
+      "Your offering disappears from where you left it, quick and quiet.",
+      "The woods feel, if only slightly, less watchful as you leave."
+    ],
+    "cold": [
+      "Your offering just sits there in the mist. Nothing comes for it.",
+      "The dark takes it without any sign it noticed you at all."
+    ]
+  },
+  "uses": [],
+  "rare_boost_events": [],
+  "event_drop_boost": {},
+  "reveals": {},
+  "events": [],
+  "secrets": []
+}

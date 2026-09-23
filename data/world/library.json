@@ -1,0 +1,799 @@
+{
+  "name": "the Library",
+  "title": "📚 The Library",
+  "blurb": "Older than the school keeps records for, and it remembers every book that's ever passed through it - including a few nobody admits to having written.",
+  "item_ids": [
+    "dust_of_forgotten_words",
+    "inkmoth_wing",
+    "overdue_slip",
+    "locked_diary",
+    "marginalia_scrap",
+    "self_inking_nib",
+    "pressed_violet",
+    "memory_bookmark"
+  ],
+  "areas": [
+    {
+      "id": "reading_room",
+      "at": "in the long reading room",
+      "zones": [
+        "any",
+        "reading"
+      ],
+      "time": "any",
+      "drops": [
+        "marginalia_scrap",
+        "dust_of_forgotten_words",
+        "pressed_violet"
+      ]
+    },
+    {
+      "id": "spiral_stacks",
+      "at": "climbing the spiral stacks",
+      "zones": [
+        "any",
+        "stacks"
+      ],
+      "time": "any",
+      "drops": [
+        "marginalia_scrap",
+        "overdue_slip",
+        "dust_of_forgotten_words"
+      ]
+    },
+    {
+      "id": "restricted_section",
+      "at": "at the edge of the Restricted Section",
+      "zones": [
+        "any",
+        "restricted"
+      ],
+      "time": "any",
+      "drops": [
+        "locked_diary",
+        "self_inking_nib"
+      ]
+    },
+    {
+      "id": "reference_desk",
+      "at": "behind the unmanned reference desk",
+      "zones": [
+        "any",
+        "desk"
+      ],
+      "time": "any",
+      "drops": [
+        "overdue_slip",
+        "self_inking_nib"
+      ]
+    },
+    {
+      "id": "map_room",
+      "at": "in the map room, charts hung floor to ceiling",
+      "zones": [
+        "any",
+        "reading"
+      ],
+      "time": "any",
+      "drops": [
+        "marginalia_scrap",
+        "pressed_violet"
+      ]
+    },
+    {
+      "id": "study_nook",
+      "at": "in a study nook nobody else seems to use",
+      "zones": [
+        "any",
+        "reading"
+      ],
+      "time": "any",
+      "drops": [
+        "dust_of_forgotten_words",
+        "memory_bookmark"
+      ]
+    },
+    {
+      "id": "returns_cart",
+      "at": "beside a returns cart that keeps re-sorting itself",
+      "zones": [
+        "any",
+        "stacks"
+      ],
+      "time": "any",
+      "drops": [
+        "overdue_slip",
+        "inkmoth_wing"
+      ]
+    },
+    {
+      "id": "periodicals",
+      "at": "among stacks of very old periodicals",
+      "zones": [
+        "any",
+        "stacks"
+      ],
+      "time": "any",
+      "drops": [
+        "marginalia_scrap",
+        "pressed_violet"
+      ]
+    },
+    {
+      "id": "card_catalogue",
+      "at": "in front of the card catalogue nobody trusts anymore",
+      "zones": [
+        "any",
+        "desk"
+      ],
+      "time": "any",
+      "drops": [
+        "overdue_slip",
+        "memory_bookmark"
+      ]
+    },
+    {
+      "id": "window_alcove",
+      "at": "in the window alcove above the courtyard",
+      "zones": [
+        "any",
+        "reading"
+      ],
+      "time": "any",
+      "drops": [
+        "pressed_violet",
+        "dust_of_forgotten_words"
+      ]
+    },
+    {
+      "id": "locked_case",
+      "at": "in front of a locked glass case of first editions",
+      "zones": [
+        "any",
+        "restricted"
+      ],
+      "time": "any",
+      "drops": [
+        "locked_diary",
+        "memory_bookmark"
+      ]
+    },
+    {
+      "id": "librarians_office",
+      "at": "outside the head librarian's office, door ajar",
+      "zones": [
+        "any",
+        "desk"
+      ],
+      "time": "any",
+      "drops": [
+        "self_inking_nib",
+        "inkmoth_wing"
+      ]
+    }
+  ],
+  "atmospheres": [
+    {
+      "id": "atm0",
+      "text": "Dust hangs in a shaft of light, completely undisturbed.",
+      "mood": "calm",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm1",
+      "text": "Somewhere close by, a page turns on its own.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm2",
+      "text": "It's so quiet you can hear your own heartbeat.",
+      "mood": "quiet",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm3",
+      "text": "A dozen candles burn without a single one of them flickering.",
+      "mood": "bright",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm4",
+      "text": "The smell of old paper and older secrets fills the air.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm5",
+      "text": "Somewhere above, a ladder rolls along its rail with nobody pushing it.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm6",
+      "text": "Moonlight falls in long pale rectangles across the floor.",
+      "mood": "quiet",
+      "time": "night",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm7",
+      "text": "A cold draft moves between the shelves, though every window is shut.",
+      "mood": "eerie",
+      "time": "night",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm8",
+      "text": "The reading lamps have all dimmed themselves to a comfortable, sleepy gold.",
+      "mood": "calm",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm9",
+      "text": "Every sound you make seems to arrive back at you a half-second late.",
+      "mood": "quiet",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    }
+  ],
+  "creatures": [
+    {
+      "id": "dust_motes",
+      "a": "a swarm of dust motes catching the light strangely",
+      "the": "the motes",
+      "kind": "drifter",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "moods": [
+        "calm",
+        "bright",
+        "quiet"
+      ],
+      "drops": [
+        "dust_of_forgotten_words"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "reshelving_cart",
+      "a": "the returns cart, moving without being pushed",
+      "the": "the cart",
+      "kind": "mover",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "moods": [
+        "eerie",
+        "quiet"
+      ],
+      "drops": [
+        "overdue_slip"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "whispering_book",
+      "a": "a book muttering quietly to itself on the shelf",
+      "the": "the book",
+      "kind": "reader",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "moods": [
+        "eerie",
+        "quiet"
+      ],
+      "drops": [
+        "marginalia_scrap",
+        "memory_bookmark"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "inkmoth",
+      "a": "an inkmoth drinking spilled ink off an open page",
+      "the": "the inkmoth",
+      "kind": "flier",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "moods": [
+        "calm",
+        "eerie"
+      ],
+      "drops": [
+        "inkmoth_wing"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "shelving_shade",
+      "a": "a shape in a librarian's coat, reshelving something too high to reach",
+      "the": "the shade",
+      "kind": "mover",
+      "zones": [
+        "restricted",
+        "any"
+      ],
+      "time": "night",
+      "moods": [
+        "eerie"
+      ],
+      "drops": [
+        "locked_diary"
+      ],
+      "rarity": "rare"
+    },
+    {
+      "id": "reading_shadow",
+      "a": "your own shadow, reading a book you aren't holding",
+      "the": "the shadow",
+      "kind": "reader",
+      "zones": [
+        "any"
+      ],
+      "time": "night",
+      "moods": [
+        "eerie"
+      ],
+      "drops": [
+        "self_inking_nib"
+      ],
+      "rarity": "uncommon"
+    }
+  ],
+  "actions": [
+    {
+      "id": "act0",
+      "text": "drifting through",
+      "kinds": [
+        "drifter",
+        "flier"
+      ]
+    },
+    {
+      "id": "act1",
+      "text": "circling",
+      "kinds": [
+        "flier",
+        "drifter"
+      ]
+    },
+    {
+      "id": "act2",
+      "text": "gliding along beside",
+      "kinds": [
+        "mover"
+      ]
+    },
+    {
+      "id": "act3",
+      "text": "muttering into",
+      "kinds": [
+        "reader"
+      ]
+    },
+    {
+      "id": "act4",
+      "text": "leafing through",
+      "kinds": [
+        "reader"
+      ]
+    },
+    {
+      "id": "act5",
+      "text": "hovering just above",
+      "kinds": [
+        "flier",
+        "drifter"
+      ]
+    }
+  ],
+  "objects": [
+    {
+      "id": "loose_page",
+      "a": "a loose page with no book to belong to",
+      "the": "the page",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "marginalia_scrap"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "cold_teacup",
+      "a": "a teacup, still faintly warm, that nobody's claiming",
+      "the": "the teacup",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "dust_of_forgotten_words"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "unshelved_tome",
+      "a": "a heavy tome left open on the floor",
+      "the": "the tome",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "memory_bookmark"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "spare_quill",
+      "a": "a spare quill, still wet",
+      "the": "the quill",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "self_inking_nib"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "sealed_letter",
+      "a": "a sealed letter with no name on it",
+      "the": "the letter",
+      "zones": [
+        "restricted",
+        "any"
+      ],
+      "drops": [
+        "locked_diary"
+      ],
+      "rarity": "rare"
+    },
+    {
+      "id": "pressed_bookmark",
+      "a": "someone's forgotten bookmark, pressed flat",
+      "the": "the bookmark",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "pressed_violet"
+      ],
+      "rarity": "common"
+    }
+  ],
+  "discoveries": [
+    {
+      "id": "dis0",
+      "text": "a card in the catalogue for a book that doesn't exist on any shelf",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "overdue_slip"
+      ],
+      "the": "the card"
+    },
+    {
+      "id": "dis1",
+      "text": "your own name, written in the margin of a book you've never opened",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "marginalia_scrap"
+      ],
+      "the": "the margin note"
+    },
+    {
+      "id": "dis2",
+      "text": "a chair pulled out at an empty desk, as if someone just left",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "dust_of_forgotten_words"
+      ],
+      "the": "the chair"
+    },
+    {
+      "id": "dis3",
+      "text": "a small potted violet growing straight out of a stack of books",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "pressed_violet"
+      ],
+      "plant": true,
+      "the": "the plant"
+    },
+    {
+      "id": "dis4",
+      "text": "a single candle burning at the end of a row nobody's shelved in years",
+      "zones": [
+        "restricted",
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "locked_diary"
+      ],
+      "the": "the candle"
+    },
+    {
+      "id": "dis5",
+      "text": "a stack of index cards, each one signed by a different, unfamiliar hand",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "memory_bookmark"
+      ],
+      "the": "the cards"
+    },
+    {
+      "id": "dis6",
+      "text": "a book that opens itself to the same page, no matter how many times you close it",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "self_inking_nib"
+      ],
+      "the": "the book"
+    },
+    {
+      "id": "dis7",
+      "text": "a windowsill herb pot someone's clearly been tending, sprouting late",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "pressed_violet"
+      ],
+      "plant": true,
+      "the": "the plant"
+    }
+  ],
+  "outcomes": [
+    {
+      "id": "out0",
+      "text": "The shelves seem to lean very slightly out of your way.",
+      "tones": [
+        "beloved",
+        "friendly"
+      ]
+    },
+    {
+      "id": "out1",
+      "text": "A reading lamp brightens on its own as you pass, just for you.",
+      "tones": [
+        "beloved"
+      ]
+    },
+    {
+      "id": "out2",
+      "text": "Nothing troubles you here. It's just a library, tonight.",
+      "tones": [
+        "neutral",
+        "friendly"
+      ]
+    },
+    {
+      "id": "out3",
+      "text": "A book slides an inch off its shelf, as if offered.",
+      "tones": [
+        "beloved",
+        "friendly"
+      ]
+    },
+    {
+      "id": "out4",
+      "text": "The silence feels companionable rather than watchful.",
+      "tones": [
+        "friendly",
+        "neutral"
+      ]
+    },
+    {
+      "id": "out5",
+      "text": "A chill draft follows you between two shelves, then gives up.",
+      "tones": [
+        "wary"
+      ]
+    },
+    {
+      "id": "out6",
+      "text": "You feel distinctly like you're being reshelved along with everything else.",
+      "tones": [
+        "wary",
+        "hostile"
+      ]
+    },
+    {
+      "id": "out7",
+      "text": "A card catalogue drawer slams shut as you walk by. On purpose, you're fairly sure.",
+      "tones": [
+        "hostile"
+      ]
+    },
+    {
+      "id": "out8",
+      "text": "The lamp above you gutters, then steadies, as if deciding something about you.",
+      "tones": [
+        "wary"
+      ]
+    },
+    {
+      "id": "out9",
+      "text": "Every book on the nearest shelf turns very slightly to face you.",
+      "tones": [
+        "hostile"
+      ]
+    }
+  ],
+  "templates": [
+    {
+      "id": "tpl0",
+      "kind": "creature",
+      "text": "{Loc}, you notice {creature} {action} {object}.\n\n{atmos} {outcome}"
+    },
+    {
+      "id": "tpl1",
+      "kind": "creature",
+      "text": "{atmos}\n\n{Loc}, {creature} is {action} {object}. {outcome}"
+    },
+    {
+      "id": "tpl2",
+      "kind": "discovery",
+      "text": "{Loc}, you find {discovery}.\n\n{atmos} {outcome}"
+    },
+    {
+      "id": "tpl3",
+      "kind": "discovery",
+      "text": "{atmos}\n\n{Loc} you come across {discovery}. {outcome}"
+    },
+    {
+      "id": "tpl4",
+      "kind": "quiet",
+      "text": "{atmos}\n\n{Loc}, nothing else stirs. {outcome}"
+    }
+  ],
+  "forage_lines": [
+    "You search {loc} and turn up {item}.",
+    "Tucked {loc}, half-forgotten, is {item}.",
+    "{Loc}, wedged behind a row of spines, you find {item}.",
+    "You check under a loose floorboard {loc} and come away with {item}.",
+    "Something catches your eye {loc} - {item}."
+  ],
+  "forage_empty": [
+    "You search {loc} and find nothing but dust and somebody else's handwriting.",
+    "{Loc}, everything worth finding has already been checked out.",
+    "You come away from {loc} with nothing but a papercut."
+  ],
+  "choices": {
+    "feed": {
+      "label": "Feed it",
+      "emoji": "🍃"
+    },
+    "follow": {
+      "label": "Follow it",
+      "emoji": "👣"
+    },
+    "steal": {
+      "label": "Steal from it",
+      "emoji": "🫳"
+    },
+    "leave": {
+      "label": "Leave it be",
+      "emoji": "🕯️"
+    }
+  },
+  "plant_choices": {
+    "tend": {
+      "label": "Tend it",
+      "emoji": "🕯️"
+    },
+    "uproot": {
+      "label": "Uproot it",
+      "emoji": "🪓"
+    },
+    "leave": {
+      "label": "Leave it be",
+      "emoji": "🕯️"
+    }
+  },
+  "choice_lines": {
+    "feed_good": [
+      "{The} seems satisfied and settles back onto its shelf, leaving something behind."
+    ],
+    "feed_meh": [
+      "{The} ignores your offering entirely and goes back to what it was doing."
+    ],
+    "follow_good": [
+      "You follow {the} down a row you've never noticed before, and it shows you something worth finding.",
+      "{The} leads you between two shelves that shouldn't fit a person - and then it's gone."
+    ],
+    "follow_lost": [
+      "You follow {the} for what feels like ten minutes. You're back where you started."
+    ],
+    "steal_good": [
+      "You take it while {the} isn't looking. Nothing chases you. That's somehow worse."
+    ],
+    "steal_caught": [
+      "{The} notices immediately. You leave empty-handed, faintly embarrassed."
+    ],
+    "leave": [
+      "You let {the} be and step quietly on. The Library, if it noticed, says nothing.",
+      "You leave {the} to whatever it was doing. Some things aren't yours to disturb."
+    ],
+    "tend": [
+      "You water it, turn its pot toward the light, and leave it a little better than you found it.",
+      "You pinch off a dead leaf and settle the soil. It seems to sit up straighter."
+    ],
+    "uproot": [
+      "You pull it out of the stack of books entirely. Something about the shelf feels wrong now.",
+      "It comes free easily. The books beneath it are strangely warm."
+    ]
+  },
+  "offer_lines": {
+    "full": "The Library accepts your offering politely and files it away somewhere you'll never find it again.",
+    "warm": [
+      "The offering is quietly shelved, as if it belongs there.",
+      "A lamp brightens, just slightly, as you leave your offering behind."
+    ],
+    "cold": [
+      "Your offering disappears from where you left it. No acknowledgment.",
+      "The Library takes it without comment. You're not sure it noticed you at all."
+    ]
+  },
+  "uses": [],
+  "rare_boost_events": [],
+  "event_drop_boost": {},
+  "reveals": {},
+  "events": [],
+  "secrets": []
+}

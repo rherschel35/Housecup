@@ -1,0 +1,696 @@
+{
+  "name": "the Dungeons",
+  "title": "🕯️ The Dungeons",
+  "blurb": "Cold stone corridors under the castle that used to hold something worse than students in detention. Not everything down here left when the doors were unlocked.",
+  "item_ids": [
+    "forgotten_shrine_ash",
+    "shackle_dust",
+    "dead_currency_coin",
+    "cellar_moss",
+    "manacle_link",
+    "rusted_key",
+    "chalk_of_shadows"
+  ],
+  "areas": [
+    {
+      "id": "old_cells",
+      "at": "among the old cells, doors long since rusted open",
+      "zones": [
+        "any",
+        "cells"
+      ],
+      "time": "any",
+      "drops": [
+        "manacle_link",
+        "rusted_key"
+      ]
+    },
+    {
+      "id": "cistern",
+      "at": "beside the dripping cistern",
+      "zones": [
+        "any",
+        "water"
+      ],
+      "time": "any",
+      "drops": [
+        "cellar_moss",
+        "dead_currency_coin"
+      ]
+    },
+    {
+      "id": "alchemy_room",
+      "at": "in the disused alchemy room",
+      "zones": [
+        "any",
+        "stone"
+      ],
+      "time": "any",
+      "drops": [
+        "chalk_of_shadows",
+        "dead_currency_coin"
+      ]
+    },
+    {
+      "id": "forgotten_shrine",
+      "at": "at a forgotten shrine cut into the wall",
+      "zones": [
+        "any",
+        "shrine"
+      ],
+      "time": "any",
+      "drops": [
+        "forgotten_shrine_ash"
+      ]
+    },
+    {
+      "id": "collapsed_passage",
+      "at": "at the edge of a collapsed passage",
+      "zones": [
+        "any",
+        "stone"
+      ],
+      "time": "any",
+      "drops": [
+        "rusted_key",
+        "shackle_dust"
+      ]
+    },
+    {
+      "id": "long_corridor",
+      "at": "down a long, unlit corridor",
+      "zones": [
+        "any",
+        "cells"
+      ],
+      "time": "any",
+      "drops": [
+        "manacle_link",
+        "cellar_moss"
+      ]
+    },
+    {
+      "id": "storeroom",
+      "at": "in an old storeroom, shelves long empty",
+      "zones": [
+        "any",
+        "stone"
+      ],
+      "time": "any",
+      "drops": [
+        "dead_currency_coin",
+        "chalk_of_shadows"
+      ]
+    },
+    {
+      "id": "drainage_grate",
+      "at": "over a drainage grate that hums faintly",
+      "zones": [
+        "any",
+        "water"
+      ],
+      "time": "any",
+      "drops": [
+        "cellar_moss",
+        "shackle_dust"
+      ]
+    },
+    {
+      "id": "stairwell",
+      "at": "on the stairwell, three steps below where the torches stop",
+      "zones": [
+        "any",
+        "cells"
+      ],
+      "time": "any",
+      "drops": [
+        "rusted_key",
+        "manacle_link"
+      ]
+    },
+    {
+      "id": "iron_door",
+      "at": "in front of an iron door, sealed and cold",
+      "zones": [
+        "any",
+        "shrine"
+      ],
+      "time": "any",
+      "drops": [
+        "forgotten_shrine_ash",
+        "shackle_dust"
+      ]
+    }
+  ],
+  "atmospheres": [
+    {
+      "id": "atm0",
+      "text": "The air is cold enough to see your own breath.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm1",
+      "text": "Water drips somewhere close, on an unhurried, uneven rhythm.",
+      "mood": "quiet",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm2",
+      "text": "Your torchlight doesn't seem to reach quite as far as it should.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm3",
+      "text": "Something scrapes stone, once, somewhere behind you.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm4",
+      "text": "It's utterly silent down here - the kind of silence that has weight.",
+      "mood": "quiet",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm5",
+      "text": "The old iron sconces still hold a little unnatural light.",
+      "mood": "calm",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm6",
+      "text": "A draft moves through with no obvious source, carrying the smell of damp stone.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    },
+    {
+      "id": "atm7",
+      "text": "Your footsteps echo longer than they should, like someone else's are mixed in.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "any"
+      ]
+    }
+  ],
+  "creatures": [
+    {
+      "id": "cellar_rats",
+      "a": "a knot of dungeon rats, unbothered by your light",
+      "the": "the rats",
+      "kind": "scurrier",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "moods": [
+        "quiet",
+        "eerie"
+      ],
+      "drops": [
+        "cellar_moss"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "creaking_armor",
+      "a": "an old suit of armor that creaks when nothing moves it",
+      "the": "the armor",
+      "kind": "mover",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "moods": [
+        "eerie"
+      ],
+      "drops": [
+        "manacle_link",
+        "rusted_key"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "cell_wisp",
+      "a": "a damp little will-o'-the-wisp, drifting between the bars",
+      "the": "the wisp",
+      "kind": "drifter",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "moods": [
+        "eerie",
+        "quiet"
+      ],
+      "drops": [
+        "cellar_moss"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "chained_moan",
+      "a": "something chained, somewhere out of sight, that just moans once",
+      "the": "the sound",
+      "kind": "unseen",
+      "zones": [
+        "cells",
+        "any"
+      ],
+      "time": "night",
+      "moods": [
+        "eerie"
+      ],
+      "drops": [
+        "shackle_dust"
+      ],
+      "rarity": "rare"
+    },
+    {
+      "id": "shadow_beneath_door",
+      "a": "a shadow moving under the iron door, though nothing should be behind it",
+      "the": "the shadow",
+      "kind": "unseen",
+      "zones": [
+        "shrine",
+        "any"
+      ],
+      "time": "night",
+      "moods": [
+        "eerie"
+      ],
+      "drops": [
+        "forgotten_shrine_ash"
+      ],
+      "rarity": "rare"
+    }
+  ],
+  "actions": [
+    {
+      "id": "act0",
+      "text": "scurrying past",
+      "kinds": [
+        "scurrier"
+      ]
+    },
+    {
+      "id": "act1",
+      "text": "creaking beside",
+      "kinds": [
+        "mover"
+      ]
+    },
+    {
+      "id": "act2",
+      "text": "drifting near",
+      "kinds": [
+        "drifter"
+      ]
+    },
+    {
+      "id": "act3",
+      "text": "shifting behind",
+      "kinds": [
+        "unseen",
+        "mover"
+      ]
+    },
+    {
+      "id": "act4",
+      "text": "circling",
+      "kinds": [
+        "drifter",
+        "scurrier"
+      ]
+    }
+  ],
+  "objects": [
+    {
+      "id": "broken_manacles",
+      "a": "a set of broken manacles, still bolted to the wall",
+      "the": "the manacles",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "manacle_link"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "cracked_urn",
+      "a": "a cracked funerary urn, long since emptied",
+      "the": "the urn",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "forgotten_shrine_ash"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "rusted_ring",
+      "a": "a rusted iron ring set into the floor",
+      "the": "the ring",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "rusted_key"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "alchemy_bench",
+      "a": "an alchemy bench, stained with things you'd rather not identify",
+      "the": "the bench",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "chalk_of_shadows"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "old_scratch_marks",
+      "a": "deep scratch marks on the inside of a cell door",
+      "the": "the marks",
+      "zones": [
+        "cells",
+        "any"
+      ],
+      "drops": [
+        "shackle_dust"
+      ],
+      "rarity": "rare"
+    }
+  ],
+  "discoveries": [
+    {
+      "id": "dis0",
+      "text": "a name carved into the stone, over and over, in a hand that got shakier each time",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "shackle_dust"
+      ],
+      "the": "the carving"
+    },
+    {
+      "id": "dis1",
+      "text": "a tally of days scratched into the wall that stopped mid-count",
+      "zones": [
+        "cells",
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "manacle_link"
+      ],
+      "the": "the tally"
+    },
+    {
+      "id": "dis2",
+      "text": "a patch of pale fungus growing in a perfect ring on the floor",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "cellar_moss"
+      ],
+      "plant": true,
+      "the": "the fungus"
+    },
+    {
+      "id": "dis3",
+      "text": "a coin purse, ancient and empty except for a single strange coin",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "dead_currency_coin"
+      ],
+      "the": "the purse"
+    },
+    {
+      "id": "dis4",
+      "text": "a door that's warm to the touch, for no reason you can find",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "forgotten_shrine_ash"
+      ],
+      "the": "the door"
+    },
+    {
+      "id": "dis5",
+      "text": "a single unlit candle, standing upright in a puddle that shouldn't be there",
+      "zones": [
+        "shrine",
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "forgotten_shrine_ash"
+      ],
+      "the": "the candle"
+    },
+    {
+      "id": "dis6",
+      "text": "a rusted key, half-buried, that doesn't fit any lock nearby",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "rusted_key"
+      ],
+      "the": "the key"
+    }
+  ],
+  "outcomes": [
+    {
+      "id": "out0",
+      "text": "The cold here doesn't feel quite as sharp as it did when you arrived.",
+      "tones": [
+        "beloved",
+        "friendly"
+      ]
+    },
+    {
+      "id": "out1",
+      "text": "Your torch burns a little steadier than it should, this deep down.",
+      "tones": [
+        "beloved"
+      ]
+    },
+    {
+      "id": "out2",
+      "text": "Nothing follows you back up the stairs. This time.",
+      "tones": [
+        "neutral",
+        "friendly"
+      ]
+    },
+    {
+      "id": "out3",
+      "text": "The dark parts around you, just slightly, like it's letting you through.",
+      "tones": [
+        "friendly"
+      ]
+    },
+    {
+      "id": "out4",
+      "text": "You get the distinct feeling something is counting your steps.",
+      "tones": [
+        "wary"
+      ]
+    },
+    {
+      "id": "out5",
+      "text": "A draft pushes past you, moving the wrong way for the corridor's shape.",
+      "tones": [
+        "wary",
+        "hostile"
+      ]
+    },
+    {
+      "id": "out6",
+      "text": "The torches gutter as you pass, one after another, like something's following the flame.",
+      "tones": [
+        "hostile"
+      ]
+    },
+    {
+      "id": "out7",
+      "text": "You leave faster than you meant to. Something down here noticed you.",
+      "tones": [
+        "hostile"
+      ]
+    },
+    {
+      "id": "out8",
+      "text": "The silence presses in, a little heavier than before.",
+      "tones": [
+        "wary"
+      ]
+    },
+    {
+      "id": "out9",
+      "text": "Something metal settles, once, in the dark behind you.",
+      "tones": [
+        "wary"
+      ]
+    }
+  ],
+  "templates": [
+    {
+      "id": "tpl0",
+      "kind": "creature",
+      "text": "{Loc}, you notice {creature} {action} {object}.\n\n{atmos} {outcome}"
+    },
+    {
+      "id": "tpl1",
+      "kind": "creature",
+      "text": "{atmos}\n\n{Loc}, {creature} is {action} {object}. {outcome}"
+    },
+    {
+      "id": "tpl2",
+      "kind": "discovery",
+      "text": "{Loc}, you find {discovery}.\n\n{atmos} {outcome}"
+    },
+    {
+      "id": "tpl3",
+      "kind": "discovery",
+      "text": "{atmos}\n\n{Loc} you come across {discovery}. {outcome}"
+    },
+    {
+      "id": "tpl4",
+      "kind": "quiet",
+      "text": "{atmos}\n\n{Loc}, nothing else stirs. {outcome}"
+    }
+  ],
+  "forage_lines": [
+    "You search {loc} and turn up {item}.",
+    "Half-buried {loc}, you find {item}.",
+    "{Loc}, wedged between two stones, is {item}.",
+    "You dig through old debris {loc} and come away with {item}.",
+    "Something glints in your torchlight {loc} - {item}."
+  ],
+  "forage_empty": [
+    "You search {loc} and find nothing but old dust and colder air.",
+    "{Loc}, whatever was here has long since rotted away.",
+    "You come away from {loc} empty-handed, glad to be leaving."
+  ],
+  "choices": {
+    "feed": {
+      "label": "Feed it",
+      "emoji": "🍃"
+    },
+    "follow": {
+      "label": "Follow it",
+      "emoji": "👣"
+    },
+    "steal": {
+      "label": "Steal from it",
+      "emoji": "🫳"
+    },
+    "leave": {
+      "label": "Leave it be",
+      "emoji": "🕯️"
+    }
+  },
+  "plant_choices": {
+    "tend": {
+      "label": "Tend it",
+      "emoji": "🕯️"
+    },
+    "uproot": {
+      "label": "Uproot it",
+      "emoji": "🪓"
+    },
+    "leave": {
+      "label": "Leave it be",
+      "emoji": "🕯️"
+    }
+  },
+  "choice_lines": {
+    "feed_good": [
+      "{The} takes it and, strangely, seems to calm down."
+    ],
+    "feed_meh": [
+      "{The} doesn't want it, or can't take it. It's hard to tell down here."
+    ],
+    "follow_good": [
+      "You follow {the} down a passage you didn't know existed, and it leads somewhere worth finding.",
+      "{The} leads you through the dark and then, quite suddenly, isn't there anymore."
+    ],
+    "follow_lost": [
+      "You follow {the} in circles for a while before giving up and finding your own way back."
+    ],
+    "steal_good": [
+      "You take it quickly and quietly. Nothing reacts. That's not exactly comforting."
+    ],
+    "steal_caught": [
+      "Something reacts immediately, and not kindly. You leave with nothing and a fright."
+    ],
+    "leave": [
+      "You leave {the} well alone and find your way back to the light.",
+      "Whatever it was, you decide it's not worth disturbing. You move on."
+    ],
+    "tend": [
+      "You clear the fungus ring gently and leave it undisturbed but tidier."
+    ],
+    "uproot": [
+      "You tear it up. The stone underneath is unpleasantly warm."
+    ]
+  },
+  "offer_lines": {
+    "full": "Whatever's down here has had enough offerings for one day. Your gift sits there, untouched.",
+    "warm": [
+      "The offering vanishes from where you set it down, quick and quiet.",
+      "Something down here seems, if only slightly, less hostile."
+    ],
+    "cold": [
+      "Your offering just sits there in the dark. Nothing comes for it.",
+      "The dark takes it without any sign it noticed."
+    ]
+  },
+  "uses": [],
+  "rare_boost_events": [],
+  "event_drop_boost": {},
+  "reveals": {},
+  "events": [],
+  "secrets": []
+}
