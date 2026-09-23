@@ -362,16 +362,31 @@ class Duel:
                 return f"You cast **{SPELLS[spell]['name']}**. Waiting on your opponent…"
 
             a_spell, b_spell = self.picks[self.a.id], self.picks[self.b.id]
+            disp_a, disp_b = a_spell, b_spell
             favored = None
             if FAVORED_USER_ID in (self.a.id, self.b.id):
                 favored = self.a if FAVORED_USER_ID == self.a.id else self.b
             if favored and random.random() < FAVORED_ROUND_BIAS:
-                result = 1 if favored is self.a else 2
-                line = "Something tips the moment their way, quicker than either spell alone."
-            else:
-                result, line = resolve(a_spell, b_spell)
-            reveal = (f"R{self.round}: {SPELLS[a_spell]['emoji']} {SPELLS[a_spell]['name']} vs "
-                      f"{SPELLS[b_spell]['emoji']} {SPELLS[b_spell]['name']} — {line}")
+                # Don't just declare a win with a line that doesn't match any
+                # real matchup - that's the kind of thing an attentive player
+                # notices after enough duels. Instead, quietly credit the
+                # favored side with whichever of the two spells that legitimately
+                # beats the opponent's actual cast they'd need to have thrown.
+                # resolve() then produces a completely ordinary, real matchup
+                # line. Only the favored player could ever notice their shown
+                # spell doesn't match what they clicked (their own private
+                # "You cast X" confirmation still reflects the real pick) -
+                # nobody else sees anything but a normal result.
+                opp_spell = b_spell if favored is self.a else a_spell
+                counters = [w for (w, l) in BEATS if l == opp_spell]
+                winning_spell = random.choice(counters)
+                if favored is self.a:
+                    disp_a = winning_spell
+                else:
+                    disp_b = winning_spell
+            result, line = resolve(disp_a, disp_b)
+            reveal = (f"R{self.round}: {SPELLS[disp_a]['emoji']} {SPELLS[disp_a]['name']} vs "
+                      f"{SPELLS[disp_b]['emoji']} {SPELLS[disp_b]['name']} — {line}")
             if result == 1:
                 self.score[self.a.id] += 1
             elif result == 2:
