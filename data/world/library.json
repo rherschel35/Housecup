@@ -795,5 +795,154 @@
   "event_drop_boost": {},
   "reveals": {},
   "events": [],
-  "secrets": []
+  "secrets": [
+    {
+      "id": "thornmere_lockpick",
+      "phrases": [
+        "i force the restricted section lock",
+        "pick the restricted section lock",
+        "break into the restricted section"
+      ],
+      "requires": {
+        "houses": [
+          "thornmere"
+        ]
+      },
+      "response": "🐺 The lock resists you, then gives, all at once. Nothing on the other side notices you at all - which is somehow worse.",
+      "reward": "locked_diary",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "veyren_silent_read",
+      "phrases": [
+        "i read in silence with it",
+        "sit in silence with the book",
+        "share the silence with the reading room"
+      ],
+      "requires": {
+        "houses": [
+          "veyren"
+        ]
+      },
+      "response": "🦌 You sit. You don't turn a page for a long while. Something settles in across the table from you and does the same.",
+      "reward": "pressed_violet",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "vashara_mend_book",
+      "phrases": [
+        "i mend the torn page",
+        "repair the torn page",
+        "i fix the damaged book"
+      ],
+      "requires": {
+        "houses": [
+          "vashara"
+        ]
+      },
+      "response": "🐘 You smooth the torn page flat between your palms. By the time you look again, the tear is gone and the ink has healed shut behind it.",
+      "reward": "self_inking_nib",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "caldrin_recatalogue",
+      "phrases": [
+        "i recatalogue the shelf",
+        "reorganize the card catalogue",
+        "i fix the card catalogue"
+      ],
+      "requires": {
+        "houses": [
+          "caldrin"
+        ]
+      },
+      "response": "🔭 You work through the drawer by system, not guesswork. The last card you file is one that shouldn't exist yet.",
+      "reward": "memory_bookmark",
+      "rep": 3,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "moonveil_footnote",
+      "phrases": [
+        "i follow the footnote",
+        "chase the footnote",
+        "i trace the footnote to its source"
+      ],
+      "requires": {
+        "houses": [
+          "moonveil"
+        ]
+      },
+      "response": "🌕 One footnote leads to another book, which leads to another footnote. You lose twenty minutes and gain an idea you can't quite let go of.",
+      "reward": "marginalia_scrap",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "beloved_gift",
+      "phrases": [
+        "i ask the library for a gift",
+        "may i borrow something rare",
+        "what will you lend me"
+      ],
+      "requires": {
+        "rep_min": 15
+      },
+      "response": "📚 A single volume slides itself an inch off a high shelf, waiting for you to notice. No one else can see it move.",
+      "reward": "locked_diary",
+      "rep": 1,
+      "points": 2,
+      "once": "user"
+    },
+    {
+      "id": "apology",
+      "phrases": [
+        "i am sorry",
+        "i apologise to the library",
+        "i apologize to the library",
+        "forgive me library"
+      ],
+      "requires": {
+        "rep_max": -3
+      },
+      "response": "📖 You say it to the empty reading room. A drawer that's been stuck for weeks slides open on its own, just a crack.",
+      "rep": 3,
+      "once": "user"
+    },
+    {
+      "id": "overdue_return",
+      "phrases": [
+        "i return the overdue book",
+        "i pay the overdue fine",
+        "i settle my overdue slip"
+      ],
+      "response": "🧾 You leave the book and the fine on the reference desk. When you turn back, both are gone, and the desk smells faintly of dust and relief.",
+      "reward": "dust_of_forgotten_words",
+      "rep": 1,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "restricted_night",
+      "phrases": [
+        "i whisper to the restricted section at night",
+        "i read past curfew",
+        "i stay past closing"
+      ],
+      "time": "night",
+      "response": "✨ The reading room is empty and the shelves seem taller in the dark. Something on the highest one flutters, once, like it's listening back.",
+      "reward": "inkmoth_wing",
+      "rep": 1,
+      "points": 1,
+      "once": "user"
+    }
+  ]
 }

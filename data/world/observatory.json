@@ -668,5 +668,152 @@
   "event_drop_boost": {},
   "reveals": {},
   "events": [],
-  "secrets": []
+  "secrets": [
+    {
+      "id": "thornmere_balcony",
+      "phrases": [
+        "i stay out on the balcony until dawn",
+        "i wait out the whole night on the balcony",
+        "i keep watch until sunrise"
+      ],
+      "requires": {
+        "houses": [
+          "thornmere"
+        ]
+      },
+      "response": "🐺 Your fingers go numb somewhere around the third hour. You stay anyway. Dawn, when it comes, comes for you specifically.",
+      "reward": "meteorite_sliver",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "veyren_stillness",
+      "phrases": [
+        "i watch the sky in silence",
+        "i sit still on the main deck",
+        "i say nothing to the stars"
+      ],
+      "requires": {
+        "houses": [
+          "veyren"
+        ]
+      },
+      "response": "🦌 You don't move for a long while. Somewhere above, a star seems to hold as still as you do.",
+      "reward": "star_chart_fragment",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "vashara_repair_orrery",
+      "phrases": [
+        "i repair the broken orrery",
+        "i fix the orrery",
+        "i mend the broken orrery"
+      ],
+      "requires": {
+        "houses": [
+          "vashara"
+        ]
+      },
+      "response": "🐘 You ease the bent arm back into its track, gently, until it clicks. The whole model shudders, then starts turning again for the first time in years.",
+      "reward": "orrery_gear",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "caldrin_chart_star",
+      "phrases": [
+        "i chart a new star",
+        "i record an uncharted star",
+        "i map an unlisted star"
+      ],
+      "requires": {
+        "houses": [
+          "caldrin"
+        ]
+      },
+      "response": "🔭 You mark its position carefully and check the old charts twice. It isn't on either of them. You're the first to write it down.",
+      "reward": "stardust_ledger_page",
+      "rep": 3,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "moonveil_lens",
+      "phrases": [
+        "i test the telescope's lens",
+        "i experiment with the moonglass lens",
+        "for research purposes"
+      ],
+      "requires": {
+        "houses": [
+          "moonveil"
+        ]
+      },
+      "response": "🌕 You swap the lens for a moment, just to see. What comes into focus isn't the sky at all, and you only get a glimpse before it's gone.",
+      "reward": "moonglass_lens",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "beloved_gift",
+      "phrases": [
+        "i ask the observatory for a gift",
+        "what will the sky give me",
+        "show me something rare"
+      ],
+      "requires": {
+        "rep_min": 15
+      },
+      "response": "☄️ A vial that wasn't on the shelf a moment ago is on the shelf now, warm to the touch and faintly glowing.",
+      "reward": "comet_dust_vial",
+      "rep": 1,
+      "points": 2,
+      "once": "user"
+    },
+    {
+      "id": "apology",
+      "phrases": [
+        "i am sorry",
+        "i apologise to the observatory",
+        "i apologize to the observatory",
+        "forgive me up here"
+      ],
+      "requires": {
+        "rep_max": -3
+      },
+      "response": "🔭 You say it to the dome and the dome, slowly, creaks back open on its own.",
+      "rep": 3,
+      "once": "user"
+    },
+    {
+      "id": "compass_follow",
+      "phrases": [
+        "i follow the broken compass",
+        "i trust the broken compass anyway"
+      ],
+      "response": "🧭 It doesn't point north. It doesn't point anywhere sensible. You follow it anyway and find something worth finding.",
+      "reward": "star_chart_fragment",
+      "rep": 1,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "name_constellation",
+      "phrases": [
+        "i name a new constellation",
+        "i name the stars i found"
+      ],
+      "time": "night",
+      "response": "🌠 You trace a shape between six stars nobody's connected before and give it a name. For tonight, at least, it's yours.",
+      "reward": "meteorite_sliver",
+      "rep": 1,
+      "points": 1,
+      "once": "user"
+    }
+  ]
 }

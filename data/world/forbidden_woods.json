@@ -695,5 +695,153 @@
   "event_drop_boost": {},
   "reveals": {},
   "events": [],
-  "secrets": []
+  "secrets": [
+    {
+      "id": "thornmere_trail",
+      "phrases": [
+        "i follow the wolf trail",
+        "i track the wolf trail to its end",
+        "i follow the tracks"
+      ],
+      "requires": {
+        "houses": [
+          "thornmere"
+        ]
+      },
+      "response": "🐺 You follow the prints past where they should have stopped. Whatever made them is long gone, but it left something behind on purpose.",
+      "reward": "shed_fang",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "veyren_stones_bow",
+      "phrases": [
+        "i bow to the standing stones",
+        "i bow at the old stones",
+        "i show the stones respect"
+      ],
+      "requires": {
+        "houses": [
+          "veyren"
+        ]
+      },
+      "response": "🦌 You bow, low and quiet. Nothing moves. But you'd swear, walking away, that the stones are standing a little straighter than before.",
+      "reward": "standing_stone_chip",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "vashara_clear_stream",
+      "phrases": [
+        "i tend the frozen stream",
+        "i clear the frozen stream",
+        "i free the stream of ice"
+      ],
+      "requires": {
+        "houses": [
+          "vashara"
+        ]
+      },
+      "response": "🐘 You work the ice loose with bare, aching hands until the water moves again underneath. Something downstream seems to breathe easier for it.",
+      "reward": "root_charm",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "caldrin_thicket_map",
+      "phrases": [
+        "i chart the deep thicket",
+        "i map a path through the thicket",
+        "i mark the way through the thicket"
+      ],
+      "requires": {
+        "houses": [
+          "caldrin"
+        ]
+      },
+      "response": "🔭 You mark trees as you go so you won't lose the way back. By the end, you've mapped a path nobody's ever bothered to write down.",
+      "reward": "standing_stone_chip",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "moonveil_witchlight",
+      "phrases": [
+        "i test the witchlight",
+        "i experiment with the witchlight oil",
+        "for research purposes"
+      ],
+      "requires": {
+        "houses": [
+          "moonveil"
+        ]
+      },
+      "response": "🌕 You dab a little on a dead leaf just to see. It doesn't burn - it glows, cold and blue, for far longer than it should.",
+      "reward": "witchlight_oil",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "beloved_gift",
+      "phrases": [
+        "i ask the woods for a gift",
+        "what will the woods give me",
+        "show me something rare out here"
+      ],
+      "requires": {
+        "rep_min": 15
+      },
+      "response": "🌲 Something pale and quiet steps out of the treeline just long enough to leave a gift at your feet, then is gone before you can look up.",
+      "reward": "moss_of_silence",
+      "rep": 1,
+      "points": 2,
+      "once": "user"
+    },
+    {
+      "id": "apology",
+      "phrases": [
+        "i am sorry",
+        "i apologise to the woods",
+        "i apologize to the woods",
+        "forgive me forest"
+      ],
+      "requires": {
+        "rep_max": -3
+      },
+      "response": "🌰 You say it out loud to the trees. The path ahead, which had been closing in, opens back up by a few feet.",
+      "rep": 3,
+      "once": "user"
+    },
+    {
+      "id": "shrine_offering",
+      "phrases": [
+        "i leave an offering at the old shrine stones",
+        "i make an offering at the shrine stones"
+      ],
+      "response": "🪨 You leave something small on the flattest stone. When you glance back from the treeline, it's already gone.",
+      "reward": "blackened_acorn",
+      "rep": 1,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "howl_back",
+      "phrases": [
+        "i howl back at the wolf trail",
+        "i answer the howling",
+        "i howl back into the dark"
+      ],
+      "time": "night",
+      "response": "🪶 Something far off answers your howl with one of its own. Closer, this time, a single black feather drifts down out of nowhere.",
+      "reward": "raven_feather",
+      "rep": 1,
+      "points": 1,
+      "once": "user"
+    }
+  ]
 }

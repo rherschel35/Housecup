@@ -692,5 +692,153 @@
   "event_drop_boost": {},
   "reveals": {},
   "events": [],
-  "secrets": []
+  "secrets": [
+    {
+      "id": "thornmere_chains",
+      "phrases": [
+        "i test the manacles",
+        "pull on the chains",
+        "i strain against the old chains"
+      ],
+      "requires": {
+        "houses": [
+          "thornmere"
+        ]
+      },
+      "response": "🐺 The chain holds, then doesn't. It was never locked - just old enough to look like it was.",
+      "reward": "manacle_link",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "veyren_vigil",
+      "phrases": [
+        "i stand silent at the shrine",
+        "keep vigil at the shrine",
+        "i watch over the forgotten shrine"
+      ],
+      "requires": {
+        "houses": [
+          "veyren"
+        ]
+      },
+      "response": "🦌 You stand with it a while and say nothing. Nothing answers. But the cold in the room eases, just slightly, just for you.",
+      "reward": "cellar_moss",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "vashara_tend_shrine",
+      "phrases": [
+        "i light a candle at the shrine",
+        "tend the forgotten shrine",
+        "i clean the shrine"
+      ],
+      "requires": {
+        "houses": [
+          "vashara"
+        ]
+      },
+      "response": "🐘 You cup a hand around the last stub of candle and it catches, though you brought no match. Whoever this shrine was for, they're grateful.",
+      "reward": "forgotten_shrine_ash",
+      "rep": 3,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "caldrin_iron_door",
+      "phrases": [
+        "i study the iron door's lock",
+        "examine the iron door",
+        "i map the iron door's mechanism"
+      ],
+      "requires": {
+        "houses": [
+          "caldrin"
+        ]
+      },
+      "response": "🔭 You trace the mechanism with a fingertip until it makes sense. It's not locked. It was just never meant to open outward.",
+      "reward": "chalk_of_shadows",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "moonveil_alchemy",
+      "phrases": [
+        "i test a theory on the alchemy table",
+        "i run an experiment in the alchemy room",
+        "for research purposes"
+      ],
+      "requires": {
+        "houses": [
+          "moonveil"
+        ]
+      },
+      "response": "🌕 You change one variable - just one. The residue in the beaker changes colour to match your own house scarf. You did not expect that.",
+      "reward": "chalk_of_shadows",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "beloved_gift",
+      "phrases": [
+        "i ask the dungeons for a gift",
+        "what would you give me down here",
+        "what's down here for me"
+      ],
+      "requires": {
+        "rep_min": 15
+      },
+      "response": "🪙 Something rolls out from under the storeroom door and stops, deliberately, at your feet.",
+      "reward": "dead_currency_coin",
+      "rep": 1,
+      "points": 2,
+      "once": "user"
+    },
+    {
+      "id": "apology",
+      "phrases": [
+        "i am sorry",
+        "i apologise to the dungeons",
+        "i apologize to the dungeons",
+        "forgive me down here"
+      ],
+      "requires": {
+        "rep_max": -3
+      },
+      "response": "⛓️ You say it into the dark of the long corridor. Somewhere, a chain that's been dragging stops dragging.",
+      "rep": 3,
+      "once": "user"
+    },
+    {
+      "id": "count_cells",
+      "phrases": [
+        "i count the old cells",
+        "count the cells",
+        "i count the doors down here"
+      ],
+      "response": "🍀 You count twelve. You count again and get eleven. You decide not to count a third time.",
+      "reward": "shackle_dust",
+      "rep": 1,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "grate_night",
+      "phrases": [
+        "i listen at the drainage grate at night",
+        "i listen at the grate after dark"
+      ],
+      "time": "night",
+      "response": "🩶 Something below the grate is breathing in a rhythm that isn't yours. You back away slowly and don't look down again.",
+      "reward": "chalk_of_shadows",
+      "rep": 1,
+      "points": 1,
+      "once": "user"
+    }
+  ]
 }
