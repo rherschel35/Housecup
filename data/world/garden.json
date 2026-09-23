@@ -1,3869 +1,3869 @@
 {
- "name": "the Garden",
- "title": "🌿 The Garden",
- "blurb": "The Garden is alive, and it remembers. Flowers move when no wind blows, paths lead where they shouldn't, and the Reflection Pool whispers things nobody told it.",
- "limits": {
-  "explore": 5,
-  "forage": 3
- },
- "item_ids": [
-  "moonbloom_petal",
-  "silverleaf",
-  "dewmint",
-  "whisperwort",
-  "starthistle",
-  "hushroot",
-  "emberleaf",
-  "thornsalt",
-  "fairy_ring_cap",
-  "glowshroom",
-  "inkcap",
-  "hollow_morel",
-  "cracked_crystal",
-  "moonstone_chip",
-  "dew_diamond",
-  "tree_amber",
-  "black_rose",
-  "sunbell",
-  "veil_lily",
-  "ghost_orchid",
-  "wandering_seed",
-  "starseed",
-  "sleeping_acorn",
-  "moth_dust",
-  "sprite_thread",
-  "dragon_scale",
-  "frog_gold",
-  "owl_feather",
-  "heron_plume",
-  "phoenix_down",
-  "hare_whisker",
-  "snail_pearl",
-  "unknown_husk",
-  "strange_key",
-  "pressed_letter",
-  "pool_water",
-  "tree_bark",
-  "lost_button",
-  "map_scrap",
-  "prophecy_leaf"
- ],
- "areas": [
-  {
-   "id": "ancient_tree",
-   "at": "beneath the Ancient Tree",
-   "zones": [
-    "tree",
-    "grove"
-   ],
-   "time": "any",
-   "drops": [
-    "tree_bark",
-    "sleeping_acorn",
-    "tree_amber"
-   ]
+  "name": "the Garden",
+  "title": "🌿 The Garden",
+  "blurb": "The Garden is alive, and it remembers. Flowers move when no wind blows, paths lead where they shouldn't, and the Reflection Pool whispers things nobody told it.",
+  "limits": {
+    "explore": 10,
+    "forage": 5
   },
-  {
-   "id": "tree_roots",
-   "at": "among the knotted roots of the Ancient Tree",
-   "zones": [
-    "tree",
-    "stone"
-   ],
-   "time": "any",
-   "drops": [
-    "tree_bark",
-    "fairy_ring_cap"
-   ]
-  },
-  {
-   "id": "reflection_pool",
-   "at": "at the edge of the Reflection Pool",
-   "zones": [
-    "water"
-   ],
-   "time": "any",
-   "drops": [
-    "pool_water",
-    "dew_diamond"
-   ]
-  },
-  {
-   "id": "pool_steps",
-   "at": "on the mossy steps down to the Reflection Pool",
-   "zones": [
-    "water",
-    "stone"
-   ],
-   "time": "any",
-   "drops": [
-    "pool_water",
-    "snail_pearl"
-   ]
-  },
-  {
-   "id": "moonbloom_meadow",
-   "at": "in the Moonbloom Meadow",
-   "zones": [
-    "meadow",
-    "flowers"
-   ],
-   "time": "any",
-   "drops": [
+  "item_ids": [
     "moonbloom_petal",
-    "sunbell"
-   ]
-  },
-  {
-   "id": "meadow_night",
-   "at": "in the Moonbloom Meadow, where every bloom is open",
-   "zones": [
-    "meadow",
-    "flowers"
-   ],
-   "time": "night",
-   "drops": [
-    "moonbloom_petal",
-    "moonstone_chip"
-   ]
-  },
-  {
-   "id": "herb_terraces",
-   "at": "along the Herb Terraces",
-   "zones": [
-    "herbs"
-   ],
-   "time": "any",
-   "drops": [
     "silverleaf",
     "dewmint",
-    "emberleaf"
-   ]
-  },
-  {
-   "id": "lower_terrace",
-   "at": "on the lowest of the Herb Terraces",
-   "zones": [
-    "herbs",
-    "stone"
-   ],
-   "time": "any",
-   "drops": [
-    "hushroot",
-    "whisperwort"
-   ]
-  },
-  {
-   "id": "rose_walk",
-   "at": "halfway down the Rose Walk",
-   "zones": [
-    "roses",
-    "flowers"
-   ],
-   "time": "any",
-   "drops": [
-    "thornsalt",
-    "black_rose"
-   ]
-  },
-  {
-   "id": "rose_arch",
-   "at": "under the rose arch at the Garden's gate",
-   "zones": [
-    "roses",
-    "stone"
-   ],
-   "time": "any",
-   "drops": [
-    "thornsalt",
-    "lost_button"
-   ]
-  },
-  {
-   "id": "glasshouse",
-   "at": "inside the old glasshouse",
-   "zones": [
-    "glass",
-    "herbs"
-   ],
-   "time": "any",
-   "drops": [
-    "veil_lily",
-    "glowshroom"
-   ]
-  },
-  {
-   "id": "glasshouse_night",
-   "at": "inside the glasshouse, lit only by the plants",
-   "zones": [
-    "glass",
-    "herbs"
-   ],
-   "time": "night",
-   "drops": [
-    "glowshroom",
-    "starthistle"
-   ]
-  },
-  {
-   "id": "reading_alcove",
-   "at": "in the Reading Alcove",
-   "zones": [
-    "alcove",
-    "stone"
-   ],
-   "time": "any",
-   "drops": [
-    "pressed_letter",
-    "prophecy_leaf"
-   ]
-  },
-  {
-   "id": "alcove_bench",
-   "at": "on the crooked bench outside the Reading Alcove",
-   "zones": [
-    "alcove",
-    "stone"
-   ],
-   "time": "any",
-   "drops": [
-    "lost_button",
-    "map_scrap"
-   ]
-  },
-  {
-   "id": "mushroom_hollow",
-   "at": "down in the Mushroom Hollow",
-   "zones": [
-    "wild",
-    "grove"
-   ],
-   "time": "any",
-   "drops": [
-    "fairy_ring_cap",
-    "inkcap",
-    "hollow_morel"
-   ]
-  },
-  {
-   "id": "fern_tunnel",
-   "at": "inside the fern tunnel",
-   "zones": [
-    "wild"
-   ],
-   "time": "any",
-   "drops": [
-    "wandering_seed",
-    "sprite_thread"
-   ]
-  },
-  {
-   "id": "willow_bank",
-   "at": "under the weeping willow by the stream",
-   "zones": [
-    "water",
-    "grove"
-   ],
-   "time": "any",
-   "drops": [
-    "heron_plume",
-    "dewmint"
-   ]
-  },
-  {
-   "id": "stepping_stones",
-   "at": "on the stepping stones across the stream",
-   "zones": [
-    "water",
-    "stone"
-   ],
-   "time": "any",
-   "drops": [
-    "snail_pearl",
-    "pool_water"
-   ]
-  },
-  {
-   "id": "sundial",
-   "at": "beside the broken sundial",
-   "zones": [
-    "stone",
-    "meadow"
-   ],
-   "time": "day",
-   "drops": [
-    "sunbell",
-    "cracked_crystal"
-   ]
-  },
-  {
-   "id": "moon_dial",
-   "at": "beside the broken sundial, which is somehow telling moon-time",
-   "zones": [
-    "stone",
-    "meadow"
-   ],
-   "time": "night",
-   "drops": [
-    "moonstone_chip",
-    "starseed"
-   ]
-  },
-  {
-   "id": "crystal_bed",
-   "at": "at the crystal beds behind the glasshouse",
-   "zones": [
-    "stone",
-    "glass"
-   ],
-   "time": "any",
-   "drops": [
-    "cracked_crystal",
-    "moonstone_chip",
-    "dew_diamond"
-   ]
-  },
-  {
-   "id": "owl_oak",
-   "at": "under the owl oak",
-   "zones": [
-    "tree",
-    "wild"
-   ],
-   "time": "any",
-   "drops": [
-    "owl_feather",
-    "sleeping_acorn"
-   ]
-  },
-  {
-   "id": "bramble_edge",
-   "at": "at the edge of the brambles, where the paths run out",
-   "zones": [
-    "wild",
-    "roses"
-   ],
-   "time": "any",
-   "drops": [
-    "thornsalt",
-    "unknown_husk"
-   ]
-  },
-  {
-   "id": "statue_garden",
-   "at": "among the statues nobody remembers commissioning",
-   "zones": [
-    "stone"
-   ],
-   "time": "any",
-   "drops": [
-    "cracked_crystal",
-    "lost_button"
-   ]
-  },
-  {
-   "id": "lantern_path",
-   "at": "along the lantern path",
-   "zones": [
-    "meadow",
-    "stone"
-   ],
-   "time": "night",
-   "drops": [
-    "moth_dust",
-    "moonbloom_petal"
-   ]
-  },
-  {
-   "id": "sprite_hedge",
-   "at": "by the sprite hedge",
-   "zones": [
-    "wild",
-    "flowers"
-   ],
-   "time": "any",
-   "drops": [
-    "sprite_thread",
-    "veil_lily"
-   ]
-  },
-  {
-   "id": "sunken_garden",
-   "at": "in the sunken garden",
-   "zones": [
-    "stone",
-    "flowers",
-    "water"
-   ],
-   "time": "any",
-   "drops": [
-    "veil_lily",
-    "pool_water"
-   ]
-  },
-  {
-   "id": "orchard",
-   "at": "in the little orchard",
-   "zones": [
-    "tree",
-    "meadow"
-   ],
-   "time": "day",
-   "drops": [
-    "sleeping_acorn",
-    "wandering_seed"
-   ]
-  },
-  {
-   "id": "well",
-   "at": "at the dry well that isn't always dry",
-   "zones": [
-    "stone",
-    "water"
-   ],
-   "time": "any",
-   "drops": [
-    "pool_water",
-    "unknown_husk"
-   ]
-  },
-  {
-   "id": "gardener_shed",
-   "at": "outside the old gardener's shed",
-   "zones": [
-    "herbs",
-    "stone"
-   ],
-   "time": "any",
-   "drops": [
-    "wandering_seed",
-    "lost_button",
-    "map_scrap"
-   ]
-  },
-  {
-   "id": "rose_door",
-   "at": "at the door behind the roses",
-   "zones": [
-    "roses",
-    "stone"
-   ],
-   "time": "any",
-   "drops": [
-    "strange_key",
-    "map_scrap"
-   ],
-   "events": [
-    "door"
-   ]
-  },
-  {
-   "id": "new_path",
-   "at": "on a path you're certain wasn't there yesterday",
-   "zones": [
-    "wild",
-    "grove"
-   ],
-   "time": "any",
-   "drops": [
-    "map_scrap",
-    "starseed",
-    "ghost_orchid"
-   ],
-   "events": [
-    "path"
-   ]
-  }
- ],
- "atmospheres": [
-  {
-   "id": "atm0",
-   "text": "The air smells of rain that hasn't fallen yet.",
-   "mood": "calm",
-   "time": "any",
-   "zones": [
-    "any"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm1",
-   "text": "Everything is very still, as if the Garden is holding its breath.",
-   "mood": "eerie",
-   "time": "any",
-   "zones": [
-    "any"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm2",
-   "text": "Bees drone lazily from bloom to bloom.",
-   "mood": "bright",
-   "time": "day",
-   "zones": [
-    "flowers",
-    "meadow",
-    "herbs"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm3",
-   "text": "Sunlight falls in long gold stripes through the leaves.",
-   "mood": "bright",
-   "time": "day",
-   "zones": [
-    "any"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm4",
-   "text": "A warm breeze carries the smell of crushed mint.",
-   "mood": "calm",
-   "time": "day",
-   "zones": [
-    "herbs"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm5",
-   "text": "Somewhere nearby, water is laughing over stones.",
-   "mood": "calm",
-   "time": "any",
-   "zones": [
-    "water"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm6",
-   "text": "The moon hangs low enough to touch.",
-   "mood": "calm",
-   "time": "night",
-   "zones": [
-    "any"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm7",
-   "text": "Fireflies drift up out of the grass like sparks that forgot to go out.",
-   "mood": "bright",
-   "time": "night",
-   "zones": [
-    "meadow",
-    "flowers",
-    "wild"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm8",
-   "text": "Your footsteps make no sound at all.",
-   "mood": "eerie",
-   "time": "any",
-   "zones": [
-    "any"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm9",
-   "text": "The shadows here are a little longer than the light should allow.",
-   "mood": "eerie",
-   "time": "any",
-   "zones": [
-    "any"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm10",
-   "text": "A cold wind moves through the leaves, but nothing else stirs.",
-   "mood": "ominous",
-   "time": "any",
-   "zones": [
-    "any"
-   ],
-   "not_events": []
-  },
-  {
-   "id": "atm11",
-   "text": "For a moment, every leaf turns to face you.",
-   "mood": "eerie",
-   "time": "any",
-   "zones": [
-    "tree",
-    "wild",
-    "herbs",
-    "grove"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm12",
-   "text": "Mist curls low over the ground, knee-deep and slow.",
-   "mood": "eerie",
-   "time": "night",
-   "zones": [
-    "any"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm13",
-   "text": "The stars are unusually bright tonight, and there seem to be more of them.",
-   "mood": "calm",
-   "time": "night",
-   "zones": [
-    "any"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm14",
-   "text": "Dew beads on every petal, catching the light.",
-   "mood": "bright",
-   "time": "day",
-   "zones": [
-    "flowers",
-    "meadow"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm15",
-   "text": "An owl calls once, then thinks better of it.",
-   "mood": "eerie",
-   "time": "night",
-   "zones": [
-    "any"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm16",
-   "text": "The glass panes hum faintly, like a finger around a wine glass.",
-   "mood": "eerie",
-   "time": "any",
-   "zones": [
-    "glass"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm17",
-   "text": "It smells of old paper and wet stone.",
-   "mood": "calm",
-   "time": "any",
-   "zones": [
-    "alcove",
-    "stone"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm18",
-   "text": "The Garden feels busy today, full of small invisible errands.",
-   "mood": "bright",
-   "time": "day",
-   "zones": [
-    "any"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm19",
-   "text": "Something rustles just beyond the edge of the path.",
-   "mood": "eerie",
-   "time": "any",
-   "zones": [
-    "wild",
-    "grove",
-    "roses"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm20",
-   "text": "The roses are unusually fragrant, almost dizzying.",
-   "mood": "bright",
-   "time": "any",
-   "zones": [
-    "roses"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm21",
-   "text": "A single leaf falls, very slowly, and never quite lands.",
-   "mood": "eerie",
-   "time": "any",
-   "zones": [
-    "tree",
-    "grove"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm22",
-   "text": "The ground is warm underfoot, like something beneath it is sleeping.",
-   "mood": "calm",
-   "time": "any",
-   "zones": [
-    "any"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm23",
-   "text": "Distant bells ring out, though Velmora has no bells that sound like that.",
-   "mood": "ominous",
-   "time": "any",
-   "zones": [
-    "any"
-   ],
-   "not_events": []
-  },
-  {
-   "id": "atm24",
-   "text": "The water is perfectly still, and the reflection in it is not quite yours.",
-   "mood": "ominous",
-   "time": "any",
-   "zones": [
-    "water"
-   ],
-   "not_events": []
-  },
-  {
-   "id": "atm25",
-   "text": "A thin, silver light clings to the edges of everything.",
-   "mood": "calm",
-   "time": "night",
-   "zones": [
-    "any"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm26",
-   "text": "The wind carries voices, too faint to make out.",
-   "mood": "eerie",
-   "time": "any",
-   "zones": [
-    "any"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm27",
-   "text": "Butterflies settle on the path ahead, as if waiting for you.",
-   "mood": "bright",
-   "time": "day",
-   "zones": [
-    "flowers",
-    "meadow",
-    "wild"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm28",
-   "text": "The temperature drops sharply, just for a breath.",
-   "mood": "ominous",
-   "time": "any",
-   "zones": [
-    "any"
-   ],
-   "not_events": []
-  },
-  {
-   "id": "atm29",
-   "text": "The whole Garden smells, impossibly, of fresh bread.",
-   "mood": "bright",
-   "time": "any",
-   "zones": [
-    "any"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm30",
-   "text": "The lanterns flicker in a pattern that's almost a word.",
-   "mood": "eerie",
-   "time": "night",
-   "zones": [
-    "stone",
-    "meadow"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm31",
-   "text": "Petals drift down from a tree that isn't blooming.",
-   "mood": "calm",
-   "time": "any",
-   "zones": [
-    "tree",
-    "grove",
-    "flowers"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm32",
-   "text": "Clouds gather overhead, but only overhead of you.",
-   "mood": "ominous",
-   "time": "day",
-   "zones": [
-    "any"
-   ],
-   "not_events": []
-  },
-  {
-   "id": "atm33",
-   "text": "The ivy on the walls has grown since this morning. You can tell.",
-   "mood": "eerie",
-   "time": "any",
-   "zones": [
-    "stone"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm34",
-   "text": "It's warm and green and perfectly peaceful.",
-   "mood": "calm",
-   "time": "day",
-   "zones": [
-    "any"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm35",
-   "text": "Crickets sing in perfect time with each other.",
-   "mood": "calm",
-   "time": "night",
-   "zones": [
-    "meadow",
-    "wild",
-    "herbs"
-   ],
-   "not_events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm36",
-   "text": "Every flower in sight has turned black.",
-   "mood": "ominous",
-   "time": "any",
-   "zones": [
-    "any"
-   ],
-   "events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm37",
-   "text": "The petals are black as ink, and the air tastes of ash.",
-   "mood": "ominous",
-   "time": "any",
-   "zones": [
-    "any"
-   ],
-   "events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "atm38",
-   "text": "The Ancient Tree's glow reaches even here, gold and green.",
-   "mood": "bright",
-   "time": "any",
-   "zones": [
-    "any"
-   ],
-   "events": [
-    "tree_glow"
-   ]
-  },
-  {
-   "id": "atm39",
-   "text": "The air is thick with moon moths, silver wings everywhere you look.",
-   "mood": "bright",
-   "time": "any",
-   "zones": [
-    "any"
-   ],
-   "events": [
-    "moths"
-   ]
-  }
- ],
- "creatures": [
-  {
-   "id": "moon_moth",
-   "a": "a silver moon moth",
-   "the": "the moth",
-   "kind": "flier",
-   "zones": [
-    "any"
-   ],
-   "time": "night",
-   "moods": [
-    "calm",
-    "bright",
-    "eerie"
-   ],
-   "drops": [
-    "moth_dust"
-   ],
-   "rarity": "common"
-  },
-  {
-   "id": "moth_swarm",
-   "a": "a cloud of moon moths",
-   "the": "the cloud of moths",
-   "kind": "flier",
-   "zones": [
-    "any"
-   ],
-   "time": "any",
-   "moods": [
-    "bright",
-    "calm"
-   ],
-   "drops": [
-    "moth_dust"
-   ],
-   "rarity": "common",
-   "events": [
-    "moths"
-   ]
-  },
-  {
-   "id": "sprite",
-   "a": "a garden sprite no bigger than your thumb",
-   "the": "the sprite",
-   "kind": "flier",
-   "zones": [
-    "flowers",
-    "wild",
-    "herbs",
-    "meadow"
-   ],
-   "time": "any",
-   "moods": [
-    "bright",
-    "calm"
-   ],
-   "drops": [
-    "sprite_thread"
-   ],
-   "rarity": "uncommon"
-  },
-  {
-   "id": "sprites",
-   "a": "a trio of quarrelling sprites",
-   "the": "the smallest sprite",
-   "kind": "flier",
-   "zones": [
-    "flowers",
-    "wild",
-    "meadow"
-   ],
-   "time": "day",
-   "moods": [
-    "bright"
-   ],
-   "drops": [
-    "sprite_thread"
-   ],
-   "rarity": "uncommon"
-  },
-  {
-   "id": "tiny_dragon",
-   "a": "a tiny green dragon",
-   "the": "the dragon",
-   "kind": "walker",
-   "zones": [
-    "stone",
-    "glass",
-    "herbs"
-   ],
-   "time": "any",
-   "moods": [
-    "bright",
-    "calm",
-    "eerie"
-   ],
-   "drops": [
-    "dragon_scale"
-   ],
-   "rarity": "rare",
-   "house_weight": {
-    "caldrin": 3
-   }
-  },
-  {
-   "id": "dragon_sleeping",
-   "a": "a tiny dragon curled up asleep",
-   "the": "the dragon",
-   "kind": "walker",
-   "zones": [
-    "stone",
-    "tree",
-    "glass"
-   ],
-   "time": "any",
-   "moods": [
-    "calm"
-   ],
-   "drops": [
-    "dragon_scale"
-   ],
-   "rarity": "rare"
-  },
-  {
-   "id": "frog",
-   "a": "an enchanted frog wearing a very small crown",
-   "the": "the frog",
-   "kind": "hopper",
-   "zones": [
-    "water"
-   ],
-   "time": "any",
-   "moods": [
-    "calm",
-    "bright",
-    "eerie"
-   ],
-   "drops": [
-    "pool_water"
-   ],
-   "rarity": "uncommon"
-  },
-  {
-   "id": "golden_frog",
-   "a": "a golden frog with a merchant's eyes",
-   "the": "the golden frog",
-   "kind": "hopper",
-   "zones": [
-    "water",
-    "stone",
-    "meadow"
-   ],
-   "time": "any",
-   "moods": [
-    "bright",
-    "eerie",
-    "calm"
-   ],
-   "drops": [
-    "frog_gold"
-   ],
-   "rarity": "very_rare",
-   "events": [
-    "frog"
-   ]
-  },
-  {
-   "id": "toad",
-   "a": "a fat, unimpressed toad",
-   "the": "the toad",
-   "kind": "hopper",
-   "zones": [
-    "water",
-    "herbs",
-    "stone"
-   ],
-   "time": "any",
-   "moods": [
-    "calm",
-    "eerie"
-   ],
-   "drops": [
-    "pool_water"
-   ],
-   "rarity": "common"
-  },
-  {
-   "id": "moon_hare",
-   "a": "a white moon-hare",
-   "the": "the hare",
-   "kind": "hopper",
-   "zones": [
-    "meadow",
-    "grove",
-    "wild"
-   ],
-   "time": "night",
-   "moods": [
-    "calm",
-    "eerie"
-   ],
-   "drops": [
-    "hare_whisker"
-   ],
-   "rarity": "uncommon",
-   "house_weight": {
-    "moonveil": 4
-   }
-  },
-  {
-   "id": "hedgehog",
-   "a": "a hedgehog with moss growing on its spines",
-   "the": "the hedgehog",
-   "kind": "walker",
-   "zones": [
-    "herbs",
-    "wild",
-    "grove"
-   ],
-   "time": "any",
-   "moods": [
-    "calm",
-    "bright"
-   ],
-   "drops": [
-    "wandering_seed"
-   ],
-   "rarity": "common",
-   "house_weight": {
-    "veyren": 2
-   }
-  },
-  {
-   "id": "fox",
-   "a": "a silver fox that is definitely watching you",
-   "the": "the fox",
-   "kind": "walker",
-   "zones": [
-    "wild",
-    "grove",
-    "meadow"
-   ],
-   "time": "any",
-   "moods": [
-    "eerie",
-    "calm"
-   ],
-   "drops": [
-    "hare_whisker"
-   ],
-   "rarity": "uncommon",
-   "house_weight": {
-    "thornmere": 2
-   }
-  },
-  {
-   "id": "owl",
-   "a": "a barn owl",
-   "the": "the owl",
-   "kind": "flier",
-   "zones": [
-    "tree",
-    "wild",
-    "grove"
-   ],
-   "time": "night",
-   "moods": [
-    "eerie",
-    "calm"
-   ],
-   "drops": [
-    "owl_feather"
-   ],
-   "rarity": "common",
-   "house_weight": {
-    "caldrin": 3
-   }
-  },
-  {
-   "id": "heron",
-   "a": "a grey heron standing on one leg",
-   "the": "the heron",
-   "kind": "walker",
-   "zones": [
-    "water"
-   ],
-   "time": "day",
-   "moods": [
-    "calm"
-   ],
-   "drops": [
-    "heron_plume"
-   ],
-   "rarity": "uncommon"
-  },
-  {
-   "id": "snail",
-   "a": "a snail with a shell like stained glass",
-   "the": "the snail",
-   "kind": "crawler",
-   "zones": [
-    "stone",
-    "herbs",
-    "water",
-    "glass"
-   ],
-   "time": "any",
-   "moods": [
-    "calm",
-    "bright"
-   ],
-   "drops": [
-    "snail_pearl"
-   ],
-   "rarity": "uncommon",
-   "house_weight": {
-    "vashara": 2
-   }
-  },
-  {
-   "id": "beetle",
-   "a": "a jewel-green beetle",
-   "the": "the beetle",
-   "kind": "crawler",
-   "zones": [
-    "any"
-   ],
-   "time": "day",
-   "moods": [
-    "bright",
-    "calm"
-   ],
-   "drops": [
-    "wandering_seed"
-   ],
-   "rarity": "common"
-  },
-  {
-   "id": "bees",
-   "a": "a line of bees walking, not flying",
-   "the": "the lead bee",
-   "kind": "crawler",
-   "zones": [
-    "flowers",
-    "meadow",
-    "herbs"
-   ],
-   "time": "day",
-   "moods": [
-    "bright",
-    "eerie"
-   ],
-   "drops": [
-    "sunbell"
-   ],
-   "rarity": "common"
-  },
-  {
-   "id": "spider",
-   "a": "a spider weaving letters into its web",
-   "the": "the spider",
-   "kind": "crawler",
-   "zones": [
-    "stone",
-    "alcove",
-    "wild",
-    "glass"
-   ],
-   "time": "any",
-   "moods": [
-    "eerie"
-   ],
-   "drops": [
-    "sprite_thread"
-   ],
-   "rarity": "uncommon"
-  },
-  {
-   "id": "raven",
-   "a": "a raven that knows your name",
-   "the": "the raven",
-   "kind": "flier",
-   "zones": [
-    "tree",
-    "stone",
-    "alcove"
-   ],
-   "time": "any",
-   "moods": [
-    "eerie",
-    "ominous"
-   ],
-   "drops": [
-    "owl_feather"
-   ],
-   "rarity": "uncommon"
-  },
-  {
-   "id": "hummingbird",
-   "a": "a hummingbird made of light",
-   "the": "the hummingbird",
-   "kind": "flier",
-   "zones": [
-    "flowers",
-    "glass",
-    "meadow"
-   ],
-   "time": "day",
-   "moods": [
-    "bright"
-   ],
-   "drops": [
-    "veil_lily"
-   ],
-   "rarity": "rare"
-  },
-  {
-   "id": "koi",
-   "a": "a pale koi with gold writing on its scales",
-   "the": "the koi",
-   "kind": "swimmer",
-   "zones": [
-    "water"
-   ],
-   "time": "any",
-   "moods": [
-    "calm",
-    "eerie"
-   ],
-   "drops": [
-    "dew_diamond"
-   ],
-   "rarity": "rare"
-  },
-  {
-   "id": "newt",
-   "a": "a fire-red newt",
-   "the": "the newt",
-   "kind": "crawler",
-   "zones": [
-    "water",
-    "stone"
-   ],
-   "time": "any",
-   "moods": [
-    "calm",
-    "bright"
-   ],
-   "drops": [
-    "emberleaf"
-   ],
-   "rarity": "common"
-  },
-  {
-   "id": "mole",
-   "a": "a mole wearing tiny spectacles",
-   "the": "the mole",
-   "kind": "walker",
-   "zones": [
-    "herbs",
-    "meadow",
-    "stone"
-   ],
-   "time": "any",
-   "moods": [
-    "calm",
-    "bright"
-   ],
-   "drops": [
-    "cracked_crystal"
-   ],
-   "rarity": "uncommon"
-  },
-  {
-   "id": "squirrel",
-   "a": "a squirrel hoarding something that glows",
-   "the": "the squirrel",
-   "kind": "walker",
-   "zones": [
-    "tree",
-    "grove"
-   ],
-   "time": "day",
-   "moods": [
-    "bright"
-   ],
-   "drops": [
-    "sleeping_acorn"
-   ],
-   "rarity": "common"
-  },
-  {
-   "id": "lantern_bug",
-   "a": "a lantern-bug the size of a plum",
-   "the": "the lantern-bug",
-   "kind": "flier",
-   "zones": [
-    "any"
-   ],
-   "time": "night",
-   "moods": [
-    "calm",
-    "eerie",
-    "bright"
-   ],
-   "drops": [
-    "glowshroom"
-   ],
-   "rarity": "uncommon"
-  },
-  {
-   "id": "shadow",
-   "a": "a shape in the shadows that no one has ever identified",
-   "the": "the shape",
-   "kind": "unknown",
-   "zones": [
-    "wild",
-    "grove",
-    "stone"
-   ],
-   "time": "any",
-   "moods": [
-    "eerie",
-    "ominous"
-   ],
-   "drops": [
-    "unknown_husk"
-   ],
-   "rarity": "rare"
-  },
-  {
-   "id": "vine_thing",
-   "a": "something small and leafy that pretends to be a plant when you look",
-   "the": "the leafy thing",
-   "kind": "unknown",
-   "zones": [
-    "herbs",
-    "wild",
-    "glass"
-   ],
-   "time": "any",
-   "moods": [
-    "eerie",
-    "bright"
-   ],
-   "drops": [
-    "wandering_seed"
-   ],
-   "rarity": "uncommon",
-   "house_weight": {
-    "moonveil": 3
-   }
-  },
-  {
-   "id": "pool_eye",
-   "a": "an eye in the water that is not a reflection",
-   "the": "the eye",
-   "kind": "unknown",
-   "zones": [
-    "water"
-   ],
-   "time": "any",
-   "moods": [
-    "ominous",
-    "eerie"
-   ],
-   "drops": [
-    "pool_water"
-   ],
-   "rarity": "rare"
-  },
-  {
-   "id": "crows",
-   "a": "a parliament of silent crows",
-   "the": "the eldest crow",
-   "kind": "flier",
-   "zones": [
-    "tree",
-    "stone",
-    "wild"
-   ],
-   "time": "any",
-   "moods": [
-    "ominous",
-    "eerie"
-   ],
-   "drops": [
-    "owl_feather"
-   ],
-   "rarity": "uncommon"
-  },
-  {
-   "id": "deer",
-   "a": "a young stag with frost on its antlers",
-   "the": "the stag",
-   "kind": "walker",
-   "zones": [
-    "meadow",
-    "grove",
-    "wild"
-   ],
-   "time": "any",
-   "moods": [
-    "calm",
-    "eerie"
-   ],
-   "drops": [
-    "hare_whisker"
-   ],
-   "rarity": "rare",
-   "house_weight": {
-    "veyren": 5
-   }
-  },
-  {
-   "id": "wolf_pup",
-   "a": "a wolf pup who seems very lost",
-   "the": "the pup",
-   "kind": "walker",
-   "zones": [
-    "wild",
-    "grove"
-   ],
-   "time": "any",
-   "moods": [
-    "calm",
-    "eerie"
-   ],
-   "drops": [
-    "hare_whisker"
-   ],
-   "rarity": "rare",
-   "house_weight": {
-    "thornmere": 5
-   }
-  },
-  {
-   "id": "elephant_shrew",
-   "a": "an elephant shrew carrying a leaf like a banner",
-   "the": "the shrew",
-   "kind": "walker",
-   "zones": [
-    "herbs",
-    "meadow",
-    "stone"
-   ],
-   "time": "day",
-   "moods": [
-    "bright",
-    "calm"
-   ],
-   "drops": [
-    "silverleaf"
-   ],
-   "rarity": "uncommon",
-   "house_weight": {
-    "vashara": 5
-   }
-  }
- ],
- "actions": [
-  {
-   "id": "act0",
-   "text": "circling",
-   "kinds": [
-    "flier"
-   ]
-  },
-  {
-   "id": "act1",
-   "text": "hovering over",
-   "kinds": [
-    "flier"
-   ]
-  },
-  {
-   "id": "act2",
-   "text": "landing, very carefully, on",
-   "kinds": [
-    "flier"
-   ]
-  },
-  {
-   "id": "act3",
-   "text": "sniffing at",
-   "kinds": [
-    "walker",
-    "hopper"
-   ]
-  },
-  {
-   "id": "act4",
-   "text": "guarding",
-   "kinds": [
-    "walker",
-    "hopper",
-    "flier",
-    "unknown",
-    "crawler"
-   ]
-  },
-  {
-   "id": "act5",
-   "text": "nudging",
-   "kinds": [
-    "walker",
-    "hopper"
-   ]
-  },
-  {
-   "id": "act6",
-   "text": "sitting perfectly still beside",
-   "kinds": [
-    "walker",
-    "hopper",
-    "flier"
-   ]
-  },
-  {
-   "id": "act7",
-   "text": "trying to drag away",
-   "kinds": [
-    "walker",
-    "crawler",
-    "hopper"
-   ]
-  },
-  {
-   "id": "act8",
-   "text": "crawling slowly across",
-   "kinds": [
-    "crawler"
-   ]
-  },
-  {
-   "id": "act9",
-   "text": "hiding behind",
-   "kinds": [
-    "walker",
-    "hopper",
-    "crawler",
-    "unknown"
-   ]
-  },
-  {
-   "id": "act10",
-   "text": "staring at",
-   "kinds": [
-    "walker",
-    "hopper",
-    "flier",
-    "unknown",
-    "swimmer"
-   ]
-  },
-  {
-   "id": "act11",
-   "text": "tapping",
-   "kinds": [
-    "flier",
-    "walker"
-   ]
-  },
-  {
-   "id": "act12",
-   "text": "curled up against",
-   "kinds": [
-    "walker",
-    "crawler"
-   ]
-  },
-  {
-   "id": "act13",
-   "text": "swimming slow circles beneath",
-   "kinds": [
-    "swimmer"
-   ]
-  },
-  {
-   "id": "act14",
-   "text": "watching you from behind",
-   "kinds": [
-    "walker",
-    "hopper",
-    "unknown",
-    "flier"
-   ]
-  },
-  {
-   "id": "act15",
-   "text": "humming to",
-   "kinds": [
-    "flier",
-    "unknown"
-   ]
-  },
-  {
-   "id": "act16",
-   "text": "polishing",
-   "kinds": [
-    "walker",
-    "crawler"
-   ]
-  },
-  {
-   "id": "act17",
-   "text": "arguing with",
-   "kinds": [
-    "flier",
-    "walker",
-    "hopper"
-   ]
-  }
- ],
- "objects": [
-  {
-   "id": "crystal",
-   "a": "a cracked crystal",
-   "the": "the crystal",
-   "zones": [
-    "stone",
-    "glass",
-    "any"
-   ],
-   "drops": [
-    "cracked_crystal"
-   ],
-   "rarity": "common"
-  },
-  {
-   "id": "moonstone",
-   "a": "a moonstone half-buried in moss",
-   "the": "the moonstone",
-   "zones": [
-    "stone",
-    "meadow",
-    "grove"
-   ],
-   "drops": [
-    "moonstone_chip"
-   ],
-   "rarity": "uncommon"
-  },
-  {
-   "id": "teacup",
-   "a": "an overturned porcelain teacup",
-   "the": "the teacup",
-   "zones": [
-    "any"
-   ],
-   "drops": [
-    "lost_button"
-   ],
-   "rarity": "common"
-  },
-  {
-   "id": "book",
-   "a": "a book with no title on its spine",
-   "the": "the book",
-   "zones": [
-    "alcove",
-    "stone",
-    "tree"
-   ],
-   "drops": [
-    "pressed_letter",
-    "prophecy_leaf"
-   ],
-   "rarity": "uncommon"
-  },
-  {
-   "id": "button",
-   "a": "a brass button engraved with a V",
-   "the": "the button",
-   "zones": [
-    "any"
-   ],
-   "drops": [
-    "lost_button"
-   ],
-   "rarity": "common"
-  },
-  {
-   "id": "lantern",
-   "a": "a lantern that is still warm",
-   "the": "the lantern",
-   "zones": [
-    "stone",
-    "meadow",
-    "alcove"
-   ],
-   "drops": [
-    "moth_dust"
-   ],
-   "rarity": "common"
-  },
-  {
-   "id": "feather",
-   "a": "a single white feather",
-   "the": "the feather",
-   "zones": [
-    "any"
-   ],
-   "drops": [
-    "owl_feather"
-   ],
-   "rarity": "common"
-  },
-  {
-   "id": "seed_pod",
-   "a": "a seed pod that ticks like a clock",
-   "the": "the seed pod",
-   "zones": [
-    "herbs",
-    "meadow",
-    "wild",
-    "glass"
-   ],
-   "drops": [
-    "wandering_seed",
-    "starseed"
-   ],
-   "rarity": "uncommon"
-  },
-  {
-   "id": "mirror",
-   "a": "a hand mirror, face-down",
-   "the": "the mirror",
-   "zones": [
-    "stone",
-    "water",
-    "alcove"
-   ],
-   "drops": [
-    "pool_water"
-   ],
-   "rarity": "uncommon"
-  },
-  {
-   "id": "acorn",
-   "a": "an acorn that is snoring",
-   "the": "the acorn",
-   "zones": [
-    "tree",
-    "grove"
-   ],
-   "drops": [
-    "sleeping_acorn"
-   ],
-   "rarity": "common"
-  },
-  {
-   "id": "ring",
-   "a": "a ring of mushrooms",
-   "the": "the ring of mushrooms",
-   "zones": [
-    "wild",
-    "grove",
-    "meadow"
-   ],
-   "drops": [
-    "fairy_ring_cap"
-   ],
-   "rarity": "common"
-  },
-  {
-   "id": "letter",
-   "a": "a folded letter sealed with green wax",
-   "the": "the letter",
-   "zones": [
-    "alcove",
-    "stone",
-    "roses"
-   ],
-   "drops": [
-    "pressed_letter"
-   ],
-   "rarity": "uncommon"
-  },
-  {
-   "id": "trowel",
-   "a": "a rusted trowel",
-   "the": "the trowel",
-   "zones": [
-    "herbs",
-    "glass",
-    "stone"
-   ],
-   "drops": [
-    "wandering_seed"
-   ],
-   "rarity": "common"
-  },
-  {
-   "id": "rose_black",
-   "a": "a single black rose",
-   "the": "the black rose",
-   "zones": [
-    "roses",
-    "flowers"
-   ],
-   "drops": [
-    "black_rose"
-   ],
-   "rarity": "rare"
-  },
-  {
-   "id": "glowing_root",
-   "a": "a root glowing through the soil",
-   "the": "the root",
-   "zones": [
-    "tree",
-    "grove",
-    "herbs"
-   ],
-   "drops": [
-    "tree_bark"
-   ],
-   "rarity": "uncommon"
-  },
-  {
-   "id": "egg",
-   "a": "a speckled egg, much too warm",
-   "the": "the egg",
-   "zones": [
-    "tree",
-    "wild",
-    "stone"
-   ],
-   "drops": [
-    "dragon_scale"
-   ],
-   "rarity": "rare"
-  },
-  {
-   "id": "sundial_shadow",
-   "a": "a shadow with nothing to cast it",
-   "the": "the shadow",
-   "zones": [
-    "stone",
-    "meadow"
-   ],
-   "drops": [
-    "unknown_husk"
-   ],
-   "rarity": "rare"
-  },
-  {
-   "id": "chalk_mark",
-   "a": "a chalk circle nobody admits to drawing",
-   "the": "the circle",
-   "zones": [
-    "stone",
-    "alcove"
-   ],
-   "drops": [
-    "prophecy_leaf"
-   ],
-   "rarity": "uncommon"
-  },
-  {
-   "id": "jar",
-   "a": "a jar of fireflies with the lid off",
-   "the": "the jar",
-   "zones": [
-    "meadow",
-    "glass",
-    "stone"
-   ],
-   "drops": [
-    "moth_dust"
-   ],
-   "rarity": "common"
-  },
-  {
-   "id": "map",
-   "a": "a scrap of map pinned under a stone",
-   "the": "the map",
-   "zones": [
-    "stone",
-    "wild",
-    "alcove"
-   ],
-   "drops": [
-    "map_scrap"
-   ],
-   "rarity": "rare"
-  },
-  {
-   "id": "dew_drop",
-   "a": "a drop of dew that won't fall",
-   "the": "the dewdrop",
-   "zones": [
-    "flowers",
-    "meadow",
-    "herbs"
-   ],
-   "drops": [
-    "dew_diamond"
-   ],
-   "rarity": "rare"
-  },
-  {
-   "id": "thorn_crown",
-   "a": "a crown woven from thorns",
-   "the": "the crown",
-   "zones": [
-    "roses"
-   ],
-   "drops": [
-    "thornsalt"
-   ],
-   "rarity": "uncommon"
-  },
-  {
-   "id": "watering_can",
-   "a": "a watering can that's always full",
-   "the": "the watering can",
-   "zones": [
-    "herbs",
-    "glass",
-    "flowers"
-   ],
-   "drops": [
-    "dewmint"
-   ],
-   "rarity": "common"
-  },
-  {
-   "id": "candle",
-   "a": "a candle burning with a green flame",
-   "the": "the candle",
-   "zones": [
-    "alcove",
-    "stone",
-    "glass"
-   ],
-   "drops": [
-    "emberleaf"
-   ],
-   "rarity": "uncommon"
-  },
-  {
-   "id": "bell",
-   "a": "a tiny silver bell hanging from nothing",
-   "the": "the bell",
-   "zones": [
-    "any"
-   ],
-   "drops": [
-    "sunbell"
-   ],
-   "rarity": "uncommon"
-  },
-  {
-   "id": "orchid",
-   "a": "a ghost-white orchid",
-   "the": "the orchid",
-   "zones": [
-    "glass",
-    "flowers",
-    "wild"
-   ],
-   "drops": [
-    "ghost_orchid"
-   ],
-   "rarity": "very_rare"
-  },
-  {
-   "id": "amber",
-   "a": "a bead of golden sap",
-   "the": "the sap",
-   "zones": [
-    "tree"
-   ],
-   "drops": [
-    "tree_amber"
-   ],
-   "rarity": "very_rare"
-  },
-  {
-   "id": "key",
-   "a": "a strange key",
-   "the": "the key",
-   "zones": [
-    "stone",
-    "alcove",
-    "roses"
-   ],
-   "drops": [
-    "strange_key"
-   ],
-   "rarity": "very_rare",
-   "events": [
-    "key"
-   ]
-  },
-  {
-   "id": "frog_coin",
-   "a": "a pile of tiny golden coins",
-   "the": "the coins",
-   "zones": [
-    "water",
-    "stone"
-   ],
-   "drops": [
-    "frog_gold"
-   ],
-   "rarity": "rare",
-   "events": [
-    "frog"
-   ]
-  },
-  {
-   "id": "statue_hand",
-   "a": "a stone hand, palm up, as if asking for something",
-   "the": "the stone hand",
-   "zones": [
-    "stone"
-   ],
-   "drops": [
-    "cracked_crystal"
-   ],
-   "rarity": "uncommon"
-  }
- ],
- "discoveries": [
-  {
-   "id": "dis0",
-   "text": "a ring of mushrooms has grown here overnight",
-   "zones": [
-    "wild",
-    "grove",
-    "meadow"
-   ],
-   "time": "any",
-   "drops": [
-    "fairy_ring_cap"
-   ],
-   "plant": true,
-   "the": "the plant"
-  },
-  {
-   "id": "dis1",
-   "text": "someone has planted a single flower in the exact middle of the path",
-   "zones": [
-    "any"
-   ],
-   "time": "any",
-   "drops": [
-    "wandering_seed"
-   ],
-   "plant": true,
-   "the": "the plant"
-  },
-  {
-   "id": "dis2",
-   "text": "the moss has grown into the shape of a word you almost recognise",
-   "zones": [
-    "stone",
-    "tree",
-    "grove"
-   ],
-   "time": "any",
-   "drops": [
-    "prophecy_leaf"
-   ],
-   "plant": true,
-   "the": "the plant"
-  },
-  {
-   "id": "dis3",
-   "text": "a trail of silver footprints leads away and simply stops",
-   "zones": [
-    "any"
-   ],
-   "time": "night",
-   "drops": [
-    "moth_dust"
-   ]
-  },
-  {
-   "id": "dis4",
-   "text": "the herbs have rearranged themselves into alphabetical order",
-   "zones": [
-    "herbs",
-    "glass"
-   ],
-   "time": "any",
-   "drops": [
-    "silverleaf",
-    "dewmint"
-   ],
-   "plant": true,
-   "the": "the plant"
-  },
-  {
-   "id": "dis5",
-   "text": "there's a door-shaped outline in the hedge",
-   "zones": [
-    "wild",
-    "roses"
-   ],
-   "time": "any",
-   "drops": [
-    "map_scrap"
-   ]
-  },
-  {
-   "id": "dis6",
-   "text": "a patch of flowers here is blooming out of season",
-   "zones": [
-    "flowers",
-    "meadow"
-   ],
-   "time": "any",
-   "drops": [
-    "moonbloom_petal",
-    "veil_lily"
-   ],
-   "plant": true,
-   "the": "the plant"
-  },
-  {
-   "id": "dis7",
-   "text": "the water has frozen into a perfect circle, in the middle of summer",
-   "zones": [
-    "water"
-   ],
-   "time": "any",
-   "drops": [
-    "dew_diamond"
-   ]
-  },
-  {
-   "id": "dis8",
-   "text": "there's a bench here that wasn't here yesterday",
-   "zones": [
-    "stone",
-    "meadow",
-    "alcove"
-   ],
-   "time": "any",
-   "drops": [
-    "lost_button"
-   ]
-  },
-  {
-   "id": "dis9",
-   "text": "the vines have written something in the dust",
-   "zones": [
-    "stone",
-    "alcove",
-    "glass"
-   ],
-   "time": "any",
-   "drops": [
-    "prophecy_leaf"
-   ]
-  },
-  {
-   "id": "dis10",
-   "text": "a dozen crystals have pushed up through the soil like teeth",
-   "zones": [
-    "stone",
-    "glass"
-   ],
-   "time": "any",
-   "drops": [
-    "cracked_crystal",
-    "moonstone_chip"
-   ]
-  },
-  {
-   "id": "dis11",
-   "text": "the petals on the ground spell out the start of a name",
-   "zones": [
-    "flowers",
-    "roses",
-    "meadow"
-   ],
-   "time": "any",
-   "drops": [
-    "moonbloom_petal"
-   ]
-  },
-  {
-   "id": "dis12",
-   "text": "someone left a cup of tea here. It's still hot",
-   "zones": [
-    "any"
-   ],
-   "time": "any",
-   "drops": [
-    "dewmint"
-   ]
-  },
-  {
-   "id": "dis13",
-   "text": "the shadows are pointing the wrong way",
-   "zones": [
-    "any"
-   ],
-   "time": "day",
-   "drops": [
-    "unknown_husk"
-   ]
-  },
-  {
-   "id": "dis14",
-   "text": "every leaf on one branch is silver",
-   "zones": [
-    "tree",
-    "grove"
-   ],
-   "time": "any",
-   "drops": [
-    "silverleaf",
-    "tree_bark"
-   ],
-   "plant": true,
-   "the": "the plant"
-  },
-  {
-   "id": "dis15",
-   "text": "a book lies open, its pages turning slowly by themselves",
-   "zones": [
-    "alcove",
-    "stone"
-   ],
-   "time": "any",
-   "drops": [
-    "pressed_letter",
-    "prophecy_leaf"
-   ]
-  },
-  {
-   "id": "dis16",
-   "text": "a small garden has been planted inside a teacup",
-   "zones": [
-    "glass",
-    "herbs"
-   ],
-   "time": "any",
-   "drops": [
-    "wandering_seed"
-   ],
-   "plant": true,
-   "the": "the plant"
-  },
-  {
-   "id": "dis17",
-   "text": "the glass panes are fogged from the inside, and someone has drawn a smiling face",
-   "zones": [
-    "glass"
-   ],
-   "time": "any",
-   "drops": [
-    "veil_lily"
-   ]
-  },
-  {
-   "id": "dis18",
-   "text": "there are tiny footprints all over the soil, far too many to count",
-   "zones": [
-    "herbs",
-    "wild",
-    "meadow"
-   ],
-   "time": "any",
-   "drops": [
-    "sprite_thread"
-   ]
-  },
-  {
-   "id": "dis19",
-   "text": "the stepping stones have rearranged into a spiral",
-   "zones": [
-    "water",
-    "stone"
-   ],
-   "time": "any",
-   "drops": [
-    "snail_pearl"
-   ]
-  },
-  {
-   "id": "dis20",
-   "text": "a lantern is burning here with nobody to hold it",
-   "zones": [
-    "stone",
-    "meadow"
-   ],
-   "time": "night",
-   "drops": [
-    "moth_dust"
-   ]
-  },
-  {
-   "id": "dis21",
-   "text": "a seed has sprouted in your footprint from a moment ago",
-   "zones": [
-    "any"
-   ],
-   "time": "any",
-   "drops": [
-    "wandering_seed",
-    "starseed"
-   ],
-   "plant": true,
-   "the": "the plant"
-  },
-  {
-   "id": "dis22",
-   "text": "the roses have all turned their heads the same way",
-   "zones": [
-    "roses"
-   ],
-   "time": "any",
-   "drops": [
-    "thornsalt"
-   ],
-   "plant": true,
-   "the": "the plant"
-  },
-  {
-   "id": "dis23",
-   "text": "there's warm light coming from under the soil",
-   "zones": [
-    "herbs",
-    "meadow",
-    "tree"
-   ],
-   "time": "night",
-   "drops": [
-    "glowshroom"
-   ]
-  },
-  {
-   "id": "dis24",
-   "text": "a statue's head has turned since the last time anyone looked",
-   "zones": [
-    "stone"
-   ],
-   "time": "any",
-   "drops": [
-    "cracked_crystal"
-   ]
-  },
-  {
-   "id": "dis25",
-   "text": "the fog has settled into the shape of a person sitting",
-   "zones": [
-    "any"
-   ],
-   "time": "night",
-   "drops": [
-    "hushroot"
-   ]
-  },
-  {
-   "id": "dis26",
-   "text": "somebody has carved initials into the bark, very recently",
-   "zones": [
-    "tree",
-    "grove"
-   ],
-   "time": "any",
-   "drops": [
-    "tree_bark"
-   ]
-  },
-  {
-   "id": "dis27",
-   "text": "a ribbon is tied around a branch, in House colours",
-   "zones": [
-    "tree",
-    "grove",
-    "wild"
-   ],
-   "time": "any",
-   "drops": [
-    "sprite_thread"
-   ]
-  },
-  {
-   "id": "dis28",
-   "text": "the well has water in it today, and it is humming",
-   "zones": [
-    "water",
-    "stone"
-   ],
-   "time": "any",
-   "drops": [
-    "pool_water"
-   ]
-  },
-  {
-   "id": "dis29",
-   "text": "a single star has fallen into the grass and is still glowing",
-   "zones": [
-    "meadow"
-   ],
-   "time": "night",
-   "drops": [
+    "whisperwort",
     "starthistle",
-    "starseed"
-   ]
-  },
-  {
-   "id": "dis30",
-   "text": "the Reflection Pool shows the sky from a different night",
-   "zones": [
-    "water"
-   ],
-   "time": "any",
-   "drops": [
-    "pool_water"
-   ]
-  },
-  {
-   "id": "dis31",
-   "text": "every mushroom here has turned to face the Ancient Tree",
-   "zones": [
-    "wild",
-    "grove"
-   ],
-   "time": "any",
-   "drops": [
+    "hushroot",
+    "emberleaf",
+    "thornsalt",
+    "fairy_ring_cap",
     "glowshroom",
-    "hollow_morel"
-   ]
-  },
-  {
-   "id": "dis32",
-   "text": "the sundial's shadow is moving backwards",
-   "zones": [
-    "stone"
-   ],
-   "time": "day",
-   "drops": [
-    "cracked_crystal"
-   ]
-  },
-  {
-   "id": "dis33",
-   "text": "there's a neat row of pebbles, largest to smallest, leading into the ferns",
-   "zones": [
-    "wild",
-    "stone"
-   ],
-   "time": "any",
-   "drops": [
-    "map_scrap"
-   ]
-  },
-  {
-   "id": "dis34",
-   "text": "the thorns on the roses have fallen out and lie in a perfect circle",
-   "zones": [
-    "roses"
-   ],
-   "time": "any",
-   "drops": [
-    "thornsalt"
-   ],
-   "plant": true,
-   "the": "the plant"
-  },
-  {
-   "id": "dis35",
-   "text": "the air shimmers here like heat off stone",
-   "zones": [
-    "any"
-   ],
-   "time": "day",
-   "drops": [
-    "emberleaf"
-   ]
-  },
-  {
-   "id": "dis36",
-   "text": "someone has hung wind chimes made of bones. Small bones",
-   "zones": [
-    "wild",
-    "grove"
-   ],
-   "time": "any",
-   "drops": [
-    "unknown_husk"
-   ],
-   "moods": [
-    "ominous"
-   ]
-  },
-  {
-   "id": "dis37",
-   "text": "the earth here has been dug up, and then carefully put back",
-   "zones": [
-    "herbs",
-    "wild",
-    "grove"
-   ],
-   "time": "any",
-   "drops": [
-    "unknown_husk"
-   ],
-   "moods": [
-    "ominous"
-   ]
-  },
-  {
-   "id": "dis38",
-   "text": "a doorway of woven willow stands in the middle of nowhere",
-   "zones": [
-    "water",
-    "grove"
-   ],
-   "time": "any",
-   "drops": [
-    "map_scrap"
-   ]
-  },
-  {
-   "id": "dis39",
-   "text": "the Ancient Tree has dropped a single leaf with writing on it",
-   "zones": [
-    "tree"
-   ],
-   "time": "any",
-   "drops": [
-    "prophecy_leaf"
-   ]
-  },
-  {
-   "id": "dis40",
-   "text": "a ring of wolf tracks circles the path, then heads for the brambles - and there's a thorn crown left in the middle",
-   "zones": [
-    "wild",
-    "grove",
-    "roses"
-   ],
-   "time": "any",
-   "drops": [
-    "thornsalt"
-   ],
-   "requires": {
-    "houses": [
-     "thornmere"
-    ]
-   },
-   "flags": [
-    "saw_wolf_ring"
-   ]
-  },
-  {
-   "id": "dis41",
-   "text": "a young stag has left its shed antler velvet on a low branch, as if hung there for someone",
-   "zones": [
-    "meadow",
-    "grove",
-    "wild"
-   ],
-   "time": "any",
-   "drops": [
-    "hare_whisker"
-   ],
-   "requires": {
-    "houses": [
-     "veyren"
-    ]
-   },
-   "flags": [
-    "saw_stag_gift"
-   ]
-  },
-  {
-   "id": "dis42",
-   "text": "a bed of healing herbs has grown in the shape of an elephant, trunk raised",
-   "zones": [
-    "herbs",
-    "glass",
-    "meadow"
-   ],
-   "time": "any",
-   "drops": [
-    "dewmint",
-    "silverleaf"
-   ],
-   "requires": {
-    "houses": [
-     "vashara"
-    ]
-   },
-   "flags": [
-    "saw_herb_elephant"
-   ],
-   "plant": true,
-   "the": "the plant"
-  },
-  {
-   "id": "dis43",
-   "text": "the constellations are reflected in a puddle that shouldn't be there - and one of them is moving",
-   "zones": [
-    "water",
-    "stone",
-    "meadow"
-   ],
-   "time": "night",
-   "drops": [
+    "inkcap",
+    "hollow_morel",
+    "cracked_crystal",
     "moonstone_chip",
-    "starseed"
-   ],
-   "requires": {
-    "houses": [
-     "caldrin"
-    ]
-   },
-   "flags": [
-    "saw_moving_star"
-   ]
-  },
-  {
-   "id": "dis44",
-   "text": "a full moon is reflected in the water, even though tonight's moon is a sliver",
-   "zones": [
-    "water",
-    "meadow"
-   ],
-   "time": "night",
-   "drops": [
-    "moonbloom_petal",
-    "moonstone_chip"
-   ],
-   "requires": {
-    "houses": [
-     "moonveil"
-    ]
-   },
-   "flags": [
-    "saw_false_moon"
-   ]
-  },
-  {
-   "id": "dis45",
-   "text": "the Garden has laid out a path of white petals just for you",
-   "zones": [
-    "any"
-   ],
-   "time": "any",
-   "drops": [
+    "dew_diamond",
+    "tree_amber",
+    "black_rose",
+    "sunbell",
+    "veil_lily",
     "ghost_orchid",
-    "moonbloom_petal"
-   ],
-   "requires": {
-    "rep_min": 15
-   }
-  },
-  {
-   "id": "dis46",
-   "text": "thorns have grown across the path you were on a moment ago",
-   "zones": [
-    "any"
-   ],
-   "time": "any",
-   "drops": [
-    "thornsalt"
-   ],
-   "requires": {
-    "rep_max": -8
-   }
-  },
-  {
-   "id": "dis47",
-   "text": "the map scrap in your satchel is warm - and the path in front of you matches it exactly",
-   "zones": [
-    "wild",
-    "grove",
-    "stone"
-   ],
-   "time": "any",
-   "drops": [
+    "wandering_seed",
     "starseed",
-    "hollow_morel"
-   ],
-   "requires": {
-    "items": [
-     "map_scrap"
-    ]
-   },
-   "flags": [
-    "followed_map"
-   ]
-  },
-  {
-   "id": "dis48",
-   "text": "banners in every House's colours have been tied through the hedges - the Garden knows the tournament is on",
-   "zones": [
-    "any"
-   ],
-   "time": "any",
-   "drops": [
-    "sprite_thread"
-   ],
-   "requires": {
-    "academy": [
-     "tournament"
-    ]
-   }
-  }
- ],
- "outcomes": [
-  {
-   "id": "out0",
-   "text": "The vines draw quietly aside to let you pass.",
-   "tones": [
-    "beloved",
-    "friendly"
-   ]
-  },
-  {
-   "id": "out1",
-   "text": "A flower opens beneath your hand as you reach out.",
-   "tones": [
-    "beloved"
-   ]
-  },
-  {
-   "id": "out2",
-   "text": "The Garden hums, very softly, as though it's pleased you came.",
-   "tones": [
-    "beloved"
-   ]
-  },
-  {
-   "id": "out3",
-   "text": "Petals settle on your shoulders like a welcome.",
-   "tones": [
-    "beloved",
-    "friendly"
-   ]
-  },
-  {
-   "id": "out4",
-   "text": "The path ahead seems to lean toward you.",
-   "tones": [
-    "beloved"
-   ]
-  },
-  {
-   "id": "out5",
-   "text": "You get the distinct feeling you are being looked after.",
-   "tones": [
-    "beloved"
-   ]
-  },
-  {
-   "id": "out6",
-   "text": "Something beneath the soil remembers you. Fondly.",
-   "tones": [
-    "beloved"
-   ]
-  },
-  {
-   "id": "out7",
-   "text": "The roses bow, just slightly, as you go by.",
-   "tones": [
-    "beloved"
-   ]
-  },
-  {
-   "id": "out8",
-   "text": "A warm breeze follows you for a while.",
-   "tones": [
-    "friendly",
-    "beloved"
-   ]
-  },
-  {
-   "id": "out9",
-   "text": "The grass springs back behind you faster than it should.",
-   "tones": [
-    "friendly"
-   ]
-  },
-  {
-   "id": "out10",
-   "text": "A bird lands on a branch beside you and stays.",
-   "tones": [
-    "friendly",
-    "neutral"
-   ]
-  },
-  {
-   "id": "out11",
-   "text": "The light shifts to show you something you'd have missed.",
-   "tones": [
-    "friendly",
-    "beloved"
-   ]
-  },
-  {
-   "id": "out12",
-   "text": "A thorn that was about to catch your sleeve pulls itself back.",
-   "tones": [
-    "friendly"
-   ]
-  },
-  {
-   "id": "out13",
-   "text": "The Garden seems to be in a generous mood.",
-   "tones": [
-    "friendly",
-    "beloved"
-   ]
-  },
-  {
-   "id": "out14",
-   "text": "As you approach, the flowers close around you.",
-   "tones": [
-    "neutral",
-    "wary"
-   ]
-  },
-  {
-   "id": "out15",
-   "text": "The Garden carries on with its business, as if you're not quite there.",
-   "tones": [
-    "neutral"
-   ]
-  },
-  {
-   "id": "out16",
-   "text": "A leaf lands on your head. It might have been an accident.",
-   "tones": [
-    "neutral"
-   ]
-  },
-  {
-   "id": "out17",
-   "text": "Nothing else happens, which somehow feels deliberate.",
-   "tones": [
-    "neutral",
-    "wary"
-   ]
-  },
-  {
-   "id": "out18",
-   "text": "You have the feeling you've been noticed.",
-   "tones": [
-    "neutral"
-   ]
-  },
-  {
-   "id": "out19",
-   "text": "A sprinkler of dew goes off, perfectly aimed at your shoes.",
-   "tones": [
-    "neutral",
-    "wary"
-   ]
-  },
-  {
-   "id": "out20",
-   "text": "The moment passes. The Garden moves on. So do you.",
-   "tones": [
-    "neutral"
-   ]
-  },
-  {
-   "id": "out21",
-   "text": "Somewhere, something makes a note of your visit.",
-   "tones": [
-    "neutral",
-    "wary"
-   ]
-  },
-  {
-   "id": "out22",
-   "text": "The roses turn their faces away as you pass.",
-   "tones": [
-    "wary"
-   ]
-  },
-  {
-   "id": "out23",
-   "text": "A bramble snags your robe and doesn't let go straight away.",
-   "tones": [
-    "wary",
-    "hostile"
-   ]
-  },
-  {
-   "id": "out24",
-   "text": "The path is a little longer on the way back than it was on the way in.",
-   "tones": [
-    "wary"
-   ]
-  },
-  {
-   "id": "out25",
-   "text": "Every bloom within reach snaps shut.",
-   "tones": [
-    "wary",
-    "hostile"
-   ]
-  },
-  {
-   "id": "out26",
-   "text": "The Garden goes very quiet while you're here.",
-   "tones": [
-    "wary"
-   ]
-  },
-  {
-   "id": "out27",
-   "text": "The birds stop singing until you leave.",
-   "tones": [
-    "wary",
-    "hostile"
-   ]
-  },
-  {
-   "id": "out28",
-   "text": "Something beneath the soil remembers you.",
-   "tones": [
-    "hostile"
-   ]
-  },
-  {
-   "id": "out29",
-   "text": "The vines tighten across the path. You find another way.",
-   "tones": [
-    "hostile"
-   ]
-  },
-  {
-   "id": "out30",
-   "text": "A cold wind pushes you, gently but firmly, toward the gate.",
-   "tones": [
-    "hostile"
-   ]
-  },
-  {
-   "id": "out31",
-   "text": "Every rose snaps shut at once. The sound is like a door slamming.",
-   "tones": [
-    "hostile"
-   ]
-  },
-  {
-   "id": "out32",
-   "text": "The ground is hard and unfriendly, and your footprints fill with water.",
-   "tones": [
-    "hostile"
-   ]
-  },
-  {
-   "id": "out33",
-   "text": "You hear, very clearly, the Garden sigh.",
-   "tones": [
-    "hostile"
-   ]
-  },
-  {
-   "id": "out34",
-   "text": "The black petals rustle as you pass, like whispering.",
-   "tones": [
-    "neutral",
-    "wary",
-    "hostile",
-    "friendly",
-    "beloved"
-   ],
-   "events": [
-    "black_flowers"
-   ]
-  },
-  {
-   "id": "out35",
-   "text": "A moth lands on your hand and stays there, glowing.",
-   "tones": [
-    "friendly",
-    "beloved",
-    "neutral"
-   ],
-   "events": [
-    "moths"
-   ]
-  },
-  {
-   "id": "out36",
-   "text": "The Tree's light brushes your face, warm as summer.",
-   "tones": [
-    "friendly",
-    "beloved",
-    "neutral"
-   ],
-   "events": [
-    "tree_glow"
-   ]
-  }
- ],
- "strange_house": [
-  "The Garden rearranges the path behind you, just to see what you'll do.",
-  "Every flower you pass turns to follow you. All of them. Slowly.",
-  "The hedges hum your House's name.",
-  "You're sure the statues were facing the other way a moment ago.",
-  "Something plucks a single thread from your sleeve and keeps it.",
-  "The Garden seems very interested in you today. Unsettlingly so."
- ],
- "templates": [
-  {
-   "id": "tpl0",
-   "kind": "creature",
-   "text": "{Loc}, you notice {creature} {action} {object}.\n\n{atmos} {outcome}"
-  },
-  {
-   "id": "tpl1",
-   "kind": "creature",
-   "text": "{atmos}\n\n{Loc}, {creature} is {action} {object}. {outcome}"
-  },
-  {
-   "id": "tpl2",
-   "kind": "creature",
-   "text": "You linger {loc}. {atmos}\n\nYou spot {creature} {action} {object}. Everything goes very still when you arrive. {outcome}"
-  },
-  {
-   "id": "tpl3",
-   "kind": "creature",
-   "text": "{Loc}: {creature}, {action} {object}.\n\n{outcome}"
-  },
-  {
-   "id": "tpl4",
-   "kind": "creature",
-   "text": "{atmos}\n\n{Loc}, something catches your eye: {creature}, {action} {object}. {outcome}"
-  },
-  {
-   "id": "tpl5",
-   "kind": "discovery",
-   "text": "{Loc}, {discovery}.\n\n{atmos} {outcome}"
-  },
-  {
-   "id": "tpl6",
-   "kind": "discovery",
-   "text": "{atmos}\n\n{Loc}, you realise {discovery}. {outcome}"
-  },
-  {
-   "id": "tpl7",
-   "kind": "discovery",
-   "text": "You take a different turning and end up {loc}. {Discovery}.\n\n{outcome}"
-  },
-  {
-   "id": "tpl8",
-   "kind": "quiet",
-   "text": "You spend a while {loc}. {atmos}\n\n{outcome}"
-  },
-  {
-   "id": "tpl9",
-   "kind": "quiet",
-   "text": "You stand {loc} for a while. {atmos} {outcome}"
-  }
- ],
- "forage_lines": [
-  "You search {loc} and turn up {item}.",
-  "Digging carefully {loc}, you find {item}.",
-  "{Loc}, half-hidden under the leaves, is {item}.",
-  "You part the undergrowth {loc}. There - {item}.",
-  "Something glints {loc}. It's {item}.",
-  "You kneel {loc} and come up with {item}."
- ],
- "forage_empty": [
-  "You search {loc} for a long while and find nothing but dirt under your nails.",
-  "{Loc}, the Garden has hidden everything worth finding. Today, anyway.",
-  "You come away from {loc} empty-handed. Something rustles, pleased with itself."
- ],
- "choices": {
-  "feed": {
-   "label": "Feed it",
-   "emoji": "🍃"
-  },
-  "follow": {
-   "label": "Follow it",
-   "emoji": "👣"
-  },
-  "steal": {
-   "label": "Steal from it",
-   "emoji": "🫳"
-  },
-  "leave": {
-   "label": "Leave it be",
-   "emoji": "🌿"
-  }
- },
- "plant_choices": {
-  "tend": {
-   "label": "Tend it",
-   "emoji": "🌱"
-  },
-  "uproot": {
-   "label": "Uproot it",
-   "emoji": "🪓"
-  },
-  "leave": {
-   "label": "Leave it be",
-   "emoji": "🌿"
-  }
- },
- "choice_lines": {
-  "feed_good": [
-   "{The} accepts your offering and nuzzles your hand before vanishing.",
-   "{The} eats from your palm, then leaves something behind in thanks."
-  ],
-  "feed_meh": [
-   "{The} sniffs your offering, considers it, and walks off with it without a word."
-  ],
-  "follow_good": [
-   "You follow {the} deeper in than you've ever been, until it stops and shows you something.",
-   "{The} leads you to a place you've never seen - and then it's gone."
-  ],
-  "follow_lost": [
-   "You follow {the} for what feels like an hour. When you look up, you're back at the gate."
-  ],
-  "steal_good": [
-   "You snatch it and run. {The} doesn't chase you. That's somehow worse."
-  ],
-  "steal_caught": [
-   "{The} is quicker than you. Much quicker. You leave with nothing but a scratch - and the Garden saw."
-  ],
-  "leave": [
-   "You let {the} be. As you go, you feel the Garden watching - approvingly, you think.",
-   "You step softly around {the} and carry on. Nothing is taken. Nothing is owed."
-  ],
-  "tend": [
-   "You clear the weeds, loosen the soil, and give it a little water. The Garden notices.",
-   "You kneel and tend it carefully. Somewhere behind you, a flower that was closed opens.",
-   "You straighten a bent stem and pat the earth down. It seems to stand a little taller."
-  ],
-  "uproot": [
-   "You tear it up by the roots. The Garden goes silent around you. It will remember this.",
-   "It comes up easily - too easily. The soil where it grew turns grey.",
-   "You rip it out and pocket what's useful. Every leaf nearby turns away from you."
-  ]
- },
- "offer_lines": {
-  "full": "The Garden accepts your offering without comment. It has had enough gifts from you for one day.",
-  "warm": [
-   "The soil takes your offering gently. A flower you haven't seen before opens nearby.",
-   "The Garden accepts. Somewhere, a bird starts singing.",
-   "Your offering sinks into the earth, and the ground feels warmer where it went."
-  ],
-  "cold": [
-   "The earth swallows your offering. The Garden says nothing. It noticed, though.",
-   "The roots draw your offering down into the dark. A little of the chill goes out of the air.",
-   "Your offering is gone the moment you look away. That's a start."
-  ]
- },
- "uses": [
-  {
-   "id": "map_path",
-   "item": "map_scrap",
-   "consume": true,
-   "reward": "starseed",
-   "rep": 1,
-   "points": 1,
-   "flags": [
-    "walked_map_path"
-   ],
-   "response": "🗺️ You unfold the scrap and follow it - left at the statue, through the ferns, three steps past the dry well - to a patch of soil nobody has touched in a century. Something is waiting in it."
-  },
-  {
-   "id": "key_garden",
-   "item": "strange_key",
-   "consume": false,
-   "response": "🗝️ You try the key in the old gate, the glasshouse door, the gardener's shed. It fits none of them. Whatever it opens, it isn't here."
-  },
-  {
-   "id": "pool_vial",
-   "item": "pool_water",
-   "consume": true,
-   "reward": "prophecy_leaf",
-   "rep": 1,
-   "response": "💧 You pour the pool water back where it came from. For a moment the surface shows words - and then a leaf drifts up, with those same words in its veins."
-  },
-  {
-   "id": "seed_plant",
-   "item": "starseed",
-   "consume": true,
-   "rep": 2,
-   "flags": [
-    "planted_starseed"
-   ],
-   "response": "🌟 You plant the starseed. Nothing happens. Then, very slowly, a single silver shoot turns - not toward the sun, but toward where the stars will be tonight."
-  },
-  {
-   "id": "acorn_tree",
-   "item": "sleeping_acorn",
-   "consume": true,
-   "reward": "tree_bark",
-   "rep": 1,
-   "response": "🌰 You tuck the snoring acorn among the Ancient Tree's roots. The snoring stops. The Tree creaks, once, like a sigh of relief, and drops something at your feet."
-  }
- ],
- "rare_boost_events": [
-  "tree_glow",
-  "path"
- ],
- "event_drop_boost": {
-  "moths": [
-   "moth_dust"
-  ],
-  "black_flowers": [
-   "black_rose"
-  ],
-  "tree_glow": [
-   "tree_amber",
-   "tree_bark"
-  ]
- },
- "reveals": {
-  "beloved": "🌿 *The vines draw back from the path as you approach. A flower opens where your hand rests. The Garden has decided you should know: **it likes you.***",
-  "friendly": "🌸 *For the first time, a bloom turns toward you when you pass. The Garden has started to notice you - kindly.*",
-  "wary": "🥀 *The roses close as you pass. It's the first time you've noticed. It won't be the last.*",
-  "hostile": "🌑 *Something beneath the soil remembers you. The Garden has decided you should know that, too.*"
- },
- "events": [
-  {
-   "key": "door",
-   "emoji": "🚪",
-   "title": "A Door Behind the Roses",
-   "start": "A door has appeared behind the roses. Old wood, iron hinges, no handle. Nobody remembers it being there.",
-   "end": "The door behind the roses is gone. Just roses now. As if it never was.",
-   "minutes": [
-    180,
-    1440
-   ],
-   "weight": 10
-  },
-  {
-   "key": "black_flowers",
-   "emoji": "🥀",
-   "title": "The Flowers Turn Black",
-   "start": "Every flower in the Garden has turned black. Nobody knows why. The Garden isn't saying.",
-   "end": "Colour creeps back into the petals, one flower at a time. Whatever it was has passed.",
-   "minutes": [
-    60,
-    720
-   ],
-   "weight": 8
-  },
-  {
-   "key": "frog",
-   "emoji": "🐸",
-   "title": "The Golden Frog",
-   "start": "A golden frog has set up shop by the water, and it's offering trades. Bring it something. It might give you something back.",
-   "end": "The golden frog packs up its tiny stall and hops away. Business, apparently, is concluded.",
-   "minutes": [
-    120,
-    480
-   ],
-   "weight": 8
-  },
-  {
-   "key": "whisper",
-   "emoji": "💧",
-   "title": "A Name From the Pool",
-   "start": "The Reflection Pool is whispering a name. **{name}**. Over and over, very softly.",
-   "end": "The Pool goes quiet. Whatever it wanted to say, it has stopped saying it.",
-   "minutes": [
-    60,
-    360
-   ],
-   "weight": 7
-  },
-  {
-   "key": "tree_glow",
-   "emoji": "🌳",
-   "title": "The Ancient Tree Glows",
-   "start": "The Ancient Tree has begun to glow, gold and green, from the roots up. The whole Garden feels warmer.",
-   "end": "The Tree's glow fades back into ordinary bark. It hums, once, and falls silent.",
-   "minutes": [
-    60,
-    480
-   ],
-   "weight": 8
-  },
-  {
-   "key": "moths",
-   "emoji": "🦋",
-   "title": "The Moon Moths",
-   "start": "Hundreds of moon moths have poured out of nowhere. The Garden is silver with them.",
-   "end": "The moon moths lift all at once and are gone, leaving silver dust on everything.",
-   "minutes": [
-    30,
-    240
-   ],
-   "weight": 9
-  },
-  {
-   "key": "key",
-   "emoji": "🗝️",
-   "title": "A Key Beneath the Bench",
-   "start": "Someone has spotted a strange key beneath a bench in the Garden. It's still there. For now.",
-   "end": "The key beneath the bench is gone. Somebody took it - or something did.",
-   "minutes": [
-    60,
-    1440
-   ],
-   "weight": 5
-  },
-  {
-   "key": "path",
-   "emoji": "🌿",
-   "title": "An Unexplored Path",
-   "start": "A new path has opened in the Garden, winding somewhere nobody has been. The hedges on either side are very, very quiet.",
-   "end": "The unexplored path has closed over. Ivy where the gap was. Did anyone see where it went?",
-   "minutes": [
-    120,
-    1440
-   ],
-   "weight": 6
-  },
-  {
-   "key": "strange_house",
-   "emoji": "🏡",
-   "title": "The Garden Takes an Interest",
-   "start": "The Garden is behaving very strangely toward **House {house}**. Flowers follow them. Paths shift. Nobody can say why.",
-   "end": "The Garden seems to have lost interest in House {house}. For now.",
-   "minutes": [
-    180,
-    1440
-   ],
-   "weight": 7
-  }
- ],
- "secrets": [
-  {
-   "id": "thornmere_howl",
-   "phrases": [
-    "i howl at the brambles",
-    "howl with the wolves",
-    "i howl"
-   ],
-   "requires": {
-    "houses": [
-     "thornmere"
-    ],
-    "time": "night"
-   },
-   "response": "🐺 You howl. For a long moment, nothing. Then, from deep in the brambles, something howls back - and a crown of thorns rolls out onto the path.",
-   "reward": "thornsalt",
-   "rep": 2,
-   "points": 1,
-   "once": "user"
-  },
-  {
-   "id": "veyren_bow",
-   "phrases": [
-    "i bow to the stag",
-    "bow to the white stag",
-    "i bow to the deer"
-   ],
-   "requires": {
-    "houses": [
-     "veyren"
-    ]
-   },
-   "response": "🦌 You bow. When you look up, a stag is standing at the edge of the meadow. It bows back - and is gone.",
-   "reward": "hare_whisker",
-   "rep": 2,
-   "points": 1,
-   "once": "user"
-  },
-  {
-   "id": "vashara_heal",
-   "phrases": [
-    "i heal the broken flower",
-    "i mend the broken stem",
-    "heal the wilted flower"
-   ],
-   "requires": {
-    "houses": [
-     "vashara"
-    ]
-   },
-   "response": "🐘 You cup the broken stem in your hands. It straightens. It blooms. Every flower nearby turns to look at you.",
-   "reward": "veil_lily",
-   "rep": 3,
-   "points": 1,
-   "once": "user"
-  },
-  {
-   "id": "caldrin_stars",
-   "phrases": [
-    "i read the stars in the pool",
-    "chart the stars in the reflection pool",
-    "i map the reflected stars"
-   ],
-   "requires": {
-    "houses": [
-     "caldrin"
-    ],
-    "time": "night"
-   },
-   "response": "🔭 You trace the reflected stars with a fingertip. They're not tonight's stars - they're a sky from centuries ago, and one of them is labelled in handwriting.",
-   "reward": "starthistle",
-   "rep": 2,
-   "points": 1,
-   "once": "user"
-  },
-  {
-   "id": "moonveil_hypothesis",
-   "phrases": [
-    "i test a hypothesis on the moonblooms",
-    "for research purposes",
-    "i run an experiment in the garden"
-   ],
-   "requires": {
-    "houses": [
-     "moonveil"
-    ]
-   },
-   "response": "🌕 You change one variable - just one - and every moonbloom in the meadow changes colour to match. The Garden, it seems, likes a good experiment.",
-   "reward": "moonbloom_petal",
-   "rep": 2,
-   "points": 1,
-   "once": "user"
-  },
-  {
-   "id": "beloved_gift",
-   "phrases": [
-    "i ask the garden for a gift",
-    "may i have a gift",
-    "what would you give me"
-   ],
-   "requires": {
-    "rep_min": 15
-   },
-   "response": "🌿 The Garden has been waiting for you to ask. A single white orchid grows up out of the path, opens, and lets itself be picked.",
-   "reward": "ghost_orchid",
-   "rep": 1,
-   "points": 2,
-   "once": "user"
-  },
-  {
-   "id": "apology",
-   "phrases": [
-    "i am sorry",
-    "i apologise to the garden",
-    "i apologize to the garden",
-    "forgive me garden"
-   ],
-   "requires": {
-    "rep_max": -3
-   },
-   "response": "🥀 You say it out loud. The roses don't open. But the thorns across the path pull back, just a little.",
-   "rep": 3,
-   "once": "user"
-  },
-  {
-   "id": "pool_ask",
-   "phrases": [
-    "i ask the pool a question",
-    "pool what do you see",
-    "what do you see pool"
-   ],
-   "requires": {
-    "flags": [
-     "garden:pool_name"
-    ]
-   },
-   "response": "💧 The Pool knows your name now, so it answers. It shows you a corridor in the Library you've never walked down, and a cabinet with a very small keyhole.",
-   "reward": "prophecy_leaf",
-   "rep": 1,
-   "points": 1,
-   "once": "user",
-   "flags": [
-    "heard_of_cabinet"
-   ]
-  },
-  {
-   "id": "tree_listen",
-   "phrases": [
-    "i press my ear to the ancient tree",
-    "listen to the ancient tree",
-    "ear to the tree"
-   ],
-   "response": "🌳 You press your ear to the bark. Deep inside, slow as centuries, something is **counting**. It gets to a number, stops, and starts again. You think it's counting students.",
-   "reward": "tree_bark",
-   "rep": 2,
-   "points": 1,
-   "once": "user"
-  },
-  {
-   "id": "pool_name",
-   "phrases": [
-    "i say my name to the pool",
-    "tell the pool my name",
-    "whisper my name into the pool"
-   ],
-   "response": "💧 You whisper your name into the Reflection Pool. It whispers back a different one. You don't know it. Yet.",
-   "reward": "pool_water",
-   "rep": 1,
-   "points": 1,
-   "once": "user"
-  },
-  {
-   "id": "roses_greet",
-   "phrases": [
-    "good morning roses",
-    "good evening roses",
-    "hello roses"
-   ],
-   "response": "🌹 The roses, one by one, turn to face you. It's a little unnerving. It's also, you think, polite.",
-   "rep": 2,
-   "once": "user"
-  },
-  {
-   "id": "hollow_ring",
-   "phrases": [
-    "i step into the mushroom ring",
-    "step inside the fairy ring",
-    "step into the ring"
-   ],
-   "response": "🍄 You step inside the ring. The world goes quiet and very green. When you step out, your pockets are heavier and your shoes are on the wrong feet.",
-   "reward": "hollow_morel",
-   "rep": -1,
-   "points": 1,
-   "once": "user"
-  },
-  {
-   "id": "moonbloom_night",
-   "phrases": [
-    "i sing to the moonblooms",
-    "sing to the moonbloom",
-    "hum to the moonblooms"
-   ],
-   "response": "🌸 You sing, softly. Every moonbloom in the meadow opens at once, and one of them lets go a petal straight into your hand.",
-   "reward": "moonbloom_petal",
-   "rep": 2,
-   "points": 1,
-   "once": "user",
-   "time": "night"
-  },
-  {
-   "id": "sundial_wind",
-   "phrases": [
-    "i turn the sundial",
-    "turn back the sundial",
-    "wind the sundial"
-   ],
-   "response": "☀️ The sundial resists, then gives. For one second, every shadow in the Garden jumps an hour. Somewhere, a bell rings that shouldn't.",
-   "reward": "cracked_crystal",
-   "rep": -2,
-   "once": "user",
-   "time": "day"
-  },
-  {
-   "id": "gardener_shed",
-   "phrases": [
-    "i knock on the gardener's shed",
-    "knock on the shed",
-    "knock three times on the shed"
-   ],
-   "response": "🏚️ You knock. From inside, someone knocks back - three times. The door stays shut. Under it, someone slides out a folded scrap of map.",
-   "reward": "map_scrap",
-   "points": 2,
-   "once": "user"
-  },
-  {
-   "id": "statue_offer",
-   "phrases": [
-    "i place a crystal in the stone hand",
-    "give the statue a crystal",
-    "put a crystal in the stone hand"
-   ],
-   "requires": {
-    "items": [
-     "cracked_crystal"
-    ]
-   },
-   "consumes": [
-    "cracked_crystal"
-   ],
-   "response": "🗿 You place it in the statue's palm. The fingers close, very slowly, and when they open again there's something else in them.",
-   "reward": "moonstone_chip",
-   "rep": 2,
-   "once": "user"
-  },
-  {
-   "id": "first_to_owl",
-   "phrases": [
-    "i bow to the owl",
-    "bow to the barn owl",
-    "ask the owl a question"
-   ],
-   "response": "🦉 The owl looks at you for a long time. Then it says - clearly, in words - *\"You're the first to ask.\"* It will not say anything else. Ever.",
-   "reward": "owl_feather",
-   "rep": 3,
-   "points": 3,
-   "once": "server",
-   "time": "night"
-  },
-  {
-   "id": "willow_door",
-   "phrases": [
-    "i walk through the willow door",
-    "step through the willow doorway",
-    "walk through the willow"
-   ],
-   "response": "🌿 You step through the woven willow doorway and out the other side - into the same Garden, but quieter, and a little bit older. When you look back, you're somehow in front of the doorway again.",
-   "reward": "starseed",
-   "rep": 1,
-   "points": 1,
-   "once": "user"
-  },
-  {
-   "id": "door_knock",
-   "phrases": [
-    "i knock on the door behind the roses",
-    "knock on the door",
-    "open the door behind the roses"
-   ],
-   "response": "🚪 You knock. The door doesn't open - but beneath it, something slides out toward your feet.",
-   "reward": "map_scrap",
-   "rep": 1,
-   "points": 1,
-   "once": "event",
-   "event": "door"
-  },
-  {
-   "id": "frog_trade",
-   "phrases": [
-    "i trade with the golden frog",
-    "trade with the frog",
-    "offer the frog a trade"
-   ],
-   "response": "FROG_TRADE",
-   "once": "none",
-   "event": "frog"
-  },
-  {
-   "id": "key_take",
-   "phrases": [
-    "i take the key",
-    "pick up the key",
-    "take the strange key"
-   ],
-   "response": "🗝️ You kneel and take the key from beneath the bench. It's heavier than it looks - and very, very cold.",
-   "reward": "strange_key",
-   "points": 2,
-   "rep": 1,
-   "once": "server_event",
-   "event": "key"
-  },
-  {
-   "id": "path_walk",
-   "phrases": [
-    "i walk the unexplored path",
-    "follow the new path",
-    "take the unexplored path"
-   ],
-   "response": "🌿 You follow the new path through the hedge. It winds and winds, and at its end there's something waiting, as if left for you.",
-   "reward_pool": [
-    "ghost_orchid",
-    "starseed",
+    "sleeping_acorn",
+    "moth_dust",
+    "sprite_thread",
+    "dragon_scale",
+    "frog_gold",
+    "owl_feather",
+    "heron_plume",
+    "phoenix_down",
+    "hare_whisker",
+    "snail_pearl",
+    "unknown_husk",
+    "strange_key",
+    "pressed_letter",
+    "pool_water",
+    "tree_bark",
+    "lost_button",
     "map_scrap",
-    "hollow_morel"
-   ],
-   "rep": 1,
-   "points": 1,
-   "once": "event",
-   "event": "path"
+    "prophecy_leaf"
+  ],
+  "areas": [
+    {
+      "id": "ancient_tree",
+      "at": "beneath the Ancient Tree",
+      "zones": [
+        "tree",
+        "grove"
+      ],
+      "time": "any",
+      "drops": [
+        "tree_bark",
+        "sleeping_acorn",
+        "tree_amber"
+      ]
+    },
+    {
+      "id": "tree_roots",
+      "at": "among the knotted roots of the Ancient Tree",
+      "zones": [
+        "tree",
+        "stone"
+      ],
+      "time": "any",
+      "drops": [
+        "tree_bark",
+        "fairy_ring_cap"
+      ]
+    },
+    {
+      "id": "reflection_pool",
+      "at": "at the edge of the Reflection Pool",
+      "zones": [
+        "water"
+      ],
+      "time": "any",
+      "drops": [
+        "pool_water",
+        "dew_diamond"
+      ]
+    },
+    {
+      "id": "pool_steps",
+      "at": "on the mossy steps down to the Reflection Pool",
+      "zones": [
+        "water",
+        "stone"
+      ],
+      "time": "any",
+      "drops": [
+        "pool_water",
+        "snail_pearl"
+      ]
+    },
+    {
+      "id": "moonbloom_meadow",
+      "at": "in the Moonbloom Meadow",
+      "zones": [
+        "meadow",
+        "flowers"
+      ],
+      "time": "any",
+      "drops": [
+        "moonbloom_petal",
+        "sunbell"
+      ]
+    },
+    {
+      "id": "meadow_night",
+      "at": "in the Moonbloom Meadow, where every bloom is open",
+      "zones": [
+        "meadow",
+        "flowers"
+      ],
+      "time": "night",
+      "drops": [
+        "moonbloom_petal",
+        "moonstone_chip"
+      ]
+    },
+    {
+      "id": "herb_terraces",
+      "at": "along the Herb Terraces",
+      "zones": [
+        "herbs"
+      ],
+      "time": "any",
+      "drops": [
+        "silverleaf",
+        "dewmint",
+        "emberleaf"
+      ]
+    },
+    {
+      "id": "lower_terrace",
+      "at": "on the lowest of the Herb Terraces",
+      "zones": [
+        "herbs",
+        "stone"
+      ],
+      "time": "any",
+      "drops": [
+        "hushroot",
+        "whisperwort"
+      ]
+    },
+    {
+      "id": "rose_walk",
+      "at": "halfway down the Rose Walk",
+      "zones": [
+        "roses",
+        "flowers"
+      ],
+      "time": "any",
+      "drops": [
+        "thornsalt",
+        "black_rose"
+      ]
+    },
+    {
+      "id": "rose_arch",
+      "at": "under the rose arch at the Garden's gate",
+      "zones": [
+        "roses",
+        "stone"
+      ],
+      "time": "any",
+      "drops": [
+        "thornsalt",
+        "lost_button"
+      ]
+    },
+    {
+      "id": "glasshouse",
+      "at": "inside the old glasshouse",
+      "zones": [
+        "glass",
+        "herbs"
+      ],
+      "time": "any",
+      "drops": [
+        "veil_lily",
+        "glowshroom"
+      ]
+    },
+    {
+      "id": "glasshouse_night",
+      "at": "inside the glasshouse, lit only by the plants",
+      "zones": [
+        "glass",
+        "herbs"
+      ],
+      "time": "night",
+      "drops": [
+        "glowshroom",
+        "starthistle"
+      ]
+    },
+    {
+      "id": "reading_alcove",
+      "at": "in the Reading Alcove",
+      "zones": [
+        "alcove",
+        "stone"
+      ],
+      "time": "any",
+      "drops": [
+        "pressed_letter",
+        "prophecy_leaf"
+      ]
+    },
+    {
+      "id": "alcove_bench",
+      "at": "on the crooked bench outside the Reading Alcove",
+      "zones": [
+        "alcove",
+        "stone"
+      ],
+      "time": "any",
+      "drops": [
+        "lost_button",
+        "map_scrap"
+      ]
+    },
+    {
+      "id": "mushroom_hollow",
+      "at": "down in the Mushroom Hollow",
+      "zones": [
+        "wild",
+        "grove"
+      ],
+      "time": "any",
+      "drops": [
+        "fairy_ring_cap",
+        "inkcap",
+        "hollow_morel"
+      ]
+    },
+    {
+      "id": "fern_tunnel",
+      "at": "inside the fern tunnel",
+      "zones": [
+        "wild"
+      ],
+      "time": "any",
+      "drops": [
+        "wandering_seed",
+        "sprite_thread"
+      ]
+    },
+    {
+      "id": "willow_bank",
+      "at": "under the weeping willow by the stream",
+      "zones": [
+        "water",
+        "grove"
+      ],
+      "time": "any",
+      "drops": [
+        "heron_plume",
+        "dewmint"
+      ]
+    },
+    {
+      "id": "stepping_stones",
+      "at": "on the stepping stones across the stream",
+      "zones": [
+        "water",
+        "stone"
+      ],
+      "time": "any",
+      "drops": [
+        "snail_pearl",
+        "pool_water"
+      ]
+    },
+    {
+      "id": "sundial",
+      "at": "beside the broken sundial",
+      "zones": [
+        "stone",
+        "meadow"
+      ],
+      "time": "day",
+      "drops": [
+        "sunbell",
+        "cracked_crystal"
+      ]
+    },
+    {
+      "id": "moon_dial",
+      "at": "beside the broken sundial, which is somehow telling moon-time",
+      "zones": [
+        "stone",
+        "meadow"
+      ],
+      "time": "night",
+      "drops": [
+        "moonstone_chip",
+        "starseed"
+      ]
+    },
+    {
+      "id": "crystal_bed",
+      "at": "at the crystal beds behind the glasshouse",
+      "zones": [
+        "stone",
+        "glass"
+      ],
+      "time": "any",
+      "drops": [
+        "cracked_crystal",
+        "moonstone_chip",
+        "dew_diamond"
+      ]
+    },
+    {
+      "id": "owl_oak",
+      "at": "under the owl oak",
+      "zones": [
+        "tree",
+        "wild"
+      ],
+      "time": "any",
+      "drops": [
+        "owl_feather",
+        "sleeping_acorn"
+      ]
+    },
+    {
+      "id": "bramble_edge",
+      "at": "at the edge of the brambles, where the paths run out",
+      "zones": [
+        "wild",
+        "roses"
+      ],
+      "time": "any",
+      "drops": [
+        "thornsalt",
+        "unknown_husk"
+      ]
+    },
+    {
+      "id": "statue_garden",
+      "at": "among the statues nobody remembers commissioning",
+      "zones": [
+        "stone"
+      ],
+      "time": "any",
+      "drops": [
+        "cracked_crystal",
+        "lost_button"
+      ]
+    },
+    {
+      "id": "lantern_path",
+      "at": "along the lantern path",
+      "zones": [
+        "meadow",
+        "stone"
+      ],
+      "time": "night",
+      "drops": [
+        "moth_dust",
+        "moonbloom_petal"
+      ]
+    },
+    {
+      "id": "sprite_hedge",
+      "at": "by the sprite hedge",
+      "zones": [
+        "wild",
+        "flowers"
+      ],
+      "time": "any",
+      "drops": [
+        "sprite_thread",
+        "veil_lily"
+      ]
+    },
+    {
+      "id": "sunken_garden",
+      "at": "in the sunken garden",
+      "zones": [
+        "stone",
+        "flowers",
+        "water"
+      ],
+      "time": "any",
+      "drops": [
+        "veil_lily",
+        "pool_water"
+      ]
+    },
+    {
+      "id": "orchard",
+      "at": "in the little orchard",
+      "zones": [
+        "tree",
+        "meadow"
+      ],
+      "time": "day",
+      "drops": [
+        "sleeping_acorn",
+        "wandering_seed"
+      ]
+    },
+    {
+      "id": "well",
+      "at": "at the dry well that isn't always dry",
+      "zones": [
+        "stone",
+        "water"
+      ],
+      "time": "any",
+      "drops": [
+        "pool_water",
+        "unknown_husk"
+      ]
+    },
+    {
+      "id": "gardener_shed",
+      "at": "outside the old gardener's shed",
+      "zones": [
+        "herbs",
+        "stone"
+      ],
+      "time": "any",
+      "drops": [
+        "wandering_seed",
+        "lost_button",
+        "map_scrap"
+      ]
+    },
+    {
+      "id": "rose_door",
+      "at": "at the door behind the roses",
+      "zones": [
+        "roses",
+        "stone"
+      ],
+      "time": "any",
+      "drops": [
+        "strange_key",
+        "map_scrap"
+      ],
+      "events": [
+        "door"
+      ]
+    },
+    {
+      "id": "new_path",
+      "at": "on a path you're certain wasn't there yesterday",
+      "zones": [
+        "wild",
+        "grove"
+      ],
+      "time": "any",
+      "drops": [
+        "map_scrap",
+        "starseed",
+        "ghost_orchid"
+      ],
+      "events": [
+        "path"
+      ]
+    }
+  ],
+  "atmospheres": [
+    {
+      "id": "atm0",
+      "text": "The air smells of rain that hasn't fallen yet.",
+      "mood": "calm",
+      "time": "any",
+      "zones": [
+        "any"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm1",
+      "text": "Everything is very still, as if the Garden is holding its breath.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "any"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm2",
+      "text": "Bees drone lazily from bloom to bloom.",
+      "mood": "bright",
+      "time": "day",
+      "zones": [
+        "flowers",
+        "meadow",
+        "herbs"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm3",
+      "text": "Sunlight falls in long gold stripes through the leaves.",
+      "mood": "bright",
+      "time": "day",
+      "zones": [
+        "any"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm4",
+      "text": "A warm breeze carries the smell of crushed mint.",
+      "mood": "calm",
+      "time": "day",
+      "zones": [
+        "herbs"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm5",
+      "text": "Somewhere nearby, water is laughing over stones.",
+      "mood": "calm",
+      "time": "any",
+      "zones": [
+        "water"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm6",
+      "text": "The moon hangs low enough to touch.",
+      "mood": "calm",
+      "time": "night",
+      "zones": [
+        "any"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm7",
+      "text": "Fireflies drift up out of the grass like sparks that forgot to go out.",
+      "mood": "bright",
+      "time": "night",
+      "zones": [
+        "meadow",
+        "flowers",
+        "wild"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm8",
+      "text": "Your footsteps make no sound at all.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "any"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm9",
+      "text": "The shadows here are a little longer than the light should allow.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "any"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm10",
+      "text": "A cold wind moves through the leaves, but nothing else stirs.",
+      "mood": "ominous",
+      "time": "any",
+      "zones": [
+        "any"
+      ],
+      "not_events": []
+    },
+    {
+      "id": "atm11",
+      "text": "For a moment, every leaf turns to face you.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "tree",
+        "wild",
+        "herbs",
+        "grove"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm12",
+      "text": "Mist curls low over the ground, knee-deep and slow.",
+      "mood": "eerie",
+      "time": "night",
+      "zones": [
+        "any"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm13",
+      "text": "The stars are unusually bright tonight, and there seem to be more of them.",
+      "mood": "calm",
+      "time": "night",
+      "zones": [
+        "any"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm14",
+      "text": "Dew beads on every petal, catching the light.",
+      "mood": "bright",
+      "time": "day",
+      "zones": [
+        "flowers",
+        "meadow"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm15",
+      "text": "An owl calls once, then thinks better of it.",
+      "mood": "eerie",
+      "time": "night",
+      "zones": [
+        "any"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm16",
+      "text": "The glass panes hum faintly, like a finger around a wine glass.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "glass"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm17",
+      "text": "It smells of old paper and wet stone.",
+      "mood": "calm",
+      "time": "any",
+      "zones": [
+        "alcove",
+        "stone"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm18",
+      "text": "The Garden feels busy today, full of small invisible errands.",
+      "mood": "bright",
+      "time": "day",
+      "zones": [
+        "any"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm19",
+      "text": "Something rustles just beyond the edge of the path.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "wild",
+        "grove",
+        "roses"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm20",
+      "text": "The roses are unusually fragrant, almost dizzying.",
+      "mood": "bright",
+      "time": "any",
+      "zones": [
+        "roses"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm21",
+      "text": "A single leaf falls, very slowly, and never quite lands.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "tree",
+        "grove"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm22",
+      "text": "The ground is warm underfoot, like something beneath it is sleeping.",
+      "mood": "calm",
+      "time": "any",
+      "zones": [
+        "any"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm23",
+      "text": "Distant bells ring out, though Velmora has no bells that sound like that.",
+      "mood": "ominous",
+      "time": "any",
+      "zones": [
+        "any"
+      ],
+      "not_events": []
+    },
+    {
+      "id": "atm24",
+      "text": "The water is perfectly still, and the reflection in it is not quite yours.",
+      "mood": "ominous",
+      "time": "any",
+      "zones": [
+        "water"
+      ],
+      "not_events": []
+    },
+    {
+      "id": "atm25",
+      "text": "A thin, silver light clings to the edges of everything.",
+      "mood": "calm",
+      "time": "night",
+      "zones": [
+        "any"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm26",
+      "text": "The wind carries voices, too faint to make out.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "any"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm27",
+      "text": "Butterflies settle on the path ahead, as if waiting for you.",
+      "mood": "bright",
+      "time": "day",
+      "zones": [
+        "flowers",
+        "meadow",
+        "wild"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm28",
+      "text": "The temperature drops sharply, just for a breath.",
+      "mood": "ominous",
+      "time": "any",
+      "zones": [
+        "any"
+      ],
+      "not_events": []
+    },
+    {
+      "id": "atm29",
+      "text": "The whole Garden smells, impossibly, of fresh bread.",
+      "mood": "bright",
+      "time": "any",
+      "zones": [
+        "any"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm30",
+      "text": "The lanterns flicker in a pattern that's almost a word.",
+      "mood": "eerie",
+      "time": "night",
+      "zones": [
+        "stone",
+        "meadow"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm31",
+      "text": "Petals drift down from a tree that isn't blooming.",
+      "mood": "calm",
+      "time": "any",
+      "zones": [
+        "tree",
+        "grove",
+        "flowers"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm32",
+      "text": "Clouds gather overhead, but only overhead of you.",
+      "mood": "ominous",
+      "time": "day",
+      "zones": [
+        "any"
+      ],
+      "not_events": []
+    },
+    {
+      "id": "atm33",
+      "text": "The ivy on the walls has grown since this morning. You can tell.",
+      "mood": "eerie",
+      "time": "any",
+      "zones": [
+        "stone"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm34",
+      "text": "It's warm and green and perfectly peaceful.",
+      "mood": "calm",
+      "time": "day",
+      "zones": [
+        "any"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm35",
+      "text": "Crickets sing in perfect time with each other.",
+      "mood": "calm",
+      "time": "night",
+      "zones": [
+        "meadow",
+        "wild",
+        "herbs"
+      ],
+      "not_events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm36",
+      "text": "Every flower in sight has turned black.",
+      "mood": "ominous",
+      "time": "any",
+      "zones": [
+        "any"
+      ],
+      "events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm37",
+      "text": "The petals are black as ink, and the air tastes of ash.",
+      "mood": "ominous",
+      "time": "any",
+      "zones": [
+        "any"
+      ],
+      "events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "atm38",
+      "text": "The Ancient Tree's glow reaches even here, gold and green.",
+      "mood": "bright",
+      "time": "any",
+      "zones": [
+        "any"
+      ],
+      "events": [
+        "tree_glow"
+      ]
+    },
+    {
+      "id": "atm39",
+      "text": "The air is thick with moon moths, silver wings everywhere you look.",
+      "mood": "bright",
+      "time": "any",
+      "zones": [
+        "any"
+      ],
+      "events": [
+        "moths"
+      ]
+    }
+  ],
+  "creatures": [
+    {
+      "id": "moon_moth",
+      "a": "a silver moon moth",
+      "the": "the moth",
+      "kind": "flier",
+      "zones": [
+        "any"
+      ],
+      "time": "night",
+      "moods": [
+        "calm",
+        "bright",
+        "eerie"
+      ],
+      "drops": [
+        "moth_dust"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "moth_swarm",
+      "a": "a cloud of moon moths",
+      "the": "the cloud of moths",
+      "kind": "flier",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "moods": [
+        "bright",
+        "calm"
+      ],
+      "drops": [
+        "moth_dust"
+      ],
+      "rarity": "common",
+      "events": [
+        "moths"
+      ]
+    },
+    {
+      "id": "sprite",
+      "a": "a garden sprite no bigger than your thumb",
+      "the": "the sprite",
+      "kind": "flier",
+      "zones": [
+        "flowers",
+        "wild",
+        "herbs",
+        "meadow"
+      ],
+      "time": "any",
+      "moods": [
+        "bright",
+        "calm"
+      ],
+      "drops": [
+        "sprite_thread"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "sprites",
+      "a": "a trio of quarrelling sprites",
+      "the": "the smallest sprite",
+      "kind": "flier",
+      "zones": [
+        "flowers",
+        "wild",
+        "meadow"
+      ],
+      "time": "day",
+      "moods": [
+        "bright"
+      ],
+      "drops": [
+        "sprite_thread"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "tiny_dragon",
+      "a": "a tiny green dragon",
+      "the": "the dragon",
+      "kind": "walker",
+      "zones": [
+        "stone",
+        "glass",
+        "herbs"
+      ],
+      "time": "any",
+      "moods": [
+        "bright",
+        "calm",
+        "eerie"
+      ],
+      "drops": [
+        "dragon_scale"
+      ],
+      "rarity": "rare",
+      "house_weight": {
+        "caldrin": 3
+      }
+    },
+    {
+      "id": "dragon_sleeping",
+      "a": "a tiny dragon curled up asleep",
+      "the": "the dragon",
+      "kind": "walker",
+      "zones": [
+        "stone",
+        "tree",
+        "glass"
+      ],
+      "time": "any",
+      "moods": [
+        "calm"
+      ],
+      "drops": [
+        "dragon_scale"
+      ],
+      "rarity": "rare"
+    },
+    {
+      "id": "frog",
+      "a": "an enchanted frog wearing a very small crown",
+      "the": "the frog",
+      "kind": "hopper",
+      "zones": [
+        "water"
+      ],
+      "time": "any",
+      "moods": [
+        "calm",
+        "bright",
+        "eerie"
+      ],
+      "drops": [
+        "pool_water"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "golden_frog",
+      "a": "a golden frog with a merchant's eyes",
+      "the": "the golden frog",
+      "kind": "hopper",
+      "zones": [
+        "water",
+        "stone",
+        "meadow"
+      ],
+      "time": "any",
+      "moods": [
+        "bright",
+        "eerie",
+        "calm"
+      ],
+      "drops": [
+        "frog_gold"
+      ],
+      "rarity": "very_rare",
+      "events": [
+        "frog"
+      ]
+    },
+    {
+      "id": "toad",
+      "a": "a fat, unimpressed toad",
+      "the": "the toad",
+      "kind": "hopper",
+      "zones": [
+        "water",
+        "herbs",
+        "stone"
+      ],
+      "time": "any",
+      "moods": [
+        "calm",
+        "eerie"
+      ],
+      "drops": [
+        "pool_water"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "moon_hare",
+      "a": "a white moon-hare",
+      "the": "the hare",
+      "kind": "hopper",
+      "zones": [
+        "meadow",
+        "grove",
+        "wild"
+      ],
+      "time": "night",
+      "moods": [
+        "calm",
+        "eerie"
+      ],
+      "drops": [
+        "hare_whisker"
+      ],
+      "rarity": "uncommon",
+      "house_weight": {
+        "moonveil": 4
+      }
+    },
+    {
+      "id": "hedgehog",
+      "a": "a hedgehog with moss growing on its spines",
+      "the": "the hedgehog",
+      "kind": "walker",
+      "zones": [
+        "herbs",
+        "wild",
+        "grove"
+      ],
+      "time": "any",
+      "moods": [
+        "calm",
+        "bright"
+      ],
+      "drops": [
+        "wandering_seed"
+      ],
+      "rarity": "common",
+      "house_weight": {
+        "veyren": 2
+      }
+    },
+    {
+      "id": "fox",
+      "a": "a silver fox that is definitely watching you",
+      "the": "the fox",
+      "kind": "walker",
+      "zones": [
+        "wild",
+        "grove",
+        "meadow"
+      ],
+      "time": "any",
+      "moods": [
+        "eerie",
+        "calm"
+      ],
+      "drops": [
+        "hare_whisker"
+      ],
+      "rarity": "uncommon",
+      "house_weight": {
+        "thornmere": 2
+      }
+    },
+    {
+      "id": "owl",
+      "a": "a barn owl",
+      "the": "the owl",
+      "kind": "flier",
+      "zones": [
+        "tree",
+        "wild",
+        "grove"
+      ],
+      "time": "night",
+      "moods": [
+        "eerie",
+        "calm"
+      ],
+      "drops": [
+        "owl_feather"
+      ],
+      "rarity": "common",
+      "house_weight": {
+        "caldrin": 3
+      }
+    },
+    {
+      "id": "heron",
+      "a": "a grey heron standing on one leg",
+      "the": "the heron",
+      "kind": "walker",
+      "zones": [
+        "water"
+      ],
+      "time": "day",
+      "moods": [
+        "calm"
+      ],
+      "drops": [
+        "heron_plume"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "snail",
+      "a": "a snail with a shell like stained glass",
+      "the": "the snail",
+      "kind": "crawler",
+      "zones": [
+        "stone",
+        "herbs",
+        "water",
+        "glass"
+      ],
+      "time": "any",
+      "moods": [
+        "calm",
+        "bright"
+      ],
+      "drops": [
+        "snail_pearl"
+      ],
+      "rarity": "uncommon",
+      "house_weight": {
+        "vashara": 2
+      }
+    },
+    {
+      "id": "beetle",
+      "a": "a jewel-green beetle",
+      "the": "the beetle",
+      "kind": "crawler",
+      "zones": [
+        "any"
+      ],
+      "time": "day",
+      "moods": [
+        "bright",
+        "calm"
+      ],
+      "drops": [
+        "wandering_seed"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "bees",
+      "a": "a line of bees walking, not flying",
+      "the": "the lead bee",
+      "kind": "crawler",
+      "zones": [
+        "flowers",
+        "meadow",
+        "herbs"
+      ],
+      "time": "day",
+      "moods": [
+        "bright",
+        "eerie"
+      ],
+      "drops": [
+        "sunbell"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "spider",
+      "a": "a spider weaving letters into its web",
+      "the": "the spider",
+      "kind": "crawler",
+      "zones": [
+        "stone",
+        "alcove",
+        "wild",
+        "glass"
+      ],
+      "time": "any",
+      "moods": [
+        "eerie"
+      ],
+      "drops": [
+        "sprite_thread"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "raven",
+      "a": "a raven that knows your name",
+      "the": "the raven",
+      "kind": "flier",
+      "zones": [
+        "tree",
+        "stone",
+        "alcove"
+      ],
+      "time": "any",
+      "moods": [
+        "eerie",
+        "ominous"
+      ],
+      "drops": [
+        "owl_feather"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "hummingbird",
+      "a": "a hummingbird made of light",
+      "the": "the hummingbird",
+      "kind": "flier",
+      "zones": [
+        "flowers",
+        "glass",
+        "meadow"
+      ],
+      "time": "day",
+      "moods": [
+        "bright"
+      ],
+      "drops": [
+        "veil_lily"
+      ],
+      "rarity": "rare"
+    },
+    {
+      "id": "koi",
+      "a": "a pale koi with gold writing on its scales",
+      "the": "the koi",
+      "kind": "swimmer",
+      "zones": [
+        "water"
+      ],
+      "time": "any",
+      "moods": [
+        "calm",
+        "eerie"
+      ],
+      "drops": [
+        "dew_diamond"
+      ],
+      "rarity": "rare"
+    },
+    {
+      "id": "newt",
+      "a": "a fire-red newt",
+      "the": "the newt",
+      "kind": "crawler",
+      "zones": [
+        "water",
+        "stone"
+      ],
+      "time": "any",
+      "moods": [
+        "calm",
+        "bright"
+      ],
+      "drops": [
+        "emberleaf"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "mole",
+      "a": "a mole wearing tiny spectacles",
+      "the": "the mole",
+      "kind": "walker",
+      "zones": [
+        "herbs",
+        "meadow",
+        "stone"
+      ],
+      "time": "any",
+      "moods": [
+        "calm",
+        "bright"
+      ],
+      "drops": [
+        "cracked_crystal"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "squirrel",
+      "a": "a squirrel hoarding something that glows",
+      "the": "the squirrel",
+      "kind": "walker",
+      "zones": [
+        "tree",
+        "grove"
+      ],
+      "time": "day",
+      "moods": [
+        "bright"
+      ],
+      "drops": [
+        "sleeping_acorn"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "lantern_bug",
+      "a": "a lantern-bug the size of a plum",
+      "the": "the lantern-bug",
+      "kind": "flier",
+      "zones": [
+        "any"
+      ],
+      "time": "night",
+      "moods": [
+        "calm",
+        "eerie",
+        "bright"
+      ],
+      "drops": [
+        "glowshroom"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "shadow",
+      "a": "a shape in the shadows that no one has ever identified",
+      "the": "the shape",
+      "kind": "unknown",
+      "zones": [
+        "wild",
+        "grove",
+        "stone"
+      ],
+      "time": "any",
+      "moods": [
+        "eerie",
+        "ominous"
+      ],
+      "drops": [
+        "unknown_husk"
+      ],
+      "rarity": "rare"
+    },
+    {
+      "id": "vine_thing",
+      "a": "something small and leafy that pretends to be a plant when you look",
+      "the": "the leafy thing",
+      "kind": "unknown",
+      "zones": [
+        "herbs",
+        "wild",
+        "glass"
+      ],
+      "time": "any",
+      "moods": [
+        "eerie",
+        "bright"
+      ],
+      "drops": [
+        "wandering_seed"
+      ],
+      "rarity": "uncommon",
+      "house_weight": {
+        "moonveil": 3
+      }
+    },
+    {
+      "id": "pool_eye",
+      "a": "an eye in the water that is not a reflection",
+      "the": "the eye",
+      "kind": "unknown",
+      "zones": [
+        "water"
+      ],
+      "time": "any",
+      "moods": [
+        "ominous",
+        "eerie"
+      ],
+      "drops": [
+        "pool_water"
+      ],
+      "rarity": "rare"
+    },
+    {
+      "id": "crows",
+      "a": "a parliament of silent crows",
+      "the": "the eldest crow",
+      "kind": "flier",
+      "zones": [
+        "tree",
+        "stone",
+        "wild"
+      ],
+      "time": "any",
+      "moods": [
+        "ominous",
+        "eerie"
+      ],
+      "drops": [
+        "owl_feather"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "deer",
+      "a": "a young stag with frost on its antlers",
+      "the": "the stag",
+      "kind": "walker",
+      "zones": [
+        "meadow",
+        "grove",
+        "wild"
+      ],
+      "time": "any",
+      "moods": [
+        "calm",
+        "eerie"
+      ],
+      "drops": [
+        "hare_whisker"
+      ],
+      "rarity": "rare",
+      "house_weight": {
+        "veyren": 5
+      }
+    },
+    {
+      "id": "wolf_pup",
+      "a": "a wolf pup who seems very lost",
+      "the": "the pup",
+      "kind": "walker",
+      "zones": [
+        "wild",
+        "grove"
+      ],
+      "time": "any",
+      "moods": [
+        "calm",
+        "eerie"
+      ],
+      "drops": [
+        "hare_whisker"
+      ],
+      "rarity": "rare",
+      "house_weight": {
+        "thornmere": 5
+      }
+    },
+    {
+      "id": "elephant_shrew",
+      "a": "an elephant shrew carrying a leaf like a banner",
+      "the": "the shrew",
+      "kind": "walker",
+      "zones": [
+        "herbs",
+        "meadow",
+        "stone"
+      ],
+      "time": "day",
+      "moods": [
+        "bright",
+        "calm"
+      ],
+      "drops": [
+        "silverleaf"
+      ],
+      "rarity": "uncommon",
+      "house_weight": {
+        "vashara": 5
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "act0",
+      "text": "circling",
+      "kinds": [
+        "flier"
+      ]
+    },
+    {
+      "id": "act1",
+      "text": "hovering over",
+      "kinds": [
+        "flier"
+      ]
+    },
+    {
+      "id": "act2",
+      "text": "landing, very carefully, on",
+      "kinds": [
+        "flier"
+      ]
+    },
+    {
+      "id": "act3",
+      "text": "sniffing at",
+      "kinds": [
+        "walker",
+        "hopper"
+      ]
+    },
+    {
+      "id": "act4",
+      "text": "guarding",
+      "kinds": [
+        "walker",
+        "hopper",
+        "flier",
+        "unknown",
+        "crawler"
+      ]
+    },
+    {
+      "id": "act5",
+      "text": "nudging",
+      "kinds": [
+        "walker",
+        "hopper"
+      ]
+    },
+    {
+      "id": "act6",
+      "text": "sitting perfectly still beside",
+      "kinds": [
+        "walker",
+        "hopper",
+        "flier"
+      ]
+    },
+    {
+      "id": "act7",
+      "text": "trying to drag away",
+      "kinds": [
+        "walker",
+        "crawler",
+        "hopper"
+      ]
+    },
+    {
+      "id": "act8",
+      "text": "crawling slowly across",
+      "kinds": [
+        "crawler"
+      ]
+    },
+    {
+      "id": "act9",
+      "text": "hiding behind",
+      "kinds": [
+        "walker",
+        "hopper",
+        "crawler",
+        "unknown"
+      ]
+    },
+    {
+      "id": "act10",
+      "text": "staring at",
+      "kinds": [
+        "walker",
+        "hopper",
+        "flier",
+        "unknown",
+        "swimmer"
+      ]
+    },
+    {
+      "id": "act11",
+      "text": "tapping",
+      "kinds": [
+        "flier",
+        "walker"
+      ]
+    },
+    {
+      "id": "act12",
+      "text": "curled up against",
+      "kinds": [
+        "walker",
+        "crawler"
+      ]
+    },
+    {
+      "id": "act13",
+      "text": "swimming slow circles beneath",
+      "kinds": [
+        "swimmer"
+      ]
+    },
+    {
+      "id": "act14",
+      "text": "watching you from behind",
+      "kinds": [
+        "walker",
+        "hopper",
+        "unknown",
+        "flier"
+      ]
+    },
+    {
+      "id": "act15",
+      "text": "humming to",
+      "kinds": [
+        "flier",
+        "unknown"
+      ]
+    },
+    {
+      "id": "act16",
+      "text": "polishing",
+      "kinds": [
+        "walker",
+        "crawler"
+      ]
+    },
+    {
+      "id": "act17",
+      "text": "arguing with",
+      "kinds": [
+        "flier",
+        "walker",
+        "hopper"
+      ]
+    }
+  ],
+  "objects": [
+    {
+      "id": "crystal",
+      "a": "a cracked crystal",
+      "the": "the crystal",
+      "zones": [
+        "stone",
+        "glass",
+        "any"
+      ],
+      "drops": [
+        "cracked_crystal"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "moonstone",
+      "a": "a moonstone half-buried in moss",
+      "the": "the moonstone",
+      "zones": [
+        "stone",
+        "meadow",
+        "grove"
+      ],
+      "drops": [
+        "moonstone_chip"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "teacup",
+      "a": "an overturned porcelain teacup",
+      "the": "the teacup",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "lost_button"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "book",
+      "a": "a book with no title on its spine",
+      "the": "the book",
+      "zones": [
+        "alcove",
+        "stone",
+        "tree"
+      ],
+      "drops": [
+        "pressed_letter",
+        "prophecy_leaf"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "button",
+      "a": "a brass button engraved with a V",
+      "the": "the button",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "lost_button"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "lantern",
+      "a": "a lantern that is still warm",
+      "the": "the lantern",
+      "zones": [
+        "stone",
+        "meadow",
+        "alcove"
+      ],
+      "drops": [
+        "moth_dust"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "feather",
+      "a": "a single white feather",
+      "the": "the feather",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "owl_feather"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "seed_pod",
+      "a": "a seed pod that ticks like a clock",
+      "the": "the seed pod",
+      "zones": [
+        "herbs",
+        "meadow",
+        "wild",
+        "glass"
+      ],
+      "drops": [
+        "wandering_seed",
+        "starseed"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "mirror",
+      "a": "a hand mirror, face-down",
+      "the": "the mirror",
+      "zones": [
+        "stone",
+        "water",
+        "alcove"
+      ],
+      "drops": [
+        "pool_water"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "acorn",
+      "a": "an acorn that is snoring",
+      "the": "the acorn",
+      "zones": [
+        "tree",
+        "grove"
+      ],
+      "drops": [
+        "sleeping_acorn"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "ring",
+      "a": "a ring of mushrooms",
+      "the": "the ring of mushrooms",
+      "zones": [
+        "wild",
+        "grove",
+        "meadow"
+      ],
+      "drops": [
+        "fairy_ring_cap"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "letter",
+      "a": "a folded letter sealed with green wax",
+      "the": "the letter",
+      "zones": [
+        "alcove",
+        "stone",
+        "roses"
+      ],
+      "drops": [
+        "pressed_letter"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "trowel",
+      "a": "a rusted trowel",
+      "the": "the trowel",
+      "zones": [
+        "herbs",
+        "glass",
+        "stone"
+      ],
+      "drops": [
+        "wandering_seed"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "rose_black",
+      "a": "a single black rose",
+      "the": "the black rose",
+      "zones": [
+        "roses",
+        "flowers"
+      ],
+      "drops": [
+        "black_rose"
+      ],
+      "rarity": "rare"
+    },
+    {
+      "id": "glowing_root",
+      "a": "a root glowing through the soil",
+      "the": "the root",
+      "zones": [
+        "tree",
+        "grove",
+        "herbs"
+      ],
+      "drops": [
+        "tree_bark"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "egg",
+      "a": "a speckled egg, much too warm",
+      "the": "the egg",
+      "zones": [
+        "tree",
+        "wild",
+        "stone"
+      ],
+      "drops": [
+        "dragon_scale"
+      ],
+      "rarity": "rare"
+    },
+    {
+      "id": "sundial_shadow",
+      "a": "a shadow with nothing to cast it",
+      "the": "the shadow",
+      "zones": [
+        "stone",
+        "meadow"
+      ],
+      "drops": [
+        "unknown_husk"
+      ],
+      "rarity": "rare"
+    },
+    {
+      "id": "chalk_mark",
+      "a": "a chalk circle nobody admits to drawing",
+      "the": "the circle",
+      "zones": [
+        "stone",
+        "alcove"
+      ],
+      "drops": [
+        "prophecy_leaf"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "jar",
+      "a": "a jar of fireflies with the lid off",
+      "the": "the jar",
+      "zones": [
+        "meadow",
+        "glass",
+        "stone"
+      ],
+      "drops": [
+        "moth_dust"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "map",
+      "a": "a scrap of map pinned under a stone",
+      "the": "the map",
+      "zones": [
+        "stone",
+        "wild",
+        "alcove"
+      ],
+      "drops": [
+        "map_scrap"
+      ],
+      "rarity": "rare"
+    },
+    {
+      "id": "dew_drop",
+      "a": "a drop of dew that won't fall",
+      "the": "the dewdrop",
+      "zones": [
+        "flowers",
+        "meadow",
+        "herbs"
+      ],
+      "drops": [
+        "dew_diamond"
+      ],
+      "rarity": "rare"
+    },
+    {
+      "id": "thorn_crown",
+      "a": "a crown woven from thorns",
+      "the": "the crown",
+      "zones": [
+        "roses"
+      ],
+      "drops": [
+        "thornsalt"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "watering_can",
+      "a": "a watering can that's always full",
+      "the": "the watering can",
+      "zones": [
+        "herbs",
+        "glass",
+        "flowers"
+      ],
+      "drops": [
+        "dewmint"
+      ],
+      "rarity": "common"
+    },
+    {
+      "id": "candle",
+      "a": "a candle burning with a green flame",
+      "the": "the candle",
+      "zones": [
+        "alcove",
+        "stone",
+        "glass"
+      ],
+      "drops": [
+        "emberleaf"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "bell",
+      "a": "a tiny silver bell hanging from nothing",
+      "the": "the bell",
+      "zones": [
+        "any"
+      ],
+      "drops": [
+        "sunbell"
+      ],
+      "rarity": "uncommon"
+    },
+    {
+      "id": "orchid",
+      "a": "a ghost-white orchid",
+      "the": "the orchid",
+      "zones": [
+        "glass",
+        "flowers",
+        "wild"
+      ],
+      "drops": [
+        "ghost_orchid"
+      ],
+      "rarity": "very_rare"
+    },
+    {
+      "id": "amber",
+      "a": "a bead of golden sap",
+      "the": "the sap",
+      "zones": [
+        "tree"
+      ],
+      "drops": [
+        "tree_amber"
+      ],
+      "rarity": "very_rare"
+    },
+    {
+      "id": "key",
+      "a": "a strange key",
+      "the": "the key",
+      "zones": [
+        "stone",
+        "alcove",
+        "roses"
+      ],
+      "drops": [
+        "strange_key"
+      ],
+      "rarity": "very_rare",
+      "events": [
+        "key"
+      ]
+    },
+    {
+      "id": "frog_coin",
+      "a": "a pile of tiny golden coins",
+      "the": "the coins",
+      "zones": [
+        "water",
+        "stone"
+      ],
+      "drops": [
+        "frog_gold"
+      ],
+      "rarity": "rare",
+      "events": [
+        "frog"
+      ]
+    },
+    {
+      "id": "statue_hand",
+      "a": "a stone hand, palm up, as if asking for something",
+      "the": "the stone hand",
+      "zones": [
+        "stone"
+      ],
+      "drops": [
+        "cracked_crystal"
+      ],
+      "rarity": "uncommon"
+    }
+  ],
+  "discoveries": [
+    {
+      "id": "dis0",
+      "text": "a ring of mushrooms has grown here overnight",
+      "zones": [
+        "wild",
+        "grove",
+        "meadow"
+      ],
+      "time": "any",
+      "drops": [
+        "fairy_ring_cap"
+      ],
+      "plant": true,
+      "the": "the plant"
+    },
+    {
+      "id": "dis1",
+      "text": "someone has planted a single flower in the exact middle of the path",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "wandering_seed"
+      ],
+      "plant": true,
+      "the": "the plant"
+    },
+    {
+      "id": "dis2",
+      "text": "the moss has grown into the shape of a word you almost recognise",
+      "zones": [
+        "stone",
+        "tree",
+        "grove"
+      ],
+      "time": "any",
+      "drops": [
+        "prophecy_leaf"
+      ],
+      "plant": true,
+      "the": "the plant"
+    },
+    {
+      "id": "dis3",
+      "text": "a trail of silver footprints leads away and simply stops",
+      "zones": [
+        "any"
+      ],
+      "time": "night",
+      "drops": [
+        "moth_dust"
+      ]
+    },
+    {
+      "id": "dis4",
+      "text": "the herbs have rearranged themselves into alphabetical order",
+      "zones": [
+        "herbs",
+        "glass"
+      ],
+      "time": "any",
+      "drops": [
+        "silverleaf",
+        "dewmint"
+      ],
+      "plant": true,
+      "the": "the plant"
+    },
+    {
+      "id": "dis5",
+      "text": "there's a door-shaped outline in the hedge",
+      "zones": [
+        "wild",
+        "roses"
+      ],
+      "time": "any",
+      "drops": [
+        "map_scrap"
+      ]
+    },
+    {
+      "id": "dis6",
+      "text": "a patch of flowers here is blooming out of season",
+      "zones": [
+        "flowers",
+        "meadow"
+      ],
+      "time": "any",
+      "drops": [
+        "moonbloom_petal",
+        "veil_lily"
+      ],
+      "plant": true,
+      "the": "the plant"
+    },
+    {
+      "id": "dis7",
+      "text": "the water has frozen into a perfect circle, in the middle of summer",
+      "zones": [
+        "water"
+      ],
+      "time": "any",
+      "drops": [
+        "dew_diamond"
+      ]
+    },
+    {
+      "id": "dis8",
+      "text": "there's a bench here that wasn't here yesterday",
+      "zones": [
+        "stone",
+        "meadow",
+        "alcove"
+      ],
+      "time": "any",
+      "drops": [
+        "lost_button"
+      ]
+    },
+    {
+      "id": "dis9",
+      "text": "the vines have written something in the dust",
+      "zones": [
+        "stone",
+        "alcove",
+        "glass"
+      ],
+      "time": "any",
+      "drops": [
+        "prophecy_leaf"
+      ]
+    },
+    {
+      "id": "dis10",
+      "text": "a dozen crystals have pushed up through the soil like teeth",
+      "zones": [
+        "stone",
+        "glass"
+      ],
+      "time": "any",
+      "drops": [
+        "cracked_crystal",
+        "moonstone_chip"
+      ]
+    },
+    {
+      "id": "dis11",
+      "text": "the petals on the ground spell out the start of a name",
+      "zones": [
+        "flowers",
+        "roses",
+        "meadow"
+      ],
+      "time": "any",
+      "drops": [
+        "moonbloom_petal"
+      ]
+    },
+    {
+      "id": "dis12",
+      "text": "someone left a cup of tea here. It's still hot",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "dewmint"
+      ]
+    },
+    {
+      "id": "dis13",
+      "text": "the shadows are pointing the wrong way",
+      "zones": [
+        "any"
+      ],
+      "time": "day",
+      "drops": [
+        "unknown_husk"
+      ]
+    },
+    {
+      "id": "dis14",
+      "text": "every leaf on one branch is silver",
+      "zones": [
+        "tree",
+        "grove"
+      ],
+      "time": "any",
+      "drops": [
+        "silverleaf",
+        "tree_bark"
+      ],
+      "plant": true,
+      "the": "the plant"
+    },
+    {
+      "id": "dis15",
+      "text": "a book lies open, its pages turning slowly by themselves",
+      "zones": [
+        "alcove",
+        "stone"
+      ],
+      "time": "any",
+      "drops": [
+        "pressed_letter",
+        "prophecy_leaf"
+      ]
+    },
+    {
+      "id": "dis16",
+      "text": "a small garden has been planted inside a teacup",
+      "zones": [
+        "glass",
+        "herbs"
+      ],
+      "time": "any",
+      "drops": [
+        "wandering_seed"
+      ],
+      "plant": true,
+      "the": "the plant"
+    },
+    {
+      "id": "dis17",
+      "text": "the glass panes are fogged from the inside, and someone has drawn a smiling face",
+      "zones": [
+        "glass"
+      ],
+      "time": "any",
+      "drops": [
+        "veil_lily"
+      ]
+    },
+    {
+      "id": "dis18",
+      "text": "there are tiny footprints all over the soil, far too many to count",
+      "zones": [
+        "herbs",
+        "wild",
+        "meadow"
+      ],
+      "time": "any",
+      "drops": [
+        "sprite_thread"
+      ]
+    },
+    {
+      "id": "dis19",
+      "text": "the stepping stones have rearranged into a spiral",
+      "zones": [
+        "water",
+        "stone"
+      ],
+      "time": "any",
+      "drops": [
+        "snail_pearl"
+      ]
+    },
+    {
+      "id": "dis20",
+      "text": "a lantern is burning here with nobody to hold it",
+      "zones": [
+        "stone",
+        "meadow"
+      ],
+      "time": "night",
+      "drops": [
+        "moth_dust"
+      ]
+    },
+    {
+      "id": "dis21",
+      "text": "a seed has sprouted in your footprint from a moment ago",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "wandering_seed",
+        "starseed"
+      ],
+      "plant": true,
+      "the": "the plant"
+    },
+    {
+      "id": "dis22",
+      "text": "the roses have all turned their heads the same way",
+      "zones": [
+        "roses"
+      ],
+      "time": "any",
+      "drops": [
+        "thornsalt"
+      ],
+      "plant": true,
+      "the": "the plant"
+    },
+    {
+      "id": "dis23",
+      "text": "there's warm light coming from under the soil",
+      "zones": [
+        "herbs",
+        "meadow",
+        "tree"
+      ],
+      "time": "night",
+      "drops": [
+        "glowshroom"
+      ]
+    },
+    {
+      "id": "dis24",
+      "text": "a statue's head has turned since the last time anyone looked",
+      "zones": [
+        "stone"
+      ],
+      "time": "any",
+      "drops": [
+        "cracked_crystal"
+      ]
+    },
+    {
+      "id": "dis25",
+      "text": "the fog has settled into the shape of a person sitting",
+      "zones": [
+        "any"
+      ],
+      "time": "night",
+      "drops": [
+        "hushroot"
+      ]
+    },
+    {
+      "id": "dis26",
+      "text": "somebody has carved initials into the bark, very recently",
+      "zones": [
+        "tree",
+        "grove"
+      ],
+      "time": "any",
+      "drops": [
+        "tree_bark"
+      ]
+    },
+    {
+      "id": "dis27",
+      "text": "a ribbon is tied around a branch, in House colours",
+      "zones": [
+        "tree",
+        "grove",
+        "wild"
+      ],
+      "time": "any",
+      "drops": [
+        "sprite_thread"
+      ]
+    },
+    {
+      "id": "dis28",
+      "text": "the well has water in it today, and it is humming",
+      "zones": [
+        "water",
+        "stone"
+      ],
+      "time": "any",
+      "drops": [
+        "pool_water"
+      ]
+    },
+    {
+      "id": "dis29",
+      "text": "a single star has fallen into the grass and is still glowing",
+      "zones": [
+        "meadow"
+      ],
+      "time": "night",
+      "drops": [
+        "starthistle",
+        "starseed"
+      ]
+    },
+    {
+      "id": "dis30",
+      "text": "the Reflection Pool shows the sky from a different night",
+      "zones": [
+        "water"
+      ],
+      "time": "any",
+      "drops": [
+        "pool_water"
+      ]
+    },
+    {
+      "id": "dis31",
+      "text": "every mushroom here has turned to face the Ancient Tree",
+      "zones": [
+        "wild",
+        "grove"
+      ],
+      "time": "any",
+      "drops": [
+        "glowshroom",
+        "hollow_morel"
+      ]
+    },
+    {
+      "id": "dis32",
+      "text": "the sundial's shadow is moving backwards",
+      "zones": [
+        "stone"
+      ],
+      "time": "day",
+      "drops": [
+        "cracked_crystal"
+      ]
+    },
+    {
+      "id": "dis33",
+      "text": "there's a neat row of pebbles, largest to smallest, leading into the ferns",
+      "zones": [
+        "wild",
+        "stone"
+      ],
+      "time": "any",
+      "drops": [
+        "map_scrap"
+      ]
+    },
+    {
+      "id": "dis34",
+      "text": "the thorns on the roses have fallen out and lie in a perfect circle",
+      "zones": [
+        "roses"
+      ],
+      "time": "any",
+      "drops": [
+        "thornsalt"
+      ],
+      "plant": true,
+      "the": "the plant"
+    },
+    {
+      "id": "dis35",
+      "text": "the air shimmers here like heat off stone",
+      "zones": [
+        "any"
+      ],
+      "time": "day",
+      "drops": [
+        "emberleaf"
+      ]
+    },
+    {
+      "id": "dis36",
+      "text": "someone has hung wind chimes made of bones. Small bones",
+      "zones": [
+        "wild",
+        "grove"
+      ],
+      "time": "any",
+      "drops": [
+        "unknown_husk"
+      ],
+      "moods": [
+        "ominous"
+      ]
+    },
+    {
+      "id": "dis37",
+      "text": "the earth here has been dug up, and then carefully put back",
+      "zones": [
+        "herbs",
+        "wild",
+        "grove"
+      ],
+      "time": "any",
+      "drops": [
+        "unknown_husk"
+      ],
+      "moods": [
+        "ominous"
+      ]
+    },
+    {
+      "id": "dis38",
+      "text": "a doorway of woven willow stands in the middle of nowhere",
+      "zones": [
+        "water",
+        "grove"
+      ],
+      "time": "any",
+      "drops": [
+        "map_scrap"
+      ]
+    },
+    {
+      "id": "dis39",
+      "text": "the Ancient Tree has dropped a single leaf with writing on it",
+      "zones": [
+        "tree"
+      ],
+      "time": "any",
+      "drops": [
+        "prophecy_leaf"
+      ]
+    },
+    {
+      "id": "dis40",
+      "text": "a ring of wolf tracks circles the path, then heads for the brambles - and there's a thorn crown left in the middle",
+      "zones": [
+        "wild",
+        "grove",
+        "roses"
+      ],
+      "time": "any",
+      "drops": [
+        "thornsalt"
+      ],
+      "requires": {
+        "houses": [
+          "thornmere"
+        ]
+      },
+      "flags": [
+        "saw_wolf_ring"
+      ]
+    },
+    {
+      "id": "dis41",
+      "text": "a young stag has left its shed antler velvet on a low branch, as if hung there for someone",
+      "zones": [
+        "meadow",
+        "grove",
+        "wild"
+      ],
+      "time": "any",
+      "drops": [
+        "hare_whisker"
+      ],
+      "requires": {
+        "houses": [
+          "veyren"
+        ]
+      },
+      "flags": [
+        "saw_stag_gift"
+      ]
+    },
+    {
+      "id": "dis42",
+      "text": "a bed of healing herbs has grown in the shape of an elephant, trunk raised",
+      "zones": [
+        "herbs",
+        "glass",
+        "meadow"
+      ],
+      "time": "any",
+      "drops": [
+        "dewmint",
+        "silverleaf"
+      ],
+      "requires": {
+        "houses": [
+          "vashara"
+        ]
+      },
+      "flags": [
+        "saw_herb_elephant"
+      ],
+      "plant": true,
+      "the": "the plant"
+    },
+    {
+      "id": "dis43",
+      "text": "the constellations are reflected in a puddle that shouldn't be there - and one of them is moving",
+      "zones": [
+        "water",
+        "stone",
+        "meadow"
+      ],
+      "time": "night",
+      "drops": [
+        "moonstone_chip",
+        "starseed"
+      ],
+      "requires": {
+        "houses": [
+          "caldrin"
+        ]
+      },
+      "flags": [
+        "saw_moving_star"
+      ]
+    },
+    {
+      "id": "dis44",
+      "text": "a full moon is reflected in the water, even though tonight's moon is a sliver",
+      "zones": [
+        "water",
+        "meadow"
+      ],
+      "time": "night",
+      "drops": [
+        "moonbloom_petal",
+        "moonstone_chip"
+      ],
+      "requires": {
+        "houses": [
+          "moonveil"
+        ]
+      },
+      "flags": [
+        "saw_false_moon"
+      ]
+    },
+    {
+      "id": "dis45",
+      "text": "the Garden has laid out a path of white petals just for you",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "ghost_orchid",
+        "moonbloom_petal"
+      ],
+      "requires": {
+        "rep_min": 15
+      }
+    },
+    {
+      "id": "dis46",
+      "text": "thorns have grown across the path you were on a moment ago",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "thornsalt"
+      ],
+      "requires": {
+        "rep_max": -8
+      }
+    },
+    {
+      "id": "dis47",
+      "text": "the map scrap in your satchel is warm - and the path in front of you matches it exactly",
+      "zones": [
+        "wild",
+        "grove",
+        "stone"
+      ],
+      "time": "any",
+      "drops": [
+        "starseed",
+        "hollow_morel"
+      ],
+      "requires": {
+        "items": [
+          "map_scrap"
+        ]
+      },
+      "flags": [
+        "followed_map"
+      ]
+    },
+    {
+      "id": "dis48",
+      "text": "banners in every House's colours have been tied through the hedges - the Garden knows the tournament is on",
+      "zones": [
+        "any"
+      ],
+      "time": "any",
+      "drops": [
+        "sprite_thread"
+      ],
+      "requires": {
+        "academy": [
+          "tournament"
+        ]
+      }
+    }
+  ],
+  "outcomes": [
+    {
+      "id": "out0",
+      "text": "The vines draw quietly aside to let you pass.",
+      "tones": [
+        "beloved",
+        "friendly"
+      ]
+    },
+    {
+      "id": "out1",
+      "text": "A flower opens beneath your hand as you reach out.",
+      "tones": [
+        "beloved"
+      ]
+    },
+    {
+      "id": "out2",
+      "text": "The Garden hums, very softly, as though it's pleased you came.",
+      "tones": [
+        "beloved"
+      ]
+    },
+    {
+      "id": "out3",
+      "text": "Petals settle on your shoulders like a welcome.",
+      "tones": [
+        "beloved",
+        "friendly"
+      ]
+    },
+    {
+      "id": "out4",
+      "text": "The path ahead seems to lean toward you.",
+      "tones": [
+        "beloved"
+      ]
+    },
+    {
+      "id": "out5",
+      "text": "You get the distinct feeling you are being looked after.",
+      "tones": [
+        "beloved"
+      ]
+    },
+    {
+      "id": "out6",
+      "text": "Something beneath the soil remembers you. Fondly.",
+      "tones": [
+        "beloved"
+      ]
+    },
+    {
+      "id": "out7",
+      "text": "The roses bow, just slightly, as you go by.",
+      "tones": [
+        "beloved"
+      ]
+    },
+    {
+      "id": "out8",
+      "text": "A warm breeze follows you for a while.",
+      "tones": [
+        "friendly",
+        "beloved"
+      ]
+    },
+    {
+      "id": "out9",
+      "text": "The grass springs back behind you faster than it should.",
+      "tones": [
+        "friendly"
+      ]
+    },
+    {
+      "id": "out10",
+      "text": "A bird lands on a branch beside you and stays.",
+      "tones": [
+        "friendly",
+        "neutral"
+      ]
+    },
+    {
+      "id": "out11",
+      "text": "The light shifts to show you something you'd have missed.",
+      "tones": [
+        "friendly",
+        "beloved"
+      ]
+    },
+    {
+      "id": "out12",
+      "text": "A thorn that was about to catch your sleeve pulls itself back.",
+      "tones": [
+        "friendly"
+      ]
+    },
+    {
+      "id": "out13",
+      "text": "The Garden seems to be in a generous mood.",
+      "tones": [
+        "friendly",
+        "beloved"
+      ]
+    },
+    {
+      "id": "out14",
+      "text": "As you approach, the flowers close around you.",
+      "tones": [
+        "neutral",
+        "wary"
+      ]
+    },
+    {
+      "id": "out15",
+      "text": "The Garden carries on with its business, as if you're not quite there.",
+      "tones": [
+        "neutral"
+      ]
+    },
+    {
+      "id": "out16",
+      "text": "A leaf lands on your head. It might have been an accident.",
+      "tones": [
+        "neutral"
+      ]
+    },
+    {
+      "id": "out17",
+      "text": "Nothing else happens, which somehow feels deliberate.",
+      "tones": [
+        "neutral",
+        "wary"
+      ]
+    },
+    {
+      "id": "out18",
+      "text": "You have the feeling you've been noticed.",
+      "tones": [
+        "neutral"
+      ]
+    },
+    {
+      "id": "out19",
+      "text": "A sprinkler of dew goes off, perfectly aimed at your shoes.",
+      "tones": [
+        "neutral",
+        "wary"
+      ]
+    },
+    {
+      "id": "out20",
+      "text": "The moment passes. The Garden moves on. So do you.",
+      "tones": [
+        "neutral"
+      ]
+    },
+    {
+      "id": "out21",
+      "text": "Somewhere, something makes a note of your visit.",
+      "tones": [
+        "neutral",
+        "wary"
+      ]
+    },
+    {
+      "id": "out22",
+      "text": "The roses turn their faces away as you pass.",
+      "tones": [
+        "wary"
+      ]
+    },
+    {
+      "id": "out23",
+      "text": "A bramble snags your robe and doesn't let go straight away.",
+      "tones": [
+        "wary",
+        "hostile"
+      ]
+    },
+    {
+      "id": "out24",
+      "text": "The path is a little longer on the way back than it was on the way in.",
+      "tones": [
+        "wary"
+      ]
+    },
+    {
+      "id": "out25",
+      "text": "Every bloom within reach snaps shut.",
+      "tones": [
+        "wary",
+        "hostile"
+      ]
+    },
+    {
+      "id": "out26",
+      "text": "The Garden goes very quiet while you're here.",
+      "tones": [
+        "wary"
+      ]
+    },
+    {
+      "id": "out27",
+      "text": "The birds stop singing until you leave.",
+      "tones": [
+        "wary",
+        "hostile"
+      ]
+    },
+    {
+      "id": "out28",
+      "text": "Something beneath the soil remembers you.",
+      "tones": [
+        "hostile"
+      ]
+    },
+    {
+      "id": "out29",
+      "text": "The vines tighten across the path. You find another way.",
+      "tones": [
+        "hostile"
+      ]
+    },
+    {
+      "id": "out30",
+      "text": "A cold wind pushes you, gently but firmly, toward the gate.",
+      "tones": [
+        "hostile"
+      ]
+    },
+    {
+      "id": "out31",
+      "text": "Every rose snaps shut at once. The sound is like a door slamming.",
+      "tones": [
+        "hostile"
+      ]
+    },
+    {
+      "id": "out32",
+      "text": "The ground is hard and unfriendly, and your footprints fill with water.",
+      "tones": [
+        "hostile"
+      ]
+    },
+    {
+      "id": "out33",
+      "text": "You hear, very clearly, the Garden sigh.",
+      "tones": [
+        "hostile"
+      ]
+    },
+    {
+      "id": "out34",
+      "text": "The black petals rustle as you pass, like whispering.",
+      "tones": [
+        "neutral",
+        "wary",
+        "hostile",
+        "friendly",
+        "beloved"
+      ],
+      "events": [
+        "black_flowers"
+      ]
+    },
+    {
+      "id": "out35",
+      "text": "A moth lands on your hand and stays there, glowing.",
+      "tones": [
+        "friendly",
+        "beloved",
+        "neutral"
+      ],
+      "events": [
+        "moths"
+      ]
+    },
+    {
+      "id": "out36",
+      "text": "The Tree's light brushes your face, warm as summer.",
+      "tones": [
+        "friendly",
+        "beloved",
+        "neutral"
+      ],
+      "events": [
+        "tree_glow"
+      ]
+    }
+  ],
+  "strange_house": [
+    "The Garden rearranges the path behind you, just to see what you'll do.",
+    "Every flower you pass turns to follow you. All of them. Slowly.",
+    "The hedges hum your House's name.",
+    "You're sure the statues were facing the other way a moment ago.",
+    "Something plucks a single thread from your sleeve and keeps it.",
+    "The Garden seems very interested in you today. Unsettlingly so."
+  ],
+  "templates": [
+    {
+      "id": "tpl0",
+      "kind": "creature",
+      "text": "{Loc}, you notice {creature} {action} {object}.\n\n{atmos} {outcome}"
+    },
+    {
+      "id": "tpl1",
+      "kind": "creature",
+      "text": "{atmos}\n\n{Loc}, {creature} is {action} {object}. {outcome}"
+    },
+    {
+      "id": "tpl2",
+      "kind": "creature",
+      "text": "You linger {loc}. {atmos}\n\nYou spot {creature} {action} {object}. Everything goes very still when you arrive. {outcome}"
+    },
+    {
+      "id": "tpl3",
+      "kind": "creature",
+      "text": "{Loc}: {creature}, {action} {object}.\n\n{outcome}"
+    },
+    {
+      "id": "tpl4",
+      "kind": "creature",
+      "text": "{atmos}\n\n{Loc}, something catches your eye: {creature}, {action} {object}. {outcome}"
+    },
+    {
+      "id": "tpl5",
+      "kind": "discovery",
+      "text": "{Loc}, {discovery}.\n\n{atmos} {outcome}"
+    },
+    {
+      "id": "tpl6",
+      "kind": "discovery",
+      "text": "{atmos}\n\n{Loc}, you realise {discovery}. {outcome}"
+    },
+    {
+      "id": "tpl7",
+      "kind": "discovery",
+      "text": "You take a different turning and end up {loc}. {Discovery}.\n\n{outcome}"
+    },
+    {
+      "id": "tpl8",
+      "kind": "quiet",
+      "text": "You spend a while {loc}. {atmos}\n\n{outcome}"
+    },
+    {
+      "id": "tpl9",
+      "kind": "quiet",
+      "text": "You stand {loc} for a while. {atmos} {outcome}"
+    }
+  ],
+  "forage_lines": [
+    "You search {loc} and turn up {item}.",
+    "Digging carefully {loc}, you find {item}.",
+    "{Loc}, half-hidden under the leaves, is {item}.",
+    "You part the undergrowth {loc}. There - {item}.",
+    "Something glints {loc}. It's {item}.",
+    "You kneel {loc} and come up with {item}."
+  ],
+  "forage_empty": [
+    "You search {loc} for a long while and find nothing but dirt under your nails.",
+    "{Loc}, the Garden has hidden everything worth finding. Today, anyway.",
+    "You come away from {loc} empty-handed. Something rustles, pleased with itself."
+  ],
+  "choices": {
+    "feed": {
+      "label": "Feed it",
+      "emoji": "🍃"
+    },
+    "follow": {
+      "label": "Follow it",
+      "emoji": "👣"
+    },
+    "steal": {
+      "label": "Steal from it",
+      "emoji": "🫳"
+    },
+    "leave": {
+      "label": "Leave it be",
+      "emoji": "🌿"
+    }
   },
-  {
-   "id": "pool_answer",
-   "phrases": [
-    "i answer the pool",
-    "answer the reflection pool",
-    "i'm here"
-   ],
-   "response": "POOL_ANSWER",
-   "once": "event",
-   "event": "whisper"
+  "plant_choices": {
+    "tend": {
+      "label": "Tend it",
+      "emoji": "🌱"
+    },
+    "uproot": {
+      "label": "Uproot it",
+      "emoji": "🪓"
+    },
+    "leave": {
+      "label": "Leave it be",
+      "emoji": "🌿"
+    }
   },
-  {
-   "id": "tree_touch_glow",
-   "phrases": [
-    "i touch the glowing tree",
-    "touch the ancient tree",
-    "put my hand on the tree"
-   ],
-   "response": "🌳 The glow runs up your arm like warm water. For a heartbeat, you can hear every root in the Garden.",
-   "reward": "tree_amber",
-   "rep": 1,
-   "points": 1,
-   "once": "event",
-   "event": "tree_glow"
-  }
- ]
+  "choice_lines": {
+    "feed_good": [
+      "{The} accepts your offering and nuzzles your hand before vanishing.",
+      "{The} eats from your palm, then leaves something behind in thanks."
+    ],
+    "feed_meh": [
+      "{The} sniffs your offering, considers it, and walks off with it without a word."
+    ],
+    "follow_good": [
+      "You follow {the} deeper in than you've ever been, until it stops and shows you something.",
+      "{The} leads you to a place you've never seen - and then it's gone."
+    ],
+    "follow_lost": [
+      "You follow {the} for what feels like an hour. When you look up, you're back at the gate."
+    ],
+    "steal_good": [
+      "You snatch it and run. {The} doesn't chase you. That's somehow worse."
+    ],
+    "steal_caught": [
+      "{The} is quicker than you. Much quicker. You leave with nothing but a scratch - and the Garden saw."
+    ],
+    "leave": [
+      "You let {the} be. As you go, you feel the Garden watching - approvingly, you think.",
+      "You step softly around {the} and carry on. Nothing is taken. Nothing is owed."
+    ],
+    "tend": [
+      "You clear the weeds, loosen the soil, and give it a little water. The Garden notices.",
+      "You kneel and tend it carefully. Somewhere behind you, a flower that was closed opens.",
+      "You straighten a bent stem and pat the earth down. It seems to stand a little taller."
+    ],
+    "uproot": [
+      "You tear it up by the roots. The Garden goes silent around you. It will remember this.",
+      "It comes up easily - too easily. The soil where it grew turns grey.",
+      "You rip it out and pocket what's useful. Every leaf nearby turns away from you."
+    ]
+  },
+  "offer_lines": {
+    "full": "The Garden accepts your offering without comment. It has had enough gifts from you for one day.",
+    "warm": [
+      "The soil takes your offering gently. A flower you haven't seen before opens nearby.",
+      "The Garden accepts. Somewhere, a bird starts singing.",
+      "Your offering sinks into the earth, and the ground feels warmer where it went."
+    ],
+    "cold": [
+      "The earth swallows your offering. The Garden says nothing. It noticed, though.",
+      "The roots draw your offering down into the dark. A little of the chill goes out of the air.",
+      "Your offering is gone the moment you look away. That's a start."
+    ]
+  },
+  "uses": [
+    {
+      "id": "map_path",
+      "item": "map_scrap",
+      "consume": true,
+      "reward": "starseed",
+      "rep": 1,
+      "points": 1,
+      "flags": [
+        "walked_map_path"
+      ],
+      "response": "🗺️ You unfold the scrap and follow it - left at the statue, through the ferns, three steps past the dry well - to a patch of soil nobody has touched in a century. Something is waiting in it."
+    },
+    {
+      "id": "key_garden",
+      "item": "strange_key",
+      "consume": false,
+      "response": "🗝️ You try the key in the old gate, the glasshouse door, the gardener's shed. It fits none of them. Whatever it opens, it isn't here."
+    },
+    {
+      "id": "pool_vial",
+      "item": "pool_water",
+      "consume": true,
+      "reward": "prophecy_leaf",
+      "rep": 1,
+      "response": "💧 You pour the pool water back where it came from. For a moment the surface shows words - and then a leaf drifts up, with those same words in its veins."
+    },
+    {
+      "id": "seed_plant",
+      "item": "starseed",
+      "consume": true,
+      "rep": 2,
+      "flags": [
+        "planted_starseed"
+      ],
+      "response": "🌟 You plant the starseed. Nothing happens. Then, very slowly, a single silver shoot turns - not toward the sun, but toward where the stars will be tonight."
+    },
+    {
+      "id": "acorn_tree",
+      "item": "sleeping_acorn",
+      "consume": true,
+      "reward": "tree_bark",
+      "rep": 1,
+      "response": "🌰 You tuck the snoring acorn among the Ancient Tree's roots. The snoring stops. The Tree creaks, once, like a sigh of relief, and drops something at your feet."
+    }
+  ],
+  "rare_boost_events": [
+    "tree_glow",
+    "path"
+  ],
+  "event_drop_boost": {
+    "moths": [
+      "moth_dust"
+    ],
+    "black_flowers": [
+      "black_rose"
+    ],
+    "tree_glow": [
+      "tree_amber",
+      "tree_bark"
+    ]
+  },
+  "reveals": {
+    "beloved": "🌿 *The vines draw back from the path as you approach. A flower opens where your hand rests. The Garden has decided you should know: **it likes you.***",
+    "friendly": "🌸 *For the first time, a bloom turns toward you when you pass. The Garden has started to notice you - kindly.*",
+    "wary": "🥀 *The roses close as you pass. It's the first time you've noticed. It won't be the last.*",
+    "hostile": "🌑 *Something beneath the soil remembers you. The Garden has decided you should know that, too.*"
+  },
+  "events": [
+    {
+      "key": "door",
+      "emoji": "🚪",
+      "title": "A Door Behind the Roses",
+      "start": "A door has appeared behind the roses. Old wood, iron hinges, no handle. Nobody remembers it being there.",
+      "end": "The door behind the roses is gone. Just roses now. As if it never was.",
+      "minutes": [
+        180,
+        1440
+      ],
+      "weight": 10
+    },
+    {
+      "key": "black_flowers",
+      "emoji": "🥀",
+      "title": "The Flowers Turn Black",
+      "start": "Every flower in the Garden has turned black. Nobody knows why. The Garden isn't saying.",
+      "end": "Colour creeps back into the petals, one flower at a time. Whatever it was has passed.",
+      "minutes": [
+        60,
+        720
+      ],
+      "weight": 8
+    },
+    {
+      "key": "frog",
+      "emoji": "🐸",
+      "title": "The Golden Frog",
+      "start": "A golden frog has set up shop by the water, and it's offering trades. Bring it something. It might give you something back.",
+      "end": "The golden frog packs up its tiny stall and hops away. Business, apparently, is concluded.",
+      "minutes": [
+        120,
+        480
+      ],
+      "weight": 8
+    },
+    {
+      "key": "whisper",
+      "emoji": "💧",
+      "title": "A Name From the Pool",
+      "start": "The Reflection Pool is whispering a name. **{name}**. Over and over, very softly.",
+      "end": "The Pool goes quiet. Whatever it wanted to say, it has stopped saying it.",
+      "minutes": [
+        60,
+        360
+      ],
+      "weight": 7
+    },
+    {
+      "key": "tree_glow",
+      "emoji": "🌳",
+      "title": "The Ancient Tree Glows",
+      "start": "The Ancient Tree has begun to glow, gold and green, from the roots up. The whole Garden feels warmer.",
+      "end": "The Tree's glow fades back into ordinary bark. It hums, once, and falls silent.",
+      "minutes": [
+        60,
+        480
+      ],
+      "weight": 8
+    },
+    {
+      "key": "moths",
+      "emoji": "🦋",
+      "title": "The Moon Moths",
+      "start": "Hundreds of moon moths have poured out of nowhere. The Garden is silver with them.",
+      "end": "The moon moths lift all at once and are gone, leaving silver dust on everything.",
+      "minutes": [
+        30,
+        240
+      ],
+      "weight": 9
+    },
+    {
+      "key": "key",
+      "emoji": "🗝️",
+      "title": "A Key Beneath the Bench",
+      "start": "Someone has spotted a strange key beneath a bench in the Garden. It's still there. For now.",
+      "end": "The key beneath the bench is gone. Somebody took it - or something did.",
+      "minutes": [
+        60,
+        1440
+      ],
+      "weight": 5
+    },
+    {
+      "key": "path",
+      "emoji": "🌿",
+      "title": "An Unexplored Path",
+      "start": "A new path has opened in the Garden, winding somewhere nobody has been. The hedges on either side are very, very quiet.",
+      "end": "The unexplored path has closed over. Ivy where the gap was. Did anyone see where it went?",
+      "minutes": [
+        120,
+        1440
+      ],
+      "weight": 6
+    },
+    {
+      "key": "strange_house",
+      "emoji": "🏡",
+      "title": "The Garden Takes an Interest",
+      "start": "The Garden is behaving very strangely toward **House {house}**. Flowers follow them. Paths shift. Nobody can say why.",
+      "end": "The Garden seems to have lost interest in House {house}. For now.",
+      "minutes": [
+        180,
+        1440
+      ],
+      "weight": 7
+    }
+  ],
+  "secrets": [
+    {
+      "id": "thornmere_howl",
+      "phrases": [
+        "i howl at the brambles",
+        "howl with the wolves",
+        "i howl"
+      ],
+      "requires": {
+        "houses": [
+          "thornmere"
+        ],
+        "time": "night"
+      },
+      "response": "🐺 You howl. For a long moment, nothing. Then, from deep in the brambles, something howls back - and a crown of thorns rolls out onto the path.",
+      "reward": "thornsalt",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "veyren_bow",
+      "phrases": [
+        "i bow to the stag",
+        "bow to the white stag",
+        "i bow to the deer"
+      ],
+      "requires": {
+        "houses": [
+          "veyren"
+        ]
+      },
+      "response": "🦌 You bow. When you look up, a stag is standing at the edge of the meadow. It bows back - and is gone.",
+      "reward": "hare_whisker",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "vashara_heal",
+      "phrases": [
+        "i heal the broken flower",
+        "i mend the broken stem",
+        "heal the wilted flower"
+      ],
+      "requires": {
+        "houses": [
+          "vashara"
+        ]
+      },
+      "response": "🐘 You cup the broken stem in your hands. It straightens. It blooms. Every flower nearby turns to look at you.",
+      "reward": "veil_lily",
+      "rep": 3,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "caldrin_stars",
+      "phrases": [
+        "i read the stars in the pool",
+        "chart the stars in the reflection pool",
+        "i map the reflected stars"
+      ],
+      "requires": {
+        "houses": [
+          "caldrin"
+        ],
+        "time": "night"
+      },
+      "response": "🔭 You trace the reflected stars with a fingertip. They're not tonight's stars - they're a sky from centuries ago, and one of them is labelled in handwriting.",
+      "reward": "starthistle",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "moonveil_hypothesis",
+      "phrases": [
+        "i test a hypothesis on the moonblooms",
+        "for research purposes",
+        "i run an experiment in the garden"
+      ],
+      "requires": {
+        "houses": [
+          "moonveil"
+        ]
+      },
+      "response": "🌕 You change one variable - just one - and every moonbloom in the meadow changes colour to match. The Garden, it seems, likes a good experiment.",
+      "reward": "moonbloom_petal",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "beloved_gift",
+      "phrases": [
+        "i ask the garden for a gift",
+        "may i have a gift",
+        "what would you give me"
+      ],
+      "requires": {
+        "rep_min": 15
+      },
+      "response": "🌿 The Garden has been waiting for you to ask. A single white orchid grows up out of the path, opens, and lets itself be picked.",
+      "reward": "ghost_orchid",
+      "rep": 1,
+      "points": 2,
+      "once": "user"
+    },
+    {
+      "id": "apology",
+      "phrases": [
+        "i am sorry",
+        "i apologise to the garden",
+        "i apologize to the garden",
+        "forgive me garden"
+      ],
+      "requires": {
+        "rep_max": -3
+      },
+      "response": "🥀 You say it out loud. The roses don't open. But the thorns across the path pull back, just a little.",
+      "rep": 3,
+      "once": "user"
+    },
+    {
+      "id": "pool_ask",
+      "phrases": [
+        "i ask the pool a question",
+        "pool what do you see",
+        "what do you see pool"
+      ],
+      "requires": {
+        "flags": [
+          "garden:pool_name"
+        ]
+      },
+      "response": "💧 The Pool knows your name now, so it answers. It shows you a corridor in the Library you've never walked down, and a cabinet with a very small keyhole.",
+      "reward": "prophecy_leaf",
+      "rep": 1,
+      "points": 1,
+      "once": "user",
+      "flags": [
+        "heard_of_cabinet"
+      ]
+    },
+    {
+      "id": "tree_listen",
+      "phrases": [
+        "i press my ear to the ancient tree",
+        "listen to the ancient tree",
+        "ear to the tree"
+      ],
+      "response": "🌳 You press your ear to the bark. Deep inside, slow as centuries, something is **counting**. It gets to a number, stops, and starts again. You think it's counting students.",
+      "reward": "tree_bark",
+      "rep": 2,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "pool_name",
+      "phrases": [
+        "i say my name to the pool",
+        "tell the pool my name",
+        "whisper my name into the pool"
+      ],
+      "response": "💧 You whisper your name into the Reflection Pool. It whispers back a different one. You don't know it. Yet.",
+      "reward": "pool_water",
+      "rep": 1,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "roses_greet",
+      "phrases": [
+        "good morning roses",
+        "good evening roses",
+        "hello roses"
+      ],
+      "response": "🌹 The roses, one by one, turn to face you. It's a little unnerving. It's also, you think, polite.",
+      "rep": 2,
+      "once": "user"
+    },
+    {
+      "id": "hollow_ring",
+      "phrases": [
+        "i step into the mushroom ring",
+        "step inside the fairy ring",
+        "step into the ring"
+      ],
+      "response": "🍄 You step inside the ring. The world goes quiet and very green. When you step out, your pockets are heavier and your shoes are on the wrong feet.",
+      "reward": "hollow_morel",
+      "rep": -1,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "moonbloom_night",
+      "phrases": [
+        "i sing to the moonblooms",
+        "sing to the moonbloom",
+        "hum to the moonblooms"
+      ],
+      "response": "🌸 You sing, softly. Every moonbloom in the meadow opens at once, and one of them lets go a petal straight into your hand.",
+      "reward": "moonbloom_petal",
+      "rep": 2,
+      "points": 1,
+      "once": "user",
+      "time": "night"
+    },
+    {
+      "id": "sundial_wind",
+      "phrases": [
+        "i turn the sundial",
+        "turn back the sundial",
+        "wind the sundial"
+      ],
+      "response": "☀️ The sundial resists, then gives. For one second, every shadow in the Garden jumps an hour. Somewhere, a bell rings that shouldn't.",
+      "reward": "cracked_crystal",
+      "rep": -2,
+      "once": "user",
+      "time": "day"
+    },
+    {
+      "id": "gardener_shed",
+      "phrases": [
+        "i knock on the gardener's shed",
+        "knock on the shed",
+        "knock three times on the shed"
+      ],
+      "response": "🏚️ You knock. From inside, someone knocks back - three times. The door stays shut. Under it, someone slides out a folded scrap of map.",
+      "reward": "map_scrap",
+      "points": 2,
+      "once": "user"
+    },
+    {
+      "id": "statue_offer",
+      "phrases": [
+        "i place a crystal in the stone hand",
+        "give the statue a crystal",
+        "put a crystal in the stone hand"
+      ],
+      "requires": {
+        "items": [
+          "cracked_crystal"
+        ]
+      },
+      "consumes": [
+        "cracked_crystal"
+      ],
+      "response": "🗿 You place it in the statue's palm. The fingers close, very slowly, and when they open again there's something else in them.",
+      "reward": "moonstone_chip",
+      "rep": 2,
+      "once": "user"
+    },
+    {
+      "id": "first_to_owl",
+      "phrases": [
+        "i bow to the owl",
+        "bow to the barn owl",
+        "ask the owl a question"
+      ],
+      "response": "🦉 The owl looks at you for a long time. Then it says - clearly, in words - *\"You're the first to ask.\"* It will not say anything else. Ever.",
+      "reward": "owl_feather",
+      "rep": 3,
+      "points": 3,
+      "once": "server",
+      "time": "night"
+    },
+    {
+      "id": "willow_door",
+      "phrases": [
+        "i walk through the willow door",
+        "step through the willow doorway",
+        "walk through the willow"
+      ],
+      "response": "🌿 You step through the woven willow doorway and out the other side - into the same Garden, but quieter, and a little bit older. When you look back, you're somehow in front of the doorway again.",
+      "reward": "starseed",
+      "rep": 1,
+      "points": 1,
+      "once": "user"
+    },
+    {
+      "id": "door_knock",
+      "phrases": [
+        "i knock on the door behind the roses",
+        "knock on the door",
+        "open the door behind the roses"
+      ],
+      "response": "🚪 You knock. The door doesn't open - but beneath it, something slides out toward your feet.",
+      "reward": "map_scrap",
+      "rep": 1,
+      "points": 1,
+      "once": "event",
+      "event": "door"
+    },
+    {
+      "id": "frog_trade",
+      "phrases": [
+        "i trade with the golden frog",
+        "trade with the frog",
+        "offer the frog a trade"
+      ],
+      "response": "FROG_TRADE",
+      "once": "none",
+      "event": "frog"
+    },
+    {
+      "id": "key_take",
+      "phrases": [
+        "i take the key",
+        "pick up the key",
+        "take the strange key"
+      ],
+      "response": "🗝️ You kneel and take the key from beneath the bench. It's heavier than it looks - and very, very cold.",
+      "reward": "strange_key",
+      "points": 2,
+      "rep": 1,
+      "once": "server_event",
+      "event": "key"
+    },
+    {
+      "id": "path_walk",
+      "phrases": [
+        "i walk the unexplored path",
+        "follow the new path",
+        "take the unexplored path"
+      ],
+      "response": "🌿 You follow the new path through the hedge. It winds and winds, and at its end there's something waiting, as if left for you.",
+      "reward_pool": [
+        "ghost_orchid",
+        "starseed",
+        "map_scrap",
+        "hollow_morel"
+      ],
+      "rep": 1,
+      "points": 1,
+      "once": "event",
+      "event": "path"
+    },
+    {
+      "id": "pool_answer",
+      "phrases": [
+        "i answer the pool",
+        "answer the reflection pool",
+        "i'm here"
+      ],
+      "response": "POOL_ANSWER",
+      "once": "event",
+      "event": "whisper"
+    },
+    {
+      "id": "tree_touch_glow",
+      "phrases": [
+        "i touch the glowing tree",
+        "touch the ancient tree",
+        "put my hand on the tree"
+      ],
+      "response": "🌳 The glow runs up your arm like warm water. For a heartbeat, you can hear every root in the Garden.",
+      "reward": "tree_amber",
+      "rep": 1,
+      "points": 1,
+      "once": "event",
+      "event": "tree_glow"
+    }
+  ]
 }
