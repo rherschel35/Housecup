@@ -50,6 +50,17 @@ HELP = {
             ("offer", "Leave an offering where you are."),
         ],
     },
+    "beasts": {
+        "title": "Beasts",
+        "staff": False,
+        "note": ("A few times a day a beast wanders into the explore channel and says what it wants. "
+                 "First to bring it befriends it. 70 to find - some only come out after dark."),
+        "entries": [
+            ("approach", "Befriend the beast that's here, if you have what it wants."),
+            ("bestiary", "Every beast you've befriended - and the ones still out there."),
+            ("summon", "Call one of your beasts to show off. Just for fun."),
+        ],
+    },
     "challenges": {
         "title": "Challenges",
         "staff": False,
@@ -63,7 +74,7 @@ HELP = {
         "title": "Your standing",
         "staff": False,
         "entries": [
-            ("profile", "Your wand, patronus, points, duel rank and honours - or anyone's."),
+            ("profile", "Your wand, patronus, points, duel rank, beasts and honours - or anyone's."),
             ("points", "Your points (or anyone's), this season and all time."),
             ("standings", "The House Cup table."),
             ("leaderboard", "The top earners."),
@@ -113,6 +124,9 @@ HELP = {
             ("dementor channels", "Set the 4 channels a wild threat can appear in."),
             ("dementor summon", "Make one appear right now (any creature, or a dementor)."),
             ("duelnight", "Start or end a House Duel Night - duel wins count double."),
+            ("beastadmin spawn", "Make a beast appear right now."),
+            ("beastadmin channel", "Set which channel beasts appear in."),
+            ("beastadmin status", "What's out there, and when the next beast comes."),
             ("dementor status", "What's configured and what's active."),
             ("dementor eventstart", "Start 'Attack on Velmora' - monsters flood every channel."),
             ("dementor eventend", "End the running event early and tally it up."),

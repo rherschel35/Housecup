@@ -4,6 +4,7 @@
     House and honours     - House Cup and Tri-Wizard titles, cups won
     Points                - this season and all time, with rank
     Duelling              - rank, ladder place, wins, streak, bounty, rival
+    Bestiary              - collector rank, beasts befriended, beast titles
     Wand                  - what chose them, and why
     Patronus              - the shape their protection takes
 
@@ -120,6 +121,20 @@ class Profile(commands.Cog):
                 value = "**Untested**\nHasn't duelled yet"
             embed.add_field(name="Duelling", value=value, inline=True)
 
+        # ------------------------------------------------------------ beasts
+        beasts_cog = self.bot.get_cog("Beasts")
+        if beasts_cog:
+            from cogs.beasts import rank_for as beast_rank
+            n = beasts_cog.count_of(member.id)
+            if n:
+                titles = beasts_cog.titles_of(member.id)
+                value = f"**{beast_rank(n)}**\n{n} of {len(beasts_cog.beasts)} befriended"
+                if titles:
+                    value += "\n" + "\n".join(f"\U0001F3C5 {t}" for t in titles[:4])
+            else:
+                value = "**Unacquainted**\nNo beasts befriended yet"
+            embed.add_field(name="Bestiary", value=value, inline=True)
+
         # --------------------------------------------------------- House Cup
         cup_lines = []
         if honours["champion_of"]:
@@ -192,7 +207,7 @@ class Profile(commands.Cog):
                             inline=True)
         return embed
 
-    @app_commands.command(name="profile", description="A player's wand, points, duels and honours.")
+    @app_commands.command(name="profile", description="A player's wand, points, duels, beasts and honours.")
     @app_commands.describe(member="Whose profile (leave blank for your own)")
     async def profile(self, interaction: discord.Interaction, member: discord.Member = None):
         member = member or interaction.user
