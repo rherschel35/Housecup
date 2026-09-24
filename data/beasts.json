@@ -1,0 +1,1210 @@
+{
+ "bramblehog": {
+  "name": "Bramblehog",
+  "emoji": "🦔",
+  "place": "garden",
+  "rarity": "common",
+  "wants": [
+   "silverleaf"
+  ],
+  "night": false,
+  "desc": "A hedgehog whose quills are tiny rose thorns. It sneezes petals.",
+  "sighting": "It's snuffling through the herb terraces, sneezing little clouds of petals.",
+  "summons": [
+   "{owner}'s Bramblehog rolls into a thorny ball and bounces down the path, sneezing petals the whole way.",
+   "The Bramblehog curls up in {owner}'s lap. It is extremely prickly. It is also extremely proud of itself.",
+   "{owner}'s Bramblehog sneezes so hard it rolls over backwards, then sneezes again from the new angle."
+  ]
+ },
+ "dewmouse": {
+  "name": "Dewmouse",
+  "emoji": "🐭",
+  "place": "garden",
+  "rarity": "common",
+  "wants": [
+   "dewmint"
+  ],
+  "night": false,
+  "desc": "A mouse no bigger than a thimble that drinks only morning dew.",
+  "sighting": "It's sipping dew off a blade of grass, one tiny sip at a time.",
+  "summons": [
+   "{owner}'s Dewmouse climbs onto the rim of a teacup and drinks exactly one drop. It looks deeply satisfied.",
+   "The Dewmouse washes its whiskers with a single dewdrop, then presents them to {owner} for inspection.",
+   "{owner}'s Dewmouse finds a spiderweb full of dew and treats it like an all-you-can-drink buffet."
+  ]
+ },
+ "sunbell_beetle": {
+  "name": "Sunbell Beetle",
+  "emoji": "🐞",
+  "place": "garden",
+  "rarity": "common",
+  "wants": [
+   "sunbell"
+  ],
+  "night": false,
+  "desc": "Its shell rings like a tiny bell whenever the sun comes out.",
+  "sighting": "Its shell is chiming softly every time the sun peeks out.",
+  "summons": [
+   "{owner}'s Sunbell Beetle flies a slow lap of the room, ringing like a very small church bell.",
+   "The Sunbell Beetle lands on {owner}'s nose and rings once, politely, as if announcing them.",
+   "{owner}'s Sunbell Beetle plays a tiny tune by flying in and out of a sunbeam."
+  ]
+ },
+ "button_magpie": {
+  "name": "Button Magpie",
+  "emoji": "🐦",
+  "place": "garden",
+  "rarity": "common",
+  "wants": [
+   "lost_button"
+  ],
+  "night": false,
+  "desc": "Collects buttons. Has never once returned one.",
+  "sighting": "It's strutting past with at least four buttons in its beak.",
+  "summons": [
+   "{owner}'s Button Magpie steals a button off the nearest robe and proudly drops it at {owner}'s feet. It is not returning it.",
+   "The Button Magpie shows {owner} its entire button collection, one button at a time, very slowly.",
+   "{owner}'s Button Magpie tries to trade someone a button for their shoelace. Negotiations are ongoing."
+  ]
+ },
+ "emberlark": {
+  "name": "Emberlark",
+  "emoji": "🐤",
+  "place": "garden",
+  "rarity": "common",
+  "wants": [
+   "emberleaf"
+  ],
+  "night": false,
+  "desc": "A songbird with glowing orange wingtips that leave warm little sparks.",
+  "sighting": "It's singing on the rose arch, trailing warm little sparks.",
+  "summons": [
+   "{owner}'s Emberlark sings a bright little song and leaves a trail of glowing sparks that spell nothing in particular.",
+   "The Emberlark perches on {owner}'s shoulder and warms their ear like a tiny hearth.",
+   "{owner}'s Emberlark does a loop-the-loop and the sparks it leaves behind hang in the air like a sparkler drawing."
+  ]
+ },
+ "seedpup": {
+  "name": "Seedpup",
+  "emoji": "🌱",
+  "place": "garden",
+  "rarity": "common",
+  "wants": [
+   "wandering_seed"
+  ],
+  "night": false,
+  "desc": "A seedling shaped like a puppy that wanders the paths looking for good soil.",
+  "sighting": "It's wandering the paths, sniffing every patch of soil it passes.",
+  "summons": [
+   "{owner}'s Seedpup digs a tiny hole, plants itself in it, and wags its leaves.",
+   "The Seedpup sprouts a single flower on its head just for {owner}, then looks very pleased.",
+   "{owner}'s Seedpup chases its own roots in a circle until it gets dizzy and flops over."
+  ]
+ },
+ "moonbloom_moth": {
+  "name": "Moonbloom Moth",
+  "emoji": "🦋",
+  "place": "garden",
+  "rarity": "uncommon",
+  "wants": [
+   "moonbloom_petal"
+  ],
+  "night": false,
+  "desc": "Pale wings patterned like the Moonbloom Meadow at midnight.",
+  "sighting": "It's drifting over the Moonbloom Meadow, wings glowing faintly.",
+  "summons": [
+   "{owner}'s Moonbloom Moth settles on the table and its wings light up like a tiny moonlit meadow.",
+   "The Moonbloom Moth circles {owner}'s head three times, leaving a silver halo that fades slowly.",
+   "{owner}'s Moonbloom Moth opens its wings and, for a moment, the whole room smells like night flowers."
+  ]
+ },
+ "whisperwren": {
+  "name": "Whisperwren",
+  "emoji": "🐦",
+  "place": "garden",
+  "rarity": "uncommon",
+  "wants": [
+   "whisperwort"
+  ],
+  "night": false,
+  "desc": "It repeats secrets it overheard - but only ever in whispers.",
+  "sighting": "It's perched on the crooked bench, whispering something to nobody.",
+  "summons": [
+   "{owner}'s Whisperwren whispers a secret into the nearest ear. It's about who ate the last biscuit.",
+   "The Whisperwren sits on {owner}'s shoulder and whispers the entire plot of a book it overheard once.",
+   "{owner}'s Whisperwren whispers 'I know what you did.' It does not elaborate. It never elaborates."
+  ]
+ },
+ "mirror_heron": {
+  "name": "Mirror Heron",
+  "emoji": "🪶",
+  "place": "garden",
+  "rarity": "uncommon",
+  "wants": [
+   "pool_water"
+  ],
+  "night": false,
+  "desc": "Stands so still in the Reflection Pool that its reflection gets bored and wanders off.",
+  "sighting": "It's standing perfectly still in the Reflection Pool. Its reflection is not.",
+  "summons": [
+   "{owner}'s Mirror Heron stands utterly still. Its reflection in the nearest window waves hello.",
+   "The Mirror Heron stretches one enormous wing over {owner} like an umbrella nobody asked for.",
+   "{owner}'s Mirror Heron strikes a dramatic pose, holds it, and waits for applause."
+  ]
+ },
+ "nutkin_dormouse": {
+  "name": "Nutkin Dormouse",
+  "emoji": "🐿️",
+  "place": "garden",
+  "rarity": "uncommon",
+  "wants": [
+   "sleeping_acorn"
+  ],
+  "night": false,
+  "desc": "Asleep 23 hours a day. The other hour, it's looking for a better acorn to sleep on.",
+  "sighting": "It's curled up asleep on a mossy step. It opened one eye. Barely.",
+  "summons": [
+   "{owner}'s Nutkin Dormouse falls asleep mid-summon. It's snoring. It's adorable.",
+   "The Nutkin Dormouse wakes up just long enough to hand {owner} an acorn, then goes back to sleep on it.",
+   "{owner}'s Nutkin Dormouse sleepwalks in a very small circle and settles down exactly where it started."
+  ]
+ },
+ "dewdrop_nibbler": {
+  "name": "Dewdrop Nibbler",
+  "emoji": "✨",
+  "place": "garden",
+  "rarity": "uncommon",
+  "wants": [
+   "moonstone_chip"
+  ],
+  "night": false,
+  "desc": "A fuzzy little nibbler that steals anything shiny - dewdrops, moonstones, your earrings - and stuffs it in its belly pouch.",
+  "sighting": "It's rummaging through the flower beds, pouch already bulging with shiny things.",
+  "summons": [
+   "{owner}'s Dewdrop Nibbler pulls a moonstone, three dewdrops, and a silver spoon out of its pouch. Nobody knows whose spoon it is.",
+   "The Dewdrop Nibbler eyes someone's earrings with enormous interest. {owner} gently picks it up before anything happens.",
+   "{owner}'s Dewdrop Nibbler rolls onto its back to have its belly rubbed. Coins fall out of its pouch everywhere."
+  ]
+ },
+ "starthistle_fox": {
+  "name": "Starthistle Fox",
+  "emoji": "🦊",
+  "place": "garden",
+  "rarity": "rare",
+  "wants": [
+   "starthistle",
+   "moonstone_chip"
+  ],
+  "night": true,
+  "desc": "A silver fox that only comes out under the stars, with a tail full of tiny lights.",
+  "sighting": "It's slipping between the moonblooms, its tail glittering like a handful of stars.",
+  "summons": [
+   "{owner}'s Starthistle Fox flicks its tail and the room fills with tiny floating lights.",
+   "The Starthistle Fox curls around {owner}'s feet and its tail glows like a lantern.",
+   "{owner}'s Starthistle Fox leaps, and for a heartbeat it leaves a trail across the room like a shooting star."
+  ]
+ },
+ "pearlshell_snail": {
+  "name": "Pearlshell Snail",
+  "emoji": "🐌",
+  "place": "garden",
+  "rarity": "rare",
+  "wants": [
+   "snail_pearl"
+  ],
+  "night": false,
+  "desc": "Its shell is one enormous pearl. It is extremely smug about this.",
+  "sighting": "It's inching along the pool steps, shell gleaming, looking very pleased with itself.",
+  "summons": [
+   "{owner}'s Pearlshell Snail turns so everyone can see its shell catch the light. It holds the pose for a long time.",
+   "The Pearlshell Snail leaves a shimmering silver trail spelling '{owner}'. It took eleven minutes.",
+   "{owner}'s Pearlshell Snail peeks out of its shell, sees an audience, and retreats back in to make a grand entrance."
+  ]
+ },
+ "rosewyrm": {
+  "name": "Rosewyrm",
+  "emoji": "🐉",
+  "place": "garden",
+  "rarity": "legendary",
+  "wants": [
+   "tree_amber",
+   "black_rose"
+  ],
+  "night": false,
+  "desc": "A tiny dragon that sleeps coiled in the Rose Walk. The roses grow toward it.",
+  "sighting": "It's coiled asleep in the Rose Walk, and every rose in the Garden is leaning toward it.",
+  "summons": [
+   "{owner}'s Rosewyrm uncoils and yawns a warm puff of rose-scented smoke. Every flower in the room blooms.",
+   "The Rosewyrm wraps itself around {owner}'s shoulders like a scarf of scales and petals, and hums.",
+   "{owner}'s Rosewyrm breathes a tiny plume of fire - which turns into a shower of rose petals before it lands."
+  ]
+ },
+ "inkling": {
+  "name": "Inkling",
+  "emoji": "🐙",
+  "place": "library",
+  "rarity": "common",
+  "wants": [
+   "marginalia_scrap"
+  ],
+  "night": false,
+  "desc": "A tiny ink octopus that lives in inkwells and doodles in the margins.",
+  "sighting": "It's peeking out of an inkwell on the reference desk, doodling in the margins.",
+  "summons": [
+   "{owner}'s Inkling draws a tiny portrait of {owner} in the margin of the nearest book. It's surprisingly flattering.",
+   "The Inkling squirts a small cloud of ink and writes 'hello' in it before it fades.",
+   "{owner}'s Inkling climbs into a teacup and turns the tea navy blue. It thinks this is hilarious."
+  ]
+ },
+ "stackbunny": {
+  "name": "Stackbunny",
+  "emoji": "🐇",
+  "place": "library",
+  "rarity": "common",
+  "wants": [
+   "dust_of_forgotten_words"
+  ],
+  "night": false,
+  "desc": "A dust-grey rabbit that hops between the highest shelves.",
+  "sighting": "It's hopping between the highest shelves, leaving little dust clouds.",
+  "summons": [
+   "{owner}'s Stackbunny hops to the very top of a bookcase and thumps once, like it's calling a meeting.",
+   "The Stackbunny burrows into {owner}'s bag and pops out wearing a bookmark like a tiny hat.",
+   "{owner}'s Stackbunny leaves a trail of little dust pawprints across the table. It looks proud of them."
+  ]
+ },
+ "slipfinch": {
+  "name": "Slipfinch",
+  "emoji": "🐦",
+  "place": "library",
+  "rarity": "common",
+  "wants": [
+   "overdue_slip"
+  ],
+  "night": false,
+  "desc": "It nests in overdue slips and scolds anyone who returns a book late.",
+  "sighting": "It's sitting on a stack of overdue slips, chirping disapprovingly.",
+  "summons": [
+   "{owner}'s Slipfinch hands the nearest person an overdue slip. They don't have a library book. The Slipfinch doesn't care.",
+   "The Slipfinch chirps a very long, very stern lecture at {owner} about returning things on time.",
+   "{owner}'s Slipfinch builds a small nest out of receipts and sits in it smugly."
+  ]
+ },
+ "bookmouse": {
+  "name": "Bookmouse",
+  "emoji": "🐭",
+  "place": "library",
+  "rarity": "common",
+  "wants": [
+   "pressed_violet"
+  ],
+  "night": false,
+  "desc": "Lives inside hollowed-out books. Very particular about which ones.",
+  "sighting": "It's peering out from a hollowed-out book, deciding whether you're worth it.",
+  "summons": [
+   "{owner}'s Bookmouse climbs out of a book, reads the first page of another one, and moves in immediately.",
+   "The Bookmouse brings {owner} a pressed violet as a gift, then looks away shyly.",
+   "{owner}'s Bookmouse rearranges a whole shelf by colour. It seems very happy about it."
+  ]
+ },
+ "pagebeetle": {
+  "name": "Pagebeetle",
+  "emoji": "🪲",
+  "place": "library",
+  "rarity": "common",
+  "wants": [
+   "dust_of_forgotten_words"
+  ],
+  "night": false,
+  "desc": "Eats only the words nobody reads anymore.",
+  "sighting": "It's munching on the forgotten words in a very old encyclopedia.",
+  "summons": [
+   "{owner}'s Pagebeetle eats a word out of the nearest sentence. Nobody can remember what the sentence was about.",
+   "The Pagebeetle burps. The burp comes out in Latin.",
+   "{owner}'s Pagebeetle tunnels through a book and comes out the other side, looking wiser."
+  ]
+ },
+ "shushcat": {
+  "name": "Shushcat",
+  "emoji": "🐈",
+  "place": "library",
+  "rarity": "common",
+  "wants": [
+   "overdue_slip"
+  ],
+  "night": false,
+  "desc": "A sleek black cat that shushes anyone who talks above a whisper.",
+  "sighting": "It's sitting on the returns cart, glaring at anyone who talks too loudly.",
+  "summons": [
+   "{owner}'s Shushcat shushes the whole channel. Everyone feels scolded. Nobody was even talking.",
+   "The Shushcat curls up on {owner}'s open book and refuses to move until they start reading quietly.",
+   "{owner}'s Shushcat knocks a book off a shelf, then shushes the book for making noise."
+  ]
+ },
+ "glimmerwing": {
+  "name": "Glimmerwing",
+  "emoji": "🦋",
+  "place": "library",
+  "rarity": "uncommon",
+  "wants": [
+   "inkmoth_wing"
+  ],
+  "night": false,
+  "desc": "A glittering moth that feeds on the gold leaf of old book spines.",
+  "sighting": "It's glittering over the old spines, nibbling at the gold leaf.",
+  "summons": [
+   "{owner}'s Glimmerwing flutters around the room, leaving a glittering trail of gold dust.",
+   "The Glimmerwing lands on {owner}'s hand and its wings shimmer like a hundred tiny gilded pages.",
+   "{owner}'s Glimmerwing finds the one gold-lettered word on a page and sits on it, glowing."
+  ]
+ },
+ "quillhawk": {
+  "name": "Quillhawk",
+  "emoji": "🦅",
+  "place": "library",
+  "rarity": "uncommon",
+  "wants": [
+   "self_inking_nib"
+  ],
+  "night": false,
+  "desc": "A small hawk with feathers that are, unmistakably, quills.",
+  "sighting": "It's perched on a lamp, preening its very pointy quill-feathers.",
+  "summons": [
+   "{owner}'s Quillhawk dips a wing in ink and signs {owner}'s name in the air with a flourish.",
+   "The Quillhawk swoops over the room and drops a single perfect quill in front of {owner}.",
+   "{owner}'s Quillhawk sharpens its feathers on the edge of a desk, then looks at everyone like it's daring them to comment."
+  ]
+ },
+ "footnote_ferret": {
+  "name": "Footnote Ferret",
+  "emoji": "🦦",
+  "place": "library",
+  "rarity": "uncommon",
+  "wants": [
+   "marginalia_scrap",
+   "pressed_violet"
+  ],
+  "night": false,
+  "desc": "Chases footnotes from book to book and never, ever finishes one.",
+  "sighting": "It's darting from book to book, chasing a footnote it will never finish.",
+  "summons": [
+   "{owner}'s Footnote Ferret dives into one book and pops out of a completely different one across the room.",
+   "The Footnote Ferret brings {owner} a footnote. The footnote has a footnote. The Ferret goes to get that one too.",
+   "{owner}'s Footnote Ferret does a victory dance after finishing a footnote. There's another footnote. The dance stops."
+  ]
+ },
+ "lampwick": {
+  "name": "Lampwick",
+  "emoji": "🪲",
+  "place": "library",
+  "rarity": "uncommon",
+  "wants": [
+   "dust_of_forgotten_words",
+   "overdue_slip"
+  ],
+  "night": false,
+  "desc": "A glowing beetle that lands on whatever page you're struggling to read.",
+  "sighting": "It's glowing over an open book, right on the hardest paragraph.",
+  "summons": [
+   "{owner}'s Lampwick lands on the nearest page and lights up exactly the sentence that was confusing everyone.",
+   "The Lampwick circles {owner}'s head like a tiny reading lamp that follows them around.",
+   "{owner}'s Lampwick blinks slowly on and off like it's thinking very hard."
+  ]
+ },
+ "gilt_nibbler": {
+  "name": "Gilt Nibbler",
+  "emoji": "✨",
+  "place": "library",
+  "rarity": "uncommon",
+  "wants": [
+   "self_inking_nib"
+  ],
+  "night": false,
+  "desc": "Peels the gold leaf off book spines and hoards it. Has stolen at least three reading glasses.",
+  "sighting": "It's peeling gold leaf off a book spine and stuffing it in its pouch.",
+  "summons": [
+   "{owner}'s Gilt Nibbler produces a gold letter 'G', a pair of reading glasses, and someone's ring from its pouch. It looks innocent.",
+   "The Gilt Nibbler polishes a gold coin on {owner}'s sleeve until it gleams, then hides it again.",
+   "{owner}'s Gilt Nibbler spots something shiny across the room and freezes, trembling with longing."
+  ]
+ },
+ "rememberowl": {
+  "name": "Rememberowl",
+  "emoji": "🦉",
+  "place": "library",
+  "rarity": "rare",
+  "wants": [
+   "memory_bookmark"
+  ],
+  "night": true,
+  "desc": "An owl that remembers every book ever shelved here - and who borrowed it.",
+  "sighting": "It's staring down from the top of the stacks, remembering everything.",
+  "summons": [
+   "{owner}'s Rememberowl recites the name of every book {owner} has ever borrowed, and the date they were due.",
+   "The Rememberowl looks at someone and says, very clearly, 'You still have my book.'",
+   "{owner}'s Rememberowl turns its head all the way around, surveys the room, and nods like it's committing everyone to memory."
+  ]
+ },
+ "folio_chameleon": {
+  "name": "Folio Chameleon",
+  "emoji": "🦎",
+  "place": "library",
+  "rarity": "rare",
+  "wants": [
+   "self_inking_nib",
+   "inkmoth_wing"
+  ],
+  "night": false,
+  "desc": "Blends perfectly into book covers. You've walked past it a hundred times.",
+  "sighting": "You almost missed it. It's pretending to be the cover of an atlas.",
+  "summons": [
+   "{owner}'s Folio Chameleon disappears against the nearest book. Only its eyes give it away. It blinks.",
+   "The Folio Chameleon turns the exact pattern of {owner}'s robes and sits on their shoulder, invisible and smug.",
+   "{owner}'s Folio Chameleon cycles through the colours of every book on the shelf, like it's showing off."
+  ]
+ },
+ "codexwyrm": {
+  "name": "Codexwyrm",
+  "emoji": "🐍",
+  "place": "library",
+  "rarity": "legendary",
+  "wants": [
+   "locked_diary",
+   "memory_bookmark"
+  ],
+  "night": false,
+  "desc": "A great serpent of living text that coils through the Restricted Section.",
+  "sighting": "It's coiling through the Restricted Section, its body made of flowing lines of text.",
+  "summons": [
+   "{owner}'s Codexwyrm unrolls into the air, its body scrolling with glowing words from every book ever written here.",
+   "The Codexwyrm curls around {owner} and whispers the last line of a story nobody has finished yet.",
+   "{owner}'s Codexwyrm rears up, and for a moment every book in the room flips open to the same page."
+  ]
+ },
+ "cinderwhisk": {
+  "name": "Cinderwhisk",
+  "emoji": "🐀",
+  "place": "dungeons",
+  "rarity": "common",
+  "wants": [
+   "cellar_moss"
+  ],
+  "night": false,
+  "desc": "A rat with glowing ember whiskers that lights its own way.",
+  "sighting": "It's scurrying along the corridor, its ember whiskers lighting the way.",
+  "summons": [
+   "{owner}'s Cinderwhisk lights up its whiskers like a tiny torch and leads everyone on a tour of the dark corners.",
+   "The Cinderwhisk curls up by {owner}'s feet, glowing like a little campfire.",
+   "{owner}'s Cinderwhisk sneezes and a puff of sparks goes up. It looks embarrassed."
+  ]
+ },
+ "rustbeetle": {
+  "name": "Rustbeetle",
+  "emoji": "🪲",
+  "place": "dungeons",
+  "rarity": "common",
+  "wants": [
+   "rusted_key"
+  ],
+  "night": false,
+  "desc": "Eats rust. Leaves old locks looking brand new and very confused.",
+  "sighting": "It's chewing the rust off an old lock, leaving it shiny and confused.",
+  "summons": [
+   "{owner}'s Rustbeetle cleans the nearest doorknob until it gleams, then moves on to the next one.",
+   "The Rustbeetle climbs onto {owner}'s belt buckle and polishes it with great seriousness.",
+   "{owner}'s Rustbeetle eats a rusty nail and makes a satisfied clicking noise."
+  ]
+ },
+ "linkling": {
+  "name": "Linkling",
+  "emoji": "🐍",
+  "place": "dungeons",
+  "rarity": "common",
+  "wants": [
+   "manacle_link"
+  ],
+  "night": false,
+  "desc": "A little snake made of chain links that rattles when it's happy.",
+  "sighting": "It's slithering across the floor, rattling happily.",
+  "summons": [
+   "{owner}'s Linkling coils into a tidy spiral and rattles like applause.",
+   "The Linkling wraps around {owner}'s wrist like a very affectionate bracelet.",
+   "{owner}'s Linkling ties itself in a knot, gets stuck, and rattles for help. {owner} untangles it."
+  ]
+ },
+ "cistern_toad": {
+  "name": "Cistern Toad",
+  "emoji": "🐸",
+  "place": "dungeons",
+  "rarity": "common",
+  "wants": [
+   "cellar_moss"
+  ],
+  "night": false,
+  "desc": "It croaks in perfect time with the dripping cistern.",
+  "sighting": "It's sitting by the cistern, croaking in time with the drips.",
+  "summons": [
+   "{owner}'s Cistern Toad croaks a perfect drumbeat. Someone in the channel starts nodding along.",
+   "The Cistern Toad hops into a cup of water and sits in it like a very small king in a bath.",
+   "{owner}'s Cistern Toad croaks once, deeply. The echo lasts far longer than it should."
+  ]
+ },
+ "keyhole_bat": {
+  "name": "Keyhole Bat",
+  "emoji": "🦇",
+  "place": "dungeons",
+  "rarity": "common",
+  "wants": [
+   "rusted_key"
+  ],
+  "night": false,
+  "desc": "Sleeps inside keyholes. Very annoying if you need the door.",
+  "sighting": "It's hanging upside down inside a keyhole. The door is very much locked now.",
+  "summons": [
+   "{owner}'s Keyhole Bat folds itself up impossibly small and tucks into the nearest keyhole.",
+   "The Keyhole Bat hangs from {owner}'s sleeve and squeaks the tune of a lullaby.",
+   "{owner}'s Keyhole Bat flutters around the room and lands upside down on the ceiling, satisfied."
+  ]
+ },
+ "mossback_newt": {
+  "name": "Mossback Newt",
+  "emoji": "🦎",
+  "place": "dungeons",
+  "rarity": "common",
+  "wants": [
+   "manacle_link"
+  ],
+  "night": false,
+  "desc": "Grows a little garden of cellar moss on its back.",
+  "sighting": "It's basking on a damp stone, a tiny moss garden growing on its back.",
+  "summons": [
+   "{owner}'s Mossback Newt shows off its back garden. A tiny mushroom has sprouted since yesterday.",
+   "The Mossback Newt climbs onto {owner}'s hand, and a little moss flower opens on its back.",
+   "{owner}'s Mossback Newt lies very still so a ladybird can land in its garden. It does."
+  ]
+ },
+ "coin_crab": {
+  "name": "Coin Crab",
+  "emoji": "🦀",
+  "place": "dungeons",
+  "rarity": "uncommon",
+  "wants": [
+   "dead_currency_coin"
+  ],
+  "night": false,
+  "desc": "Uses old coins as a shell and trades up whenever it can.",
+  "sighting": "It's scuttling out of the storeroom wearing an ancient coin as a shell.",
+  "summons": [
+   "{owner}'s Coin Crab clacks its claws and offers to trade shells with anyone who has a shinier coin.",
+   "The Coin Crab climbs onto {owner}'s palm and spins its coin-shell like a tiny top.",
+   "{owner}'s Coin Crab counts its coins out loud, click by click. It loses count and starts again."
+  ]
+ },
+ "chalkshade_ferret": {
+  "name": "Chalkshade Ferret",
+  "emoji": "🦡",
+  "place": "dungeons",
+  "rarity": "uncommon",
+  "wants": [
+   "chalk_of_shadows"
+  ],
+  "night": false,
+  "desc": "Draws doorways on the walls in chalk, then disappears through them.",
+  "sighting": "It's drawing a chalk door on the wall - and it's about to go through it.",
+  "summons": [
+   "{owner}'s Chalkshade Ferret draws a door on the wall, dives through it, and pops out of a different chalk door behind everyone.",
+   "The Chalkshade Ferret draws a chalk portrait of {owner} on the floor. It's mostly nose.",
+   "{owner}'s Chalkshade Ferret draws a tiny chalk hat, puts it on, and wears it proudly."
+  ]
+ },
+ "grateling": {
+  "name": "Grateling",
+  "emoji": "🕷️",
+  "place": "dungeons",
+  "rarity": "uncommon",
+  "wants": [
+   "chalk_of_shadows",
+   "cellar_moss"
+  ],
+  "night": true,
+  "desc": "The thing breathing under the drainage grate. It's shy, actually.",
+  "sighting": "Something is peeking out from the drainage grate. It's very shy. It's waving.",
+  "summons": [
+   "{owner}'s Grateling peeks out, waves eight small legs at everyone, and hides again.",
+   "The Grateling spins a tiny web that spells '{owner}' and then looks away bashfully.",
+   "{owner}'s Grateling breathes in a slow, calm rhythm. Somehow the whole channel relaxes a little."
+  ]
+ },
+ "waxwing_moth": {
+  "name": "Waxwing Moth",
+  "emoji": "🕯️",
+  "place": "dungeons",
+  "rarity": "uncommon",
+  "wants": [
+   "cellar_moss",
+   "manacle_link"
+  ],
+  "night": false,
+  "desc": "Its wings are dripping candle wax that never burns out.",
+  "sighting": "It's fluttering near a candle stub, wax dripping from its glowing wings.",
+  "summons": [
+   "{owner}'s Waxwing Moth lands on a table and its wings light like two small candles.",
+   "The Waxwing Moth flutters around {owner}, dripping little wax stars that harden where they land.",
+   "{owner}'s Waxwing Moth dims its wings to a gentle glow, like a nightlight that loves you."
+  ]
+ },
+ "coinpurse_nibbler": {
+  "name": "Coinpurse Nibbler",
+  "emoji": "✨",
+  "place": "dungeons",
+  "rarity": "uncommon",
+  "wants": [
+   "dead_currency_coin"
+  ],
+  "night": false,
+  "desc": "Its pouch jingles with old coins. It will absolutely try to pick your pocket.",
+  "sighting": "It's sniffing around the old cells, its pouch jingling with stolen coins.",
+  "summons": [
+   "{owner}'s Coinpurse Nibbler empties its pouch: coins, a spoon, a key, and somebody's wedding ring. It puts it all back fast.",
+   "The Coinpurse Nibbler tries to pick {owner}'s pocket, gets caught, and pretends it was a hug.",
+   "{owner}'s Coinpurse Nibbler balances on its tail and juggles three stolen coins."
+  ]
+ },
+ "hinge_hound": {
+  "name": "Hinge Hound",
+  "emoji": "🐕",
+  "place": "dungeons",
+  "rarity": "rare",
+  "wants": [
+   "shackle_dust"
+  ],
+  "night": false,
+  "desc": "An iron pup that guards the sealed door and wags its whole body.",
+  "sighting": "It's sitting in front of the iron door, wagging its whole clanking body.",
+  "summons": [
+   "{owner}'s Hinge Hound wags so hard its whole body creaks like an old door.",
+   "The Hinge Hound sits at {owner}'s feet and guards them very seriously from absolutely nothing.",
+   "{owner}'s Hinge Hound fetches a rusty bolt, drops it at {owner}'s feet, and waits with its tail squeaking."
+  ]
+ },
+ "pale_warren_hare": {
+  "name": "Pale Warren-Hare",
+  "emoji": "🐇",
+  "place": "dungeons",
+  "rarity": "rare",
+  "wants": [
+   "shackle_dust",
+   "chalk_of_shadows"
+  ],
+  "night": true,
+  "desc": "A see-through hare that only appears in the old cells after dark.",
+  "sighting": "A see-through hare is sitting in the old cells, glowing faintly in the dark.",
+  "summons": [
+   "{owner}'s Pale Warren-Hare hops straight through the nearest wall and back again, glowing softly.",
+   "The Pale Warren-Hare sits beside {owner}, and everything nearby goes calm and moonlit.",
+   "{owner}'s Pale Warren-Hare thumps a foot, and a gentle chill runs through the channel."
+  ]
+ },
+ "emberwarden": {
+  "name": "Emberwarden",
+  "emoji": "🦎",
+  "place": "dungeons",
+  "rarity": "legendary",
+  "wants": [
+   "forgotten_shrine_ash",
+   "shackle_dust"
+  ],
+  "night": false,
+  "desc": "A great salamander that has kept the forgotten shrine's flame alive for centuries.",
+  "sighting": "The great salamander is lying across the shrine, the old flame flickering on its back.",
+  "summons": [
+   "{owner}'s Emberwarden raises its head and every candle in the room lights at once.",
+   "The Emberwarden curls around {owner}, warm as a hearth, and the old shrine flame dances on its back.",
+   "{owner}'s Emberwarden breathes out slowly, and the air fills with drifting golden embers that never burn."
+  ]
+ },
+ "mossback_tortoise": {
+  "name": "Mossback Tortoise",
+  "emoji": "🐢",
+  "place": "forbidden_woods",
+  "rarity": "common",
+  "wants": [
+   "standing_stone_chip"
+  ],
+  "night": false,
+  "desc": "So old and slow that a small forest grows on its shell.",
+  "sighting": "It's plodding past the treeline with a small forest growing on its shell.",
+  "summons": [
+   "{owner}'s Mossback Tortoise arrives. Eventually. A bird has built a nest in its shell-forest on the way.",
+   "The Mossback Tortoise stretches out its neck and blinks slowly at {owner}. It's the most peaceful thing in the world.",
+   "{owner}'s Mossback Tortoise grows a single new flower in its shell-forest, just for this moment."
+  ]
+ },
+ "blackcap_squirrel": {
+  "name": "Blackcap Squirrel",
+  "emoji": "🐿️",
+  "place": "forbidden_woods",
+  "rarity": "common",
+  "wants": [
+   "blackened_acorn"
+  ],
+  "night": false,
+  "desc": "A black squirrel that buries acorns and forgets on purpose.",
+  "sighting": "It's burying acorns under the brambles and immediately forgetting where.",
+  "summons": [
+   "{owner}'s Blackcap Squirrel buries an acorn in someone's hood and runs away giggling.",
+   "The Blackcap Squirrel sits on {owner}'s head and chatters at everyone like it owns the place.",
+   "{owner}'s Blackcap Squirrel digs up an acorn, looks at it, and reburies it in exactly the same spot."
+  ]
+ },
+ "tattlecrow": {
+  "name": "Tattlecrow",
+  "emoji": "🐦‍⬛",
+  "place": "forbidden_woods",
+  "rarity": "common",
+  "wants": [
+   "raven_feather"
+  ],
+  "night": false,
+  "desc": "A crow that tells everyone exactly who's been in the Woods.",
+  "sighting": "It's on a branch at the treeline, cawing the names of everyone who's been out here.",
+  "summons": [
+   "{owner}'s Tattlecrow caws the name of the last person who snuck into the Woods. Everyone turns to look at them.",
+   "The Tattlecrow lands on {owner}'s shoulder and tattles on them. Loudly. To everyone.",
+   "{owner}'s Tattlecrow brings {owner} a shiny beetle and a very juicy piece of gossip."
+  ]
+ },
+ "mistweasel": {
+  "name": "Mistweasel",
+  "emoji": "🦦",
+  "place": "forbidden_woods",
+  "rarity": "common",
+  "wants": [
+   "raven_feather"
+  ],
+  "night": false,
+  "desc": "Made half of fur and half of mist. Mostly mist.",
+  "sighting": "It's winding through the mist in the clearing. Or it's just mist. Hard to tell.",
+  "summons": [
+   "{owner}'s Mistweasel curls around their neck like a soft, cool scarf of fog.",
+   "The Mistweasel dissolves into mist, drifts across the room, and reappears on the other side.",
+   "{owner}'s Mistweasel pops out of a cup of tea as a puff of steam and looks very pleased with itself."
+  ]
+ },
+ "stonebadger": {
+  "name": "Stonebadger",
+  "emoji": "🦡",
+  "place": "forbidden_woods",
+  "rarity": "common",
+  "wants": [
+   "standing_stone_chip"
+  ],
+  "night": false,
+  "desc": "Digs its den under the standing stones and guards them fiercely.",
+  "sighting": "It's digging under the standing stones and grumbling at anyone who gets close.",
+  "summons": [
+   "{owner}'s Stonebadger digs a burrow under the table and grumbles from inside it.",
+   "The Stonebadger sits beside {owner} like a very small, very stubborn bodyguard.",
+   "{owner}'s Stonebadger rolls a pebble over to {owner} as a gift. It's a very good pebble."
+  ]
+ },
+ "thornpiglet": {
+  "name": "Thornpiglet",
+  "emoji": "🐗",
+  "place": "forbidden_woods",
+  "rarity": "common",
+  "wants": [
+   "blackened_acorn"
+  ],
+  "night": false,
+  "desc": "A wild piglet with bramble bristles. Charges things. Misses.",
+  "sighting": "It's charging at a tree. It missed. It's charging again.",
+  "summons": [
+   "{owner}'s Thornpiglet charges bravely across the room. It misses the target entirely. It's thrilled anyway.",
+   "The Thornpiglet snuffles around {owner}'s feet and squeals happily when it finds a dropped crumb.",
+   "{owner}'s Thornpiglet rolls in the mud and comes out looking extremely proud of its new outfit."
+  ]
+ },
+ "frostfin": {
+  "name": "Frostfin",
+  "emoji": "🐟",
+  "place": "forbidden_woods",
+  "rarity": "uncommon",
+  "wants": [
+   "root_charm"
+  ],
+  "night": false,
+  "desc": "A trout that swims under the frozen stream, keeping it from freezing solid.",
+  "sighting": "It's swimming under the ice of the frozen stream, keeping a little patch of water open.",
+  "summons": [
+   "{owner}'s Frostfin leaps out of a glass of water and leaves a sparkle of frost in the air.",
+   "The Frostfin swims in a slow circle, and the water around it clears like glass.",
+   "{owner}'s Frostfin flicks its tail and a tiny snowflake lands on {owner}'s nose."
+  ]
+ },
+ "duskpup": {
+  "name": "Duskpup",
+  "emoji": "🐺",
+  "place": "forbidden_woods",
+  "rarity": "uncommon",
+  "wants": [
+   "shed_fang"
+  ],
+  "night": false,
+  "desc": "A wolf cub that's lost its pack and howls very small howls.",
+  "sighting": "A lost wolf cub is sitting on the trail, howling a very small howl.",
+  "summons": [
+   "{owner}'s Duskpup lets out a tiny howl. Somewhere very far away, something howls back. The Duskpup is delighted.",
+   "The Duskpup chews {owner}'s sleeve, then falls asleep mid-chew.",
+   "{owner}'s Duskpup chases its own tail, catches it, and has no idea what to do next."
+  ]
+ },
+ "hollowhoot": {
+  "name": "Hollowhoot",
+  "emoji": "🦉",
+  "place": "forbidden_woods",
+  "rarity": "uncommon",
+  "wants": [
+   "raven_feather",
+   "standing_stone_chip"
+  ],
+  "night": false,
+  "desc": "An owl that lives in the hollow log and hoots in riddles.",
+  "sighting": "It's peering out of the hollow log, hooting something that sounds like a riddle.",
+  "summons": [
+   "{owner}'s Hollowhoot hoots a riddle. Nobody can solve it. It hoots smugly.",
+   "The Hollowhoot tilts its head at {owner} almost upside down, as if they're the riddle.",
+   "{owner}'s Hollowhoot hoots the answer to yesterday's riddle. It was 'a candle'. It's always a candle."
+  ]
+ },
+ "rootling": {
+  "name": "Rootling",
+  "emoji": "🌿",
+  "place": "forbidden_woods",
+  "rarity": "uncommon",
+  "wants": [
+   "root_charm",
+   "blackened_acorn"
+  ],
+  "night": false,
+  "desc": "A walking bundle of roots with two bright green eyes.",
+  "sighting": "A bundle of roots with two bright green eyes is shuffling along the path.",
+  "summons": [
+   "{owner}'s Rootling plants its feet, wiggles its toes into the ground, and sprouts a leaf of pure joy.",
+   "The Rootling wraps a little root around {owner}'s finger, like a handshake.",
+   "{owner}'s Rootling does a slow, creaky dance. Several mushrooms sprout where it stepped."
+  ]
+ },
+ "glimmer_nibbler": {
+  "name": "Glimmer Nibbler",
+  "emoji": "✨",
+  "place": "forbidden_woods",
+  "rarity": "uncommon",
+  "wants": [
+   "shed_fang"
+  ],
+  "night": false,
+  "desc": "Collects anything that glints in the dark - fangs, beetle shells, lost buckles - and buries them in a secret hoard.",
+  "sighting": "It's rooting around the old hunting blind, stuffing anything that glints into its pouch.",
+  "summons": [
+   "{owner}'s Glimmer Nibbler digs up its secret hoard: fangs, beetle shells, a lost buckle, and someone's missing spoon.",
+   "The Glimmer Nibbler eyes the shiny clasp on {owner}'s robes. {owner} holds it closed. The Nibbler sulks.",
+   "{owner}'s Glimmer Nibbler finds a single glinting pebble and treats it like the treasure of the century."
+  ]
+ },
+ "lanternback_stag": {
+  "name": "Lanternback Stag",
+  "emoji": "🦌",
+  "place": "forbidden_woods",
+  "rarity": "rare",
+  "wants": [
+   "witchlight_oil"
+  ],
+  "night": true,
+  "desc": "Its antlers glow with cold blue witchlight in the dark.",
+  "sighting": "Blue witchlight is glowing between the trees. It's coming from a stag's antlers.",
+  "summons": [
+   "{owner}'s Lanternback Stag lowers its head, and its antlers light the whole room in cold, beautiful blue.",
+   "The Lanternback Stag walks a slow circle around {owner}, leaving little floating witchlights behind.",
+   "{owner}'s Lanternback Stag raises its antlers to the sky, and they blaze like a lighthouse in a storm."
+  ]
+ },
+ "starpond_otter": {
+  "name": "Starpond Otter",
+  "emoji": "🦦",
+  "place": "forbidden_woods",
+  "rarity": "rare",
+  "wants": [
+   "witchlight_oil",
+   "shed_fang"
+  ],
+  "night": true,
+  "desc": "Swims in the black pond at night, juggling reflected stars.",
+  "sighting": "It's floating on its back in the black pond, juggling reflected stars.",
+  "summons": [
+   "{owner}'s Starpond Otter juggles three tiny stars and catches them all without looking.",
+   "The Starpond Otter floats on its back and hands {owner} a single glowing star to hold.",
+   "{owner}'s Starpond Otter dives, and ripples of starlight spread across the whole channel."
+  ]
+ },
+ "hushelk": {
+  "name": "Hushelk",
+  "emoji": "🦌",
+  "place": "forbidden_woods",
+  "rarity": "legendary",
+  "wants": [
+   "moss_of_silence",
+   "witchlight_oil"
+  ],
+  "night": false,
+  "desc": "A vast white elk that moves without a sound. The whole forest goes quiet around it.",
+  "sighting": "The forest has gone completely silent. A huge white elk is standing in the clearing.",
+  "summons": [
+   "{owner}'s Hushelk steps forward, and for one long moment the whole channel falls perfectly, peacefully quiet.",
+   "The Hushelk lowers its great head to {owner}. Snow begins to fall, softly, from nowhere.",
+   "{owner}'s Hushelk looks up, and every sound in the room fades to a hush as if the world is listening."
+  ]
+ },
+ "gearmouse": {
+  "name": "Gearmouse",
+  "emoji": "🐭",
+  "place": "observatory",
+  "rarity": "common",
+  "wants": [
+   "orrery_gear"
+  ],
+  "night": false,
+  "desc": "A clockwork mouse that winds itself up and runs laps around the orrery.",
+  "sighting": "It's running laps around the orrery, winding itself up as it goes.",
+  "summons": [
+   "{owner}'s Gearmouse winds its own key, runs three laps of the room, and ticks happily.",
+   "The Gearmouse climbs into {owner}'s pocket and ticks like a heartbeat.",
+   "{owner}'s Gearmouse runs down, stops, and waits patiently for someone to wind it back up."
+  ]
+ },
+ "northless_crab": {
+  "name": "Northless Crab",
+  "emoji": "🦀",
+  "place": "observatory",
+  "rarity": "common",
+  "wants": [
+   "broken_compass"
+  ],
+  "night": false,
+  "desc": "It walks sideways because it has never once known which way is north.",
+  "sighting": "It's scuttling sideways across the deck, completely lost.",
+  "summons": [
+   "{owner}'s Northless Crab points confidently in a direction. It is not north. It has never been north.",
+   "The Northless Crab scuttles in a perfect circle, looking for north. It ends up back beside {owner}.",
+   "{owner}'s Northless Crab waves its claws at the sky, as if asking the stars for directions."
+  ]
+ },
+ "chartfinch": {
+  "name": "Chartfinch",
+  "emoji": "🐦",
+  "place": "observatory",
+  "rarity": "common",
+  "wants": [
+   "star_chart_fragment"
+  ],
+  "night": false,
+  "desc": "Builds its nest out of old star charts, in the right constellation order.",
+  "sighting": "It's building a nest out of old star charts, arranging them in the right order.",
+  "summons": [
+   "{owner}'s Chartfinch arranges some crumbs into a perfect little constellation.",
+   "The Chartfinch perches on {owner}'s finger and sings the names of the stars in order.",
+   "{owner}'s Chartfinch tucks a scrap of star chart behind {owner}'s ear like a gift."
+  ]
+ },
+ "domedove": {
+  "name": "Domedove",
+  "emoji": "🕊️",
+  "place": "observatory",
+  "rarity": "common",
+  "wants": [
+   "star_chart_fragment"
+  ],
+  "night": false,
+  "desc": "Roosts in the dome and coos whenever a star falls.",
+  "sighting": "It's roosting at the top of the dome, cooing up at the sky.",
+  "summons": [
+   "{owner}'s Domedove coos softly, and somewhere a star falls just to be polite.",
+   "The Domedove settles on {owner}'s shoulder and preens their hair gently.",
+   "{owner}'s Domedove flies a loop of the dome and lands exactly where it started, very pleased."
+  ]
+ },
+ "cogbeetle": {
+  "name": "Cogbeetle",
+  "emoji": "🪲",
+  "place": "observatory",
+  "rarity": "common",
+  "wants": [
+   "orrery_gear"
+  ],
+  "night": false,
+  "desc": "Its shell is a tiny brass gear that actually turns.",
+  "sighting": "Its brass-gear shell is turning slowly as it climbs the old telescope.",
+  "summons": [
+   "{owner}'s Cogbeetle spins its gear-shell, and a tiny music-box tune plays.",
+   "The Cogbeetle locks into a gear in the nearest clock and keeps perfect time.",
+   "{owner}'s Cogbeetle climbs onto {owner}'s hand and ticks along with their pulse."
+  ]
+ },
+ "spiral_gecko": {
+  "name": "Spiral Gecko",
+  "emoji": "🦎",
+  "place": "observatory",
+  "rarity": "common",
+  "wants": [
+   "broken_compass"
+  ],
+  "night": false,
+  "desc": "Runs up and down the spiral stair all day. Dizzy. Happy.",
+  "sighting": "It's zooming up and down the spiral stair. Again. And again.",
+  "summons": [
+   "{owner}'s Spiral Gecko runs up the wall, across the ceiling, and down again, very dizzy and very happy.",
+   "The Spiral Gecko stops, wobbles, and falls over. It gets back up and does it again.",
+   "{owner}'s Spiral Gecko curls into a perfect spiral and falls asleep."
+  ]
+ },
+ "meteorkit": {
+  "name": "Meteorkit",
+  "emoji": "🦊",
+  "place": "observatory",
+  "rarity": "uncommon",
+  "wants": [
+   "meteorite_sliver"
+  ],
+  "night": false,
+  "desc": "A fox kit with a meteorite tail that sparks when it wags.",
+  "sighting": "It's pouncing at falling sparks on the viewing deck, tail glowing.",
+  "summons": [
+   "{owner}'s Meteorkit wags its tail and a shower of little sparks rains down like a tiny meteor storm.",
+   "The Meteorkit pounces on a falling spark, misses, and pounces on {owner} instead.",
+   "{owner}'s Meteorkit curls up and its tail glows like a comet settling down for the night."
+  ]
+ },
+ "moonglass_owl": {
+  "name": "Moonglass Owl",
+  "emoji": "🦉",
+  "place": "observatory",
+  "rarity": "uncommon",
+  "wants": [
+   "moonglass_lens"
+  ],
+  "night": true,
+  "desc": "Its eyes are two perfect moonglass lenses. It sees the whole sky.",
+  "sighting": "It's perched on the telescope, its moonglass eyes reflecting the whole sky.",
+  "summons": [
+   "{owner}'s Moonglass Owl turns its eyes toward {owner}, and for a moment {owner} can see the whole night sky in them.",
+   "The Moonglass Owl focuses on something very far away and nods, like it's seen something wonderful.",
+   "{owner}'s Moonglass Owl blinks slowly, and the stars in its eyes rearrange into a smile."
+  ]
+ },
+ "orbitcat": {
+  "name": "Orbitcat",
+  "emoji": "🐈",
+  "place": "observatory",
+  "rarity": "uncommon",
+  "wants": [
+   "orrery_gear",
+   "star_chart_fragment"
+  ],
+  "night": false,
+  "desc": "Sleeps curled around the orrery's sun and bats at passing planets.",
+  "sighting": "It's curled around the orrery's sun, batting at the planets as they pass.",
+  "summons": [
+   "{owner}'s Orbitcat bats a tiny planet across the room and chases it in a perfect orbit.",
+   "The Orbitcat curls around {owner} like they're the sun, and purrs.",
+   "{owner}'s Orbitcat knocks a moon off the orrery, looks directly at {owner}, and does it again."
+  ]
+ },
+ "stardrop_newt": {
+  "name": "Stardrop Newt",
+  "emoji": "🦎",
+  "place": "observatory",
+  "rarity": "uncommon",
+  "wants": [
+   "meteorite_sliver",
+   "broken_compass"
+  ],
+  "night": false,
+  "desc": "Speckled like the night sky. The speckles move.",
+  "sighting": "Its speckles are drifting across its back like slow-moving stars.",
+  "summons": [
+   "{owner}'s Stardrop Newt's speckles rearrange into {owner}'s initials.",
+   "The Stardrop Newt sits very still while its spots slowly spin like a galaxy.",
+   "{owner}'s Stardrop Newt licks a speckle off its own back and it floats up into the air like a firefly."
+  ]
+ },
+ "stardust_nibbler": {
+  "name": "Stardust Nibbler",
+  "emoji": "✨",
+  "place": "observatory",
+  "rarity": "uncommon",
+  "wants": [
+   "meteorite_sliver"
+  ],
+  "night": false,
+  "desc": "Sneaks up to the roof to steal fallen stardust. Its pouch glows faintly at night.",
+  "sighting": "It's sneaking across the roof, scooping fallen stardust into its glowing pouch.",
+  "summons": [
+   "{owner}'s Stardust Nibbler opens its pouch and a cloud of glittering stardust puffs out. It quickly stuffs it back in.",
+   "The Stardust Nibbler steals a sparkle from the nearest candle flame. Nobody knows how.",
+   "{owner}'s Stardust Nibbler hands {owner} a single speck of stardust, then immediately tries to take it back."
+  ]
+ },
+ "cometail_hare": {
+  "name": "Cometail Hare",
+  "emoji": "🐇",
+  "place": "observatory",
+  "rarity": "rare",
+  "wants": [
+   "comet_dust_vial"
+  ],
+  "night": true,
+  "desc": "Leaves a shimmering trail of comet dust across the viewing deck at night.",
+  "sighting": "A hare is racing across the viewing deck, leaving a shimmering trail of comet dust.",
+  "summons": [
+   "{owner}'s Cometail Hare races a loop of the room and leaves a glowing tail that hangs in the air.",
+   "The Cometail Hare sits up tall beside {owner}, ears twitching toward the stars.",
+   "{owner}'s Cometail Hare leaps so high it seems to hang among the stars for a moment before landing."
+  ]
+ },
+ "cloudwhale_calf": {
+  "name": "Cloudwhale Calf",
+  "emoji": "🐋",
+  "place": "observatory",
+  "rarity": "rare",
+  "wants": [
+   "comet_dust_vial",
+   "moonglass_lens"
+  ],
+  "night": false,
+  "desc": "A baby whale made of cloud that floats around the top of the dome.",
+  "sighting": "A small whale made of cloud is floating near the top of the dome.",
+  "summons": [
+   "{owner}'s Cloudwhale Calf drifts across the room and sings a low, soft song that makes everyone sleepy.",
+   "The Cloudwhale Calf floats down and nuzzles {owner}, leaving them slightly damp and very happy.",
+   "{owner}'s Cloudwhale Calf blows a tiny rain cloud out of its spout. It rains on exactly one person."
+  ]
+ },
+ "starling_drake": {
+  "name": "Starling Drake",
+  "emoji": "🐉",
+  "place": "observatory",
+  "rarity": "legendary",
+  "wants": [
+   "stardust_ledger_page",
+   "comet_dust_vial"
+  ],
+  "night": true,
+  "desc": "A dragon whose scales are a map of the sky. Only seen when the stars are out.",
+  "sighting": "The sky over the dome is moving. It's a dragon, and its scales are a map of the stars.",
+  "summons": [
+   "{owner}'s Starling Drake unfurls its wings, and the ceiling fills with a moving map of the night sky.",
+   "The Starling Drake curls around {owner}, and a new constellation shaped like the two of them appears overhead.",
+   "{owner}'s Starling Drake breathes out a gentle stream of starlight that settles on everyone like glitter."
+  ]
+ }
+}
