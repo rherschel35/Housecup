@@ -928,7 +928,10 @@ class LookSelect(discord.ui.Select):
         for key in art.LOOK_FIELDS[field]:
             opts.append(discord.SelectOption(label=art.option_label(field, key), value=key,
                                              default=(wizard_view.look.get(field) == key)))
-        super().__init__(placeholder=FIELD_LABEL[field], options=opts[:25], min_values=1, max_values=1)
+        # a fixed id for the life of this /wizard window, so a click that lands
+        # while the preview is redrawing still finds its menu
+        super().__init__(placeholder=FIELD_LABEL[field], options=opts[:25], min_values=1, max_values=1,
+                         custom_id=f"wiz:{wizard_view.nonce}:{field}")
 
     async def callback(self, interaction: discord.Interaction):
         self.wv.look[self.field] = self.values[0]
@@ -942,6 +945,7 @@ class WizardView(discord.ui.View):
         self.user = user
         self.look = dict(look)
         self.page = page
+        self.nonce = f"{user.id}-{int(time.time() * 1000) % 10**9}"
         self.build()
 
     def header(self) -> str:
@@ -954,10 +958,11 @@ class WizardView(discord.ui.View):
         for field in PAGES[self.page][1]:
             self.add_item(LookSelect(self, field))
         prev_b = discord.ui.Button(label="◂ Back", style=discord.ButtonStyle.secondary, row=4,
-                                   disabled=self.page == 0)
+                                   disabled=self.page == 0, custom_id=f"wiz:{self.nonce}:back")
         next_b = discord.ui.Button(label="Next ▸", style=discord.ButtonStyle.secondary, row=4,
-                                   disabled=self.page == len(PAGES) - 1)
-        rand_b = discord.ui.Button(label="🎲 Surprise me", style=discord.ButtonStyle.primary, row=4)
+                                   disabled=self.page == len(PAGES) - 1, custom_id=f"wiz:{self.nonce}:next")
+        rand_b = discord.ui.Button(label="🎲 Surprise me", style=discord.ButtonStyle.primary, row=4,
+                                   custom_id=f"wiz:{self.nonce}:random")
         prev_b.callback = self._prev
         next_b.callback = self._next
         rand_b.callback = self._random

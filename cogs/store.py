@@ -37,31 +37,31 @@ LEDGER_LIMIT = 500
 HOUSES = {
     "vashara": {
         "name": "Vashara",
-        "color": 0x4C9A7D,
+        "color": 0x8B5FBF,
         "emoji": "\U0001F418",  # elephant
         "motto": "The first house. Medicine, patience, and care for the fragile.",
     },
     "moonveil": {
         "name": "Moonveil",
-        "color": 0x8B5FBF,
+        "color": 0x6FB7E0,
         "emoji": "\U0001F315",  # full moon
         "motto": "Curiosity without a leash. For research purposes, of course.",
     },
     "veyren": {
         "name": "Veyren",
-        "color": 0xD9A441,
+        "color": 0xB8434F,
         "emoji": "\U0001F98C",  # deer
         "motto": "Some bonds need no words.",
     },
     "caldrin": {
         "name": "Caldrin",
-        "color": 0x3FA9A0,
+        "color": 0xE0B53A,
         "emoji": "\U0001F52D",  # telescope
         "motto": "Build it anyway. Ask forgiveness of the blueprint later.",
     },
     "thornmere": {
         "name": "Thornmere",
-        "color": 0xB8434F,
+        "color": 0x3E8E5A,
         "emoji": "\U0001F43A",  # wolf
         "motto": "Think it through. Then think it through again.",
     },
