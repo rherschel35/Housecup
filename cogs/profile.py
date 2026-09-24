@@ -3,7 +3,7 @@
 
     House and honours     - House Cup and Tri-Wizard titles, cups won
     Points                - this season and all time, with rank
-    Duelling              - ladder rank, title, record
+    Duelling              - rank, ladder place, wins, streak, bounty, rival
     Wand                  - what chose them, and why
     Patronus              - the shape their protection takes
 
@@ -23,34 +23,19 @@ from discord.ext import commands
 
 log = logging.getLogger("velmora.profile")
 
-# (minimum wins, title) - highest threshold first.
-DUEL_TITLES = [
-    (60, "Grand Duelist"),
-    (30, "Master Duelist"),
-    (15, "Duelist"),
-    (5, "Adept"),
-    (1, "Novice"),
-    (0, "Untested"),
-]
-
-
-def duel_title(wins: int) -> str:
-    for threshold, title in DUEL_TITLES:
-        if wins >= threshold:
-            return title
-    return "Untested"
+from cogs.duels import rank_for as duel_title, REP_GLOW, CHAMPION_ROLE_NAME
 
 
 def duel_ladder(records: dict) -> list[int]:
-    """Everyone who has duelled, best first: most wins, then best win rate,
-    then fewest losses."""
+    """Everyone who has won a duel, best first: most wins, then fewest
+    losses. (Only the order is shown - never anyone's losses or win rate.)"""
     rows = []
     for uid, rec in records.items():
         w, l = rec.get("w", 0), rec.get("l", 0)
-        if w + l == 0:
+        if w == 0:
             continue
-        rows.append((int(uid), w, w / (w + l), l))
-    rows.sort(key=lambda r: (-r[1], -r[2], r[3]))
+        rows.append((int(uid), w, l))
+    rows.sort(key=lambda r: (-r[1], r[2]))
     return [r[0] for r in rows]
 
 
@@ -83,9 +68,12 @@ class Profile(commands.Cog):
         if tw_titles:
             n = len(tw_titles)
             header.append(f"\U0001F3C5 **Tri-Wizard Champion**" + (f" ×{n}" if n > 1 else ""))
+        if duels and duels.is_champion(member.id):
+            header.append(f"\U0001F3C6 **{CHAMPION_ROLE_NAME}** (Duelist of the Week)")
 
+        sig = duels.signature_of(member.id) if duels else None
         embed = discord.Embed(
-            title=member.display_name,
+            title=member.display_name + (f" {sig[1]}" if sig else ""),
             description="\n".join(header),
             color=meta["color"] if meta else 0x6C5CE7,
         )
@@ -113,10 +101,21 @@ class Profile(commands.Cog):
             if w + l:
                 ladder = duel_ladder(records)
                 place = ladder.index(member.id) + 1 if member.id in ladder else None
-                pct = round(100 * w / (w + l))
-                value = (f"**{duel_title(w)}**\n"
-                         + (f"Rank #{place} of {len(ladder)}\n" if place else "")
-                         + f"{w}–{l} • {pct}% won")
+                lines = [f"**{duel_title(w)}**"]
+                if place:
+                    lines.append(f"#{place} of {len(ladder)} duellists")
+                lines.append(f"{w} win{'s' if w != 1 else ''}")
+                streak = duels.streak_of(member.id)
+                if streak >= 2:
+                    lines.append(f"\U0001F525 {streak}-win streak")
+                if duels.has_bounty(member.id):
+                    lines.append("\U0001F3AF Bounty on their head")
+                rivals = duels.rivals_of(member.id)
+                if rivals:
+                    guild = getattr(member, "guild", None)
+                    rm = guild.get_member(rivals[0]) if guild else None
+                    lines.append(f"Rival: {rm.display_name if rm else f'<@{rivals[0]}>'}")
+                value = "\n".join(lines)
             else:
                 value = "**Untested**\nHasn't duelled yet"
             embed.add_field(name="Duelling", value=value, inline=True)
@@ -150,7 +149,9 @@ class Profile(commands.Cog):
             from cogs.wands import _fmt_length
             embed.add_field(
                 name="Wand",
-                value=(f"**{wand['wood']}, {wand['core'].lower()} core**\n"
+                value=(f"**{wand['wood']}, {wand['core'].lower()} core**"
+                       + (" \u2728 *it glows*" if duels and duels.rep_of(member.id) >= REP_GLOW else "")
+                       + "\n"
                        f"{_fmt_length(wand['length'])}, {wand['flexibility']}\n\n"
                        f"*{wand['reading']}*"),
                 inline=False,

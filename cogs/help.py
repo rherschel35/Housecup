@@ -67,7 +67,7 @@ HELP = {
             ("points", "Your points (or anyone's), this season and all time."),
             ("standings", "The House Cup table."),
             ("leaderboard", "The top earners."),
-            ("duelrecord", "Wins, losses, and today's duel points left."),
+            ("duelrecord", "Your duel rank, wins, streak, rivals, and today's duel points left."),
             ("history", "Recent points activity."),
             ("housecup", "Past seasons and their champions."),
             ("triwizard history", "Every Tri-Wizard champion so far."),
@@ -112,6 +112,7 @@ HELP = {
         "entries": [
             ("dementor channels", "Set the 4 channels a wild threat can appear in."),
             ("dementor summon", "Make one appear right now (any creature, or a dementor)."),
+            ("duelnight", "Start or end a House Duel Night - duel wins count double."),
             ("dementor status", "What's configured and what's active."),
             ("dementor eventstart", "Start 'Attack on Velmora' - monsters flood every channel."),
             ("dementor eventend", "End the running event early and tally it up."),
