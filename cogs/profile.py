@@ -73,8 +73,14 @@ class Profile(commands.Cog):
             header.append(f"\U0001F3C6 **{CHAMPION_ROLE_NAME}** (Duelist of the Week)")
 
         sig = duels.signature_of(member.id) if duels else None
+        adorn = self.bot.get_cog("Adornments")
+        shown = adorn.title_of(member) if adorn else (sig[1] if sig else None)
+        if shown:
+            name_line = f"{member.display_name} {shown}" if shown.startswith("the ") else f"{member.display_name}, {shown}"
+        else:
+            name_line = member.display_name
         embed = discord.Embed(
-            title=member.display_name + (f" {sig[1]}" if sig else ""),
+            title=name_line,
             description="\n".join(header),
             color=meta["color"] if meta else 0x6C5CE7,
         )
@@ -205,6 +211,10 @@ class Profile(commands.Cog):
         else:
             embed.add_field(name="Familiar", value="Not adopted yet \u2014 `/familiar`.",
                             inline=True)
+
+        # -------------------------------------------------------- adornments
+        if adorn:
+            embed.add_field(name="Adornments", value=adorn.profile_line(member.id), inline=False)
         return embed
 
     @app_commands.command(name="profile", description="A player's wand, points, duels, beasts and honours.")
@@ -216,7 +226,24 @@ class Profile(commands.Cog):
                 "Ghosts don't keep profiles. They keep grudges.", ephemeral=True
             )
             return
-        await interaction.response.send_message(embed=self.build(member))
+        adorn = self.bot.get_cog("Adornments")
+        if not adorn:
+            await interaction.response.send_message(embed=self.build(member))
+            return
+        # the Mirror portrait takes a moment to draw
+        await interaction.response.defer()
+        try:
+            await adorn.check_member(member)
+        except Exception:
+            log.exception("Gear check on /profile failed")
+        embed = self.build(member)
+        try:
+            file = await adorn.mirror_file(member, name="mirror.png")
+            embed.set_thumbnail(url="attachment://mirror.png")
+            await interaction.followup.send(embed=embed, file=file)
+        except Exception:
+            log.exception("Mirror portrait for /profile failed")
+            await interaction.followup.send(embed=embed)
 
 
 async def setup(bot: commands.Bot):

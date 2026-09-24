@@ -216,6 +216,18 @@ class WorldCog(commands.Cog, name="World"):
             return here["place"]
         return None
 
+    def gear_finds(self, user_id, student, place, found, exploring: bool) -> list:
+        """Extra finds from worn gear (Seeker's Ring, Magpie's Eye). Never
+        breaks exploring if the Adornments cog is missing or fails."""
+        adorn = self.bot.get_cog("Adornments")
+        if not adorn:
+            return []
+        try:
+            return adorn.bonus_finds(user_id, student, self.world, place, found, exploring)
+        except Exception:
+            log.exception("Gear bonus find failed")
+            return []
+
     # ------------------------------------------------------------ house points
 
     async def points(self, student, member, delta: int, reason: str) -> str:
@@ -270,12 +282,15 @@ class WorldCog(commands.Cog, name="World"):
             self.world.bump(ctx.student, key)
             pe = self.event(place)
             enc = P.explore(ctx, strange_house=pe.get("house") if pe and pe["key"] == "strange_house" else None)
+            bonus = self.gear_finds(interaction.user.id, ctx.student, place, enc["reward"], exploring=True)
             reveal = self.world.reveal_if_new(ctx.student, place)
             left = self.limit(place, "explore") - self.world.count(ctx.student, key)
             self.save()
         text = enc["text"]
         if enc["reward"]:
             text += f"\n\n🎁 You receive: {self.world.item_line(enc['reward'])}"
+        for item, why in bonus:
+            text += f"\n💍 {why}: {self.world.item_line(item)}"
         text += await self.points(ctx.student, interaction.user, self.world.reward_points(enc["reward"]),
                                   f"🌿 found something rare in {P.name}")
         if reveal:
@@ -331,12 +346,15 @@ class WorldCog(commands.Cog, name="World"):
                     "🍂 You've searched it bare for today. It will grow back. Probably.", ephemeral=True)
             self.world.bump(ctx.student, key)
             res = P.forage(ctx)
+            bonus = self.gear_finds(interaction.user.id, ctx.student, place, res["item"], exploring=False)
             left = self.limit(place, "forage") - self.world.count(ctx.student, key)
             self.save()
         text = res["text"]
         if res["item"]:
             it = self.world.items[res["item"]]
             text += f"\n*{RARITY_LABEL[it['rarity']]}* - {it['desc']}"
+        for item, why in bonus:
+            text += f"\n💍 {why}: {self.world.item_line(item)}"
         text += await self.points(ctx.student, interaction.user, self.world.reward_points(res["item"]),
                                   f"🌱 foraged something rare in {P.name}")
         monster = await self.maybe_spawn_monster(place, interaction.channel_id)

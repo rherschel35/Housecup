@@ -260,11 +260,23 @@ class Familiars(commands.Cog):
             await interaction.response.send_message(already, ephemeral=True)
             return
         rec["day"][action] = True
-        rec["friendship"] = min(FRIENDSHIP_CAP, rec["friendship"] + FRIENDSHIP_PER_ACTION)
+        adorn = self.bot.get_cog("Adornments")
+        bonus = adorn.friendship_bonus(interaction.user.id) if adorn else 0
+        rec["friendship"] = min(FRIENDSHIP_CAP, rec["friendship"] + FRIENDSHIP_PER_ACTION + bonus)
         self.save()
         fam = self.fam_word(rec)
         line = self.rng_module.choice(lines[rec["species"]]).format(fam=fam)
+        extra = adorn.bell_line(interaction.user.id, rec["species"], fam) if adorn else None
+        if extra:
+            line += f"\n{extra}"
+        if bonus:
+            line += "\n-# 🧶 Your Kindred Bracelet tightens a little. You two are closer than ever."
         await interaction.response.send_message(line)
+        if adorn:
+            try:
+                await adorn.check_member(interaction.user)
+            except Exception:
+                log.exception("Gear check after familiar care failed")
 
     @app_commands.command(name="feed", description="Feed your familiar. Once a day.")
     async def feed(self, interaction: discord.Interaction):

@@ -61,6 +61,25 @@ HELP = {
             ("summon", "Call one of your beasts to show off. Just for fun."),
         ],
     },
+    "adornments": {
+        "title": "Your wizard & gear",
+        "staff": False,
+        "note": ("40 pieces to collect: craft them from your satchel, or earn the rare ones. "
+                 "Earned pieces have perks while you wear them (never for duels or points)."),
+        "entries": [
+            ("wizard", "Design how your wizard looks."),
+            ("mirror", "Your wizard trading card (or anyone's): look, gear, title and stats."),
+            ("jewelbox", "What you own, what you're wearing, what you can craft."),
+            ("craft", "Make a piece from materials in your satchel."),
+            ("wear", "Put on a piece you own."),
+            ("remove", "Take off whatever's in a slot."),
+            ("title", "Choose which earned title shows under your name."),
+            ("cheer", "House Cup Bracelet: a celebration for your house."),
+            ("whistle", "Beastcaller's Whistle: call the next beast now. Once a week."),
+            ("secrets", "Keeper's Talisman: how many secrets you haven't found."),
+            ("nightwatch", "Nightwatch Pendant: night-beast heads-up on or off."),
+        ],
+    },
     "challenges": {
         "title": "Challenges",
         "staff": False,
@@ -74,7 +93,7 @@ HELP = {
         "title": "Your standing",
         "staff": False,
         "entries": [
-            ("profile", "Your wand, patronus, points, duel rank, beasts and honours - or anyone's."),
+            ("profile", "Your Mirror, wand, patronus, points, duel rank, beasts and honours - or anyone's."),
             ("points", "Your points (or anyone's), this season and all time."),
             ("standings", "The House Cup table."),
             ("leaderboard", "The top earners."),
@@ -127,6 +146,10 @@ HELP = {
             ("beastadmin spawn", "Make a beast appear right now."),
             ("beastadmin channel", "Set which channel beasts appear in."),
             ("beastadmin status", "What's out there, and when the next beast comes."),
+            ("adornadmin give", "Give someone a piece of gear."),
+            ("adornadmin take", "Take a piece of gear back."),
+            ("adornadmin channel", "Where earned gear is announced."),
+            ("adornadmin status", "How gear is spread around the server."),
             ("dementor status", "What's configured and what's active."),
             ("dementor eventstart", "Start 'Attack on Velmora' - monsters flood every channel."),
             ("dementor eventend", "End the running event early and tally it up."),
@@ -200,21 +223,39 @@ class Help(commands.Cog):
             return f"</{path}:{ids[root]}>"
         return f"`/{path}`"
 
-    def build(self, ids: dict[str, int], is_staff: bool) -> discord.Embed:
-        embed = discord.Embed(
-            title="Velmora",
-            description=("Everything you do here earns points for your house. "
-                         "The house with the most points when the season ends takes the House Cup."),
-            color=0x6C5CE7,
-        )
+    def build(self, ids: dict[str, int], is_staff: bool, staff_part: bool = False) -> discord.Embed:
+        """One embed: the player sections, or (staff_part=True) the staff
+        sections. They're sent as two messages because Discord caps a
+        message at 6000 characters of embeds, and with clickable command
+        mentions everything together is longer than that."""
+        if staff_part:
+            embed = discord.Embed(title="Velmora — staff",
+                                  description="Only staff can see and use these.", color=0x4B3F99)
+        else:
+            embed = discord.Embed(
+                title="Velmora",
+                description=("Everything you do here earns points for your house. "
+                             "The house with the most points when the season ends takes the House Cup."),
+                color=0x6C5CE7,
+            )
         for section in HELP.values():
+            if section["staff"] != staff_part:
+                continue
             if section["staff"] and not is_staff:
                 continue
             lines = []
             if section.get("note"):
                 lines.append(section["note"])
             lines += [f"{self.mention(p, ids)} — {d}" for p, d in section["entries"]]
-            embed.add_field(name=section["title"], value="\n".join(lines), inline=False)
+            # a field holds 1024 characters; long sections carry on in a second field
+            chunk, name = [], section["title"]
+            for line in lines:
+                if chunk and len("\n".join(chunk + [line])) > 1024:
+                    embed.add_field(name=name, value="\n".join(chunk), inline=False)
+                    chunk, name = [], f"{section['title']} (cont.)"
+                chunk.append(line)
+            if chunk:
+                embed.add_field(name=name, value="\n".join(chunk), inline=False)
 
         embed.set_footer(text="Tap a command to use it. Only you can see this.")
         return embed
@@ -225,6 +266,8 @@ class Help(commands.Cog):
         is_staff = bool(store and store.is_staff(interaction.user))
         ids = await self._command_ids(interaction.guild)
         await interaction.response.send_message(embed=self.build(ids, is_staff), ephemeral=True)
+        if is_staff:
+            await interaction.followup.send(embed=self.build(ids, True, staff_part=True), ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

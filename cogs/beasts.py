@@ -60,6 +60,7 @@ RARITY_LABEL = {"common": "Common", "uncommon": "Uncommon", "rare": "Rare", "leg
 DAILY_POINT_CAP = 5
 WINDOW = 24 * 3600
 SUMMON_COOLDOWN = 60
+LINGER_GRACE = 120           # Lingering Charm: wearers can still approach this long after a beast leaves
 
 PLACES = {
     "garden": "The Garden",
@@ -235,6 +236,9 @@ class Beasts(commands.Cog):
         self.state["next_at"] = now + self._gap()
         self.save()
         log.info("Beast sighting: %s in %s", key, channel.id)
+        adorn = self.bot.get_cog("Adornments")
+        if adorn and self.beasts[key].get("night"):
+            asyncio.ensure_future(adorn.notify_nightwatch(self.beasts[key], channel.id))
         return key
 
     async def _edit_sighting(self, sighting: dict, embed: discord.Embed):
@@ -256,8 +260,9 @@ class Beasts(commands.Cog):
 
     async def _tick(self, now: float):
         s = self.state.get("sighting")
-        if s and now >= s["expires"]:
-            self.state["sighting"] = None
+        if s and now >= s["expires"] and not s.get("left"):
+            # it's gone - but anyone wearing a Lingering Charm gets a short grace
+            s["left"] = True
             self.save()
             b = self.beasts.get(s["beast"])
             if b:
@@ -265,7 +270,11 @@ class Beasts(commands.Cog):
                     description=f"{b['emoji']} The {b['name']} slipped away. Maybe next time.",
                     color=0x7A7A7A))
             return
-        if not s and now >= self.state.get("next_at", 0):
+        if s and now >= s["expires"] + LINGER_GRACE:
+            self.state["sighting"] = None
+            self.save()
+            return
+        if (not s or s.get("left")) and now >= self.state.get("next_at", 0):
             await self.spawn(now=now)
 
     @tick.before_loop
@@ -319,10 +328,13 @@ class Beasts(commands.Cog):
         now = time.time()
         async with self.lock:
             s = self.state.get("sighting")
-            if not s or now >= s["expires"]:
+            adorn = self.bot.get_cog("Adornments")
+            grace = adorn.linger_seconds(interaction.user.id) if adorn else 0
+            if not s or now >= s["expires"] + min(grace, LINGER_GRACE):
                 await interaction.response.send_message(
                     "There's no beast here right now. Keep an eye on the explore channel.", ephemeral=True)
                 return
+            lingered = now >= s["expires"]
             if interaction.channel_id != s["channel_id"]:
                 await interaction.response.send_message(
                     f"The beast is in <#{s['channel_id']}>.", ephemeral=True)
@@ -353,6 +365,8 @@ class Beasts(commands.Cog):
         from cogs.store import HOUSES
         lines = [f"{b['emoji']} **{interaction.user.display_name}** offers {self.items_line(b['wants'])} "
                  f"and befriends the **{b['name']}**!", f"*{b['desc']}*"]
+        if lingered:
+            lines.insert(1, "⏳ *It had nearly gone, but the Lingering Charm made it look back.*")
         if out["first"]:
             if out["points"]:
                 h = HOUSES.get(out["house"], {})
@@ -371,6 +385,11 @@ class Beasts(commands.Cog):
         await self._edit_sighting(s, discord.Embed(
             description=f"{b['emoji']} The {b['name']} went home with **{interaction.user.display_name}**.",
             color=RARITY_COLORS[b["rarity"]]))
+        if adorn:
+            try:
+                await adorn.check_member(interaction.user)
+            except Exception:
+                log.exception("Gear check after befriending failed")
 
     # ------------------------------------------------------------- bestiary
 
@@ -403,18 +422,40 @@ class Beasts(commands.Cog):
     @app_commands.command(name="bestiary", description="Every beast you've befriended - or anyone's.")
     @app_commands.describe(member="Whose bestiary (leave blank for your own)")
     async def bestiary(self, interaction: discord.Interaction, member: discord.Member = None):
-        await interaction.response.send_message(embed=self.bestiary_embed(member or interaction.user))
+        embed = self.bestiary_embed(member or interaction.user)
+        adorn = self.bot.get_cog("Adornments")
+        if (member is None or member.id == interaction.user.id) and adorn and adorn.has_perk(interaction.user.id, "tracker"):
+            s = self.state.get("sighting")
+            if s and time.time() < s["expires"]:
+                hint = f"one is out right now in <#{s['channel_id']}>!"
+            else:
+                # rounded to the nearest quarter hour - a hum, not a clock
+                at = int(round(self.state.get("next_at", 0) / 900) * 900)
+                hint = f"the next beast should turn up around <t:{at}:t> (<t:{at}:R>)."
+            embed.description += f"\n💍 Your Tracker's Band hums: {hint}"
+        await interaction.response.send_message(embed=embed)
 
     # --------------------------------------------------------------- summon
 
     @app_commands.command(name="summon", description="Call one of your beasts to show off. Just for fun.")
-    @app_commands.describe(beast="Which of your beasts")
-    async def summon(self, interaction: discord.Interaction, beast: str):
+    @app_commands.describe(beast="Which of your beasts",
+                           second="(Beastmaster's Totem) a second beast to call at the same time")
+    async def summon(self, interaction: discord.Interaction, beast: str, second: str = None):
         col = self.collection(interaction.user.id)
         if beast not in col or beast not in self.beasts:
             await interaction.response.send_message(
                 "You haven't befriended that beast yet. `/bestiary` shows the ones you have.", ephemeral=True)
             return
+        adorn = self.bot.get_cog("Adornments")
+        if second is not None:
+            if not (adorn and adorn.has_perk(interaction.user.id, "totem")):
+                await interaction.response.send_message(
+                    "Only someone wearing the **Beastmaster's Totem** can call two beasts at once.", ephemeral=True)
+                return
+            if second not in col or second not in self.beasts or second == beast:
+                await interaction.response.send_message(
+                    "Pick a different beast you've befriended for the second one.", ephemeral=True)
+                return
         now = time.time()
         last = self._summoned.get(interaction.user.id, 0)
         if now - last < SUMMON_COOLDOWN:
@@ -425,10 +466,18 @@ class Beasts(commands.Cog):
         self._summoned[interaction.user.id] = now
         b = self.beasts[beast]
         moment = self.rng.choice(b["summons"]).format(owner=interaction.user.display_name)
+        title = f"{b['emoji']} {interaction.user.display_name} summons their {b['name']}!"
+        if second is not None:
+            b2 = self.beasts[second]
+            moment += "\n\n" + self.rng.choice(b2["summons"]).format(owner=interaction.user.display_name)
+            title = f"{b['emoji']}{b2['emoji']} {interaction.user.display_name} summons their {b['name']} and {b2['name']}!"
+        flourish = adorn.summon_flourish(interaction.user.id) if adorn else None
+        if flourish:
+            moment += f"\n\n{flourish}"
         await interaction.response.send_message(embed=discord.Embed(
-            title=f"{b['emoji']} {interaction.user.display_name} summons their {b['name']}!",
-            description=moment, color=RARITY_COLORS[b["rarity"]]))
+            title=title[:256], description=moment, color=RARITY_COLORS[b["rarity"]]))
 
+    @summon.autocomplete("second")
     @summon.autocomplete("beast")
     async def _your_beasts(self, interaction: discord.Interaction, current: str):
         col = self.collection(interaction.user.id)
