@@ -245,7 +245,7 @@ MAX_FLOOR = 100
 STARTING_MAX_AP = 5
 AP_REGEN_PER_TURN = 1
 CAST_AP_COST = 3
-DEFEND_AP_COST = 1
+DEFEND_AP_COST = 0
 HEAL_AP_COST = 3
 STRIKE_MULT = 0.5    # a free hit always lands at "resisted"-tier damage
 DEFEND_DMG_MULT = 0.5   # incoming damage while defending
@@ -558,7 +558,8 @@ class Descent(commands.Cog):
                 return
             fight.ap -= DEFEND_AP_COST
             counter_mult = DEFEND_DMG_MULT
-            lines.append(f"🛡️ You brace to defend (-{DEFEND_AP_COST} AP)")
+            lines.append("🛡️ You brace to defend (free action)" if DEFEND_AP_COST == 0
+                         else f"🛡️ You brace to defend (-{DEFEND_AP_COST} AP)")
         elif action == "rest":
             fight.ap = fight.ap_max
             counter_mult = REST_DMG_MULT
