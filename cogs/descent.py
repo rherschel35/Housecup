@@ -67,7 +67,7 @@ ASSETS_DIR = Path(__file__).resolve().parent.parent / "monster_art_assets"
 
 # The Descent only runs in this one channel - keeps the fight embeds and
 # spam out of every other channel in the server.
-DESCENT_CHANNEL_ID = 1553046260401840239
+DESCENT_CHANNEL_ID = 1553089612849877053
 
 # ------------------------------------------------------------- elements
 

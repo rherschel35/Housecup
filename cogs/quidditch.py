@@ -49,7 +49,7 @@ STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "quidditch_state.json"
 
 # Quidditch only runs in this one channel.
-QUIDDITCH_CHANNEL_ID = 1553071961641328720
+QUIDDITCH_CHANNEL_ID = 1553089438933065913
 
 HOUSES = ["Caldrin", "Thornmere", "Veyren", "Vashara", "Moonveil"]
 
