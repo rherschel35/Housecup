@@ -904,6 +904,21 @@ class Descent(commands.Cog):
         embed.add_field(name="⚡ Max AP", value=str(rec["max_ap"]))
         await interaction.response.send_message(embed=embed)
 
+    @app_commands.command(name="descentreset", description="(staff) Wipe someone's Descent progress back to floor 1.")
+    @app_commands.describe(member="Whose progress to reset (leave blank for your own)")
+    async def descentreset(self, interaction: discord.Interaction, member: discord.Member = None):
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        target = member or interaction.user
+        self.fights.pop(target.id, None)
+        self.state["players"][str(target.id)] = blank_record()
+        self.save()
+        who = "Your" if target.id == interaction.user.id else f"{target.display_name}'s"
+        await interaction.response.send_message(
+            f"{who} Descent progress has been wiped - back to floor 1, monster 1.", ephemeral=True)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Descent(bot))
