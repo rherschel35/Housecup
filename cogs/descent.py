@@ -63,7 +63,7 @@ log = logging.getLogger("velmora.descent")
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "descent_state.json"
-ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets" / "monsters"
+ASSETS_DIR = Path(__file__).resolve().parent.parent / "monster_art_assets"
 
 # The Descent only runs in this one channel - keeps the fight embeds and
 # spam out of every other channel in the server.
