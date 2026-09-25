@@ -55,6 +55,7 @@ HOUSES = ["Caldrin", "Thornmere", "Veyren", "Vashara", "Moonveil"]
 
 ROUNDS = 5
 ROUND_TIMEOUT = 60   # seconds before a stalled round auto-resolves (non-responders just do nothing)
+SIGNUP_TIMEOUT = 60  # seconds a match request waits for players before it expires
 GOAL_POINTS = 10
 SNITCH_CHANCE_PER_CHASER = 0.12   # per chaser, per round
 SNITCH_BONUS = 30                 # added to the catcher's side's score
@@ -100,6 +101,10 @@ class Signup:
         self.house_b = house_b
         self.team_a: list[int] = []
         self.team_b: list[int] = []
+        self.started = False
+        self.cancelled = False
+        self.message: Optional[discord.Message] = None
+        self.timer_task: Optional[asyncio.Task] = None
 
     def label_a(self) -> str:
         return f"Join {self.house_a}" if self.is_house else "Join Team A"
@@ -270,9 +275,32 @@ class Quidditch(commands.Cog):
             return
         signup = Signup(is_house, size, house_a, house_b)
         await interaction.response.send_message(embed=signup.embed(), view=SignupView(self, signup))
+        signup.message = await interaction.original_response()
+        signup.timer_task = asyncio.create_task(self._signup_timeout(signup))
+
+    async def _signup_timeout(self, signup: Signup):
+        try:
+            await asyncio.sleep(SIGNUP_TIMEOUT)
+        except asyncio.CancelledError:
+            return
+        if signup.started or signup.cancelled or signup.message is None:
+            return
+        signup.cancelled = True
+        e = discord.Embed(
+            title="Match request expired",
+            description="Not enough players joined within 60 seconds. Start a new match whenever you're ready.",
+            color=0x95A5A6,
+        )
+        try:
+            await signup.message.edit(embed=e, view=None)
+        except discord.DiscordException:
+            log.exception("Could not close out an expired quidditch signup.")
 
     async def join_signup(self, interaction: discord.Interaction, view: SignupView, side: str):
         signup = view.signup
+        if signup.cancelled:
+            await interaction.response.send_message("This match request has expired.", ephemeral=True)
+            return
         uid = interaction.user.id
         if uid in signup.team_a or uid in signup.team_b:
             await interaction.response.send_message("You're already signed up for this match.", ephemeral=True)
@@ -292,6 +320,9 @@ class Quidditch(commands.Cog):
         target.append(uid)
 
         if len(signup.team_a) >= signup.size and len(signup.team_b) >= signup.size:
+            signup.started = True
+            if signup.timer_task:
+                signup.timer_task.cancel()
             match = Match(signup)
             match.message = interaction.message
             await interaction.response.edit_message(embed=match.embed(), view=MatchView(self, match))
@@ -465,7 +496,25 @@ class Quidditch(commands.Cog):
                 if capped:
                     desc += "\nDaily cap reached (no points, win still recorded): " + ", ".join(f"<@{u}>" for u in capped)
 
-        return discord.Embed(title="Match Result", description=desc, color=0x2ECC71)
+        embed = discord.Embed(title="Match Result", description=desc, color=0x2ECC71)
+
+        # Keep the recap visible so players can see why the match ended the way
+        # it did, instead of it vanishing once the result posts. Newest rounds
+        # first, trimmed to fit an embed field if the match ran long.
+        if match.log:
+            recap = "\n\n".join(reversed(match.log))
+            if len(recap) > 1024:
+                kept = []
+                total = 0
+                for block in reversed(match.log):
+                    if total + len(block) + 2 > 1024:
+                        break
+                    kept.append(block)
+                    total += len(block) + 2
+                recap = "\n\n".join(kept)
+            embed.add_field(name="Round-by-round recap", value=recap, inline=False)
+
+        return embed
 
     # ----------------------------------------------------------- commands
 
