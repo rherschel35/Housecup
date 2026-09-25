@@ -191,6 +191,13 @@ class Beasts(commands.Cog):
     def channel_id(self) -> int:
         return self.state.get("channel_id") or DEFAULT_CHANNEL_ID
 
+    def _boss_trophies(self, user_id: int) -> dict:
+        """Descent boss trophies (see cogs/descent.py) - a separate, cosmetic-only
+        collection that plugs into /summon and /bestiary without touching the
+        real beast collection, its counts, or its ranks."""
+        descent = self.bot.get_cog("Descent")
+        return descent.boss_trophies(user_id) if descent else {}
+
     # ------------------------------------------------------------ spawning
 
     def pick_beast(self, now: float) -> str:
@@ -418,6 +425,10 @@ class Beasts(commands.Cog):
                     lines.append(f"❔ *??? ({RARITY_LABEL[b['rarity']].lower()})*")
             embed.add_field(name=f"{PLACE_EMOJI[place]} {name} — {got}/{len(keys)}",
                             value="\n".join(lines), inline=True)
+        trophies = self._boss_trophies(member.id)
+        if trophies:
+            lines = [f"{t['emoji']} {t['name']}" for t in trophies.values()]
+            embed.add_field(name="👑 Descent Trophies", value="\n".join(lines), inline=False)
         return embed
 
     @app_commands.command(name="bestiary", description="Every beast you've befriended - or anyone's.")
@@ -438,22 +449,39 @@ class Beasts(commands.Cog):
 
     # --------------------------------------------------------------- summon
 
+    def _entry(self, user_id: int, key: str):
+        """Look up something summonable: a real befriended beast, or a Descent
+        boss trophy. Returns (data, is_boss_trophy), or (None, False)."""
+        if key.startswith("boss:"):
+            trophy = self._boss_trophies(user_id).get(key)
+            return (trophy, True) if trophy else (None, False)
+        col = self.collection(user_id)
+        if key in col and key in self.beasts:
+            return self.beasts[key], False
+        return None, False
+
     @app_commands.command(name="summon", description="Call one of your beasts to show off. Just for fun.")
-    @app_commands.describe(beast="Which of your beasts",
+    @app_commands.describe(beast="Which of your beasts (or a Descent boss trophy)",
                            second="(Beastmaster's Totem) a second beast to call at the same time")
     async def summon(self, interaction: discord.Interaction, beast: str, second: str = None):
-        col = self.collection(interaction.user.id)
-        if beast not in col or beast not in self.beasts:
+        b, b_is_boss = self._entry(interaction.user.id, beast)
+        if b is None:
             await interaction.response.send_message(
                 "You haven't befriended that beast yet. `/bestiary` shows the ones you have.", ephemeral=True)
             return
         adorn = self.bot.get_cog("Adornments")
+        b2 = b2_is_boss = None
         if second is not None:
             if not (adorn and adorn.has_perk(interaction.user.id, "totem")):
                 await interaction.response.send_message(
                     "Only someone wearing the **Beastmaster's Totem** can call two beasts at once.", ephemeral=True)
                 return
-            if second not in col or second not in self.beasts or second == beast:
+            if second == beast:
+                await interaction.response.send_message(
+                    "Pick a different beast you've befriended for the second one.", ephemeral=True)
+                return
+            b2, b2_is_boss = self._entry(interaction.user.id, second)
+            if b2 is None:
                 await interaction.response.send_message(
                     "Pick a different beast you've befriended for the second one.", ephemeral=True)
                 return
@@ -465,18 +493,30 @@ class Beasts(commands.Cog):
                 ephemeral=True)
             return
         self._summoned[interaction.user.id] = now
-        b = self.beasts[beast]
         moment = self.rng.choice(b["summons"]).format(owner=interaction.user.display_name)
         title = f"{b['emoji']} {interaction.user.display_name} summons their {b['name']}!"
-        if second is not None:
-            b2 = self.beasts[second]
+        if b2 is not None:
             moment += "\n\n" + self.rng.choice(b2["summons"]).format(owner=interaction.user.display_name)
             title = f"{b['emoji']}{b2['emoji']} {interaction.user.display_name} summons their {b['name']} and {b2['name']}!"
         flourish = adorn.summon_flourish(interaction.user.id) if adorn else None
         if flourish:
             moment += f"\n\n{flourish}"
-        await interaction.response.send_message(embed=discord.Embed(
-            title=title[:256], description=moment, color=RARITY_COLORS[b["rarity"]]))
+        color = 0xE0A526 if (b_is_boss or b2_is_boss) else RARITY_COLORS[b["rarity"]]
+        embed = discord.Embed(title=title[:256], description=moment, color=color)
+
+        # A Descent boss trophy shows its real portrait art - the thing that
+        # makes it feel like a genuine trophy rather than just another entry.
+        image_path = (b.get("image_path") if b_is_boss else None) or \
+                     (b2.get("image_path") if b2_is_boss else None)
+        file = None
+        if image_path and image_path.exists():
+            file = discord.File(image_path, filename=image_path.name)
+            embed.set_image(url=f"attachment://{image_path.name}")
+
+        if file:
+            await interaction.response.send_message(embed=embed, file=file)
+        else:
+            await interaction.response.send_message(embed=embed)
 
     @summon.autocomplete("second")
     @summon.autocomplete("beast")
@@ -487,6 +527,9 @@ class Beasts(commands.Cog):
             b = self.beasts.get(k)
             if b and current.lower() in b["name"].lower():
                 out.append(app_commands.Choice(name=f"{b['name']} ({PLACE_SHORT[b['place']]})", value=k))
+        for k, t in self._boss_trophies(interaction.user.id).items():
+            if current.lower() in t["name"].lower():
+                out.append(app_commands.Choice(name=f"{t['name']} (Descent Boss)", value=k))
         return sorted(out, key=lambda c: c.name)[:25]
 
     # ---------------------------------------------------------------- staff

@@ -165,6 +165,52 @@ MONSTER_IMAGE = {
     "Radiant Husk": "Radiant_Husk.png",
     "Vault Warden": "Vault_Warden.png",
 }
+# Dramatic /summon flourish lines for each boss trophy, written to that
+# boss's own character rather than a shared template - the whole point is
+# that these read as a flex, not a reused line everyone else's also has.
+BOSS_SUMMONS = {
+    10: [
+        "{owner} calls, and the ground splits - the Bloated Sovereign rises, dripping poison that curls the grass a full room away.",
+        "The air turns thick and sour the instant the Bloated Sovereign answers {owner}'s call. Even the torches seem to lean away from it.",
+    ],
+    20: [
+        "{owner} snaps their fingers and Cinderlord Ashgrave erupts from the floor in a column of fire that scorches the ceiling.",
+        "The temperature in the room jumps twenty degrees the instant Cinderlord Ashgrave answers {owner}'s call.",
+    ],
+    30: [
+        "Frost creeps across every surface as the Rime Empress steps out of thin air at {owner}'s call, and everyone's breath turns visible.",
+        "The Rime Empress arrives in a hush of falling snow, and bows - only ever - to {owner}.",
+    ],
+    40: [
+        "Lightning forks across the ceiling with no storm behind it - Stormcaller Vessel has answered {owner}, and the lights flicker for a full ten seconds.",
+        "The hair on everyone's arms stands up at once. Stormcaller Vessel has arrived, and it only ever comes for {owner}.",
+    ],
+    50: [
+        "A column of pure light drops from nowhere, and the Hollow Saint stands within it, waiting on {owner}'s word.",
+        "Every candle in the room burns gold instead of orange the moment the Hollow Saint appears for {owner}.",
+    ],
+    60: [
+        "The Sovereign, Reborn claws up through the floorboards themselves - twice the horror it was the first time {owner} beat it.",
+        "The poison this time doesn't just curl the grass, it kills it. The Sovereign, Reborn has come, and it only answers to {owner}.",
+    ],
+    70: [
+        "Ashgrave, Undying doesn't erupt from the floor this time - it simply is, all fire and fury, standing exactly where {owner} pointed.",
+        "The whole room holds its breath as Ashgrave, Undying answers {owner}. It burned once already, and came back anyway.",
+    ],
+    80: [
+        "The Rime Empress, Unbound arrives without the hush this time - ice cracks the floor outright at {owner}'s call.",
+        "Every light in the room dims to blue. The Rime Empress, Unbound has come, and it only ever comes for {owner}.",
+    ],
+    90: [
+        "The sky doesn't need to be visible for Vessel of the Last Storm to bring the thunder - {owner} calls, and it cracks directly overhead.",
+        "Vessel of the Last Storm arrives already mid-strike, lightning still crawling off it, obedient only to {owner}.",
+    ],
+    100: [
+        "The last thing standing between anyone and the bottom of the Descent now answers to {owner} alone. The Hollow Saint, Ascendant arrives in total silence, and the whole room feels it.",
+        "The Hollow Saint, Ascendant doesn't erupt, doesn't roar - it simply arrives, and everyone in the room understands, all at once, exactly what {owner} accomplished to earn this.",
+    ],
+}
+
 BOSS_IMAGE = {
     10: "Floor_10_The_Bloated_Sovereign.png",
     20: "Floor_20_Cinderlord_Ashgrave.png",
@@ -188,8 +234,8 @@ ZONE_ITEM = {
 }
 BOSS_ITEM = "descent_sigil"
 
-MONSTER_DROP_CHANCE = 0.25   # any regular win
-FLOOR_CLEAR_GUARANTEED = 2   # material given on a full floor clear
+MONSTER_DROP_CHANCE = 0.40   # any regular win
+FLOOR_CLEAR_GUARANTEED = 3   # material given on a full floor clear
 PRACTICE_STATUP_CHANCE = 0.20  # in-window practice win: chance at a stat point
 
 # ----------------------------------------------------------- difficulty
@@ -271,6 +317,7 @@ def blank_record() -> dict:
         "stat_points": {"hp": 0, "atk": 0, "def": 0},
         "pending_statup": False,
         "max_ap": STARTING_MAX_AP,
+        "bosses_bound": [],
     }
 
 
@@ -467,7 +514,27 @@ class Descent(commands.Cog):
     def record(self, user_id: int) -> dict:
         rec = self.state["players"].setdefault(str(user_id), blank_record())
         rec.setdefault("max_ap", STARTING_MAX_AP)  # back-compat for records saved before AP existed
+        rec.setdefault("bosses_bound", [])          # back-compat for records saved before boss trophies existed
         return rec
+
+    def boss_trophies(self, user_id: int) -> dict:
+        """Descent boss trophies this player has bound, keyed for /summon and
+        /bestiary in the Beasts cog. Read-only - never creates a record."""
+        rec = self.state["players"].get(str(user_id))
+        if not rec:
+            return {}
+        out = {}
+        for floor in rec.get("bosses_bound", []):
+            name, emoji, _ = BOSS_NAMES.get(floor, (f"Floor {floor} Boss", "👑", None))
+            image = BOSS_IMAGE.get(floor)
+            out[f"boss:{floor}"] = {
+                "name": name,
+                "emoji": emoji,
+                "floor": floor,
+                "image_path": (ASSETS_DIR / image) if image else None,
+                "summons": BOSS_SUMMONS.get(floor, [f"{{owner}}'s {name} answers the call."]),
+            }
+        return out
 
     # -------------------------------------------------------- fight setup
 
@@ -587,26 +654,31 @@ class Descent(commands.Cog):
         fight.ap = min(fight.ap_max, fight.ap + AP_REGEN_PER_TURN)
         await interaction.edit_original_response(embed=fight.embed(interaction.user), view=FightView(self, fight))
 
-    async def _drop_loot(self, member: discord.Member, element: str, n: int = 1):
+    async def _drop_loot(self, member: discord.Member, element: str, n: int = 1) -> Optional[str]:
         world_cog = self.bot.get_cog("World")
         if not world_cog:
-            return
+            return None
         item_id = ZONE_ITEM[element]
-        if item_id not in world_cog.world.items:
-            return
+        item = world_cog.world.items.get(item_id)
+        if not item:
+            return None
         async with world_cog.lock:
             student = world_cog.student(member)
             world_cog.world.give(student, item_id, n)
             world_cog.save()
+        qty = f" x{n}" if n > 1 else ""
+        return f"{item.get('emoji', '')} **{item['name']}**{qty}".strip()
 
-    async def _drop_boss_item(self, member: discord.Member):
+    async def _drop_boss_item(self, member: discord.Member) -> Optional[str]:
         world_cog = self.bot.get_cog("World")
-        if not world_cog or BOSS_ITEM not in world_cog.world.items:
-            return
+        item = world_cog.world.items.get(BOSS_ITEM) if world_cog else None
+        if not world_cog or not item:
+            return None
         async with world_cog.lock:
             student = world_cog.student(member)
             world_cog.world.give(student, BOSS_ITEM, 1)
             world_cog.save()
+        return f"{item.get('emoji', '')} **{item['name']}**".strip()
 
     async def _on_win(self, interaction: discord.Interaction, fight: Fight):
         del self.fights[interaction.user.id]
@@ -617,10 +689,11 @@ class Descent(commands.Cog):
             await self._on_practice_win(interaction, fight, rec, member)
             return
 
+        drop_text = None
         if fight.is_boss:
-            await self._drop_boss_item(member)
+            drop_text = await self._drop_boss_item(member)
         elif random.random() < MONSTER_DROP_CHANCE:
-            await self._drop_loot(member, fight.element)
+            drop_text = await self._drop_loot(member, fight.element)
 
         cleared_index = fight.monster_index
         if cleared_index >= MONSTERS_PER_FLOOR:
@@ -633,12 +706,17 @@ class Descent(commands.Cog):
             ap_increased = floor % 10 == 0
             if ap_increased:
                 rec["max_ap"] += 1
-            await self._drop_loot(member, zone_for(floor)["element"], FLOOR_CLEAR_GUARANTEED)
+            clear_drop = await self._drop_loot(member, zone_for(floor)["element"], FLOOR_CLEAR_GUARANTEED)
+            rec["pending_statup"] = True
             self.save()
 
             desc = f"**Floor {floor} cleared!**"
             if ap_increased:
                 desc += f" Max AP is now **{rec['max_ap']}**."
+            if drop_text:
+                desc += f"\n📦 The kill dropped {drop_text}."
+            if clear_drop:
+                desc += f"\n📦 Clearing the floor also dropped {clear_drop}."
             if fight.is_boss:
                 store = self.bot.get_cog("Store")
                 house = store.member_house(member) if store else None
@@ -646,18 +724,27 @@ class Descent(commands.Cog):
                     store.record(house=house, delta=5, actor_id=self.bot.user.id if self.bot.user else 0,
                                  target_id=member.id, reason=f"Descent: floor {floor} boss defeated")
                 desc += f"\n🏆 You defeated **{fight.name}** and earned House {house or 'points (unassigned)'} 5 points."
+                if floor not in rec["bosses_bound"]:
+                    rec["bosses_bound"].append(floor)
+                    self.save()
+                desc += (f"\n🐲 **{fight.name}** now answers to you. See it with `/bestiary`, "
+                        f"call it with `/summon`.")
             if floor >= MAX_FLOOR:
                 desc += "\n\n👑 **The Descent is complete.** There is nothing further down."
+            desc += "\n\nYou've earned a stat point for clearing the floor - pick where it goes."
             embed = discord.Embed(title=f"{fight.emoji} Victory!", description=desc, color=0x2ECC71)
-            await interaction.edit_original_response(embed=embed, view=None)
+            await interaction.edit_original_response(embed=embed, view=StatUpView(self, interaction.user.id))
             return
 
         rec["monster_index"] = cleared_index + 1
         self.save()
 
+        desc = f"**{fight.name}** falls. On to monster {rec['monster_index']}/{MONSTERS_PER_FLOOR}."
+        if drop_text:
+            desc += f"\n📦 It dropped {drop_text}."
         embed = discord.Embed(
             title=f"{fight.emoji} Victory!",
-            description=f"**{fight.name}** falls. On to monster {rec['monster_index']}/{MONSTERS_PER_FLOOR}.",
+            description=desc,
             color=0x2ECC71,
         )
         if cleared_index == STATUP_AT_MONSTER:
