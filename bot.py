@@ -67,6 +67,7 @@ INITIAL_COGS = (
     "cogs.beasts",
     "cogs.adornments",
     "cogs.reaction_roles",
+    "cogs.descent",
 )
 
 
