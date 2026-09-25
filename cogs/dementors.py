@@ -64,6 +64,7 @@ WANDER_MINUTES = 10   # how long a creature that can wander waits before it bolt
 
 REWARD_POINTS = 3   # kept for backward compatibility; see CREATURES["dementor"]["points"]
 DARK = 0x0B0B12
+THREAT_ALERT_COLOR = 0xC0392B  # every "X has appeared" alert, regardless of creature, so it never blends in
 
 EVENT_WAVE_SECONDS = 15
 EVENT_DEFAULT_MINUTES = 5
@@ -276,7 +277,7 @@ class Dementors(commands.Cog):
         desc = self.rng.choice(c["arrivals"])
         if creature_id == "dementor":
             desc += "\n\nOnly a cast patronus can drive it out - `/cast spell:Patronus`."
-        return discord.Embed(title=f"{c['emoji']} A {c['name']} has appeared", description=desc, color=c["color"])
+        return discord.Embed(title=f"{c['emoji']} A {c['name']} has appeared", description=desc, color=THREAT_ALERT_COLOR)
 
     async def spawn(self, channel_id: int = None, creature_id: str = None) -> discord.TextChannel | None:
         """Make a creature appear. Picks a random configured channel if none

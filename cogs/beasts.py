@@ -56,6 +56,7 @@ STAY_MINUTES = 10
 RARITY_WEIGHTS = {"common": 50, "uncommon": 30, "rare": 15, "legendary": 5}
 RARITY_POINTS = {"common": 1, "uncommon": 2, "rare": 3, "legendary": 5}
 RARITY_COLORS = {"common": 0x7FA66A, "uncommon": 0x4F8FC0, "rare": 0x9B59B6, "legendary": 0xE0A526}
+SIGHTING_COLOR = 0x2E8B44  # every "X appears!" alert, regardless of rarity, so it never blends in
 RARITY_LABEL = {"common": "Common", "uncommon": "Uncommon", "rare": "Rare", "legendary": "Legendary"}
 DAILY_POINT_CAP = 5
 WINDOW = 24 * 3600
@@ -208,7 +209,7 @@ class Beasts(commands.Cog):
                 f"First to `/approach` with {'it' if n == 1 else 'them'} in their satchel befriends it. "
                 f"It'll slip away <t:{int(expires)}:R>.")
         embed = discord.Embed(title=f"{b['emoji']} A {b['name']} appears!", description=desc,
-                              color=RARITY_COLORS[b["rarity"]])
+                              color=SIGHTING_COLOR)
         embed.set_footer(text=f"{RARITY_LABEL[b['rarity']]} • from {PLACES[b['place']]}"
                               + (" • only seen after dark" if b.get("night") else ""))
         return embed
