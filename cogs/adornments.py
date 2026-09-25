@@ -510,12 +510,10 @@ class Adornments(commands.Cog):
         return discord.File(io.BytesIO(png), filename=name)
 
     def profile_line(self, user_id: int) -> str:
-        worn = self.worn(user_id)
         owned = len(self.peek(user_id).get("owned", {}))
-        if not worn:
-            return f"Nothing worn yet • {owned}/{len(GEAR)} collected\n`/jewelbox` · `/craft`"
-        lines = [gear_line(worn[s], with_slot=True) for s in SLOTS if s in worn]
-        return "\n".join(lines) + f"\n{owned}/{len(GEAR)} collected"
+        if not owned:
+            return f"Nothing collected yet\n`/jewelbox` · `/craft`"
+        return f"{owned}/{len(GEAR)} collected"
 
     # ================================================================ /mirror
 

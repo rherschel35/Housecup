@@ -29,7 +29,7 @@ from cogs.duels import rank_for as duel_title, REP_GLOW, CHAMPION_ROLE_NAME
 
 def duel_ladder(records: dict) -> list[int]:
     """Everyone who has won a duel, best first: most wins, then fewest
-    losses. (Only the order is shown - never anyone's losses or win rate.)"""
+    losses."""
     rows = []
     for uid, rec in records.items():
         w, l = rec.get("w", 0), rec.get("l", 0)
@@ -111,7 +111,7 @@ class Profile(commands.Cog):
                 lines = [f"**{duel_title(w)}**"]
                 if place:
                     lines.append(f"#{place} of {len(ladder)} duellists")
-                lines.append(f"{w} win{'s' if w != 1 else ''}")
+                lines.append(f"{w}-{l} record")
                 streak = duels.streak_of(member.id)
                 if streak >= 2:
                     lines.append(f"\U0001F525 {streak}-win streak")
@@ -173,8 +173,7 @@ class Profile(commands.Cog):
                 value=(f"**{wand['wood']}, {wand['core'].lower()} core**"
                        + (" \u2728 *it glows*" if duels and duels.rep_of(member.id) >= REP_GLOW else "")
                        + "\n"
-                       f"{_fmt_length(wand['length'])}, {wand['flexibility']}\n\n"
-                       f"*{wand['reading']}*"),
+                       f"{_fmt_length(wand['length'])}, {wand['flexibility']}"),
                 inline=False,
             )
         else:

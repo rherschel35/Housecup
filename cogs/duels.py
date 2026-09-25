@@ -597,8 +597,10 @@ class Duels(commands.Cog):
         if sig:
             title += f" {sig[1]}"
         embed = discord.Embed(title=f"{title} — duelling record", color=0x6C5CE7)
+        losses = self.record_of(member.id).get("l", 0)
         embed.add_field(name="Rank", value=rank_for(wins))
         embed.add_field(name="Wins", value=str(wins))
+        embed.add_field(name="Losses", value=str(losses))
         streak = self.streak_of(member.id)
         embed.add_field(name="Streak", value=(f"🔥 {streak}" if streak >= 2 else str(streak))
                         + (" 🎯 bounty" if self.has_bounty(member.id) else ""))
