@@ -629,11 +629,15 @@ class Descent(commands.Cog):
             rec["floor"] = min(floor + 1, MAX_FLOOR)
             rec["monster_index"] = 1
             rec["losses"] = 0
-            rec["max_ap"] += 1
+            ap_increased = floor % 10 == 0
+            if ap_increased:
+                rec["max_ap"] += 1
             await self._drop_loot(member, zone_for(floor)["element"], FLOOR_CLEAR_GUARANTEED)
             self.save()
 
-            desc = f"**Floor {floor} cleared!** Max AP is now **{rec['max_ap']}**."
+            desc = f"**Floor {floor} cleared!**"
+            if ap_increased:
+                desc += f" Max AP is now **{rec['max_ap']}**."
             if fight.is_boss:
                 store = self.bot.get_cog("Store")
                 house = store.member_house(member) if store else None
