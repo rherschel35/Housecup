@@ -29,6 +29,7 @@ Rewards:
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import json
 import logging
@@ -53,6 +54,7 @@ QUIDDITCH_CHANNEL_ID = 1553071961641328720
 HOUSES = ["Caldrin", "Thornmere", "Veyren", "Vashara", "Moonveil"]
 
 ROUNDS = 5
+ROUND_TIMEOUT = 60   # seconds before a stalled round auto-resolves (non-responders just do nothing)
 GOAL_POINTS = 10
 SNITCH_CHANCE_PER_CHASER = 0.12   # per chaser, per round
 SNITCH_BONUS = 30                 # added to the catcher's side's score
@@ -134,6 +136,9 @@ class Match:
         self.log: list[str] = []
         self.finished = False
         self.winner: Optional[str] = None  # "a", "b", or None for a tie
+        self.lock = asyncio.Lock()
+        self.message: Optional[discord.Message] = None
+        self.timer_task: Optional[asyncio.Task] = None
 
     def all_players(self) -> list[int]:
         return self.team_a + self.team_b
@@ -158,6 +163,8 @@ class Match:
         e.add_field(name=f"{self.side_name('b')}", value=f"**{self.score_b}** pts", inline=True)
         if self.log:
             e.add_field(name="What just happened", value=self.log[-1], inline=False)
+        if not self.finished:
+            e.set_footer(text=f"{ROUND_TIMEOUT}s to act, or the round auto-resolves without you")
         return e
 
 
@@ -286,11 +293,41 @@ class Quidditch(commands.Cog):
 
         if len(signup.team_a) >= signup.size and len(signup.team_b) >= signup.size:
             match = Match(signup)
+            match.message = interaction.message
             await interaction.response.edit_message(embed=match.embed(), view=MatchView(self, match))
+            self._arm_timer(match)
         else:
             await interaction.response.edit_message(embed=signup.embed(), view=view)
 
     # ------------------------------------------------------------ combat
+
+    def _arm_timer(self, match: Match):
+        if match.timer_task:
+            match.timer_task.cancel()
+        match.timer_task = asyncio.create_task(self._round_timeout(match, match.round))
+
+    async def _round_timeout(self, match: Match, round_no: int):
+        try:
+            await asyncio.sleep(ROUND_TIMEOUT)
+        except asyncio.CancelledError:
+            return
+        async with match.lock:
+            if match.finished or match.round != round_no or match.message is None:
+                return
+            self._resolve_round(match)
+            if match.finished:
+                embed = self._apply_match_results(match)
+                try:
+                    await match.message.edit(embed=embed, view=None)
+                except discord.DiscordException:
+                    log.exception("Could not post the final quidditch result.")
+            else:
+                match.actions = {}
+                try:
+                    await match.message.edit(embed=match.embed(), view=MatchView(self, match))
+                except discord.DiscordException:
+                    log.exception("Could not update the quidditch match message.")
+                self._arm_timer(match)
 
     async def submit_action(self, interaction: discord.Interaction, view: MatchView, action: str):
         match = view.match
@@ -298,22 +335,33 @@ class Quidditch(commands.Cog):
         if uid not in match.all_players():
             await interaction.response.send_message("You're not in this match.", ephemeral=True)
             return
-        if uid in match.actions:
-            await interaction.response.send_message("You've already chosen this round.", ephemeral=True)
-            return
-        match.actions[uid] = action
+        async with match.lock:
+            if match.finished:
+                await interaction.response.send_message("This match is already over.", ephemeral=True)
+                return
+            if uid in match.actions:
+                await interaction.response.send_message("You've already chosen this round.", ephemeral=True)
+                return
+            if match.message is None:
+                match.message = interaction.message
+            match.actions[uid] = action
 
-        if len(match.actions) < len(match.all_players()):
-            await interaction.response.edit_message(embed=match.embed(), view=view)
-            return
+            if len(match.actions) < len(match.all_players()):
+                await interaction.response.edit_message(embed=match.embed(), view=view)
+                return
 
-        self._resolve_round(match)
+            self._resolve_round(match)
 
-        if match.finished:
-            await self.finish_match(interaction, match)
-        else:
-            match.actions = {}
-            await interaction.response.edit_message(embed=match.embed(), view=view)
+            if match.timer_task:
+                match.timer_task.cancel()
+
+            if match.finished:
+                embed = self._apply_match_results(match)
+                await interaction.response.edit_message(embed=embed, view=None)
+            else:
+                match.actions = {}
+                await interaction.response.edit_message(embed=match.embed(), view=view)
+                self._arm_timer(match)
 
     def _resolve_round(self, match: Match):
         attackers_a = [u for u in match.team_a if match.actions.get(u) == "attack"]
@@ -369,7 +417,7 @@ class Quidditch(commands.Cog):
             else:
                 match.winner = None
 
-    async def finish_match(self, interaction: discord.Interaction, match: Match):
+    def _apply_match_results(self, match: Match) -> discord.Embed:
         winning_team = None
         losing_team = None
         if match.winner == "a":
@@ -417,8 +465,7 @@ class Quidditch(commands.Cog):
                 if capped:
                     desc += "\nDaily cap reached (no points, win still recorded): " + ", ".join(f"<@{u}>" for u in capped)
 
-        embed = discord.Embed(title="Match Result", description=desc, color=0x2ECC71)
-        await interaction.response.edit_message(embed=embed, view=None)
+        return discord.Embed(title="Match Result", description=desc, color=0x2ECC71)
 
     # ----------------------------------------------------------- commands
 
