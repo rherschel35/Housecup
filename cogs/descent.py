@@ -24,7 +24,7 @@ Combat runs on an AP (action point) economy, not just "pick a spell every
 round": you start each fight with your current max AP (and full HP),
 gaining 1 AP back automatically each round. Actions:
 
-    - Cast a named spell (2 AP) - each tied to an element (the emoji on
+    - Cast a named spell (3 AP) - each tied to an element (the emoji on
       the button says which). A monster's home element resists that same
       element (half damage) and is weak to one other (double damage) -
       neither is shown up front, so you learn it by testing spells.
@@ -244,7 +244,7 @@ MAX_FLOOR = 100
 
 STARTING_MAX_AP = 5
 AP_REGEN_PER_TURN = 1
-CAST_AP_COST = 2
+CAST_AP_COST = 3
 DEFEND_AP_COST = 1
 HEAL_AP_COST = 3
 STRIKE_MULT = 0.5    # a free hit always lands at "resisted"-tier damage
