@@ -157,7 +157,7 @@ class Match:
         e.add_field(name=f"{self.side_name('a')}", value=f"**{self.score_a}** pts", inline=True)
         e.add_field(name=f"{self.side_name('b')}", value=f"**{self.score_b}** pts", inline=True)
         if self.log:
-            e.add_field(name="Last round", value="\n".join(self.log[-4:]), inline=False)
+            e.add_field(name="What just happened", value=self.log[-1], inline=False)
         return e
 
 
@@ -327,8 +327,19 @@ class Quidditch(commands.Cog):
         match.score_a += goals_a
         match.score_b += goals_b
 
-        line = f"**Round {match.round + 1}:** {match.side_name('a')} +{goals_a} · {match.side_name('b')} +{goals_b}"
-        match.log.append(line)
+        def names(uids: list[int]) -> str:
+            return ", ".join(f"<@{u}>" for u in uids) if uids else "—"
+
+        block = [f"**Round {match.round + 1} recap**"]
+        block.append(f"⚔️ Attacked: {names(attackers_a + attackers_b)}")
+        block.append(f"🛡️ Blocked: {names(blockers_a + blockers_b)}")
+        if chasers:
+            block.append(f"✨ Chased the Snitch: {names(chasers)}")
+
+        a_vs = f"{len(attackers_a)} attacker{'s' if len(attackers_a) != 1 else ''} vs {len(blockers_b)} blocker{'s' if len(blockers_b) != 1 else ''}"
+        b_vs = f"{len(attackers_b)} attacker{'s' if len(attackers_b) != 1 else ''} vs {len(blockers_a)} blocker{'s' if len(blockers_a) != 1 else ''}"
+        block.append(f"→ {match.side_name('a')}: {a_vs} → **+{goals_a}**")
+        block.append(f"→ {match.side_name('b')}: {b_vs} → **+{goals_b}**")
 
         catcher_side = None
         for uid in chasers:
@@ -343,10 +354,12 @@ class Quidditch(commands.Cog):
                 match.score_a += SNITCH_BONUS
             else:
                 match.score_b += SNITCH_BONUS
-            match.log.append(f"✨ {match.side_name(catcher_side)} caught the Snitch! +{SNITCH_BONUS} bonus")
+            block.append(f"✨ **{match.side_name(catcher_side)} caught the Snitch!** +{SNITCH_BONUS} bonus, match over.")
             match.finished = True
         elif match.round >= ROUNDS:
             match.finished = True
+
+        match.log.append("\n".join(block))
 
         if match.finished:
             if match.score_a > match.score_b:
