@@ -24,6 +24,7 @@ RARITY_LABEL = {"common": "Common", "uncommon": "Uncommon", "rare": "Rare", "leg
 PLACE_OF = {  # crafted pieces are themed to the place their materials come from
     "garden": "🌿 Garden", "library": "📚 Library", "dungeons": "🕯️ Dungeons",
     "forbidden_woods": "🌲 Forbidden Woods", "observatory": "🔭 Observatory",
+    "descent": "🗝️ The Descent",
 }
 
 GEAR = {
@@ -188,6 +189,32 @@ GEAR = {
         "desc": "A broken compass that points at whatever you're looking for. It's rarely right.",
         "recipe": {"broken_compass": 1, "star_chart_fragment": 1},
         "visual": {"shape": "compass", "color": "#B03030", "accent": "brass"},
+    },
+
+    # ---------------------------------------------------------------- descent
+    "descent_choker": {
+        "name": "Ichor-Ember Choker", "slot": "necklace", "rarity": "uncommon", "place": "descent",
+        "desc": "Poison ichor and an ember shard, set side by side. They shouldn't get along.",
+        "recipe": {"descent_poison_ichor": 2, "descent_ember_shard": 1},
+        "visual": {"chain": "black", "pendant": "shard", "color": "#7A5A8C"},
+    },
+    "descent_frost_band": {
+        "name": "Frost Core Bracelet", "slot": "bracelet", "rarity": "uncommon", "place": "descent",
+        "desc": "A frost core set in plain iron. Your wrist is always a little cold.",
+        "recipe": {"descent_frost_core": 2},
+        "visual": {"band": "iron", "style": "beads", "color": "#9FD8E8"},
+    },
+    "descent_storm_ring": {
+        "name": "Storm Relic Ring", "slot": "ring", "rarity": "rare", "place": "descent",
+        "desc": "A storm relic set into a plain band. It hums before the room does.",
+        "recipe": {"descent_storm_relic": 2, "descent_light_dust": 1},
+        "visual": {"band": "iron", "color": "#E8D96B"},
+    },
+    "descent_warden_talisman": {
+        "name": "Warden's Talisman", "slot": "talisman", "rarity": "legendary", "place": "descent",
+        "desc": "Carved from Vault Sigils taken off things that don't usually give them up.",
+        "recipe": {"descent_sigil": 3, "descent_light_dust": 2},
+        "visual": {"shape": "shield", "color": "#8A6A48", "accent": "#E0A526"},
     },
 
     # ================================================================ earned
