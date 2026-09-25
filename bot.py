@@ -68,6 +68,7 @@ INITIAL_COGS = (
     "cogs.adornments",
     "cogs.reaction_roles",
     "cogs.descent",
+    "cogs.quidditch",
 )
 
 
