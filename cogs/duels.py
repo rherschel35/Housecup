@@ -3,6 +3,7 @@ Wizard duels. Best of three, spells chosen in secret.
 
     /duel @member        - challenge someone
     /duelrecord [member] - rank, wins, streak, rivals, and today's duel points
+    /houseduels          - each house's overall win/loss duelling record
     /duelnight start|end - (staff) House Duel Night: duel wins count double
 
 Rewards: ranks by total wins, hidden Dueling Circle reputation (flourish,
@@ -629,6 +630,39 @@ class Duels(commands.Cog):
         if self.duel_night_on():
             footer += " • ⚔️ Duel Night: wins count double"
         embed.set_footer(text=footer)
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="houseduels", description="Each house's overall duelling record.")
+    async def houseduels(self, interaction: discord.Interaction):
+        from cogs.store import HOUSES
+        store = self.bot.get_cog("Store")
+        guild = interaction.guild
+
+        totals = {key: {"w": 0, "l": 0} for key in HOUSES}
+        for uid, rec in self.state.get("records", {}).items():
+            member = guild.get_member(int(uid)) if guild else None
+            if member is None:
+                continue
+            house = store.member_house(member) if store else None
+            if house not in totals:
+                continue
+            totals[house]["w"] += rec.get("w", 0)
+            totals[house]["l"] += rec.get("l", 0)
+
+        ranked = sorted(totals.items(), key=lambda kv: (-kv[1]["w"], kv[1]["l"]))
+
+        lines = []
+        for i, (house_key, rec) in enumerate(ranked, start=1):
+            meta = HOUSES[house_key]
+            w, l = rec["w"], rec["l"]
+            lines.append(f"**{i}. {meta['emoji']} {meta['name']}** — {w}-{l}")
+
+        embed = discord.Embed(
+            title="⚔️ House Duelling Record",
+            description="\n".join(lines) if lines else "No duels have been fought yet.",
+            color=HOUSES[ranked[0][0]]["color"] if ranked and (ranked[0][1]["w"] or ranked[0][1]["l"]) else 0x6C5CE7,
+        )
+        embed.set_footer(text="Ranked by total wins • same-house duels count too")
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="duelnight", description="(staff) Start or end a House Duel Night - duel wins count double.")
