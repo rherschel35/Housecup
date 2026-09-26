@@ -2,7 +2,8 @@
 Wizard's Chess - real chess, played out over Discord messages.
 
     /chess challenge member:<@user>              - challenge someone to a match
-    /chess move opponent:<name> from:<sq> to:<sq> - make a move in your match against them
+    /chess move opponent:<name> from:<sq> to:<sq> - make a move (or just tap a move in the dropdown
+                                                     on the board message - no typing needed)
     /chess resign opponent:<name>                 - concede a match in progress
     /chessstats [member]                          - wins, losses, title, and active games
     /chessreset member:<@user>                    - (staff) wipe someone's chess record
@@ -152,6 +153,43 @@ class ChallengeView(discord.ui.View):
         self.stop()
 
 
+class MoveSelect(discord.ui.Select):
+    """A dropdown of every legal move for whoever's turn it is - tap one and it plays instantly,
+    no command typing required."""
+
+    def __init__(self, cog: "Chess", match_key: tuple[int, int], player_id: int,
+                choices: list[tuple[str, str]]):
+        self.cog = cog
+        self.match_key = match_key
+        self.player_id = player_id
+        options = [discord.SelectOption(label=san, value=uci) for san, uci in choices[:25]]
+        super().__init__(placeholder="Tap a move...", options=options, min_values=1, max_values=1)
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.player_id:
+            await interaction.response.send_message("It's not your move.", ephemeral=True)
+            return
+        m = self.cog.matches.get(self.match_key)
+        if not m:
+            await interaction.response.send_message("This match has ended.", ephemeral=True)
+            return
+        mv = chess.Move.from_uci(self.values[0])
+        if mv not in m.board.legal_moves:
+            await interaction.response.send_message(
+                "That move isn't legal anymore - someone else's move landed first. Refresh by "
+                "checking the latest board message.", ephemeral=True)
+            return
+        await self.cog.play_move(interaction, m, mv, interaction.user)
+
+
+class MoveView(discord.ui.View):
+    def __init__(self, cog: "Chess", match_key: tuple[int, int], player_id: int,
+                choices: list[tuple[str, str]]):
+        super().__init__(timeout=None)
+        if choices:
+            self.add_item(MoveSelect(cog, match_key, player_id, choices))
+
+
 class Chess(commands.Cog):
     group = app_commands.Group(name="chess", description="Wizard's Chess.")
 
@@ -215,6 +253,17 @@ class Chess(commands.Cog):
 
     def _in_channel(self, interaction: discord.Interaction) -> bool:
         return interaction.channel_id == CHESS_CHANNEL_ID
+
+    def _move_choices(self, board: chess.Board) -> list[tuple[str, str]]:
+        """Legal moves as (label, uci-value) pairs for the tap-to-move dropdown. Non-queen
+        promotions are skipped so underpromotion doesn't quadruple the list - queen is what
+        anyone tapping a dropdown wants almost every time."""
+        out = []
+        for mv in board.legal_moves:
+            if mv.promotion and mv.promotion != chess.QUEEN:
+                continue
+            out.append((board.san(mv), mv.uci()))
+        return out[:25]
 
     # ------------------------------------------------------------- rewards
 
@@ -301,10 +350,11 @@ class Chess(commands.Cog):
         embed = discord.Embed(
             title=f"♟️ Wizard's Chess — {white.display_name} ⚔️ {black.display_name}",
             description=f"```\n{m.render()}\n```\n♙ {white.display_name} is White. "
-                       f"{white.display_name} to move — use `/chess move`.",
+                       f"{white.display_name} to move — tap a move below, or use `/chess move`.",
             color=0x8B5FBF,
         )
-        await interaction.response.edit_message(content=None, embed=embed, view=None)
+        view = MoveView(self, key, white_id, self._move_choices(m.board))
+        await interaction.response.edit_message(content=None, embed=embed, view=view)
 
     @group.command(name="challenge", description="Challenge someone to a game of Wizard's Chess.")
     @app_commands.describe(member="Who to challenge")
@@ -324,13 +374,46 @@ class Chess(commands.Cog):
 
     # ------------------------------------------------------------- moving
 
-    def _legal_from_squares(self, m: Match) -> list[chess.Square]:
-        return sorted({mv.from_square for mv in m.board.legal_moves})
+    async def play_move(self, interaction: discord.Interaction, m: Match, mv: chess.Move, mover):
+        """Applies a legal move (from either the dropdown or the typed command) and posts the
+        result, with a fresh tap-to-move dropdown for whoever moves next."""
+        san = m.board.san(mv)
+        m.board.push(mv)
+        m.last_move_at = time.time()
 
-    def _legal_to_squares(self, m: Match, from_sq: chess.Square) -> list[chess.Move]:
-        return [mv for mv in m.board.legal_moves if mv.from_square == from_sq]
+        white = interaction.guild.get_member(m.white_id)
+        black = interaction.guild.get_member(m.black_id)
+        desc = f"```\n{m.render()}\n```\n⚔️ {mover.display_name} played **{san}**."
 
-    @group.command(name="move", description="Make a move in your match against someone.")
+        outcome = m.board.outcome(claim_draw=True)
+        if outcome:
+            self.matches.pop(self._key(m.white_id, m.black_id), None)
+            if outcome.winner is None:
+                self.record(m.white_id)["draws"] += 1
+                self.record(m.black_id)["draws"] += 1
+                self.save()
+                desc += "\n\n🤝 **Draw.** Nobody's chess pieces get smashed today."
+                await interaction.response.send_message(embed=discord.Embed(
+                    title="♟️ Wizard's Chess", description=desc, color=0x8B5FBF))
+                return
+            winner_id = m.white_id if outcome.winner == chess.WHITE else m.black_id
+            loser_id = m.black_id if outcome.winner == chess.WHITE else m.white_id
+            winner = white if outcome.winner == chess.WHITE else black
+            desc += f"\n\n🏆 **Checkmate.** {winner.display_name} wins."
+            await interaction.response.send_message(embed=discord.Embed(
+                title="♟️ Wizard's Chess", description=desc, color=0x2ECC71))
+            await self._award_and_record(interaction.channel, winner_id, loser_id, "checkmate")
+            return
+
+        next_player_id = m.turn_id()
+        next_player = white if next_player_id == m.white_id else black
+        check_note = " **Check!**" if m.board.is_check() else ""
+        desc += f"{check_note}\n{next_player.display_name} to move — tap a move below, or use `/chess move`."
+        view = MoveView(self, self._key(m.white_id, m.black_id), next_player_id, self._move_choices(m.board))
+        await interaction.response.send_message(embed=discord.Embed(
+            title="♟️ Wizard's Chess", description=desc, color=0x8B5FBF), view=view)
+
+    @group.command(name="move", description="Make a move by typing squares (or just tap one on the board message).")
     @app_commands.describe(opponent="Who you're playing", from_square="Square to move from (e.g. e2)",
                            to_square="Square to move to (e.g. e4)")
     async def move(self, interaction: discord.Interaction, opponent: discord.Member,
@@ -361,41 +444,7 @@ class Chess(commands.Cog):
         if len(candidates) > 1:  # promotion choices - default to queen
             mv = chess.Move(fsq, tsq, promotion=chess.QUEEN)
 
-        san = m.board.san(mv)
-        m.board.push(mv)
-        m.last_move_at = time.time()
-        mover = interaction.user
-
-        white = interaction.guild.get_member(m.white_id)
-        black = interaction.guild.get_member(m.black_id)
-        desc = f"```\n{m.render()}\n```\n⚔️ {mover.display_name} played **{san}**."
-
-        outcome = m.board.outcome(claim_draw=True)
-        if outcome:
-            self.matches.pop(self._key(m.white_id, m.black_id), None)
-            if outcome.winner is None:
-                self.record(m.white_id)["draws"] += 1
-                self.record(m.black_id)["draws"] += 1
-                self.save()
-                desc += "\n\n🤝 **Draw.** Nobody's chess pieces get smashed today."
-            else:
-                winner_id = m.white_id if outcome.winner == chess.WHITE else m.black_id
-                loser_id = m.black_id if outcome.winner == chess.WHITE else m.white_id
-                winner = white if outcome.winner == chess.WHITE else black
-                desc += f"\n\n🏆 **Checkmate.** {winner.display_name} wins."
-                await interaction.response.send_message(embed=discord.Embed(
-                    title="♟️ Wizard's Chess", description=desc, color=0x2ECC71))
-                await self._award_and_record(interaction.channel, winner_id, loser_id, "checkmate")
-                return
-            await interaction.response.send_message(embed=discord.Embed(
-                title="♟️ Wizard's Chess", description=desc, color=0x8B5FBF))
-            return
-
-        next_player = black if m.board.turn == chess.BLACK else white
-        check_note = " **Check!**" if m.board.is_check() else ""
-        desc += f"{check_note}\n{next_player.display_name} to move — use `/chess move`."
-        await interaction.response.send_message(embed=discord.Embed(
-            title="♟️ Wizard's Chess", description=desc, color=0x8B5FBF))
+        await self.play_move(interaction, m, mv, interaction.user)
 
     @move.autocomplete("from_square")
     async def _from_autocomplete(self, interaction: discord.Interaction, current: str):
@@ -406,7 +455,7 @@ class Chess(commands.Cog):
         if not m or m.color_of(interaction.user.id) != m.board.turn:
             return []
         out = []
-        for sq in self._legal_from_squares(m):
+        for sq in sorted({mv.from_square for mv in m.board.legal_moves}):
             name = chess.square_name(sq)
             if current.lower() in name:
                 piece = m.board.piece_at(sq)
@@ -427,7 +476,7 @@ class Chess(commands.Cog):
         except ValueError:
             return []
         out = []
-        for mv in self._legal_to_squares(m, fsq):
+        for mv in [mv for mv in m.board.legal_moves if mv.from_square == fsq]:
             name = chess.square_name(mv.to_square)
             if current.lower() in name and name not in [o.value for o in out]:
                 out.append(app_commands.Choice(name=name, value=name))

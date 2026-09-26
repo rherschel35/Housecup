@@ -2,7 +2,8 @@
 Wizard's Checkers - standard American checkers rules, played over Discord.
 
     /checkers challenge member:<@user>              - challenge someone to a match
-    /checkers move opponent:<name> from:<sq> to:<sq> - make a move (or continue a jump chain)
+    /checkers move opponent:<name> from:<sq> to:<sq> - make a move (or just tap a move in the
+                                                        dropdown on the board message)
     /checkers resign opponent:<name>                 - concede a match in progress
     /checkersstats [member]                          - wins, losses, title, and active games
     /checkersreset member:<@user>                    - (staff) wipe someone's checkers record
@@ -239,6 +240,49 @@ class ChallengeView(discord.ui.View):
         self.stop()
 
 
+class MoveSelect(discord.ui.Select):
+    """A dropdown of every legal move (or every legal continuation, mid-jump-chain) for whoever's
+    turn it is - tap one and it plays instantly, no command typing required."""
+
+    def __init__(self, cog: "Checkers", match_key: tuple[int, int], player_id: int,
+                choices: list[tuple[str, str]]):
+        self.cog = cog
+        self.match_key = match_key
+        self.player_id = player_id
+        options = [discord.SelectOption(label=label, value=value) for label, value in choices[:25]]
+        super().__init__(placeholder="Tap a move...", options=options, min_values=1, max_values=1)
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.player_id:
+            await interaction.response.send_message("It's not your move.", ephemeral=True)
+            return
+        m = self.cog.matches.get(self.match_key)
+        if not m:
+            await interaction.response.send_message("This match has ended.", ephemeral=True)
+            return
+        raw = self.values[0]
+        fsq, tsq = parse_square(raw[:2]), parse_square(raw[2:4])
+        color = m.color_of(interaction.user.id)
+        candidates = all_moves(m.board, color)
+        if m.chain_square is not None:
+            candidates = [mv for mv in candidates if mv.frm == m.chain_square]
+        match = next((mv for mv in candidates if mv.frm == fsq and mv.to == tsq), None)
+        if not match:
+            await interaction.response.send_message(
+                "That move isn't legal anymore - someone else's move landed first. Refresh by "
+                "checking the latest board message.", ephemeral=True)
+            return
+        await self.cog.play_move(interaction, m, match, interaction.user)
+
+
+class MoveView(discord.ui.View):
+    def __init__(self, cog: "Checkers", match_key: tuple[int, int], player_id: int,
+                choices: list[tuple[str, str]]):
+        super().__init__(timeout=None)
+        if choices:
+            self.add_item(MoveSelect(cog, match_key, player_id, choices))
+
+
 class Checkers(commands.Cog):
     group = app_commands.Group(name="checkers", description="Wizard's Checkers.")
 
@@ -302,6 +346,20 @@ class Checkers(commands.Cog):
 
     def _in_channel(self, interaction: discord.Interaction) -> bool:
         return interaction.channel_id == CHECKERS_CHANNEL_ID
+
+    def _move_choices(self, m: Match) -> list[tuple[str, str]]:
+        """Legal moves (or legal jump-chain continuations) as (label, value) pairs for the
+        tap-to-move dropdown. Value is the from+to square names concatenated (e.g. 'b6c5')."""
+        moves = all_moves(m.board, m.turn)
+        if m.chain_square is not None:
+            moves = [mv for mv in moves if mv.frm == m.chain_square]
+        out = []
+        for mv in moves:
+            label = f"{square_name(mv.frm)} → {square_name(mv.to)}"
+            if mv.captured:
+                label += " (jump!)"
+            out.append((label, f"{square_name(mv.frm)}{square_name(mv.to)}"))
+        return out[:25]
 
     # ------------------------------------------------------------- rewards
 
@@ -385,10 +443,12 @@ class Checkers(commands.Cog):
         black = interaction.guild.get_member(black_id)
         embed = discord.Embed(
             title=f"🔴 Wizard's Checkers — {red.display_name} ⚔️ {black.display_name}",
-            description=f"{m.render()}\n🔴 {red.display_name} moves first — use `/checkers move`.",
+            description=f"{m.render()}\n🔴 {red.display_name} moves first — tap a move below, or "
+                       f"use `/checkers move`.",
             color=0xC0392B,
         )
-        await interaction.response.edit_message(content=None, embed=embed, view=None)
+        view = MoveView(self, key, red_id, self._move_choices(m))
+        await interaction.response.edit_message(content=None, embed=embed, view=view)
 
     @group.command(name="challenge", description="Challenge someone to a game of Wizard's Checkers.")
     @app_commands.describe(member="Who to challenge")
@@ -409,7 +469,58 @@ class Checkers(commands.Cog):
 
     # ------------------------------------------------------------- moving
 
-    @group.command(name="move", description="Make a move (or continue a jump) in your match against someone.")
+    async def play_move(self, interaction: discord.Interaction, m: Match, match: Move, mover):
+        """Applies a legal move/jump (from either the dropdown or the typed command) and posts
+        the result, with a fresh tap-to-move dropdown for whoever moves (or jumps) next."""
+        my_color = m.turn
+        crowned = apply_move(m.board, match)
+        m.last_move_at = time.time()
+
+        continue_chain = False
+        if match.captured and not crowned:
+            _, further_jumps = piece_moves(m.board, match.to, m.board[match.to])
+            if further_jumps:
+                continue_chain = True
+
+        red = interaction.guild.get_member(m.red_id)
+        black = interaction.guild.get_member(m.black_id)
+        verb = "jumps to" if match.captured else "moves to"
+        desc = f"{m.render()}\n⚔️ {mover.display_name} {verb} **{square_name(match.to)}**"
+        if match.captured:
+            desc += " - a piece is crushed to splinters!"
+        if crowned:
+            desc += f"\n👑 That piece is crowned a king at {square_name(match.to)}!"
+
+        if continue_chain:
+            m.chain_square = match.to
+            desc += f"\n{mover.display_name} must continue jumping with that piece — tap the next jump below."
+            view = MoveView(self, self._key(m.red_id, m.black_id), mover.id, self._move_choices(m))
+            await interaction.response.send_message(embed=discord.Embed(
+                title="🔴 Wizard's Checkers", description=desc, color=0xC0392B), view=view)
+            return
+
+        m.chain_square = None
+        m.turn = "b" if my_color == "r" else "r"
+
+        if not all_moves(m.board, m.turn):
+            self.matches.pop(self._key(m.red_id, m.black_id), None)
+            loser_id = m.turn_id()
+            winner_id = m.red_id if loser_id == m.black_id else m.black_id
+            winner = red if winner_id == m.red_id else black
+            desc += f"\n\n🏆 {winner.display_name} wins — no legal moves left for the other side."
+            await interaction.response.send_message(embed=discord.Embed(
+                title="🔴 Wizard's Checkers", description=desc, color=0x2ECC71))
+            await self._award_and_record(interaction.channel, winner_id, loser_id, "no legal moves")
+            return
+
+        next_player_id = m.turn_id()
+        next_player = red if next_player_id == m.red_id else black
+        desc += f"\n{next_player.display_name} to move — tap a move below, or use `/checkers move`."
+        view = MoveView(self, self._key(m.red_id, m.black_id), next_player_id, self._move_choices(m))
+        await interaction.response.send_message(embed=discord.Embed(
+            title="🔴 Wizard's Checkers", description=desc, color=0xC0392B), view=view)
+
+    @group.command(name="move", description="Make a move by typing squares (or just tap one on the board message).")
     @app_commands.describe(opponent="Who you're playing", from_square="Square to move from (e.g. b6)",
                            to_square="Square to move to (e.g. c5)")
     async def move(self, interaction: discord.Interaction, opponent: discord.Member,
@@ -444,50 +555,7 @@ class Checkers(commands.Cog):
             await interaction.response.send_message("That's not a legal move right now.", ephemeral=True)
             return
 
-        crowned = apply_move(m.board, match)
-        m.last_move_at = time.time()
-        mover = interaction.user
-
-        continue_chain = False
-        if match.captured and not crowned:
-            _, further_jumps = piece_moves(m.board, match.to, m.board[match.to])
-            if further_jumps:
-                continue_chain = True
-
-        red = interaction.guild.get_member(m.red_id)
-        black = interaction.guild.get_member(m.black_id)
-        verb = "jumps to" if match.captured else "moves to"
-        desc = f"{m.render()}\n⚔️ {mover.display_name} {verb} **{square_name(tsq)}**"
-        if match.captured:
-            desc += " - a piece is crushed to splinters!"
-        if crowned:
-            desc += f"\n👑 That piece is crowned a king at {square_name(tsq)}!"
-
-        if continue_chain:
-            m.chain_square = match.to
-            desc += f"\n{mover.display_name} must continue jumping with that piece — use `/checkers move` again."
-            await interaction.response.send_message(embed=discord.Embed(
-                title="🔴 Wizard's Checkers", description=desc, color=0xC0392B))
-            return
-
-        m.chain_square = None
-        m.turn = "b" if my_color == "r" else "r"
-
-        if not all_moves(m.board, m.turn):
-            self.matches.pop(self._key(m.red_id, m.black_id), None)
-            loser_id = m.turn_id()
-            winner_id = m.red_id if loser_id == m.black_id else m.black_id
-            winner = red if winner_id == m.red_id else black
-            desc += f"\n\n🏆 {winner.display_name} wins — no legal moves left for the other side."
-            await interaction.response.send_message(embed=discord.Embed(
-                title="🔴 Wizard's Checkers", description=desc, color=0x2ECC71))
-            await self._award_and_record(interaction.channel, winner_id, loser_id, "no legal moves")
-            return
-
-        next_player = red if m.turn == "r" else black
-        desc += f"\n{next_player.display_name} to move — use `/checkers move`."
-        await interaction.response.send_message(embed=discord.Embed(
-            title="🔴 Wizard's Checkers", description=desc, color=0xC0392B))
+        await self.play_move(interaction, m, match, interaction.user)
 
     @move.autocomplete("from_square")
     async def _from_autocomplete(self, interaction: discord.Interaction, current: str):
