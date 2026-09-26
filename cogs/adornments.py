@@ -64,6 +64,19 @@ TITLE_SCORE = {
     "Beastmaster": 90, "Master of the Circle": 86, "Champion of the Circle": 82,
     "Warden of Wild Things": 78, "Legend-Tamer": 74, "Spellblade": 62, "Beastkeeper": 60,
     "Handler": 46, "Duelist": 42, "Tracker": 36, "Apprentice": 26, "Beast-Spotter": 16, "Novice": 10,
+    # Wizard's Chess
+    "God-Emperor of the 64 Squares": 88, "International Menace to Casual Gaming": 88,
+    "Board Certified War Criminal": 64, "The Unnecessarily Sweaty Grandmaster": 64,
+    "Department Head of Psychological Warfare": 64,
+    "The Forklift Certified Bishop": 48, "Assistant Manager of Checkmate": 48,
+    "Pawn Star": 30, "Knight Shift Supervisor": 30, "Certified Board Menace": 30,
+    # Wizard's Checkers
+    "The Final Boss of Cracker Barrel": 88, "He Who Has Never Touched Grass": 88,
+    "Supreme Overlord of Checkers & Poor Sportsmanship": 88,
+    "Supreme Chancellor of Tiny Wooden Violence": 64, "King of Ruined Friendships": 64,
+    "Regional Threat to Game Night": 48, "Grandmaster of Bad Intentions": 48,
+    "Destroyer of Friendly Competition": 48,
+    "Checker Wrecker": 30, "Minor Strategic Nuisance": 30,
 }
 KEEPER_SCORE, SIGNATURE_SCORE = 66, 52
 
@@ -430,6 +443,12 @@ class Adornments(commands.Cog):
         tw = self.bot.get_cog("TriWizard")
         if tw and tw.titles_of(uid):
             out.append("Tri-Wizard Champion")
+        chess_cog = self.bot.get_cog("Chess")
+        if chess_cog:
+            out += chess_cog.titles_of(uid)
+        checkers_cog = self.bot.get_cog("Checkers")
+        if checkers_cog:
+            out += checkers_cog.titles_of(uid)
         seen, uniq = set(), []
         for t in out:
             if t not in seen:

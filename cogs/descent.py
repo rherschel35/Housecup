@@ -361,6 +361,14 @@ class Fight:
         self.is_practice = is_practice
         self.round = 0
         self.log: list[str] = []
+        # potion buffs - defaults are "no effect"; _apply_potion_mods and
+        # _start_fight may override these right after construction
+        self.heal_mult = 1.0
+        self.defend_mult = DEFEND_DMG_MULT
+        self.rest_no_penalty = False
+        self.reveal_weakness = False
+        self.boss_dmg_mult = 1.0
+        self.revive_available = False
 
     def embed(self, member: discord.Member) -> discord.Embed:
         title = f"{self.emoji} Floor {self.floor} — {self.name}"
@@ -383,6 +391,9 @@ class Fight:
         )
         e.add_field(name=self.name, value=f"{bar(self.m_hp, self.m_hp_max)} {self.m_hp}/{self.m_hp_max}",
                     inline=False)
+        if self.reveal_weakness and self.weak:
+            e.add_field(name="🦉 Owl's Eye", value=f"Weak to {' / '.join(ELEMENT_EMOJI[w] for w in self.weak)}",
+                       inline=False)
         if self.log:
             e.add_field(name="Last round", value="\n".join(self.log[-2:]), inline=False)
         return e
@@ -559,12 +570,46 @@ class Descent(commands.Cog):
         path = ASSETS_DIR / filename
         return discord.File(path, filename="monster.png")
 
+    def _apply_potion_mods(self, fight: "Fight", user_id: int, is_boss: bool):
+        """Pull any active potion buffs for a real fight and fold them
+        into this Fight - a no-op if the Potions cog isn't loaded."""
+        potions = self.bot.get_cog("Potions")
+        if not potions:
+            return
+        mods = potions.consume_for_fight(user_id, is_boss)
+        if not mods:
+            return
+        if "atk_mult" in mods:
+            fight.p_atk = round(fight.p_atk * mods["atk_mult"])
+        if "def_mult" in mods:
+            fight.p_def = round(fight.p_def * mods["def_mult"])
+        if "ap_bonus" in mods:
+            fight.ap_max += mods["ap_bonus"]
+            fight.ap = fight.ap_max
+        if "hp_bonus" in mods:
+            fight.p_hp_max += mods["hp_bonus"]
+            fight.p_hp += mods["hp_bonus"]
+        if "heal_mult" in mods:
+            fight.heal_mult = mods["heal_mult"]
+        if "defend_mult" in mods:
+            fight.defend_mult = mods["defend_mult"]
+        if "rest_no_penalty" in mods:
+            fight.rest_no_penalty = True
+        if "reveal_weakness" in mods:
+            fight.reveal_weakness = True
+        if "boss_dmg_mult" in mods:
+            fight.boss_dmg_mult = mods["boss_dmg_mult"]
+        if potions.has_revive(user_id):
+            fight.revive_available = True
+            potions.consume_revive(user_id)
+
     async def _start_fight(self, interaction: discord.Interaction, rec: dict):
         floor, idx = rec["floor"], rec["monster_index"]
         name, emoji, element, kind, weak, is_boss, m_hp, m_atk, m_def = self._make_monster(floor, idx)
         p_hp, p_atk, p_def = player_stats(rec)
         fight = Fight(interaction.user.id, floor, idx, is_boss, name, emoji, element, kind, weak,
                       m_hp, m_atk, m_def, p_hp, p_atk, p_def, ap_max=rec["max_ap"])
+        self._apply_potion_mods(fight, interaction.user.id, is_boss)
         self.fights[interaction.user.id] = fight
         file = await self._monster_file(fight)
         await interaction.response.send_message(embed=fight.embed(interaction.user),
@@ -616,7 +661,7 @@ class Descent(commands.Cog):
                 return
             fight.ap -= HEAL_AP_COST
             missing = fight.p_hp_max - fight.p_hp
-            healed = round(missing * HEAL_FRACTION)
+            healed = round(missing * HEAL_FRACTION * fight.heal_mult)
             fight.p_hp = min(fight.p_hp_max, fight.p_hp + healed)
             lines.append(f"💚 You heal for **{healed}** (-{HEAL_AP_COST} AP, you're exposed)")
         elif action == "defend":
@@ -624,13 +669,14 @@ class Descent(commands.Cog):
                 await interaction.followup.send("Not enough AP to defend.", ephemeral=True)
                 return
             fight.ap -= DEFEND_AP_COST
-            counter_mult = DEFEND_DMG_MULT
+            counter_mult = fight.defend_mult
             lines.append("🛡️ You brace to defend (free action)" if DEFEND_AP_COST == 0
                          else f"🛡️ You brace to defend (-{DEFEND_AP_COST} AP)")
         elif action == "rest":
             fight.ap = fight.ap_max
-            counter_mult = REST_DMG_MULT
-            lines.append("😮‍💨 You catch your breath - AP fully restored (unguarded)")
+            counter_mult = 1.0 if fight.rest_no_penalty else REST_DMG_MULT
+            lines.append("😮‍💨 You catch your breath - AP fully restored"
+                        + (" and unbothered" if fight.rest_no_penalty else " (unguarded)"))
         else:
             return
 
@@ -642,14 +688,20 @@ class Descent(commands.Cog):
             await self._on_win(interaction, fight)
             return
 
+        counter_mult *= fight.boss_dmg_mult if fight.is_boss else 1.0
         back = mitigate(fight.m_atk, counter_mult, fight.p_def)
         fight.p_hp -= back
         tag = " (reduced)" if counter_mult < 1 else (" (extra!)" if counter_mult > 1 else "")
         fight.log.append(f"{fight.emoji} {fight.name} hits back for **{back}**{tag}")
 
         if fight.p_hp <= 0:
-            await self._on_loss(interaction, fight)
-            return
+            if fight.revive_available:
+                fight.revive_available = False
+                fight.p_hp = 1
+                fight.log.append("🪽 Phoenix Tears flares - you're pulled back from the brink at **1 HP**.")
+            else:
+                await self._on_loss(interaction, fight)
+                return
 
         fight.ap = min(fight.ap_max, fight.ap + AP_REGEN_PER_TURN)
         await interaction.edit_original_response(embed=fight.embed(interaction.user), view=FightView(self, fight))
@@ -710,6 +762,13 @@ class Descent(commands.Cog):
             rec["pending_statup"] = True
             self.save()
 
+            potions = self.bot.get_cog("Potions")
+            fortune_drop = None
+            if potions:
+                bonus_n = potions.consume_loot_boost(member.id)
+                if bonus_n:
+                    fortune_drop = await self._drop_loot(member, zone_for(floor)["element"], bonus_n)
+
             desc = f"**Floor {floor} cleared!**"
             if ap_increased:
                 desc += f" Max AP is now **{rec['max_ap']}**."
@@ -717,6 +776,8 @@ class Descent(commands.Cog):
                 desc += f"\n📦 The kill dropped {drop_text}."
             if clear_drop:
                 desc += f"\n📦 Clearing the floor also dropped {clear_drop}."
+            if fortune_drop:
+                desc += f"\n🍀 Draught of Fortune paid off: {fortune_drop}."
             if fight.is_boss:
                 store = self.bot.get_cog("Store")
                 house = store.member_house(member) if store else None
