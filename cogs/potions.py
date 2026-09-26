@@ -546,14 +546,20 @@ class Potions(commands.Cog):
         embed.add_field(name="🧪 Satchel", value="\n".join(inv_lines) if inv_lines else "*Nothing brewed yet.*",
                         inline=False)
 
+        world = self.bot.get_cog("World")
+        have = world.student(interaction.user).get("items", {}) if world else {}
+
         known_lines = []
         for key, r in RECIPES.items():
             gated = idx < TIER_MIN_RANK[r["tier"]]
             known = key in rec["discovered"]
             tag = "🔓 known" if known else ("🔒 locked" if gated else "❔ undiscovered")
-            known_lines.append(f"{r['emoji']} **{r['name']}** ({TIER_LABEL[r['tier']]}) - {tag}\n"
+            ready = all(have.get(i, 0) >= 1 for i in r["ingredients"])
+            readiness = " • 🟢 you have everything for this" if ready else ""
+            known_lines.append(f"{r['emoji']} **{r['name']}** ({TIER_LABEL[r['tier']]}) - {tag}{readiness}\n"
                               f"　{self.items_line(r['ingredients'])} - {r['blurb']}")
-        embed.add_field(name="📖 Recipes", value="\n".join(known_lines), inline=False)
+        embed.add_field(name="📖 Recipes (🟢 = you can brew this right now)", value="\n".join(known_lines),
+                        inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     # ------------------------------------------------------- Descent hooks
