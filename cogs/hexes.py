@@ -299,8 +299,7 @@ class Hexes(commands.Cog):
     @app_commands.command(name="hex", description="(Headmaster) Curse a student's messages with a prank spell.")
     @app_commands.describe(member="Who to hex", effect="Which curse to cast",
                            duration="How many minutes it lasts (0 = until lifted)")
-    @app_commands.choices(effect=[app_commands.Choice(name=f"{v['name']} — {v['description']}", value=k)
-                                  for k, v in EFFECTS.items()])
+    @app_commands.choices(effect=[app_commands.Choice(name=v["name"], value=k) for k, v in EFFECTS.items()])
     async def hex(self, interaction: discord.Interaction, member: discord.Member,
                   effect: app_commands.Choice[str], duration: app_commands.Range[int, 0, 10080]):
         if not self._is_headmaster(interaction.user):
