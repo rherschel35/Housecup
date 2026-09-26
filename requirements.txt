@@ -3,3 +3,4 @@ python-dotenv>=1.0.1
 anthropic>=0.40
 tzdata
 Pillow>=10.3
+chess>=1.10.0

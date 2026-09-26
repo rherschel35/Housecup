@@ -69,6 +69,10 @@ INITIAL_COGS = (
     "cogs.reaction_roles",
     "cogs.descent",
     "cogs.quidditch",
+    "cogs.potions",
+    "cogs.chess",
+    "cogs.checkers",
+    "cogs.hexes",
 )
 
 
