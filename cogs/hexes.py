@@ -44,28 +44,10 @@ WORD = re.compile(r"[A-Za-z']+")
 WORD_WITH_EDGES = re.compile(r"^([^a-zA-Z]*)([a-zA-Z]+)([^a-zA-Z]*)$")
 VOWELS = "aeiouAEIOU"
 
-NONSENSE_WORDS = ["blorp", "fwibble", "quonk", "zamble", "hobnock", "skarn", "wibbet", "glorm", "nizzle", "florp"]
+CHEER_EMOJIS = ["📣", "🎉", "✨", "💜", "🙌", "🏆", "⭐"]
+CHEER_OPENERS = ["OMG okay so like,", "Ahh wait,", "Okay but like,", "Bestie,", "Okay okay but hear me out,"]
+CHEER_CLOSERS = ["GO VELMORA!!", "VELMORA PRIDE FOREVER", "we are SO velmora", "V-E-L-M-O-R-A!!", "GO GO VELMORA!!"]
 
-OLDE_WIZARD_MAP = {
-    "you": "thou", "your": "thine", "yours": "thine own", "you're": "thou art",
-    "hello": "hark", "hi": "hark", "hey": "hark thee",
-    "is": "art", "are": "art", "am": "art",
-    "my": "mine own", "me": "mine own self", "i": "I, verily,",
-    "yes": "aye", "no": "nay", "really": "verily", "very": "most exceedingly",
-    "cool": "most excellent", "okay": "very well", "ok": "very well",
-    "please": "prithee", "sorry": "I beg thy pardon",
-}
-FORMALITIS_MAP = {
-    "hey": "greetings and salutations", "hi": "good day to you", "hello": "good day to you",
-    "yeah": "indubitably", "yes": "indeed", "yep": "quite so",
-    "lol": "how terribly droll", "lmao": "a most amusing turn of events",
-    "no": "regrettably, no", "nah": "regrettably, no",
-    "cool": "most satisfactory", "nice": "most satisfactory",
-    "gonna": "shall presently", "wanna": "should very much like to", "gotta": "must, with some urgency,",
-    "dude": "esteemed colleague", "bro": "esteemed colleague", "man": "esteemed colleague",
-    "thanks": "you have my utmost gratitude", "thx": "you have my utmost gratitude",
-    "ok": "very well", "okay": "very well", "sup": "how do you fare",
-}
 PIRATES_TONGUE_MAP = {
     "you": "ye", "your": "yer", "you're": "ye be", "yours": "yer own",
     "my": "me", "is": "be", "are": "be", "am": "be",
@@ -73,6 +55,31 @@ PIRATES_TONGUE_MAP = {
     "friend": "matey", "friends": "mateys", "stop": "avast", "money": "doubloons",
     "drink": "grog", "food": "grub", "boat": "ship", "car": "ship",
     "no": "nay", "okay": "aye aye", "ok": "aye aye",
+}
+COUNTRY_MAP = {
+    "you": "y'all", "your": "yer", "you're": "y'all're", "yours": "yer own",
+    "gonna": "fixin' to", "going": "fixin'", "friend": "partner", "friends": "partners",
+    "hello": "howdy", "hi": "howdy", "hey": "howdy", "man": "fella", "guy": "fella", "dude": "fella",
+    "girl": "gal", "boy": "young'un", "yes": "reckon so", "yeah": "reckon so", "yep": "yessir",
+    "no": "nah, reckon not", "isn't": "ain't", "aren't": "ain't", "wasn't": "weren't",
+    "is not": "ain't", "cool": "mighty fine", "great": "mighty fine", "awesome": "plumb amazing",
+    "very": "plumb", "really": "sure as shootin'", "car": "truck", "money": "coin",
+    "okay": "reckon so", "ok": "reckon so", "food": "grub", "crazy": "loco",
+}
+CHEER_MAP = {
+    "yes": "YES OMG YES", "hi": "OMG HII", "hello": "OMG HELLO", "hey": "OMG HEYY",
+    "good": "like SO good", "great": "literally amazing", "cool": "so iconic", "nice": "so iconic",
+    "no": "no way, like NO", "friend": "bestie", "friends": "besties",
+    "happy": "like SO happy", "excited": "SO hyped", "fun": "literally SO fun",
+    "love": "am OBSESSED with", "like": "am OBSESSED with",
+}
+CAVEMAN_PRONOUN_MAP = {"i": "me", "my": "me", "we": "us", "our": "us", "myself": "me"}
+CAVEMAN_FILLERS = {
+    "a", "an", "the", "is", "are", "am", "was", "were", "be", "been", "being",
+    "to", "of", "and", "but", "that", "this", "these", "those", "so", "very",
+    "really", "just", "then", "well", "actually", "basically", "kind", "sort",
+    "like", "um", "uh", "also", "too", "quite", "rather", "perhaps", "maybe",
+    "please", "would", "could", "should", "will", "shall", "there", "here",
 }
 
 
@@ -103,8 +110,8 @@ def fx_reversed(text: str) -> str:
     return text[::-1]
 
 
-def fx_vowelless(text: str) -> str:
-    return re.sub(r"[aeiouAEIOU]", "", text)
+def fx_runon(text: str) -> str:
+    return re.sub(r"[^A-Za-z0-9]", "", text)
 
 
 def fx_piglatin(text: str) -> str:
@@ -124,8 +131,12 @@ def fx_piglatin(text: str) -> str:
     return re.sub(r"[A-Za-z]+", repl, text)
 
 
-def fx_shout(text: str) -> str:
-    return "".join(c.upper() if random.random() < 0.5 else c.lower() for c in text)
+def fx_country(text: str) -> str:
+    text = _word_swap(text, COUNTRY_MAP)
+    if random.random() < 0.4:
+        text = text.rstrip() + random.choice([", y'all.", " — mighty fine, partner.", ", I reckon.",
+                                              " ...that's the way it be, pardner."])
+    return text
 
 
 def fx_stutter(text: str) -> str:
@@ -141,22 +152,62 @@ def fx_stutter(text: str) -> str:
     return re.sub(r"[A-Za-z]+", repl, text)
 
 
-def fx_babbling(text: str) -> str:
+def fx_cheerleader(text: str) -> str:
+    text = _word_swap(text, CHEER_MAP)
+    if random.random() < 0.5:
+        text = f"{random.choice(CHEER_OPENERS)} {text}"
+    words = text.split(" ")
+    out = []
+    for w in words:
+        out.append(w)
+        if random.random() < 0.15:
+            out.append(random.choice(CHEER_EMOJIS))
+    text = " ".join(out)
+    if random.random() < 0.6:
+        text = f"{text.rstrip()} {random.choice(CHEER_CLOSERS)} {random.choice(CHEER_EMOJIS)}"
+    return text
+
+
+def _every_nth_word(text: str, replacement: str, n: int = 3) -> str:
+    counter = 0
+
     def repl(m: re.Match) -> str:
+        nonlocal counter
         parts = _split_word(m.group(0))
-        if not parts or random.random() > 0.3:
-            return m.group(0)
-        lead, core, trail = parts
-        return lead + _match_case(core, random.choice(NONSENSE_WORDS)) + trail
-    return re.sub(r"[A-Za-z]+", repl, text)
+        core = parts[1] if parts else m.group(0)
+        counter += 1
+        if counter % n == 0:
+            return _match_case(core, replacement)
+        return m.group(0)
+    return re.sub(r"[A-Za-z']+", repl, text)
 
 
-def fx_olde_wizard(text: str) -> str:
-    return _word_swap(text, OLDE_WIZARD_MAP)
+def fx_frog(text: str) -> str:
+    return _every_nth_word(text, "ribbit")
 
 
-def fx_formalitis(text: str) -> str:
-    return _word_swap(text, FORMALITIS_MAP)
+def fx_cat(text: str) -> str:
+    text = _every_nth_word(text, "meow")
+
+    def sentence_repl(m: re.Match) -> str:
+        return f"{m.group(0)} *purrrr*"
+    new_text, n = re.subn(r"[.!?]+", sentence_repl, text)
+    return new_text if n else f"{text.rstrip()} *purrrr*"
+
+
+def fx_caveman(text: str) -> str:
+    text = _word_swap(text, CAVEMAN_PRONOUN_MAP)
+
+    def repl(m: re.Match) -> str:
+        return "" if m.group(0).lower() in CAVEMAN_FILLERS else m.group(0)
+    result = re.sub(r"[A-Za-z']+", repl, text)
+    result = re.sub(r"\s{2,}", " ", result)
+    result = re.sub(r"\s+([,.!?])", r"\1", result).strip()
+    if not result:
+        result = "Ugh."
+    prefix = random.choice(["Ugh. ", "Grr. ", "Hrm. ", ""])
+    suffix = random.choice([" Ugh!", " Grr!", ""])
+    return f"{prefix}{result}{suffix}".strip()
 
 
 def fx_pirates_tongue(text: str) -> str:
@@ -167,16 +218,35 @@ def fx_pirates_tongue(text: str) -> str:
 
 
 EFFECTS = {
-    "reversed": {"label": "Reversed", "func": fx_reversed},
-    "vowelless": {"label": "Vowel-less", "func": fx_vowelless},
-    "piglatin": {"label": "Pig Latin", "func": fx_piglatin},
-    "shout": {"label": "Shout (random caps)", "func": fx_shout},
-    "stutter": {"label": "Stutter", "func": fx_stutter},
-    "babbling": {"label": "Babbling Curse", "func": fx_babbling},
-    "olde_wizard": {"label": "Ye Olde Wizard", "func": fx_olde_wizard},
-    "formalitis": {"label": "Formal-itis", "func": fx_formalitis},
-    "pirates_tongue": {"label": "Pirate's Tongue", "func": fx_pirates_tongue},
+    "reversed": {"name": "Retro-Verbis", "description": "Every word comes out back-to-front.",
+                "func": fx_reversed},
+    "runon": {"name": "Verbum Unum", "description": "Deletes every space and punctuation mark - it all runs "
+             "together into one impossible word.", "func": fx_runon},
+    "piglatin": {"name": "Linguae Torque", "description": "Twists their words into Pig Latin.",
+                "func": fx_piglatin},
+    "country": {"name": "Rusticus Maximus", "description": "Curses them to talk like they've never left the deep "
+               "woods - full cowboy, full country twang.", "func": fx_country},
+    "stutter": {"name": "Balbus Maxima", "description": "Makes them stutter over random syllables.",
+               "func": fx_stutter},
+    "cheerleader": {"name": "Spiritus Maximus", "description": "Curses them into the most school-spirited Velmora "
+                    "cheerleader alive.", "func": fx_cheerleader},
+    "frog": {"name": "Ranae Vox", "description": "Turns every third word into a ribbit.", "func": fx_frog},
+    "cat": {"name": "Felinus Vox", "description": "Turns every third word into a meow, and ends every sentence "
+           "with a *purrrr*.", "func": fx_cat},
+    "caveman": {"name": "Primus Loquor", "description": "Strips out every filler word - grunts and caveman talk "
+               "only.", "func": fx_caveman},
+    "pirates_tongue": {"name": "Piraticus", "description": "Curses them to talk like a pirate.",
+                      "func": fx_pirates_tongue},
 }
+
+CAST_FLOURISHES = [
+    "draws their wand with a flourish and levels it at",
+    "steps forward, robes billowing, and points their wand straight at",
+    "doesn't even blink before aiming their wand at",
+    "raises their wand overhead like a conductor and swings it toward",
+    "flicks their wand once, almost bored, in the direction of",
+    "spins their wand once around a finger before snapping it toward",
+]
 
 
 class Hexes(commands.Cog):
@@ -229,7 +299,8 @@ class Hexes(commands.Cog):
     @app_commands.command(name="hex", description="(Headmaster) Curse a student's messages with a prank spell.")
     @app_commands.describe(member="Who to hex", effect="Which curse to cast",
                            duration="How many minutes it lasts (0 = until lifted)")
-    @app_commands.choices(effect=[app_commands.Choice(name=v["label"], value=k) for k, v in EFFECTS.items()])
+    @app_commands.choices(effect=[app_commands.Choice(name=f"{v['name']} — {v['description']}", value=k)
+                                  for k, v in EFFECTS.items()])
     async def hex(self, interaction: discord.Interaction, member: discord.Member,
                   effect: app_commands.Choice[str], duration: app_commands.Range[int, 0, 10080]):
         if not self._is_headmaster(interaction.user):
@@ -239,6 +310,7 @@ class Hexes(commands.Cog):
             await interaction.response.send_message("You can't hex a bot.", ephemeral=True)
             return
 
+        spell = EFFECTS[effect.value]
         was_hexed = str(member.id) in self.state["hexed"]
         expires_at = None if duration == 0 else time.time() + duration * 60
         self.state["hexed"][str(member.id)] = {
@@ -246,11 +318,18 @@ class Hexes(commands.Cog):
         }
         self.save()
 
+        flourish = random.choice(CAST_FLOURISHES)
+        await interaction.response.send_message(embed=discord.Embed(
+            title=f"⚡ {spell['name']}!",
+            description=f"**{interaction.user.display_name}** {flourish} **{member.display_name}**.",
+            color=0x8B5CF6,
+        ))
+
         replaced_note = " (replacing the curse already on them)" if was_hexed else ""
         until = "until a Headmaster lifts it" if expires_at is None else f"for {duration} minute(s)"
-        await interaction.response.send_message(
-            f"🪄 {member.mention} has been hexed with **{effect.name}**{replaced_note}, {until}. They have not "
-            f"been told.", ephemeral=True)
+        await interaction.followup.send(
+            f"🪄 {member.mention} is hexed with **{spell['name']}** ({spell['description']}){replaced_note}, "
+            f"{until}.", ephemeral=True)
 
     @app_commands.command(name="unhex", description="(Headmaster) Lift a hex early.")
     @app_commands.describe(member="Whose hex to lift")
@@ -279,7 +358,8 @@ class Hexes(commands.Cog):
         for uid, rec in entries.items():
             member = interaction.guild.get_member(int(uid))
             name = member.display_name if member else uid
-            label = EFFECTS.get(rec["effect"], {}).get("label", rec["effect"])
+            spell = EFFECTS.get(rec["effect"], {})
+            label = f"{spell.get('name', rec['effect'])} ({spell.get('description', '')})" if spell else rec["effect"]
             if rec["expires_at"] is None:
                 remaining = "until lifted"
             else:
@@ -346,6 +426,23 @@ class Hexes(commands.Cog):
         if not cursed.strip():
             cursed = message.content  # never post an empty message
 
+        # Deleting + reposting via webhook loses Discord's native reply-thread indicator,
+        # so if this was a reply, stitch a quoted line back in manually.
+        if message.reference is not None and message.reference.message_id is not None:
+            ref_msg = message.reference.resolved
+            if isinstance(ref_msg, discord.DeletedReferencedMessage) or ref_msg is None:
+                try:
+                    ref_msg = await message.channel.fetch_message(message.reference.message_id)
+                except discord.DiscordException:
+                    ref_msg = None
+            if ref_msg is not None:
+                snippet = (ref_msg.content or "*(no text)*").replace("\n", " ")
+                if len(snippet) > 100:
+                    snippet = snippet[:97] + "..."
+                quote = f"> ↩️ replying to **{ref_msg.author.display_name}**: {snippet}\n"
+                cursed = quote + cursed
+
+        cursed = cursed[:2000]
         channel = message.channel
         if not isinstance(channel, discord.TextChannel):
             return
