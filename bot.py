@@ -70,8 +70,6 @@ INITIAL_COGS = (
     "cogs.descent",
     "cogs.quidditch",
     "cogs.potions",
-    "cogs.chess",
-    "cogs.checkers",
     "cogs.hexes",
 )
 
@@ -85,6 +83,7 @@ async def _leave_if_unauthorized(guild: discord.Guild) -> bool:
 
 
 _synced = False
+SYNC_GLOBALLY = True
 
 
 async def sync_commands():
@@ -109,20 +108,19 @@ async def sync_commands():
     if DEV_GUILD_ID:
         targets.add(int(DEV_GUILD_ID))
 
-    if not targets:
+    # TEMPORARY (Sept 26): the server hit Discord's 200-per-day limit on creating commands,
+    # so commands are registered bot-wide (a separate daily limit) until that resets.
+    # Flip SYNC_GLOBALLY back to False once the server's limit has reset, to go back to
+    # instant server-only registration.
+    if SYNC_GLOBALLY or not targets:
         synced = await bot.tree.sync()
-        log.info("Synced %d global commands (no server set, so registered globally)",
-                 len(synced))
+        log.info("Synced %d global commands", len(synced))
         return
 
     for guild_id in targets:
         guild = discord.Object(id=guild_id)
-        # Discord sometimes fails to fully overwrite a command's `choices` list on an
-        # incremental update - wiping the guild's commands first and re-registering from
-        # scratch forces a real delete+recreate instead of a partial diff, so option/choice
-        # renames actually take effect right away instead of getting stuck on old labels.
-        bot.tree.clear_commands(guild=guild)
-        await bot.tree.sync(guild=guild)
+        # One overwrite per restart. (A clear-then-rebuild step used to live here; it doubled
+        # the requests and tripped Discord's rate limit during rapid redeploys.)
         bot.tree.copy_global_to(guild=guild)
         synced = await bot.tree.sync(guild=guild)
         log.info("Synced %d commands to server %s", len(synced), guild_id)
