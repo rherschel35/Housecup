@@ -218,24 +218,24 @@ def fx_pirates_tongue(text: str) -> str:
 
 
 EFFECTS = {
-    "reversed": {"name": "Retro-Verbis", "description": "Every word comes out back-to-front.",
+    "reversed": {"name": "Backwards Curse", "description": "Every word comes out back-to-front.",
                 "func": fx_reversed},
-    "runon": {"name": "Verbum Unum", "description": "Deletes every space and punctuation mark - it all runs "
+    "runon": {"name": "Run-On Curse", "description": "Deletes every space and punctuation mark - it all runs "
              "together into one impossible word.", "func": fx_runon},
-    "piglatin": {"name": "Linguae Torque", "description": "Twists their words into Pig Latin.",
+    "piglatin": {"name": "Pig Latin Curse", "description": "Twists their words into Pig Latin.",
                 "func": fx_piglatin},
-    "country": {"name": "Rusticus Maximus", "description": "Curses them to talk like they've never left the deep "
+    "country": {"name": "Cowboy Curse", "description": "Curses them to talk like they've never left the deep "
                "woods - full cowboy, full country twang.", "func": fx_country},
-    "stutter": {"name": "Balbus Maxima", "description": "Makes them stutter over random syllables.",
+    "stutter": {"name": "Stutter Curse", "description": "Makes them stutter over random syllables.",
                "func": fx_stutter},
-    "cheerleader": {"name": "Spiritus Maximus", "description": "Curses them into the most school-spirited Velmora "
+    "cheerleader": {"name": "Cheerleader Curse", "description": "Curses them into the most school-spirited Velmora "
                     "cheerleader alive.", "func": fx_cheerleader},
-    "frog": {"name": "Ranae Vox", "description": "Turns every third word into a ribbit.", "func": fx_frog},
-    "cat": {"name": "Felinus Vox", "description": "Turns every third word into a meow, and ends every sentence "
+    "frog": {"name": "Frog Curse", "description": "Turns every third word into a ribbit.", "func": fx_frog},
+    "cat": {"name": "Cat Curse", "description": "Turns every third word into a meow, and ends every sentence "
            "with a *purrrr*.", "func": fx_cat},
-    "caveman": {"name": "Primus Loquor", "description": "Strips out every filler word - grunts and caveman talk "
+    "caveman": {"name": "Caveman Curse", "description": "Strips out every filler word - grunts and caveman talk "
                "only.", "func": fx_caveman},
-    "pirates_tongue": {"name": "Piraticus", "description": "Curses them to talk like a pirate.",
+    "pirates_tongue": {"name": "Pirate Curse", "description": "Curses them to talk like a pirate.",
                       "func": fx_pirates_tongue},
 }
 
