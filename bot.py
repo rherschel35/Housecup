@@ -117,6 +117,12 @@ async def sync_commands():
 
     for guild_id in targets:
         guild = discord.Object(id=guild_id)
+        # Discord sometimes fails to fully overwrite a command's `choices` list on an
+        # incremental update - wiping the guild's commands first and re-registering from
+        # scratch forces a real delete+recreate instead of a partial diff, so option/choice
+        # renames actually take effect right away instead of getting stuck on old labels.
+        bot.tree.clear_commands(guild=guild)
+        await bot.tree.sync(guild=guild)
         bot.tree.copy_global_to(guild=guild)
         synced = await bot.tree.sync(guild=guild)
         log.info("Synced %d commands to server %s", len(synced), guild_id)
