@@ -310,7 +310,12 @@ class Hexes(commands.Cog):
             await interaction.response.send_message("You can't hex a bot.", ephemeral=True)
             return
 
-        spell = EFFECTS[effect.value]
+        spell = EFFECTS.get(effect.value)
+        if spell is None:
+            await interaction.response.send_message(
+                "That curse doesn't exist anymore - your Discord app is showing a stale spell list. Force-quit "
+                "and reopen Discord (or wait a bit for it to refresh) and try `/hex` again.", ephemeral=True)
+            return
         was_hexed = str(member.id) in self.state["hexed"]
         expires_at = None if duration == 0 else time.time() + duration * 60
         self.state["hexed"][str(member.id)] = {
