@@ -52,6 +52,7 @@ CHESS_CHANNEL_ID = 1553832675993985024
 POINTS_PER_WIN = 3
 DAILY_WIN_CAP = 5   # point-earning wins per day (5 x 3 = 15 points/day)
 TIMEOUT_SECONDS = 24 * 3600
+CHALLENGE_TIMEOUT_SECONDS = 60
 
 # (min wins, [titles unlocked at this tier])
 TITLE_TIERS = [
@@ -130,11 +131,13 @@ class Match:
 
 
 class ChallengeView(discord.ui.View):
-    def __init__(self, cog: "Chess", challenger_id: int, opponent_id: int):
-        super().__init__(timeout=300)
+    def __init__(self, cog: "Chess", challenger_id: int, opponent_id: int,
+                 message: discord.Message | None = None):
+        super().__init__(timeout=CHALLENGE_TIMEOUT_SECONDS)
         self.cog = cog
         self.challenger_id = challenger_id
         self.opponent_id = opponent_id
+        self.message = message
 
     @discord.ui.button(label="Accept", style=discord.ButtonStyle.success, emoji="♟️")
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -152,6 +155,16 @@ class ChallengeView(discord.ui.View):
         await interaction.response.edit_message(content="Challenge declined.", embed=None, view=None,
                                                 attachments=[])
         self.stop()
+
+    async def on_timeout(self):
+        if self.message:
+            try:
+                await self.message.edit(
+                    content="♟️ Challenge expired (no response in 60 seconds).",
+                    view=None,
+                )
+            except discord.HTTPException:
+                pass
 
 
 class PieceSelect(discord.ui.Select):
@@ -594,9 +607,12 @@ class Chess(commands.Cog):
         if self.match_between(interaction.user.id, member.id):
             await interaction.response.send_message("You two already have a match in progress.", ephemeral=True)
             return
+        view = ChallengeView(self, interaction.user.id, member.id)
         await interaction.response.send_message(
-            f"♟️ {member.mention}, {interaction.user.display_name} challenges you to Wizard's Chess!",
-            view=ChallengeView(self, interaction.user.id, member.id))
+            f"♟️ {member.mention}, {interaction.user.display_name} challenges you to Wizard's Chess!\n"
+            f"*(Expires in {CHALLENGE_TIMEOUT_SECONDS} seconds.)*",
+            view=view)
+        view.message = await interaction.original_response()
 
     # ------------------------------------------------------------- moving
 
