@@ -130,15 +130,55 @@ HAIR_BACK = {**HAIR_BACK_FEMALE, **HAIR_BACK_MALE}
 HAIR_BANGS = {**HAIR_BANGS_FEMALE, **HAIR_BANGS_MALE}
 
 HAIR_COLORS = {
-    "1": "Color 1", "2": "Color 2", "3": "Color 3", "4": "Color 4", "5": "Color 5",
-    "6": "Color 6", "7": "Color 7", "8": "Color 8", "9": "Color 9", "10": "Color 10",
+    "1": "Black",
+    "2": "Dark brown",
+    "3": "Auburn",
+    "4": "Light brown",
+    "5": "Wine red",
+    "6": "Pink",
+    "7": "Purple",
+    "8": "Blue",
+    "9": "Green",
+    "10": "Silver",
 }
 
-EYE_TYPES = {str(i): f"Eyes {i}" for i in range(1, 7)}
+EYE_TYPES = {
+    "1": "Round",
+    "2": "Almond",
+    "3": "Soft lidded",
+    "4": "Sharp",
+    "5": "Wide",
+    "6": "Tired",
+}
 
-IRIS_TYPES = {"1": "Iris A", "2": "Iris B", "3": "Iris C", "4": "Iris D"}
+IRIS_TYPES = {
+    "1": "Classic",
+    "2": "Soft glow",
+    "3": "Ringed",
+    "4": "Bright",
+}
 
-IRIS_COLORS = {str(i): f"Eye colour {i}" for i in range(1, 21)}
+IRIS_COLORS = {
+    "1": "Dark brown",
+    "2": "Plum",
+    "3": "Crimson",
+    "4": "Deep red",
+    "5": "Rose red",
+    "6": "Copper",
+    "7": "Amber",
+    "8": "Forest green",
+    "9": "Bright green",
+    "10": "Teal",
+    "11": "Steel blue",
+    "12": "Sea green",
+    "13": "Sky blue",
+    "14": "Royal blue",
+    "15": "Purple",
+    "16": "Midnight",
+    "17": "Violet",
+    "18": "Rose",
+    "19": "Grey",
+}
 
 MOUTHS = {
     "Smile": "Smile", "Smiling": "Soft smile", "Grin": "Grin", "Big Smile": "Big smile",
@@ -156,7 +196,16 @@ BROWS = {
 # Clothes 1-24 exist for both packs
 CLOTHES = {str(i): f"Outfit {i}" for i in range(1, 25)}
 
-CLOTHES_COLORS = {str(i): f"Outfit colour {i}" for i in range(1, 9)}
+CLOTHES_COLORS = {
+    "1": "Black",
+    "2": "White",
+    "3": "Blue",
+    "4": "Green",
+    "5": "Red",
+    "6": "Lavender",
+    "7": "Cream",
+    "8": "Leaf green",
+}
 
 GLASSES = {
     "none": "No glasses",
