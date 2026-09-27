@@ -296,6 +296,19 @@ class Hexes(commands.Cog):
 
     # ------------------------------------------------------------ casting
 
+    def apply_hex(self, *, target_id: int, effect: str, duration_minutes: int | None,
+                  cast_by: int) -> tuple[dict, bool]:
+        """Apply a hex by effect key. duration_minutes None/0 = until lifted.
+        Returns (spell dict, was_replacing_existing). Raises KeyError if effect unknown."""
+        spell = EFFECTS[effect]
+        was_hexed = str(target_id) in self.state["hexed"]
+        expires_at = None if not duration_minutes else time.time() + duration_minutes * 60
+        self.state["hexed"][str(target_id)] = {
+            "effect": effect, "expires_at": expires_at, "cast_by": cast_by,
+        }
+        self.save()
+        return spell, was_hexed
+
     @app_commands.command(name="hex", description="(Headmaster) Curse a student's messages with a prank spell.")
     @app_commands.describe(member="Who to hex", effect="Which curse to cast",
                            duration="How many minutes it lasts (0 = until lifted)")
@@ -309,18 +322,15 @@ class Hexes(commands.Cog):
             await interaction.response.send_message("You can't hex a bot.", ephemeral=True)
             return
 
-        spell = EFFECTS.get(effect.value)
-        if spell is None:
+        if effect.value not in EFFECTS:
             await interaction.response.send_message(
                 "That curse doesn't exist anymore - your Discord app is showing a stale spell list. Force-quit "
                 "and reopen Discord (or wait a bit for it to refresh) and try `/hex` again.", ephemeral=True)
             return
-        was_hexed = str(member.id) in self.state["hexed"]
-        expires_at = None if duration == 0 else time.time() + duration * 60
-        self.state["hexed"][str(member.id)] = {
-            "effect": effect.value, "expires_at": expires_at, "cast_by": interaction.user.id,
-        }
-        self.save()
+        spell, was_hexed = self.apply_hex(
+            target_id=member.id, effect=effect.value,
+            duration_minutes=duration or None, cast_by=interaction.user.id,
+        )
 
         flourish = random.choice(CAST_FLOURISHES)
         await interaction.response.send_message(embed=discord.Embed(
@@ -330,7 +340,7 @@ class Hexes(commands.Cog):
         ))
 
         replaced_note = " (replacing the curse already on them)" if was_hexed else ""
-        until = "until a Headmaster lifts it" if expires_at is None else f"for {duration} minute(s)"
+        until = "until a Headmaster lifts it" if not duration else f"for {duration} minute(s)"
         await interaction.followup.send(
             f"🪄 {member.mention} is hexed with **{spell['name']}** ({spell['description']}){replaced_note}, "
             f"{until}.", ephemeral=True)
@@ -411,6 +421,12 @@ class Hexes(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.guild is None or message.author.bot or message.webhook_id is not None:
+            return
+        # Anti-spam runs first (cog load order) and deletes overflowing spam;
+        # skip the hex relay when the author is on a personal pause so spam
+        # is deleted rather than mangled through the webhook.
+        antispam = self.bot.get_cog("AntiSpam")
+        if antispam is not None and antispam.should_block(message):
             return
         if not message.content or not message.content.strip():
             return

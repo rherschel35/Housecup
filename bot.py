@@ -84,7 +84,9 @@ INITIAL_COGS = (
     "cogs.descent",
     "cogs.quidditch",
     "cogs.potions",
+    "cogs.antispam",  # before hexes so spam is deleted, not mangled
     "cogs.hexes",
+    "cogs.marketplace",
 )
 
 
@@ -262,6 +264,18 @@ async def on_guild_join(guild: discord.Guild):
 @bot.event
 async def on_ready():
     log.info("Points keeper online. Logged in as %s (id=%s)", bot.user, bot.user.id)
+
+    try:
+        from cogs.wizard_assets_bootstrap import ensure_wizard_assets
+        from cogs import mirror_art
+        ready = await asyncio.to_thread(ensure_wizard_assets)
+        mirror_art.refresh_asset_paths()
+        if ready:
+            log.info("Mirror wizard assets ready at %s", mirror_art.ASSETS)
+        else:
+            log.warning("Mirror wizard assets not ready — /wizard portraits may fail")
+    except Exception:
+        log.exception("Wizard asset bootstrap failed")
 
     for guild in list(bot.guilds):
         await _leave_if_unauthorized(guild)

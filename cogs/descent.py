@@ -38,10 +38,10 @@ gaining 1 AP back automatically each round. Actions:
 
 Floor replay: once you've cleared a floor, `/descend floor:<n>` lets you
 refight a single monster from it any time (not boss floors) - for loot,
-or to grind. Loot always has a chance to drop. A shot at a stat point,
-though, only exists if that floor is in your current zone or the zone
-right before it - grinding floor 1 while you're on floor 85 nets you
-items, not power.
+or to grind. Loot always has a chance to drop. Stat-point odds on
+practice clears scale with how far behind you are: close floors are more
+likely to sharpen you, deep-behind floors still have a small chance.
+Practice fights ignore the floor-clear path and never count toward lockouts.
 """
 
 from __future__ import annotations
@@ -236,26 +236,36 @@ BOSS_ITEM = "descent_sigil"
 
 MONSTER_DROP_CHANCE = 0.40   # any regular win
 FLOOR_CLEAR_GUARANTEED = 3   # material given on a full floor clear
-PRACTICE_STATUP_CHANCE = 0.20  # in-window practice win: chance at a stat point
+
+# Practice clear: chance of a free stat pick scales with how far the
+# practiced floor sits behind your current Descent floor.
+PRACTICE_STATUP_CLOSE = 0.20   # distance ≤ 5
+PRACTICE_STATUP_MID = 0.10     # distance 6–20
+PRACTICE_STATUP_FAR = 0.05     # distance 21+
+
+# Late-game Fury bosses (every swing is a multi-hit burst)
+FURY_BOSS_FLOORS = frozenset({60, 70, 80, 90, 100})
+FURY_START_FLOOR = 51          # regular monsters: alternating Fury from here
+FURY_REGULAR_HITS = (2, 4)     # inclusive randint range for regular Fury
+FURY_BOSS_HITS = (3, 6)        # inclusive randint range for Fury-boss swings
 
 # ----------------------------------------------------------- difficulty
 #
-# Long HP-attrition fights are unforgiving: even a small, steady edge in
-# damage-per-round compounds hard over a dozen rounds, so this curve is
-# naturally "mostly a sure win" or "mostly a sure loss" rather than a
-# gentle slope. These constants are tuned (by simulation, not just guessed)
-# so floors 1-3 are close to a guaranteed clear, floor 4 starts costing you
-# real losses, and floors 7+ demand the extra stat points only repeated,
-# failed attempts actually bank - i.e. a genuine grind, never a hard,
-# un-crossable wall (damage never floors below 1, so persistence always
-# eventually gets there). Adding AP actions and two-element floors makes
-# every floor harder than this curve alone implies - expect to retune
-# after real playtesting.
+# Floors 1–50 use doubled growth vs the original curve. Floors 51–100 keep
+# that same linear formula evaluated at the floor, then apply a late-game
+# ramp so depth feels punishing without a hard wall. Boss multipliers are
+# applied after the curve (unchanged).
 
 def monster_stats(floor: int, is_boss: bool) -> tuple[int, int, int]:
-    hp = 24 + floor * 11
-    atk = 5 + floor * 1.7
-    df = 2 + floor * 1.1
+    # Doubled growth baseline (floors 1–50, and the pre-ramp term for 51+)
+    hp = 24 + floor * 22
+    atk = 5 + floor * 3.4
+    df = 2 + floor * 2.2
+    if floor > 50:
+        ramp = 1 + 1.5 * (floor - 50) / 50
+        hp *= ramp
+        atk *= ramp
+        df *= ramp
     if is_boss:
         hp *= 2.0
         atk *= 1.3
@@ -315,7 +325,7 @@ def blank_record() -> dict:
         "locked_until": 0.0,
         "highest_cleared": 0,
         "stat_points": {"hp": 0, "atk": 0, "def": 0},
-        "pending_statup": False,
+        "pending_statup": 0,
         "max_ap": STARTING_MAX_AP,
         "bosses_bound": [],
     }
@@ -327,10 +337,43 @@ def bar(current: int, maximum: int, width: int = 12) -> str:
     return "█" * filled + "░" * (width - filled)
 
 
-def eligible_for_statup(rec: dict, practiced_floor: int) -> bool:
-    """A practice win only has a shot at a stat point if it's in your
-    current zone or the zone right before it - older floors are loot-only."""
-    return zone_index(practiced_floor) >= zone_index(rec["floor"]) - 1
+def practice_statup_chance(current_floor: int, practiced_floor: int) -> float:
+    """Chance of a free stat pick on a practice clear, by how far behind
+    the practiced floor is relative to your current Descent floor."""
+    distance = current_floor - practiced_floor
+    if distance <= 5:
+        return PRACTICE_STATUP_CLOSE
+    if distance <= 20:
+        return PRACTICE_STATUP_MID
+    return PRACTICE_STATUP_FAR
+
+
+def pending_statup_picks(rec: dict) -> int:
+    """How many free stat picks the player still owes. Supports legacy
+    True/False saves as well as an integer pick count."""
+    v = rec.get("pending_statup", 0)
+    if v is True:
+        return 1
+    if v is False or v is None:
+        return 0
+    return max(0, int(v))
+
+
+def fury_hit_count(fight: "Fight") -> int:
+    """How many separate hit rolls the monster makes this counterattack.
+    Floors 1–50: always a single hit. Regular monsters on 51+: alternate
+    Fury (2–4) and single, starting with Fury on the first swing. Fury
+    bosses (60/70/80/90/100): every swing is Fury (3–6). Earlier bosses
+    are unchanged (single hits)."""
+    if fight.is_boss and fight.floor in FURY_BOSS_FLOORS:
+        return random.randint(*FURY_BOSS_HITS)
+    if not fight.is_boss and fight.floor >= FURY_START_FLOOR:
+        if fight.fury_next:
+            fight.fury_next = False
+            return random.randint(*FURY_REGULAR_HITS)
+        fight.fury_next = True
+        return 1
+    return 1
 
 
 class Fight:
@@ -361,6 +404,9 @@ class Fight:
         self.is_practice = is_practice
         self.round = 0
         self.log: list[str] = []
+        # Regular floors 51+: first monster swing is Fury, then alternate.
+        # Toggled by fury_hit_count; unused on floors without alternating Fury.
+        self.fury_next = True
         # potion buffs - defaults are "no effect"; _apply_potion_mods and
         # _start_fight may override these right after construction
         self.heal_mult = 1.0
@@ -689,10 +735,21 @@ class Descent(commands.Cog):
             return
 
         counter_mult *= fight.boss_dmg_mult if fight.is_boss else 1.0
-        back = mitigate(fight.m_atk, counter_mult, fight.p_def)
-        fight.p_hp -= back
+        hits = fury_hit_count(fight)
+        hit_rolls: list[int] = []
+        for _ in range(hits):
+            roll = mitigate(fight.m_atk, counter_mult, fight.p_def)
+            fight.p_hp -= roll
+            hit_rolls.append(roll)
         tag = " (reduced)" if counter_mult < 1 else (" (extra!)" if counter_mult > 1 else "")
-        fight.log.append(f"{fight.emoji} {fight.name} hits back for **{back}**{tag}")
+        if hits > 1:
+            rolls_txt = ", ".join(f"**{r}**" for r in hit_rolls)
+            fight.log.append(
+                f"{fight.emoji} {fight.name} strikes in a **Fury** ({hits} hits: {rolls_txt})"
+                f" — **{sum(hit_rolls)}** total{tag}"
+            )
+        else:
+            fight.log.append(f"{fight.emoji} {fight.name} hits back for **{hit_rolls[0]}**{tag}")
 
         if fight.p_hp <= 0:
             if fight.revive_available:
@@ -759,7 +816,9 @@ class Descent(commands.Cog):
             if ap_increased:
                 rec["max_ap"] += 1
             clear_drop = await self._drop_loot(member, zone_for(floor)["element"], FLOOR_CLEAR_GUARANTEED)
-            rec["pending_statup"] = True
+            # Fury bosses (60/70/80/90/100) bank three free picks; everything else one.
+            clear_picks = 3 if fight.is_boss and floor in FURY_BOSS_FLOORS else 1
+            rec["pending_statup"] = clear_picks
             self.save()
 
             potions = self.bot.get_cog("Potions")
@@ -792,7 +851,11 @@ class Descent(commands.Cog):
                         f"call it with `/summon`.")
             if floor >= MAX_FLOOR:
                 desc += "\n\n👑 **The Descent is complete.** There is nothing further down."
-            desc += "\n\nYou've earned a stat point for clearing the floor - pick where it goes."
+            if clear_picks > 1:
+                desc += (f"\n\nYou've earned **{clear_picks}** stat points for clearing this Fury boss "
+                         f"— pick where each one goes.")
+            else:
+                desc += "\n\nYou've earned a stat point for clearing the floor - pick where it goes."
             embed = discord.Embed(title=f"{fight.emoji} Victory!", description=desc, color=0x2ECC71)
             await interaction.edit_original_response(embed=embed, view=StatUpView(self, interaction.user.id))
             return
@@ -809,7 +872,7 @@ class Descent(commands.Cog):
             color=0x2ECC71,
         )
         if cleared_index == STATUP_AT_MONSTER:
-            rec["pending_statup"] = True
+            rec["pending_statup"] = 1
             self.save()
             embed.description += "\n\nYou've earned a stat point - pick where it goes."
             await interaction.edit_original_response(embed=embed, view=StatUpView(self, interaction.user.id))
@@ -825,17 +888,15 @@ class Descent(commands.Cog):
         desc = f"**{fight.name}** falls. This was a practice fight - your floor progress hasn't changed."
         desc += "\nA material dropped!" if got_loot else "\nNo material dropped this time."
 
-        if eligible_for_statup(rec, fight.floor) and not rec.get("pending_statup") \
-                and random.random() < PRACTICE_STATUP_CHANCE:
-            rec["pending_statup"] = True
+        chance = practice_statup_chance(rec["floor"], fight.floor)
+        if pending_statup_picks(rec) == 0 and random.random() < chance:
+            rec["pending_statup"] = 1
             self.save()
-            desc += "\n\nThis one was close enough to your depth to sharpen you too - pick a stat to raise."
+            desc += "\n\nThis grind sharpened you - pick a stat to raise."
             embed = discord.Embed(title=f"{fight.emoji} Practice victory!", description=desc, color=0x2ECC71)
             await interaction.edit_original_response(embed=embed, view=StatUpView(self, interaction.user.id))
             return
 
-        if not eligible_for_statup(rec, fight.floor):
-            desc += "\n\nThis floor is far enough behind your progress that it's loot-only now - no stat gains."
         self.save()
         embed = discord.Embed(title=f"{fight.emoji} Practice victory!", description=desc, color=0x2ECC71)
         await interaction.edit_original_response(embed=embed, view=None)
@@ -873,13 +934,26 @@ class Descent(commands.Cog):
 
     async def pick_stat(self, interaction: discord.Interaction, stat: str):
         rec = self.record(interaction.user.id)
-        if not rec.get("pending_statup"):
+        remaining = pending_statup_picks(rec)
+        if remaining <= 0:
             await interaction.response.send_message("Nothing to spend right now.", ephemeral=True)
             return
         rec["stat_points"][stat] += 1
-        rec["pending_statup"] = False
+        remaining -= 1
+        rec["pending_statup"] = remaining
         self.save()
         label = {"hp": "Max HP", "atk": "Attack", "def": "Defense"}[stat]
+        if remaining > 0:
+            await interaction.response.edit_message(
+                embed=discord.Embed(
+                    title="Stat raised",
+                    description=(f"**+1 {label}**. {remaining} pick"
+                                 f"{'s' if remaining != 1 else ''} left — choose another."),
+                    color=0x6C5CE7,
+                ),
+                view=StatUpView(self, interaction.user.id),
+            )
+            return
         await interaction.response.edit_message(
             embed=discord.Embed(title="Stat raised", description=f"**+1 {label}**. Use `/descend` to keep going.",
                                 color=0x6C5CE7),
@@ -921,10 +995,14 @@ class Descent(commands.Cog):
             await interaction.response.send_message(
                 f"Floor {rec['floor']} is locked after 3 losses. Try again in {h}h {m}m.", ephemeral=True)
             return
-        if rec.get("pending_statup"):
+        if pending_statup_picks(rec) > 0:
+            left = pending_statup_picks(rec)
+            tip = "Pick your remaining stat points first." if left > 1 else "Pick your stat point first."
             await interaction.response.send_message(
-                "Pick your stat point first.", embed=discord.Embed(
-                    title="Choose a stat to raise", color=0x6C5CE7), view=StatUpView(self, interaction.user.id))
+                tip, embed=discord.Embed(
+                    title="Choose a stat to raise",
+                    description=f"{left} pick{'s' if left != 1 else ''} remaining." if left > 1 else None,
+                    color=0x6C5CE7), view=StatUpView(self, interaction.user.id))
             return
         if interaction.user.id in self.fights:
             fight = self.fights[interaction.user.id]

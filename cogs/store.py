@@ -39,13 +39,13 @@ HOUSES = {
         "name": "Vashara",
         "color": 0x8B5FBF,
         "emoji": "\U0001F418",  # elephant
-        "motto": "The first house. Medicine, patience, and care for the fragile.",
+        "motto": "We forgive. We remember.",
     },
     "moonveil": {
         "name": "Moonveil",
         "color": 0x6FB7E0,
-        "emoji": "\U0001F315",  # full moon
-        "motto": "Curiosity without a leash. For research purposes, of course.",
+        "emoji": "\U0001F407",  # rabbit
+        "motto": "Fuck around. Find out.",
     },
     "veyren": {
         "name": "Veyren",
@@ -56,14 +56,14 @@ HOUSES = {
     "caldrin": {
         "name": "Caldrin",
         "color": 0xE0B53A,
-        "emoji": "\U0001F52D",  # telescope
-        "motto": "Build it anyway. Ask forgiveness of the blueprint later.",
+        "emoji": "\U0001F435",  # monkey (lemur-adjacent)
+        "motto": "Measured, not meek.",
     },
     "thornmere": {
         "name": "Thornmere",
         "color": 0x3E8E5A,
         "emoji": "\U0001F43A",  # wolf
-        "motto": "Think it through. Then think it through again.",
+        "motto": "Loyalty is earned, Advantage is taken.",
     },
 }
 
