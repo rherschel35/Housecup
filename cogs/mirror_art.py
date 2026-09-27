@@ -93,7 +93,7 @@ HAIR_BACK_FEMALE = {
 # Bangs = fringe overlay. Masculine menu is curated short-only so it doesn't
 # read as long hair; feminine keeps a fuller set (Discord max 25 options).
 HAIR_BANGS_MALE = {
-    "none": "No bangs (best for short cuts)",
+    "none": "No fringe (short hairline)",
     "1": "Short clean fringe",
     "6": "Short spikes",
     "7": "Jagged short",
@@ -102,7 +102,7 @@ HAIR_BANGS_MALE = {
 }
 
 HAIR_BANGS_FEMALE = {
-    "none": "No bangs",
+    "none": "No fringe (short hairline)",
     "1": "Short fringe",
     "2": "Side-swept",
     "3": "Straight mid",
@@ -124,6 +124,10 @@ HAIR_BANGS_FEMALE = {
     "19": "Bangs 19",
     "20": "Bangs 20",
 }
+
+# In these packs the crown/front hair lives in Bangs/. Skipping that layer
+# leaves a bald scalp. "none" still draws a short hairline fill:
+BANGS_NONE_LAYER = {"male": "6", "female": "1"}
 
 # Unions used for validation / storage (either presentation may have saved a key).
 HAIR_BACK = {**HAIR_BACK_FEMALE, **HAIR_BACK_MALE}
@@ -462,9 +466,10 @@ def compose_portrait(look: dict) -> Image.Image:
     ])
     layers.append(mouth_p)
 
-    # 8. bangs
-    if hair_bangs != "none":
-        layers.append(root / "Hair" / "Bangs" / f"Bangs {hair_bangs}" / f"Color {hair_c}.png")
+    # 8. bangs — crown/front hair lives here; "none" still draws a short
+    # hairline fill so the scalp isn't bald.
+    bangs_id = BANGS_NONE_LAYER.get(gender, "1") if hair_bangs == "none" else hair_bangs
+    layers.append(root / "Hair" / "Bangs" / f"Bangs {bangs_id}" / f"Color {hair_c}.png")
 
     # 9. glasses (use outfit colour as a stand-in accent)
     layers.append(_glasses_path(root, glasses, clothes_c))
