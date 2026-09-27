@@ -128,19 +128,44 @@ def zone_index(floor: int) -> int:
 
 # ------------------------------------------------------------- monsters
 
-# (name, emoji, art-kind) - art-kind is unused now that every monster has
-# real art (kept for logging/back-compat only)
+# (name, emoji, art-kind) - art-kind feeds the procedural portrait fallback
+# when no PNG exists in monster_art_assets/
 MONSTER_NAMES = {
-    "poison": [("Bloatcap Crawler", "🍄", "blob"), ("Weeping Adder", "🐍", "serpent"),
-              ("Fen Wretch", "🧟", "humanoid")],
-    "fire": [("Ember Hound", "🐕", "quadruped"), ("Cinder Wisp", "🔥", "orb"),
-            ("Forge Golem", "🗿", "humanoid")],
-    "ice": [("Frostbite Wraith", "👻", "humanoid"), ("Glacier Stalker", "🐺", "quadruped"),
-           ("Rime Widow", "🕷️", "blob")],
-    "lightning": [("Static Hollow", "⚡", "orb"), ("Storm-Touched Raven", "🐦‍⬛", "flier"),
-                 ("Volt Serpent", "🐉", "serpent")],
-    "light": [("Hollow Choirling", "🕊️", "flier"), ("Radiant Husk", "💀", "humanoid"),
-             ("Vault Warden", "🛡️", "humanoid")],
+    "poison": [
+        ("Bloatcap Crawler", "🍄", "blob"), ("Weeping Adder", "🐍", "serpent"),
+        ("Fen Wretch", "🧟", "humanoid"), ("Mire Leech", "🪱", "blob"),
+        ("Spore Mantid", "🦗", "quadruped"), ("Bog Lantern", "🏮", "orb"),
+        ("Venom Cap", "☠️", "blob"), ("Rotvine Horror", "🌿", "humanoid"),
+        ("Plague Rat King", "🐀", "quadruped"), ("Nettle Shade", "👻", "humanoid"),
+    ],
+    "fire": [
+        ("Ember Hound", "🐕", "quadruped"), ("Cinder Wisp", "🔥", "orb"),
+        ("Forge Golem", "🗿", "humanoid"), ("Ash Imp", "😈", "humanoid"),
+        ("Magma Beetle", "🪲", "blob"), ("Pyre Hawk", "🦅", "flier"),
+        ("Soot Serpent", "🐍", "serpent"), ("Kiln Warden", "🛡️", "humanoid"),
+        ("Spark Hound", "🐕", "quadruped"), ("Coal Elemental", "🪨", "orb"),
+    ],
+    "ice": [
+        ("Frostbite Wraith", "👻", "humanoid"), ("Glacier Stalker", "🐺", "quadruped"),
+        ("Rime Widow", "🕷️", "blob"), ("Hail Sprite", "❄️", "orb"),
+        ("Icebound Knight", "⚔️", "humanoid"), ("Snow Moth", "🦋", "flier"),
+        ("Permafrost Drake", "🐉", "serpent"), ("Chill Howler", "🐺", "quadruped"),
+        ("Crystal Lurker", "💎", "blob"), ("Hoarfrost Imp", "👺", "humanoid"),
+    ],
+    "lightning": [
+        ("Static Hollow", "⚡", "orb"), ("Storm-Touched Raven", "🐦‍⬛", "flier"),
+        ("Volt Serpent", "🐉", "serpent"), ("Thunder Mite", "🪲", "blob"),
+        ("Arc Wraith", "👻", "humanoid"), ("Cloud Stag", "🦌", "quadruped"),
+        ("Sparkling Wyrm", "🐉", "serpent"), ("Ion Sentinel", "🤖", "humanoid"),
+        ("Gale Razor", "🗡️", "flier"), ("Livewire Slime", "🟢", "blob"),
+    ],
+    "light": [
+        ("Hollow Choirling", "🕊️", "flier"), ("Radiant Husk", "💀", "humanoid"),
+        ("Vault Warden", "🛡️", "humanoid"), ("Gleam Mote", "✨", "orb"),
+        ("Blessed Remnant", "📿", "humanoid"), ("Sunblind Moth", "🦋", "flier"),
+        ("Halo Serpent", "🐍", "serpent"), ("Marble Guardian", "🗿", "humanoid"),
+        ("Lumen Stag", "🦌", "quadruped"), ("Sanctum Shade", "👤", "humanoid"),
+    ],
 }
 
 BOSS_NAMES = {
@@ -621,9 +646,21 @@ class Descent(commands.Cog):
         return name, emoji, element, kind, weak, is_boss, m_hp, m_atk, m_def
 
     async def _monster_file(self, fight: "Fight") -> discord.File:
-        filename = BOSS_IMAGE[fight.floor] if fight.is_boss else MONSTER_IMAGE[fight.name]
-        path = ASSETS_DIR / filename
-        return discord.File(path, filename="monster.png")
+        import io
+        from cogs.monster_art import render as render_monster
+
+        filename = None
+        if fight.is_boss:
+            filename = BOSS_IMAGE.get(fight.floor)
+        else:
+            filename = MONSTER_IMAGE.get(fight.name)
+        if filename:
+            path = ASSETS_DIR / filename
+            if path.exists():
+                return discord.File(path, filename="monster.png")
+        # New roster creatures (and any missing PNG) use procedural art.
+        png = render_monster(fight.name, fight.element, fight.kind, fight.is_boss)
+        return discord.File(io.BytesIO(png), filename="monster.png")
 
     def _apply_potion_mods(self, fight: "Fight", user_id: int, is_boss: bool):
         """Pull any active potion buffs for a real fight and fold them
