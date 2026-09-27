@@ -8,14 +8,14 @@ we download the Dropbox zips from env vars once and unpack them.
 Env (all optional; skip download if unset):
     WIZARD_PACK_FEMALE
     WIZARD_PACK_FEMALE_UPDATE
-    WIZARD_PACK_MALE
+    WIZARD_PACK_MALE          - overrides the default MALE1 muscular pack URL
     WIZARD_PACK_MALE_UPDATE
-    WIZARD_ASSETS_DIR   - override destination (default STATE_DIR/wizard_assets)
+    WIZARD_ASSETS_DIR         - override destination (default STATE_DIR/wizard_assets)
 
-Safe to call on every boot:
-  - populated female pack is left alone
-  - male is (re)installed when WIZARD_PACK_MALE* is set and the on-disk
-    male tree is not yet the MALE1 muscular format (hair_top/ + body/)
+On every boot:
+  - female is left alone if already present
+  - male is replaced whenever it is not the MALE1 muscular format
+    (hair_top/ + body/), using WIZARD_PACK_MALE* or the built-in Dropbox URL
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ import logging
 import os
 import shutil
 import tempfile
+import time
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -32,6 +33,12 @@ log = logging.getLogger("velmora.wizard_assets")
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
+
+# Default masculine pack (muscular MALE1). Env WIZARD_PACK_MALE overrides.
+DEFAULT_MALE1_URL = (
+    "https://www.dropbox.com/scl/fi/wek73vd4h4vyts80ewnwi/MALE1_assets.zip"
+    "?rlkey=3ybjz1332k00a8b01eiokqa3s&dl=1"
+)
 
 PACK_ENVS = (
     ("female", "WIZARD_PACK_FEMALE"),
@@ -66,9 +73,10 @@ def _is_male1(gender_root: Path) -> bool:
 
 
 def assets_ready(root: Path | None = None) -> bool:
+    """Female = Tainara; male must be MALE1 (old soft male pack counts as not ready)."""
     root = root or assets_root()
     female_ok = _is_tainara(root / "female")
-    male_ok = _is_male1(root / "male") or _is_tainara(root / "male")
+    male_ok = _is_male1(root / "male")
     return female_ok and male_ok
 
 
@@ -83,7 +91,7 @@ def _looks_like_pack(path: Path) -> bool:
 
 
 def _find_pack_root(extracted: Path) -> Path | None:
-    """Zip may unwrap to nested folders; find the one that has Body/Head."""
+    """Zip may unwrap to nested folders; find the one with pack folders."""
     if _looks_like_pack(extracted):
         return extracted
     for child in extracted.rglob("*"):
@@ -103,11 +111,37 @@ def _merge_tree(src: Path, dest: Path) -> None:
             shutil.copy2(item, target)
 
 
+def _normalize_dropbox(url: str) -> str:
+    """Force Dropbox direct-download (dl=1)."""
+    if "dropbox.com" not in url:
+        return url
+    if "dl=0" in url:
+        return url.replace("dl=0", "dl=1")
+    if "dl=" not in url:
+        sep = "&" if "?" in url else "?"
+        return f"{url}{sep}dl=1"
+    return url
+
+
 def _download(url: str, dest: Path) -> None:
-    log.info("Downloading wizard pack → %s", dest.name)
-    req = urllib.request.Request(url, headers={"User-Agent": "VelmoraHouseCup/1.0"})
-    with urllib.request.urlopen(req, timeout=180) as resp, open(dest, "wb") as out:
-        shutil.copyfileobj(resp, out)
+    url = _normalize_dropbox(url)
+    log.info("Downloading wizard pack → %s (%s…)", dest.name, url[:80])
+    last_err: Exception | None = None
+    for attempt in range(1, 4):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "VelmoraHouseCup/1.0"})
+            with urllib.request.urlopen(req, timeout=300) as resp, open(dest, "wb") as out:
+                shutil.copyfileobj(resp, out)
+            size = dest.stat().st_size
+            log.info("Downloaded %s (%s bytes)", dest.name, f"{size:,}")
+            if size < 1_000_000:
+                raise RuntimeError(f"Pack download too small ({size} bytes) — check Dropbox link")
+            return
+        except Exception as e:
+            last_err = e
+            log.warning("Pack download attempt %s failed: %s", attempt, e)
+            time.sleep(2 * attempt)
+    raise last_err or RuntimeError("download failed")
 
 
 def _install_zip(url: str, gender: str, root: Path) -> bool:
@@ -148,67 +182,71 @@ def _env_urls_for(gender: str) -> list[str]:
             continue
         u = os.getenv(env, "").strip()
         if u:
-            urls.append(u)
+            urls.append(_normalize_dropbox(u))
     return urls
 
 
-def _ensure_male1_if_configured(root: Path) -> None:
-    """If WIZARD_PACK_MALE* is set and male isn't MALE1 yet, replace it."""
+def _male_urls() -> list[str]:
+    """Env overrides first, then the built-in MALE1 Dropbox URL."""
     urls = _env_urls_for("male")
-    if not urls:
-        return
+    default = _normalize_dropbox(DEFAULT_MALE1_URL)
+    if default not in urls:
+        urls.append(default)
+    return urls
+
+
+def _ensure_male1(root: Path) -> bool:
+    """Replace soft/old male pack with MALE1 whenever needed."""
     male = root / "male"
     if _is_male1(male):
-        return
-    log.info("Male pack is missing or not MALE1 — installing from WIZARD_PACK_MALE*")
+        log.info("Male pack is MALE1 at %s", male)
+        return True
+    if _is_tainara(male):
+        log.warning(
+            "Male pack at %s is the old soft Tainara set — replacing with MALE1 muscular pack",
+            male,
+        )
+    else:
+        log.info("Male pack missing — installing MALE1 muscular pack")
     root.mkdir(parents=True, exist_ok=True)
-    for url in urls:
-        if _install_zip(url, "male", root):
-            return
+    for url in _male_urls():
+        if _install_zip(url, "male", root) and _is_male1(root / "male"):
+            return True
+    log.error("Could not install MALE1 male pack")
+    return False
 
 
 def ensure_wizard_assets() -> bool:
     """Make sure STATE_DIR (or override) has male+female packs. Returns ready?"""
     root = assets_root()
 
-    # Prefer copying from the repo checkout if a dev machine has them locally
-    # (and male is already MALE1 when present).
+    # Dev machines: seed female from repo checkout if volume is empty.
     repo = DATA_DIR / "wizard_assets"
-    if not assets_ready(root) and assets_ready(repo):
-        log.info("Copying wizard assets from repo %s → %s", repo, root)
-        if root.exists():
-            shutil.rmtree(root)
-        shutil.copytree(repo, root)
+    if not (root / "female").exists() and _is_tainara(repo / "female"):
+        log.info("Copying female wizard assets from repo %s → %s", repo, root)
+        root.mkdir(parents=True, exist_ok=True)
+        dest = root / "female"
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.copytree(repo / "female", dest)
 
-    # Upgrade/replace male when the new Dropbox URL is configured.
-    _ensure_male1_if_configured(root)
+    # Always enforce muscular male pack (even if an old soft male is present).
+    _ensure_male1(root)
+
+    # Female from env if still missing.
+    if not _is_tainara(root / "female"):
+        for url in _env_urls_for("female"):
+            if _install_zip(url, "female", root):
+                break
 
     if assets_ready(root):
-        log.info("Wizard assets ready at %s", root)
+        log.info("Wizard assets ready at %s (male=MALE1)", root)
         return True
 
-    urls = [(gender, os.getenv(env, "").strip()) for gender, env in PACK_ENVS]
-    urls = [(g, u) for g, u in urls if u]
-    if not urls:
-        log.warning(
-            "Wizard assets missing at %s and no WIZARD_PACK_* env vars set. "
-            "/wizard and /mirror portraits will fail until packs are installed.",
-            root,
-        )
-        return False
-
-    root.mkdir(parents=True, exist_ok=True)
-    ok = True
-    seen = set()
-    for gender, url in urls:
-        if gender in seen and (root / gender).exists():
-            continue
-        if not _install_zip(url, gender, root):
-            ok = False
-        else:
-            seen.add(gender)
-    if ok and assets_ready(root):
-        log.info("Wizard assets ready at %s", root)
-        return True
-    log.error("Wizard assets still incomplete after download at %s", root)
+    log.error(
+        "Wizard assets incomplete at %s (female=%s male1=%s)",
+        root,
+        _is_tainara(root / "female"),
+        _is_male1(root / "male"),
+    )
     return False
