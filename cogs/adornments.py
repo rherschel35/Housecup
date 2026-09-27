@@ -984,10 +984,18 @@ class LookSelect(discord.ui.Select):
     def __init__(self, wizard_view: "WizardView", field: str):
         self.wv = wizard_view
         self.field = field
+        opts_map = art.options_for(field, wizard_view.look)
+        current = wizard_view.look.get(field)
+        if current not in opts_map:
+            current = next(iter(opts_map))
+            wizard_view.look[field] = current
         opts = []
-        for key in art.LOOK_FIELDS[field]:
-            opts.append(discord.SelectOption(label=art.option_label(field, key), value=key,
-                                             default=(wizard_view.look.get(field) == key)))
+        for key in opts_map:
+            opts.append(discord.SelectOption(
+                label=art.option_label(field, key, wizard_view.look)[:100],
+                value=key,
+                default=(current == key),
+            ))
         # a fixed id for the life of this /wizard window, so a click that lands
         # while the preview is redrawing still finds its menu
         super().__init__(placeholder=FIELD_LABEL[field], options=opts[:25], min_values=1, max_values=1,
@@ -995,6 +1003,8 @@ class LookSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         self.wv.look[self.field] = self.values[0]
+        if self.field == "gender":
+            art.clamp_hair_to_gender(self.wv.look)
         await self.wv.refresh(interaction)
 
 
@@ -1044,6 +1054,15 @@ class WizardView(discord.ui.View):
 
     async def _random(self, interaction):
         self.look = {f: self.cog.rng.choice(sorted(opts)) for f, opts in art.LOOK_FIELDS.items()}
+        # Hair menus are presentation-specific.
+        self.look["hair_back"] = self.cog.rng.choice(sorted(art.options_for("hair_back", self.look)))
+        bangs_opts = art.options_for("hair_bangs", self.look)
+        if self.look.get("gender") == "male":
+            self.look["hair_bangs"] = "none" if self.cog.rng.random() < 0.7 else self.cog.rng.choice(
+                [k for k in bangs_opts if k != "none"] or ["none"])
+        else:
+            self.look["hair_bangs"] = self.cog.rng.choice(sorted(bangs_opts))
+        art.clamp_hair_to_gender(self.look)
         await self.refresh(interaction)
 
     async def refresh(self, interaction: discord.Interaction):

@@ -14,7 +14,6 @@ from __future__ import annotations
 import hashlib
 import io
 import math
-import os
 import random
 from pathlib import Path
 
@@ -47,9 +46,88 @@ GENDERS = {"male": "Masculine", "female": "Feminine"}
 
 SKINS = {str(i): f"Skin tone {i}" for i in range(1, 10)}
 
-HAIR_BACK = {str(i): f"Hair style {i}" for i in range(1, 19)}  # Back 1-18
+# Hair Back = the actual cut. Labels differ by presentation; keys are pack folder numbers.
+HAIR_BACK_MALE = {
+    "1": "Soft bowl",
+    "2": "Rounded fringe",
+    "3": "Close crop",
+    "4": "Messy tufts",
+    "5": "Short spikes",
+    "6": "Textured short",
+    "7": "Smooth round",
+    "8": "Soft cap",
+    "9": "Wild spikes",
+    "10": "Soft dome",
+    "11": "Classic bowl",
+    "12": "Full fringe cut",
+    "13": "Rounded cap",
+    "14": "Soft curtain",
+    "15": "Tall spikes",
+    "16": "Messy medium",
+    "17": "Short crop",
+    "18": "Spiky volume",
+    "19": "Wispy medium",
+}
 
-HAIR_BANGS = {"none": "No bangs", **{str(i): f"Bangs {i}" for i in range(1, 21)}}
+HAIR_BACK_FEMALE = {
+    "1": "Straight long",
+    "2": "Soft waves",
+    "3": "Layered",
+    "4": "Full volume",
+    "5": "Sleek",
+    "6": "Wavy mid",
+    "7": "Long cascade",
+    "8": "Soft bob",
+    "9": "Fluffy",
+    "10": "Long layers",
+    "11": "Silky",
+    "12": "Thick waves",
+    "13": "Gentle curl",
+    "14": "Long smooth",
+    "15": "Voluminous",
+    "16": "Flowing",
+    "17": "Soft length",
+    "18": "Classic long",
+}
+
+# Bangs = fringe overlay. Masculine menu is curated short-only so it doesn't
+# read as long hair; feminine keeps a fuller set (Discord max 25 options).
+HAIR_BANGS_MALE = {
+    "none": "No bangs (best for short cuts)",
+    "1": "Short clean fringe",
+    "6": "Short spikes",
+    "7": "Jagged short",
+    "9": "Choppy crop fringe",
+    "10": "Pushed-back hairline",
+}
+
+HAIR_BANGS_FEMALE = {
+    "none": "No bangs",
+    "1": "Short fringe",
+    "2": "Side-swept",
+    "3": "Straight mid",
+    "4": "Full blunt",
+    "5": "Choppy side",
+    "6": "Spiky fringe",
+    "7": "Even spikes",
+    "8": "Center part long",
+    "9": "Short choppy",
+    "10": "Open forehead",
+    "11": "Mid with gap",
+    "12": "Long rounded",
+    "13": "Long flat",
+    "14": "Heavy side sweep",
+    "15": "Long face frame",
+    "16": "Bangs 16",
+    "17": "Bangs 17",
+    "18": "Bangs 18",
+    "19": "Bangs 19",
+    "20": "Bangs 20",
+}
+
+# Unions used for validation / storage (either presentation may have saved a key).
+HAIR_BACK = {**HAIR_BACK_FEMALE, **HAIR_BACK_MALE}
+HAIR_BANGS = {**HAIR_BANGS_FEMALE, **HAIR_BANGS_MALE}
 
 HAIR_COLORS = {
     "1": "Color 1", "2": "Color 2", "3": "Color 3", "4": "Color 4", "5": "Color 5",
@@ -102,16 +180,45 @@ LOOK_FIELDS = {
 }
 
 
-def option_label(field: str, key: str) -> str:
-    v = LOOK_FIELDS[field][key]
+def options_for(field: str, look: dict | None = None) -> dict:
+    """Menu options for a field, filtered by presentation when it matters."""
+    look = look or {}
+    gender = look.get("gender", "female")
+    if field == "hair_back":
+        return HAIR_BACK_MALE if gender == "male" else HAIR_BACK_FEMALE
+    if field == "hair_bangs":
+        return HAIR_BANGS_MALE if gender == "male" else HAIR_BANGS_FEMALE
+    return LOOK_FIELDS[field]
+
+
+def option_label(field: str, key: str, look: dict | None = None) -> str:
+    opts = options_for(field, look) if look is not None else LOOK_FIELDS.get(field, {})
+    v = opts.get(key, LOOK_FIELDS.get(field, {}).get(key, key))
     return v[0] if isinstance(v, tuple) else v
+
+
+def clamp_hair_to_gender(look: dict) -> dict:
+    """If bangs/style aren't in the current presentation's menu, pick a sensible default."""
+    for field, fallback in (("hair_back", "17" if look.get("gender") == "male" else "1"),
+                            ("hair_bangs", "none")):
+        opts = options_for(field, look)
+        if look.get(field) not in opts:
+            look[field] = fallback if fallback in opts else next(iter(opts))
+    return look
 
 
 def default_look(user_id: int) -> dict:
     rng = random.Random(int(hashlib.sha256(str(user_id).encode()).hexdigest()[:12], 16))
     look = {f: rng.choice(sorted(opts)) for f, opts in LOOK_FIELDS.items()}
+    # Re-roll hair against the chosen presentation so masculine defaults short.
+    look["hair_back"] = rng.choice(sorted(options_for("hair_back", look)))
+    if look.get("gender") == "male":
+        look["hair_bangs"] = "none" if rng.random() < 0.75 else rng.choice(
+            [k for k in options_for("hair_bangs", look) if k != "none"] or ["none"])
+    else:
+        look["hair_bangs"] = "none" if rng.random() < 0.25 else rng.choice(
+            sorted(options_for("hair_bangs", look)))
     look["glasses"] = "none" if rng.random() < 0.7 else look["glasses"]
-    look["hair_bangs"] = "none" if rng.random() < 0.25 else look["hair_bangs"]
     return look
 
 
@@ -119,11 +226,11 @@ def clean_look(look: dict | None, user_id: int) -> dict:
     """Accept current fields; ignore legacy Pillow look keys."""
     base = default_look(user_id)
     if not look:
-        return base
+        return clamp_hair_to_gender(base)
     for f, opts in LOOK_FIELDS.items():
         if look.get(f) in opts:
             base[f] = look[f]
-    return base
+    return clamp_hair_to_gender(base)
 
 
 # ---------------------------------------------------------------- colour / fonts
