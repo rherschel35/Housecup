@@ -130,6 +130,8 @@ HELP = {
             ("season rename", "Rename the current season."),
             ("triwizard crown", "Record a Tri-Wizard Tournament winner."),
             ("triwizard remove", "Undo a Tri-Wizard entry made by mistake."),
+            ("descentboost", "Add Descent HP / Attack / Defense points to a player."),
+            ("descentreset", "Wipe someone's Descent progress back to floor 1."),
         ],
     },
     "staff_world": {
