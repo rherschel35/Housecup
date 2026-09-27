@@ -47,7 +47,7 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "chess_state.json"
 
-CHESS_CHANNEL_ID = 1553366177584124014
+CHESS_CHANNEL_ID = 1553832675993985024
 
 POINTS_PER_WIN = 3
 DAILY_WIN_CAP = 5   # point-earning wins per day (5 x 3 = 15 points/day)
