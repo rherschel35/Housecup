@@ -1,0 +1,8 @@
+
+# Licensed sprite packs — do not commit
+data/wizard_assets/
+mirror_test*.png
+chess_ui_*.png
+cogs/__pycache__/
+__pycache__/
+*.pyc
