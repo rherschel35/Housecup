@@ -46,27 +46,19 @@ GENDERS = {"male": "Masculine", "female": "Feminine"}
 
 SKINS = {str(i): f"Skin tone {i}" for i in range(1, 10)}
 
-# Hair Back = the actual cut. Labels differ by presentation; keys are pack folder numbers.
+# Hair Back = the actual cut. Masculine menu is short-only (long male-pack
+# styles still exist on disk but read feminine in this anime set).
 HAIR_BACK_MALE = {
     "1": "Soft bowl",
-    "2": "Rounded fringe",
-    "3": "Close crop",
     "4": "Messy tufts",
     "5": "Short spikes",
     "6": "Textured short",
     "7": "Smooth round",
-    "8": "Soft cap",
     "9": "Wild spikes",
-    "10": "Soft dome",
-    "11": "Classic bowl",
-    "12": "Full fringe cut",
-    "13": "Rounded cap",
-    "14": "Soft curtain",
     "15": "Tall spikes",
-    "16": "Messy medium",
+    "16": "Messy crop",
     "17": "Short crop",
     "18": "Spiky volume",
-    "19": "Wispy medium",
 }
 
 HAIR_BACK_FEMALE = {
@@ -197,8 +189,36 @@ BROWS = {
     "Confused": "Confused brows",
 }
 
-# Clothes 1-24 exist for both packs
-CLOTHES = {str(i): f"Outfit {i}" for i in range(1, 25)}
+# Feminine pack outfits (Discord max 25).
+CLOTHES_FEMALE = {str(i): f"Outfit {i}" for i in range(1, 25)}
+
+# Masculine pack: named cuts that read male (uniforms, shirts, jackets).
+CLOTHES_MALE = {
+    "1": "Gakuran closed",
+    "2": "Gakuran open collar",
+    "3": "Gakuran over shirt",
+    "4": "White dress shirt",
+    "5": "Open dress shirt",
+    "6": "Sport tee",
+    "7": "Track jacket open",
+    "8": "Track jacket half",
+    "9": "Track jacket zipped",
+    "10": "Blue button-down",
+    "11": "Plain tee",
+    "15": "Basketball jersey",
+    "16": "Blue vest",
+    "17": "Denim jacket",
+    "18": "Hoodie",
+    "20": "Beige sweater",
+    "21": "Suit vest + tie",
+    "22": "Blazer",
+    "28": "Grey polo",
+    "29": "Black button shirt",
+    "30": "Khaki polo",
+    "34": "Logo tee",
+}
+
+CLOTHES = {**CLOTHES_FEMALE, **CLOTHES_MALE}
 
 CLOTHES_COLORS = {
     "1": "Black",
@@ -210,6 +230,11 @@ CLOTHES_COLORS = {
     "7": "Cream",
     "8": "Leaf green",
 }
+
+# Natural-looking defaults for masculine randomize (menu still offers all colours).
+MALE_HAIR_COLORS = ("1", "2", "3", "4", "5", "10")
+MALE_BROWS = ("Serious", "Neutro", "Angry")
+MALE_EYES = ("4", "2", "1")  # Sharp, Almond, Round
 
 GLASSES = {
     "none": "No glasses",
@@ -241,6 +266,8 @@ def options_for(field: str, look: dict | None = None) -> dict:
         return HAIR_BACK_MALE if gender == "male" else HAIR_BACK_FEMALE
     if field == "hair_bangs":
         return HAIR_BANGS_MALE if gender == "male" else HAIR_BANGS_FEMALE
+    if field == "clothes":
+        return CLOTHES_MALE if gender == "male" else CLOTHES_FEMALE
     return LOOK_FIELDS[field]
 
 
@@ -251,28 +278,47 @@ def option_label(field: str, key: str, look: dict | None = None) -> str:
 
 
 def clamp_hair_to_gender(look: dict) -> dict:
-    """If bangs/style aren't in the current presentation's menu, pick a sensible default."""
-    for field, fallback in (("hair_back", "17" if look.get("gender") == "male" else "1"),
-                            ("hair_bangs", "none")):
+    """Drop styles/outfits that aren't in the current presentation's menu."""
+    male = look.get("gender") == "male"
+    fallbacks = {
+        "hair_back": "17" if male else "1",
+        "hair_bangs": "1" if male else "none",
+        "clothes": "1",
+    }
+    for field, fallback in fallbacks.items():
         opts = options_for(field, look)
         if look.get(field) not in opts:
             look[field] = fallback if fallback in opts else next(iter(opts))
     return look
 
 
+def _roll_presentation(look: dict, rng: random.Random) -> dict:
+    """Re-roll presentation-specific fields so masculine stays short/sharp."""
+    look["hair_back"] = rng.choice(sorted(options_for("hair_back", look)))
+    look["clothes"] = rng.choice(sorted(options_for("clothes", look)))
+    bangs_opts = options_for("hair_bangs", look)
+    if look.get("gender") == "male":
+        # Prefer a short fringe so the forehead doesn't read bald/androgynous.
+        short = [k for k in ("1", "6", "7", "9") if k in bangs_opts]
+        if rng.random() < 0.2 or not short:
+            look["hair_bangs"] = "none"
+        else:
+            look["hair_bangs"] = rng.choice(short)
+        look["brows"] = rng.choice(MALE_BROWS)
+        look["eyes"] = rng.choice(MALE_EYES)
+        look["hair_color"] = rng.choice(MALE_HAIR_COLORS)
+    else:
+        look["hair_bangs"] = "none" if rng.random() < 0.25 else rng.choice(
+            sorted(bangs_opts))
+    return look
+
+
 def default_look(user_id: int) -> dict:
     rng = random.Random(int(hashlib.sha256(str(user_id).encode()).hexdigest()[:12], 16))
     look = {f: rng.choice(sorted(opts)) for f, opts in LOOK_FIELDS.items()}
-    # Re-roll hair against the chosen presentation so masculine defaults short.
-    look["hair_back"] = rng.choice(sorted(options_for("hair_back", look)))
-    if look.get("gender") == "male":
-        look["hair_bangs"] = "none" if rng.random() < 0.75 else rng.choice(
-            [k for k in options_for("hair_bangs", look) if k != "none"] or ["none"])
-    else:
-        look["hair_bangs"] = "none" if rng.random() < 0.25 else rng.choice(
-            sorted(options_for("hair_bangs", look)))
+    _roll_presentation(look, rng)
     look["glasses"] = "none" if rng.random() < 0.7 else look["glasses"]
-    return look
+    return clamp_hair_to_gender(look)
 
 
 def clean_look(look: dict | None, user_id: int) -> dict:
