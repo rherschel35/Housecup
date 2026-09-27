@@ -1,8 +1,10 @@
 """
 The Mirror - player's wizard as a collectible trading card.
 
-Portrait is composited from the Tainara-P layered sprite packs under
+Portrait is composited from layered sprite packs under
 wizard_assets/{male,female} (STATE_DIR on Railway, or data/ locally).
+  - female: Tainara-P style (Body/Head/Hair folders)
+  - male:   MALE1 muscular pack (flat body/hair_top/… folders) when present
 House identity is the card colour (not robes on the figure). Worn gear
 is shown as icons beside the portrait, not drawn on the body.
 
@@ -20,6 +22,7 @@ from pathlib import Path
 from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 from cogs.wizard_assets_bootstrap import assets_root, crests_root
+from cogs import mirror_male1 as male1
 
 FONT_DIR = Path(__file__).resolve().parent.parent / "data" / "fonts"
 ASSETS = assets_root()
@@ -46,8 +49,8 @@ GENDERS = {"male": "Masculine", "female": "Feminine"}
 
 SKINS = {str(i): f"Skin tone {i}" for i in range(1, 10)}
 
-# Hair Back = the actual cut. Masculine menu is short-only (long male-pack
-# styles still exist on disk but read feminine in this anime set).
+# Hair Back = the actual cut. (Legacy Tainara male menus — used only if the
+# old male pack is still on disk; MALE1 overrides via options_for.)
 HAIR_BACK_MALE = {
     "1": "Soft bowl",
     "4": "Messy tufts",
@@ -122,8 +125,8 @@ HAIR_BANGS_FEMALE = {
 BANGS_NONE_LAYER = {"male": "6", "female": "1"}
 
 # Unions used for validation / storage (either presentation may have saved a key).
-HAIR_BACK = {**HAIR_BACK_FEMALE, **HAIR_BACK_MALE}
-HAIR_BANGS = {**HAIR_BANGS_FEMALE, **HAIR_BANGS_MALE}
+HAIR_BACK = {**HAIR_BACK_FEMALE, **HAIR_BACK_MALE, **male1.HAIR_BACK}
+HAIR_BANGS = {**HAIR_BANGS_FEMALE, **HAIR_BANGS_MALE, **male1.HAIR_TOP}
 
 HAIR_COLORS = {
     "1": "Black",
@@ -147,46 +150,19 @@ EYE_TYPES = {
     "6": "Tired",
 }
 
-IRIS_TYPES = {
-    "1": "Classic",
-    "2": "Soft glow",
-    "3": "Ringed",
-    "4": "Bright",
-}
-
-IRIS_COLORS = {
-    "1": "Dark brown",
-    "2": "Plum",
-    "3": "Crimson",
-    "4": "Deep red",
-    "5": "Rose red",
-    "6": "Copper",
-    "7": "Amber",
-    "8": "Forest green",
-    "9": "Bright green",
-    "10": "Teal",
-    "11": "Steel blue",
-    "12": "Sea green",
-    "13": "Sky blue",
-    "14": "Royal blue",
-    "15": "Purple",
-    "16": "Midnight",
-    "17": "Violet",
-    "18": "Rose",
-    "19": "Grey",
-}
-
 MOUTHS = {
     "Smile": "Smile", "Smiling": "Soft smile", "Grin": "Grin", "Big Smile": "Big smile",
     "Neutro": "Neutral", "Serious": "Serious", "Smirk": "Smirk", "Laugh": "Laugh",
     "Embarrassed": "Embarrassed", "Sulking": "Sulking", "Surprised": "Surprised",
     "Angry": "Angry", "Sad": "Sad", "Cheeky": "Cheeky",
+    **male1.MOUTHS,
 }
 
 BROWS = {
     "Neutro": "Neutral brows", "Serious": "Serious brows", "Curved": "Curved brows",
     "Up": "Raised brows", "Sad": "Sad brows", "Angry": "Angry brows",
     "Confused": "Confused brows",
+    **male1.BROWS,
 }
 
 # Feminine pack outfits (Discord max 25).
@@ -218,7 +194,7 @@ CLOTHES_MALE = {
     "34": "Logo tee",
 }
 
-CLOTHES = {**CLOTHES_FEMALE, **CLOTHES_MALE}
+CLOTHES = {**CLOTHES_FEMALE, **CLOTHES_MALE, **male1.CLOTHES}
 
 CLOTHES_COLORS = {
     "1": "Black",
@@ -229,9 +205,10 @@ CLOTHES_COLORS = {
     "6": "Lavender",
     "7": "Cream",
     "8": "Leaf green",
+    **male1.CLOTHES_COLORS,
 }
 
-# Natural-looking defaults for masculine randomize (menu still offers all colours).
+# Natural-looking defaults for legacy masculine randomize.
 MALE_HAIR_COLORS = ("1", "2", "3", "4", "5", "10")
 MALE_BROWS = ("Serious", "Neutro", "Angry")
 MALE_EYES = ("4", "2", "1")  # Sharp, Almond, Round
@@ -239,6 +216,38 @@ MALE_EYES = ("4", "2", "1")  # Sharp, Almond, Round
 GLASSES = {
     "none": "No glasses",
     "1": "Glasses 1", "2": "Glasses 2", "3": "Glasses 3", "4": "Glasses 4", "5": "Glasses 5",
+    **male1.BEARDS,
+}
+
+IRIS_TYPES = {
+    "1": "Classic",
+    "2": "Soft glow",
+    "3": "Ringed",
+    "4": "Bright",
+    **male1.NOSES,
+}
+
+IRIS_COLORS = {
+    "1": "Dark brown",
+    "2": "Plum",
+    "3": "Crimson",
+    "4": "Deep red",
+    "5": "Rose red",
+    "6": "Copper",
+    "7": "Amber",
+    "8": "Forest green",
+    "9": "Bright green",
+    "10": "Teal",
+    "11": "Steel blue",
+    "12": "Sea green",
+    "13": "Sky blue",
+    "14": "Royal blue",
+    "15": "Purple",
+    "16": "Midnight",
+    "17": "Violet",
+    "18": "Rose",
+    "19": "Grey",
+    **male1.PUPILS,
 }
 
 LOOK_FIELDS = {
@@ -258,10 +267,22 @@ LOOK_FIELDS = {
 }
 
 
+def _use_male1() -> bool:
+    return male1.is_male1_root(ASSETS / "male")
+
+
 def options_for(field: str, look: dict | None = None) -> dict:
     """Menu options for a field, filtered by presentation when it matters."""
     look = look or {}
     gender = look.get("gender", "female")
+    if gender == "male" and _use_male1():
+        m1 = male1.options(field)
+        if m1:
+            return m1
+        if field == "gender":
+            return GENDERS
+        if field == "skin":
+            return male1.SKINS
     if field == "hair_back":
         return HAIR_BACK_MALE if gender == "male" else HAIR_BACK_FEMALE
     if field == "hair_bangs":
@@ -277,8 +298,28 @@ def option_label(field: str, key: str, look: dict | None = None) -> str:
     return v[0] if isinstance(v, tuple) else v
 
 
+DEFAULT_FIELD_LABEL = {
+    "gender": "Presentation", "skin": "Skin tone", "clothes": "Outfit", "clothes_color": "Outfit colour",
+    "hair_back": "Hair style", "hair_bangs": "Bangs", "hair_color": "Hair colour",
+    "eyes": "Eye shape", "iris_type": "Iris style", "iris_color": "Eye colour",
+    "brows": "Brows", "mouth": "Expression", "glasses": "Glasses",
+}
+
+
+def field_label(field: str, look: dict | None = None) -> str:
+    """Human placeholder for a /wizard select."""
+    look = look or {}
+    if look.get("gender") == "male" and _use_male1():
+        override = male1.field_label(field)
+        if override:
+            return override
+    return DEFAULT_FIELD_LABEL.get(field, field)
+
+
 def clamp_hair_to_gender(look: dict) -> dict:
     """Drop styles/outfits that aren't in the current presentation's menu."""
+    if look.get("gender") == "male" and _use_male1():
+        return male1.clamp_look(look)
     male = look.get("gender") == "male"
     fallbacks = {
         "hair_back": "17" if male else "1",
@@ -293,12 +334,26 @@ def clamp_hair_to_gender(look: dict) -> dict:
 
 
 def _roll_presentation(look: dict, rng: random.Random) -> dict:
-    """Re-roll presentation-specific fields so masculine stays short/sharp."""
+    """Re-roll presentation-specific fields for the active pack."""
+    if look.get("gender") == "male" and _use_male1():
+        for field in ("skin", "hair_back", "hair_bangs", "hair_color", "eyes",
+                      "iris_type", "iris_color", "brows", "mouth",
+                      "clothes_color"):
+            opts = options_for(field, look)
+            look[field] = rng.choice(sorted(opts))
+        tops = options_for("clothes", look)
+        preferred = [k for k in (
+            "basic_shirt", "shirt", "short_shirt", "sweatshirt", "jacket",
+            "rustic_shirt", "open_shirt", "ample_sweater", "long_jacket",
+        ) if k in tops]
+        look["clothes"] = rng.choice(preferred or sorted(tops))
+        look["glasses"] = "none" if rng.random() < 0.55 else rng.choice(
+            [k for k in options_for("glasses", look) if k != "none"] or ["none"])
+        return look
     look["hair_back"] = rng.choice(sorted(options_for("hair_back", look)))
     look["clothes"] = rng.choice(sorted(options_for("clothes", look)))
     bangs_opts = options_for("hair_bangs", look)
     if look.get("gender") == "male":
-        # Prefer a short fringe so the forehead doesn't read bald/androgynous.
         short = [k for k in ("1", "6", "7", "9") if k in bangs_opts]
         if rng.random() < 0.2 or not short:
             look["hair_bangs"] = "none"
@@ -317,7 +372,8 @@ def default_look(user_id: int) -> dict:
     rng = random.Random(int(hashlib.sha256(str(user_id).encode()).hexdigest()[:12], 16))
     look = {f: rng.choice(sorted(opts)) for f, opts in LOOK_FIELDS.items()}
     _roll_presentation(look, rng)
-    look["glasses"] = "none" if rng.random() < 0.7 else look["glasses"]
+    if not (look.get("gender") == "male" and _use_male1()):
+        look["glasses"] = "none" if rng.random() < 0.7 else look["glasses"]
     return clamp_hair_to_gender(look)
 
 
@@ -452,9 +508,12 @@ def _glasses_path(root: Path, glasses: str, color: str) -> Path | None:
 
 
 def compose_portrait(look: dict) -> Image.Image:
-    """Stack sprite layers into a 1400x1200 RGBA portrait."""
+    """Stack sprite layers into a portrait (typically ~1400x1200)."""
     gender = look.get("gender", "male")
     root = _root(gender)
+    if gender == "male" and male1.is_male1_root(root):
+        return male1.compose(root, look, (SRC_W, SRC_H))
+
     canvas = Image.new("RGBA", (SRC_W, SRC_H), (0, 0, 0, 0))
 
     skin = look.get("skin", "1")

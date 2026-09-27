@@ -972,12 +972,7 @@ PAGES = [
     ("Eyes", ["eyes", "iris_type", "iris_color"]),
     ("Expression", ["brows", "mouth", "glasses"]),
 ]
-FIELD_LABEL = {
-    "gender": "Presentation", "skin": "Skin tone", "clothes": "Outfit", "clothes_color": "Outfit colour",
-    "hair_back": "Hair style", "hair_bangs": "Bangs", "hair_color": "Hair colour",
-    "eyes": "Eye shape", "iris_type": "Iris style", "iris_color": "Eye colour",
-    "brows": "Brows", "mouth": "Expression", "glasses": "Glasses",
-}
+FIELD_LABEL = art.DEFAULT_FIELD_LABEL
 
 
 class LookSelect(discord.ui.Select):
@@ -998,7 +993,7 @@ class LookSelect(discord.ui.Select):
             ))
         # a fixed id for the life of this /wizard window, so a click that lands
         # while the preview is redrawing still finds its menu
-        super().__init__(placeholder=FIELD_LABEL[field], options=opts[:25], min_values=1, max_values=1,
+        super().__init__(placeholder=art.field_label(field, wizard_view.look), options=opts[:25], min_values=1, max_values=1,
                          custom_id=f"wiz:{wizard_view.nonce}:{field}")
 
     async def callback(self, interaction: discord.Interaction):
