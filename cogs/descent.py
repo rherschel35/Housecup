@@ -1065,6 +1065,53 @@ class Descent(commands.Cog):
         await interaction.response.send_message(
             f"{who} Descent progress has been wiped - back to floor 1, monster 1.", ephemeral=True)
 
+    @app_commands.command(
+        name="descentboost",
+        description="(staff) Add Descent HP / Attack / Defense points to a player.",
+    )
+    @app_commands.describe(
+        member="Who to boost",
+        hp="Stat points to add to Max HP (12 HP each). Can be negative.",
+        attack="Stat points to add to Attack (2 ATK each). Can be negative.",
+        defense="Stat points to add to Defense (1 DEF each). Can be negative.",
+    )
+    async def descentboost(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        hp: int = 0,
+        attack: int = 0,
+        defense: int = 0,
+    ):
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        if hp == 0 and attack == 0 and defense == 0:
+            await interaction.response.send_message(
+                "Give at least one of `hp`, `attack`, or `defense` (can be negative to remove).",
+                ephemeral=True,
+            )
+            return
+
+        rec = self.record(member.id)
+        pts = rec["stat_points"]
+        pts["hp"] = max(0, pts.get("hp", 0) + hp)
+        pts["atk"] = max(0, pts.get("atk", 0) + attack)
+        pts["def"] = max(0, pts.get("def", 0) + defense)
+        # Active fight keeps old stats; drop it so the next /descend uses the boost.
+        self.fights.pop(member.id, None)
+        self.save()
+
+        p_hp, p_atk, p_def = player_stats(rec)
+        await interaction.response.send_message(
+            f"Boosted **{member.display_name}**'s Descent stats "
+            f"(+{hp} HP pts, +{attack} ATK pts, +{defense} DEF pts).\n"
+            f"Now: ❤️ **{p_hp}** · ⚔️ **{p_atk}** · 🛡️ **{p_def}** "
+            f"(points: hp={pts['hp']}, atk={pts['atk']}, def={pts['def']}).",
+            ephemeral=True,
+        )
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Descent(bot))
