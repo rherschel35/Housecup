@@ -1,15 +1,19 @@
 """
 Wizard duels. Best of three, spells chosen in secret.
 
-    /duel @member        - challenge someone
-    /duelrecord [member] - rank, wins, streak, rivals, and today's duel points
-    /houseduels          - each house's overall win/loss duelling record
-    /duelnight start|end - (staff) House Duel Night: duel wins count double
+    /duel @member              - challenge someone (1v1)
+    /duelrecord [member]       - rank, wins, streak, rivals, trio/grand, points
+    /houseduels                - each house's overall win/loss duelling record
+    /duelnight start|end       - (staff) House Duel Night: duel wins count double
+    /trio scramble             - open 3v3 signup (any houses)
+    /trio housematch h1 h2     - house-gated 3v3 signup
+    /grand @member             - Grand Duel (both need 50+ 1v1 wins)
 
 Rewards: ranks by total wins, hidden Dueling Circle reputation (flourish,
-wand glow, one-time gift), win streaks with bounties, rivals, signature
-spells with titles, and a weekly Duelist of the Week (role + house points).
-Only wins, ranks, streaks and titles are ever shown - never a win rate.
+wand glow, one-time gift), win streaks with bounties, rivals, stacked
+signature-spell titles, trio/grand records and titles, and a weekly
+Duelist of the Week (role + house points). Only wins, ranks, streaks and
+titles are ever shown - never a win rate.
 
 Five spells. Each beats exactly two others and loses to the other two, so
 there is no safe pick - only reading your opponent. Both duelists choose
@@ -49,23 +53,24 @@ REWARD_POINTS = 1
 REWARDED_PER_DAY = 3
 WINDOW = 24 * 3600
 
-# Optional, off by default: a single Discord user ID who quietly wins duels
-# more often than the spells alone would give them. Set DUEL_FAVORED_USER_ID
-# in the environment to turn it on for that account - no code change needed
-# to flip it on/off or retarget it. When unset, duels are decided purely by
-# resolve() below, exactly as documented.
+# Optional, off by default: a single Discord user ID who quietly wins duel
+# exchanges more often than the spells alone would give them. Applies to
+# 1v1 rounds, trio pairings, and Grand steps/sudden death. Set
+# DUEL_FAVORED_USER_ID in the environment to turn it on for that account.
+# When unset, every mode is decided purely by resolve() below.
 FAVORED_USER_ID = os.getenv("DUEL_FAVORED_USER_ID")
 FAVORED_USER_ID = int(FAVORED_USER_ID) if FAVORED_USER_ID and FAVORED_USER_ID.isdigit() else None
-# Chance, PER ROUND, that the favored user's round is decided in their favor
-# regardless of what either side cast. Rounds that don't trigger this fall
-# through to the real rock-paper-scissors-of-five above, which is roughly a
-# coin flip against an unpredictable opponent. There's no clean closed form
-# from a per-round bias to a match-level win rate (best of 3, ties replay),
-# so this default was tuned by simulation against a random opponent:
-# 0.455 per round -> ~85% of matches won overall, 0.342 -> ~78% (the
-# current setting; tuned with /tmp/test_duel_bias.py). A more adversarial opponent who could
-# somehow read your picks would knock this down toward the raw per-round
-# number, never above it - the bias never makes you invincible, only likely.
+# Chance, PER exchange, that the favored user's side is decided in their
+# favor regardless of what either side cast. Exchanges that don't trigger
+# this fall through to the real rock-paper-scissors-of-five above, which
+# is roughly a coin flip against an unpredictable opponent. There's no
+# clean closed form from a per-round bias to a match-level win rate (best
+# of 3, ties replay), so this default was tuned by simulation against a
+# random opponent: 0.455 per round -> ~85% of 1v1 matches won overall,
+# 0.342 -> ~78% (the current setting). A more adversarial opponent who
+# could somehow read your picks would knock this down toward the raw
+# per-exchange number, never above it - the bias never makes you
+# invincible, only likely.
 FAVORED_ROUND_BIAS = float(os.getenv("DUEL_FAVORED_BIAS", "0.342"))
 
 SPELLS = {
@@ -101,12 +106,43 @@ def resolve(a: str, b: str) -> tuple[int, str]:
     return 2, BEATS[(b, a)]
 
 
+def favor_display_spells(a_id: int, b_id: int, a_spell: str, b_spell: str,
+                         rng: random.Random | None = None) -> tuple[str, str]:
+    """Maybe rewrite one side's shown spell so resolve() favors FAVORED_USER_ID.
+
+    Same trick as classic 1v1: credit the favored caster with a legitimate
+    counter to the opponent's real pick, so the public line looks like a
+    normal matchup. No-ops when the env var is unset, neither id matches,
+    or the bias roll misses. Used by 1v1, trio pairings, and Grand.
+    """
+    if FAVORED_USER_ID is None or FAVORED_USER_ID not in (a_id, b_id):
+        return a_spell, b_spell
+    roll = (rng or random).random()
+    if roll >= FAVORED_ROUND_BIAS:
+        return a_spell, b_spell
+    if FAVORED_USER_ID == a_id:
+        counters = [w for (w, l) in BEATS if l == b_spell]
+        if not counters:
+            return a_spell, b_spell
+        return (rng or random).choice(counters), b_spell
+    counters = [w for (w, l) in BEATS if l == a_spell]
+    if not counters:
+        return a_spell, b_spell
+    return a_spell, (rng or random).choice(counters)
+
+
 # ------------------------------------------------------------ duel rewards
 #
 # Ranks come from all-time wins. Everything shown publicly is wins, rank,
 # streaks and titles - never a win rate or a loss count.
 
 RANKS = [            # (minimum wins, title) - highest first
+    (1000, "Golden God"),
+    (800, "Myth Made Flesh"),
+    (600, "Unanswerable"),
+    (400, "Terror of the Dueling Floor"),
+    (250, "Wandlord"),
+    (150, "Archmage of the Circle"),
     (100, "Legend"),
     (60, "Master of the Circle"),
     (30, "Spellblade"),
@@ -116,14 +152,41 @@ RANKS = [            # (minimum wins, title) - highest first
     (0, "Untested"),
 ]
 
-SIGNATURE_AT = 10            # round wins with one spell to make it your signature
-SIGNATURE_TITLES = {
-    "hex": "the Hexer",
-    "ward": "the Wall",
-    "disarm": "the Quickdraw",
-    "bind": "the Binder",
-    "mirror": "the Trickster",
-}
+# Signature titles STACK — keep every lower tier when a higher one unlocks.
+# (round-wins with that spell, {spell: title})
+SIGNATURE_TIERS = [
+    (10, {
+        "hex": "the Hexer",
+        "ward": "the Wall",
+        "disarm": "the Quickdraw",
+        "bind": "the Binder",
+        "mirror": "the Trickster",
+    }),
+    (50, {
+        "hex": "the Hex Addict",
+        "ward": "the Immovable Object",
+        "disarm": "Twitchy",
+        "bind": "the Rope Guy",
+        "mirror": "Smoke and Mirrors",
+    }),
+    (150, {
+        "hex": "Certified Hex Menace",
+        "ward": "Human Fortress",
+        "disarm": "Faster Than Your Wand",
+        "bind": "Basically a Boy Scout",
+        "mirror": "The Reflection Nobody Asked For",
+    }),
+    (500, {
+        "hex": "The One-Trick Nightmare",
+        "ward": "The Wall Has Feelings Now",
+        "disarm": "Too Fast, Too Furious",
+        "bind": "Knot Theory PhD",
+        "mirror": "Mirror, Mirror, Shut Up",
+    }),
+]
+# Flat lookup for adornments / legacy callers (spell -> lowest-tier title).
+SIGNATURE_TITLES = SIGNATURE_TIERS[0][1]
+SIGNATURE_AT = SIGNATURE_TIERS[0][0]
 
 STREAK_ANNOUNCE = 3          # wins in a row before the channel hears about it
 STREAK_EVERY = 5             # past the bounty, only announce every 5th win in a row
@@ -131,8 +194,78 @@ ANNOUNCE_RANKS_FROM = 5      # Novice (first win) isn't worth a post; Apprentice
 BOUNTY_AT = 5                # wins in a row before a bounty goes up
 BOUNTY_POINTS = 2            # paid to whoever breaks it (outside the daily cap)
 
-RIVAL_AFTER = 5              # duels between the same two people
+RIVAL_AFTER = 5              # duels between the same two people (point bonus threshold)
 RIVAL_BONUS = 1              # extra point for beating your rival (uses a cap slot)
+# Rival titles by total meetings — both players earn each tier when crossed.
+RIVAL_TITLE_TIERS = [        # (meetings, title) - highest first
+    (100, "Rivals Turned Lovers"),
+    (75, "The Unfinished Duel"),
+    (50, "Eternal Opposition"),
+    (30, "Bound by Sparks"),
+    (15, "Nemeses"),
+    (5, "Rivals"),
+]
+
+TRIO_SIZE = 3
+TRIO_SIGNUP_TIMEOUT = 90
+TRIO_ROUNDS_TO_WIN = 2       # best of three
+TRIO_REWARD_POINTS = 1
+TRIO_REWARDED_PER_DAY = 3
+TRIO_TITLE_TIERS = [         # (trio wins, title) - highest first
+    (50, "Three's Company"),
+    (30, "Pack Hunter"),
+    (15, "Triangle Terror"),
+    (5, "Triad Novice"),
+]
+
+GRAND_MIN_WINS = 50          # 1v1 wins required on both sides
+GRAND_SLOTS = 10
+GRAND_TO_WIN = 6             # first to 6 of 10 (or sudden death after 5–5)
+GRAND_REWARD_POINTS = 2
+GRAND_REWARDED_PER_DAY = 3
+GRAND_PLAY_DELAY = 5         # seconds between announced rounds
+GRAND_TITLE_TIERS = [        # (grand wins, title) - highest first
+    (1000, "Grandmaster of Inevitability"),
+    (750, "I Knew You'd Pick That"),
+    (500, "Destiny's Ghostwriter"),
+    (250, "The Script Is Already Written"),
+    (100, "Prophet of the Tenth Step"),
+    (50, "Grand Architect"),
+    (30, "Ten Steps Ahead"),
+    (15, "Pattern Mage"),
+    (5, "Sequencer"),
+]
+GRAND_RIVAL_TITLE_TIERS = [  # (grand meetings, title) - highest first
+    (100, "Married In The Eyes Of The Circle"),
+    (75, "The Longest Grudge"),
+    (50, "Mutual Destruction Pact"),
+    (30, "We Need To Stop Meeting Like This"),
+    (15, "Calendar Nemeses"),
+    (5, "Scheduled Enemies"),
+]
+
+GRAND_THEATRE = [
+    "The Circle holds its breath.",
+    "Wands rise as one.",
+    "A hush falls over the floor.",
+    "Somewhere, a portrait covers its eyes.",
+    "The stones remember this kind of duel.",
+    "Fate sharpens its quill.",
+    "Two spells leave two wands. Only one will land.",
+    "The air tastes like ozone and bad decisions.",
+    "Someone in the stands has already started a betting pool.",
+    "A first-year whispers 'oh no' a little too loudly.",
+    "The torches lean in, nosy as ever.",
+    "Time stretches. Spells do not.",
+    "The floor itself seems to brace.",
+    "One of them smiles. The other notices.",
+    "Destiny clears its throat.",
+    "A moth chooses this exact moment to fly between them.",
+    "The referee has left the building. There is no referee.",
+    "History is taking notes. History has terrible handwriting.",
+    "Both duelists blink. Neither yields.",
+    "The next second will be very opinionated.",
+]
 
 # Hidden Dueling Circle reputation.
 REP_WIN, REP_LOSS = 2, 1
@@ -189,11 +322,35 @@ def pair_key(a: int, b: int) -> str:
     return f"{min(a, b)}-{max(a, b)}"
 
 
+def titles_at_or_below(tiers: list, count: int) -> list[str]:
+    """All titles from a highest-first (threshold, title) list that count unlocks."""
+    return [title for threshold, title in reversed(tiers) if count >= threshold]
+
+
+def highest_title(tiers: list, count: int):
+    for threshold, title in tiers:
+        if count >= threshold:
+            return title
+    return None
+
+
+def signature_unlocks_for(tally: dict) -> list[tuple[str, int, str]]:
+    """(spell, threshold, title) for every unlocked signature tier across spells."""
+    out = []
+    for spell, n in (tally or {}).items():
+        for threshold, titles in SIGNATURE_TIERS:
+            if n >= threshold and spell in titles:
+                out.append((spell, threshold, titles[spell]))
+    return out
+
+
 class Duels(commands.Cog):
+    trio = app_commands.Group(name="trio", description="3v3 wizard duels.")
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.state = self._load()
-        self.busy: set[int] = set()   # members currently in a duel
+        self.busy: set[int] = set()   # members currently in a duel / trio / grand
 
     async def cog_load(self):
         self.weekly.start()
@@ -214,14 +371,40 @@ class Duels(commands.Cog):
             state = {}
         state.setdefault("records", {})
         state.setdefault("rewarded", {})
+        state.setdefault("trio_rewarded", {})
+        state.setdefault("grand_rewarded", {})
         for key in ("rep", "streaks", "bounties", "pairs", "spell_wins", "signature",
-                    "rank_seen", "gifted", "rivals_announced"):
+                    "rank_seen", "gifted", "rivals_announced", "signature_announced",
+                    "grand_pairs", "grand_rivals_announced"):
             state.setdefault(key, {})
         state.setdefault("week", {"key": week_key(), "wins": {}})
         state.setdefault("champion", None)      # {"user_id", "week"}
         state.setdefault("duel_night", None)    # {"by", "at"}
         if not state.get("rewards_backfilled"):
             self._backfill(state)
+        # Quietly mark already-earned signature titles as announced so a redeploy
+        # doesn't flood the channel with every historical unlock at once.
+        if not state.get("signature_announced_backfilled"):
+            for uid, tally in state.get("spell_wins", {}).items():
+                have = set(state["signature_announced"].setdefault(uid, []))
+                for _, _, title in signature_unlocks_for(tally):
+                    if title not in have:
+                        state["signature_announced"][uid].append(title)
+                        have.add(title)
+            state["signature_announced_backfilled"] = True
+        if not state.get("rival_tiers_backfilled"):
+            for pk, n in list(state.get("pairs", {}).items()):
+                best = 0
+                for thresh, _ in RIVAL_TITLE_TIERS:
+                    if n >= thresh:
+                        best = thresh
+                        break
+                raw = state["rivals_announced"].get(pk)
+                if best:
+                    state["rivals_announced"][pk] = best
+                elif raw is True:
+                    state["rivals_announced"][pk] = RIVAL_AFTER
+            state["rival_tiers_backfilled"] = True
         return state
 
     @staticmethod
@@ -248,18 +431,46 @@ class Duels(commands.Cog):
             log.exception("Could not save duel records.")
 
     def record_of(self, user_id: int) -> dict:
-        return self.state["records"].setdefault(str(user_id), {"w": 0, "l": 0})
+        rec = self.state["records"].setdefault(str(user_id), {"w": 0, "l": 0})
+        rec.setdefault("w", 0)
+        rec.setdefault("l", 0)
+        rec.setdefault("trio_w", 0)
+        rec.setdefault("trio_l", 0)
+        rec.setdefault("grand_w", 0)
+        rec.setdefault("grand_l", 0)
+        return rec
 
     def rewarded_today(self, user_id: int, now: float = None) -> int:
+        return self._rewarded_count("rewarded", user_id, now)
+
+    def trio_rewarded_today(self, user_id: int, now: float = None) -> int:
+        return self._rewarded_count("trio_rewarded", user_id, now)
+
+    def grand_rewarded_today(self, user_id: int, now: float = None) -> int:
+        return self._rewarded_count("grand_rewarded", user_id, now)
+
+    def _rewarded_count(self, bucket: str, user_id: int, now: float = None) -> int:
         now = now if now is not None else time.time()
-        stamps = [t for t in self.state["rewarded"].get(str(user_id), []) if now - t < WINDOW]
-        self.state["rewarded"][str(user_id)] = stamps
+        stamps = [t for t in self.state[bucket].get(str(user_id), []) if now - t < WINDOW]
+        self.state[bucket][str(user_id)] = stamps
         return len(stamps)
+
+    def _in_duel_channel(self, interaction: discord.Interaction):
+        arena = os.getenv("DUEL_CHANNEL_ID", "")
+        if arena.isdigit() and interaction.channel_id != int(arena):
+            return False, arena
+        return True, arena
 
     # ------------------------------------------------------- public helpers
 
     def wins_of(self, user_id: int) -> int:
         return self.state["records"].get(str(user_id), {}).get("w", 0)
+
+    def trio_wins_of(self, user_id: int) -> int:
+        return self.state["records"].get(str(user_id), {}).get("trio_w", 0)
+
+    def grand_wins_of(self, user_id: int) -> int:
+        return self.state["records"].get(str(user_id), {}).get("grand_w", 0)
 
     def rep_of(self, user_id: int) -> int:
         return self.state["rep"].get(str(user_id), 0)
@@ -270,10 +481,20 @@ class Duels(commands.Cog):
     def has_bounty(self, user_id: int) -> bool:
         return str(user_id) in self.state["bounties"]
 
+    def signature_titles_of(self, user_id: int) -> list[str]:
+        """Every unlocked signature title across spells and tiers (stacked)."""
+        tally = self.state["spell_wins"].get(str(user_id), {})
+        return [title for _, _, title in signature_unlocks_for(tally)]
+
     def signature_of(self, user_id: int):
-        """(spell key, title) once they've earned a signature, else None."""
-        key = self.state["signature"].get(str(user_id))
-        return (key, SIGNATURE_TITLES[key]) if key in SIGNATURE_TITLES else None
+        """Best (spell key, title) for display compatibility, else None."""
+        tally = self.state["spell_wins"].get(str(user_id), {})
+        unlocks = signature_unlocks_for(tally)
+        if not unlocks:
+            key = self.state["signature"].get(str(user_id))
+            return (key, SIGNATURE_TITLES[key]) if key in SIGNATURE_TITLES else None
+        best = max(unlocks, key=lambda row: (row[1], tally.get(row[0], 0), row[0]))
+        return (best[0], best[2])
 
     def rivals_of(self, user_id: int) -> list[int]:
         """Everyone they've duelled RIVAL_AFTER+ times, most duelled first."""
@@ -285,6 +506,53 @@ class Duels(commands.Cog):
                 rows.append((n, int(b if a == me else a)))
         rows.sort(reverse=True)
         return [uid for _, uid in rows]
+
+    def rival_titles_of(self, user_id: int) -> list[str]:
+        """All rival-pair titles unlocked with any opponent (deduped, stacked)."""
+        me = str(user_id)
+        got: list[str] = []
+        seen: set[str] = set()
+        for key, n in self.state["pairs"].items():
+            a, b = key.split("-")
+            if me not in (a, b):
+                continue
+            for title in titles_at_or_below(RIVAL_TITLE_TIERS, n):
+                if title not in seen:
+                    seen.add(title)
+                    got.append(title)
+        return got
+
+    def trio_titles_of(self, user_id: int) -> list[str]:
+        return titles_at_or_below(TRIO_TITLE_TIERS, self.trio_wins_of(user_id))
+
+    def grand_titles_of(self, user_id: int) -> list[str]:
+        return titles_at_or_below(GRAND_TITLE_TIERS, self.grand_wins_of(user_id))
+
+    def grand_rival_titles_of(self, user_id: int) -> list[str]:
+        me = str(user_id)
+        got: list[str] = []
+        seen: set[str] = set()
+        for key, n in self.state["grand_pairs"].items():
+            a, b = key.split("-")
+            if me not in (a, b):
+                continue
+            for title in titles_at_or_below(GRAND_RIVAL_TITLE_TIERS, n):
+                if title not in seen:
+                    seen.add(title)
+                    got.append(title)
+        return got
+
+    @staticmethod
+    def _announced_tier(raw) -> int:
+        """rivals_announced used to be bool; now stores the highest threshold posted."""
+        if raw is True:
+            return RIVAL_AFTER
+        if raw is False or raw is None:
+            return 0
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return 0
 
     def is_champion(self, user_id: int) -> bool:
         c = self.state.get("champion")
@@ -342,11 +610,18 @@ class Duels(commands.Cog):
         # rivalry (counted before scoring so the 5th duel already pays)
         pk = pair_key(winner.id, loser.id)
         self.state["pairs"][pk] = self.state["pairs"].get(pk, 0) + 1
-        rivals = self.state["pairs"][pk] >= RIVAL_AFTER
-        if rivals and not self.state["rivals_announced"].get(pk):
-            self.state["rivals_announced"][pk] = True
-            notes.append(f"⚔️ **{winner.display_name}** and **{loser.display_name}** have met "
-                         f"{self.state['pairs'][pk]} times. They are now **Rivals**.")
+        meetings = self.state["pairs"][pk]
+        rivals = meetings >= RIVAL_AFTER
+        announced = self._announced_tier(self.state["rivals_announced"].get(pk))
+        # lowest-first so announcements climb the ladder in order
+        for threshold, title in reversed(RIVAL_TITLE_TIERS):
+            if meetings >= threshold > announced:
+                self.state["rivals_announced"][pk] = threshold
+                announced = threshold
+                notes.append(
+                    f"⚔️ **{winner.display_name}** and **{loser.display_name}** have met "
+                    f"{meetings} times. They are now **{title}**."
+                )
 
         # ------------------------------------------------ house points
         outcome = {"awarded": 0, "reason": None, "house": w_house, "notes": notes,
@@ -428,18 +703,30 @@ class Duels(commands.Cog):
                 notes.append(f"⬆️ **{winner.display_name}** has risen to **{rank_for(wins)}** "
                              f"({wins} wins).")
 
-        # ------------------------------------------------ signature spells
+        # ------------------------------------------------ signature spells (stacked tiers)
         for member in (winner, loser):
             uid = str(member.id)
             tally = self.state["spell_wins"].get(uid, {})
             if not tally:
                 continue
-            best = max(tally, key=lambda k: (tally[k], k))
-            if tally[best] >= SIGNATURE_AT and self.state["signature"].get(uid) != best:
-                self.state["signature"][uid] = best
-                notes.append(f"✨ **{member.display_name}** has made {SPELLS[best]['name']} their "
-                             f"signature spell. They are now **{member.display_name} "
-                             f"{SIGNATURE_TITLES[best]}**.")
+            unlocks = signature_unlocks_for(tally)
+            if not unlocks:
+                continue
+            # Keep legacy single-signature pointer on the strongest spell.
+            best = max(unlocks, key=lambda row: (row[1], tally.get(row[0], 0), row[0]))
+            self.state["signature"][uid] = best[0]
+            seen = set(self.state["signature_announced"].setdefault(uid, []))
+            # Announce newly crossed tiers in ascending threshold order.
+            for spell, threshold, title in sorted(unlocks, key=lambda r: (r[1], r[0])):
+                if title in seen:
+                    continue
+                seen.add(title)
+                self.state["signature_announced"][uid].append(title)
+                notes.append(
+                    f"✨ **{member.display_name}** has unlocked a signature title with "
+                    f"{SPELLS[spell]['name']}: **{title}** "
+                    f"({threshold} round wins with that spell)."
+                )
 
         # ------------------------------------------------ this week's tally
         week = self.state["week"]["wins"]
@@ -553,8 +840,8 @@ class Duels(commands.Cog):
     @app_commands.describe(opponent="Who you're challenging")
     async def duel(self, interaction: discord.Interaction, opponent: discord.Member):
         me = interaction.user
-        arena = os.getenv("DUEL_CHANNEL_ID", "")
-        if arena.isdigit() and interaction.channel_id != int(arena):
+        ok, arena = self._in_duel_channel(interaction)
+        if not ok:
             await interaction.response.send_message(
                 f"⚔️ Duels are fought in <#{arena}>.", ephemeral=True
             )
@@ -586,19 +873,22 @@ class Duels(commands.Cog):
         duel.message = await interaction.original_response()
         duel.start_accept_timer()
 
-    @app_commands.command(name="duelrecord", description="Duel wins, rank, streak, and today's duel points.")
+    @app_commands.command(name="duelrecord", description="Duel wins, rank, streak, trio/grand, and today's duel points.")
     @app_commands.describe(member="Whose record (leave blank for your own)")
     async def duelrecord(self, interaction: discord.Interaction, member: discord.Member = None):
         member = member or interaction.user
         wins = self.wins_of(member.id)
         left = max(0, REWARDED_PER_DAY - self.rewarded_today(member.id))
+        trio_left = max(0, TRIO_REWARDED_PER_DAY - self.trio_rewarded_today(member.id))
+        grand_left = max(0, GRAND_REWARDED_PER_DAY - self.grand_rewarded_today(member.id))
 
         title = member.display_name
         sig = self.signature_of(member.id)
         if sig:
             title += f" {sig[1]}"
         embed = discord.Embed(title=f"{title} — duelling record", color=0x6C5CE7)
-        losses = self.record_of(member.id).get("l", 0)
+        rec = self.record_of(member.id)
+        losses = rec.get("l", 0)
         embed.add_field(name="Rank", value=rank_for(wins))
         embed.add_field(name="Wins", value=str(wins))
         embed.add_field(name="Losses", value=str(losses))
@@ -615,9 +905,30 @@ class Duels(commands.Cog):
                 m = interaction.guild.get_member(rid) if interaction.guild else None
                 names.append(m.display_name if m else f"<@{rid}>")
             embed.add_field(name="Rivals", value=", ".join(names))
-        if sig:
+        rival_titles = self.rival_titles_of(member.id)
+        if rival_titles:
+            embed.add_field(name="Rival titles", value=", ".join(rival_titles), inline=False)
+        sig_titles = self.signature_titles_of(member.id)
+        if sig_titles:
+            embed.add_field(name="Signature titles", value=", ".join(sig_titles), inline=False)
+        elif sig:
             embed.add_field(name="Signature spell",
                             value=f"{SPELLS[sig[0]]['emoji']} {SPELLS[sig[0]]['name']}")
+        embed.add_field(
+            name="Trio",
+            value=f"{rec.get('trio_w', 0)}W — {rec.get('trio_l', 0)}L"
+                  + (f"\n{', '.join(self.trio_titles_of(member.id))}" if self.trio_titles_of(member.id) else ""),
+            inline=True,
+        )
+        embed.add_field(
+            name="Grand",
+            value=f"{rec.get('grand_w', 0)}W — {rec.get('grand_l', 0)}L"
+                  + (f"\n{', '.join(self.grand_titles_of(member.id))}" if self.grand_titles_of(member.id) else ""),
+            inline=True,
+        )
+        grand_rivals = self.grand_rival_titles_of(member.id)
+        if grand_rivals:
+            embed.add_field(name="Grand rival titles", value=", ".join(grand_rivals), inline=False)
         if self.is_champion(member.id):
             embed.add_field(name="Honours", value=f"🏆 {CHAMPION_ROLE_NAME}", inline=False)
         wands = self.bot.get_cog("Wands")
@@ -626,7 +937,8 @@ class Duels(commands.Cog):
             glow = " ✨ *(it glows)*" if self.rep_of(member.id) >= REP_GLOW else ""
             embed.add_field(name="Wand", value=f"{wand['wood']}, {wand['core'].lower()}{glow}",
                             inline=False)
-        footer = f"{left} of {REWARDED_PER_DAY} duel points still available today"
+        footer = (f"{left}/{REWARDED_PER_DAY} 1v1 • {trio_left}/{TRIO_REWARDED_PER_DAY} trio • "
+                  f"{grand_left}/{GRAND_REWARDED_PER_DAY} grand points left today")
         if self.duel_night_on():
             footer += " • ⚔️ Duel Night: wins count double"
         embed.set_footer(text=footer)
@@ -692,6 +1004,213 @@ class Duels(commands.Cog):
             await interaction.response.send_message(
                 "⚔️ Duel Night is over. Wins are back to normal." if was_on
                 else "There's no Duel Night running.", ephemeral=not was_on)
+
+    # -------------------------------------------------------- trio / grand settle
+
+    def _unanimous_house(self, members) -> str | None:
+        store = self.bot.get_cog("Store")
+        if not store or not members:
+            return None
+        houses = {store.member_house(m) for m in members}
+        houses.discard(None)
+        return next(iter(houses)) if len(houses) == 1 else None
+
+    def settle_trio(self, winners: list, losers: list, now: float = None) -> dict:
+        """Record a trio result. Never touches 1v1 w/l, streaks, signatures, or pairs."""
+        now = now if now is not None else time.time()
+        notes: list[str] = []
+        for m in winners:
+            self.record_of(m.id)["trio_w"] += 1
+        for m in losers:
+            self.record_of(m.id)["trio_l"] += 1
+
+        store = self.bot.get_cog("Store")
+        night = self.duel_night_on(now)
+        house_w = self._unanimous_house(winners)
+        house_l = self._unanimous_house(losers)
+        same_house_teams = bool(house_w and house_l and house_w == house_l)
+
+        awarded = 0
+        paid_names: list[str] = []
+        capped_names: list[str] = []
+        if store and not same_house_teams:
+            for member in winners:
+                house = store.member_house(member)
+                if not house:
+                    continue
+                if self.trio_rewarded_today(member.id, now) >= TRIO_REWARDED_PER_DAY:
+                    capped_names.append(member.display_name)
+                    continue
+                pts = TRIO_REWARD_POINTS * (DUEL_NIGHT_MULTIPLIER if night else 1)
+                why = f"Trio win"
+                if night:
+                    why += " (Duel Night)"
+                self._award(store, house, pts, member.id, why)
+                self.state["trio_rewarded"].setdefault(str(member.id), []).append(now)
+                awarded += pts
+                paid_names.append(member.display_name)
+
+        for member in winners:
+            uid = str(member.id)
+            wins = self.record_of(member.id)["trio_w"]
+            prev = highest_title(TRIO_TITLE_TIERS, wins - 1)
+            now_title = highest_title(TRIO_TITLE_TIERS, wins)
+            if now_title and now_title != prev:
+                notes.append(f"🔺 **{member.display_name}** is now **{now_title}** ({wins} trio wins).")
+
+        self.save()
+        return {
+            "awarded": awarded, "night": night, "notes": notes,
+            "same_house": same_house_teams, "paid": paid_names, "capped": capped_names,
+            "house": house_w,
+        }
+
+    def settle_grand(self, winner, loser, now: float = None) -> dict:
+        """Record a Grand Duel. Never touches 1v1/trio/signature/streak/bounty."""
+        now = now if now is not None else time.time()
+        notes: list[str] = []
+        self.record_of(winner.id)["grand_w"] += 1
+        self.record_of(loser.id)["grand_l"] += 1
+
+        pk = pair_key(winner.id, loser.id)
+        self.state["grand_pairs"][pk] = self.state["grand_pairs"].get(pk, 0) + 1
+        meetings = self.state["grand_pairs"][pk]
+        announced = self._announced_tier(self.state["grand_rivals_announced"].get(pk))
+        for threshold, title in reversed(GRAND_RIVAL_TITLE_TIERS):
+            if meetings >= threshold > announced:
+                self.state["grand_rivals_announced"][pk] = threshold
+                announced = threshold
+                notes.append(
+                    f"📜 **{winner.display_name}** and **{loser.display_name}** have Grand-Duelled "
+                    f"{meetings} times. They are now **{title}**."
+                )
+
+        store = self.bot.get_cog("Store")
+        w_house = store.member_house(winner) if store else None
+        l_house = store.member_house(loser) if store else None
+        night = self.duel_night_on(now)
+        awarded = 0
+        reason = None
+        if not store or not w_house:
+            reason = "no-house"
+        elif w_house == l_house:
+            reason = "same-house"
+        elif self.grand_rewarded_today(winner.id, now) >= GRAND_REWARDED_PER_DAY:
+            reason = "daily-cap"
+        else:
+            pts = GRAND_REWARD_POINTS * (DUEL_NIGHT_MULTIPLIER if night else 1)
+            why = f"Grand Duel win over {loser.display_name}"
+            if night:
+                why += " (Duel Night)"
+            self._award(store, w_house, pts, winner.id, why)
+            self.state["grand_rewarded"].setdefault(str(winner.id), []).append(now)
+            awarded = pts
+
+        wins = self.record_of(winner.id)["grand_w"]
+        prev = highest_title(GRAND_TITLE_TIERS, wins - 1)
+        now_title = highest_title(GRAND_TITLE_TIERS, wins)
+        if now_title and now_title != prev:
+            notes.append(f"🏛️ **{winner.display_name}** is now **{now_title}** ({wins} Grand wins).")
+
+        self.save()
+        return {
+            "awarded": awarded, "reason": reason, "house": w_house,
+            "night": night, "notes": notes,
+        }
+
+    # ---------------------------------------------------------------- trio
+
+    @trio.command(name="scramble", description="Open a casual 3v3 trio duel — any houses, either side.")
+    async def trio_scramble(self, interaction: discord.Interaction):
+        await self._start_trio_signup(interaction, is_house=False)
+
+    @trio.command(name="housematch", description="Open a house-vs-house 3v3 trio duel.")
+    @app_commands.describe(house1="First house", house2="Second house")
+    async def trio_housematch(self, interaction: discord.Interaction, house1: str, house2: str):
+        from cogs.store import HOUSES
+        h1, h2 = house1.lower(), house2.lower()
+        if h1 not in HOUSES or h2 not in HOUSES:
+            await interaction.response.send_message(
+                "Pick two real houses: " + ", ".join(HOUSES[k]["name"] for k in HOUSES),
+                ephemeral=True,
+            )
+            return
+        if h1 == h2:
+            await interaction.response.send_message("Pick two different houses.", ephemeral=True)
+            return
+        await self._start_trio_signup(interaction, is_house=True, house_a=h1, house_b=h2)
+
+    @trio_housematch.autocomplete("house1")
+    @trio_housematch.autocomplete("house2")
+    async def _trio_house_ac(self, interaction: discord.Interaction, current: str):
+        from cogs.store import HOUSES
+        cur = (current or "").lower()
+        return [
+            app_commands.Choice(name=meta["name"], value=key)
+            for key, meta in HOUSES.items()
+            if cur in key or cur in meta["name"].lower()
+        ][:25]
+
+    async def _start_trio_signup(self, interaction: discord.Interaction, is_house: bool,
+                                 house_a: str = None, house_b: str = None):
+        ok, arena = self._in_duel_channel(interaction)
+        if not ok:
+            await interaction.response.send_message(
+                f"⚔️ Duels are fought in <#{arena}>.", ephemeral=True)
+            return
+        if interaction.user.id in self.busy:
+            await interaction.response.send_message("You're already in a duel.", ephemeral=True)
+            return
+        signup = TrioSignup(self, is_house, house_a, house_b)
+        await interaction.response.send_message(embed=signup.embed(), view=TrioSignupView(signup))
+        signup.message = await interaction.original_response()
+        signup.timer_task = asyncio.create_task(signup._timeout())
+
+    # ---------------------------------------------------------------- grand
+
+    @app_commands.command(name="grand", description="Challenge someone to a Grand Duel (10-spell sequences).")
+    @app_commands.describe(member="Who you're challenging")
+    async def grand(self, interaction: discord.Interaction, member: discord.Member):
+        me = interaction.user
+        ok, arena = self._in_duel_channel(interaction)
+        if not ok:
+            await interaction.response.send_message(
+                f"⚔️ Duels are fought in <#{arena}>.", ephemeral=True)
+            return
+        if member.id == me.id:
+            await interaction.response.send_message("You can't Grand Duel yourself.", ephemeral=True)
+            return
+        if member.bot:
+            await interaction.response.send_message(
+                "The ghosts don't Grand Duel.", ephemeral=True)
+            return
+        if me.id in self.busy:
+            await interaction.response.send_message("You're already in a duel.", ephemeral=True)
+            return
+        if member.id in self.busy:
+            await interaction.response.send_message(
+                f"{member.display_name} is already in a duel.", ephemeral=True)
+            return
+        if self.wins_of(me.id) < GRAND_MIN_WINS:
+            await interaction.response.send_message(
+                f"You need at least **{GRAND_MIN_WINS}** 1v1 wins before calling a Grand Duel "
+                f"(you have {self.wins_of(me.id)}).", ephemeral=True)
+            return
+        if self.wins_of(member.id) < GRAND_MIN_WINS:
+            await interaction.response.send_message(
+                f"{member.display_name} needs at least **{GRAND_MIN_WINS}** 1v1 wins "
+                f"(they have {self.wins_of(member.id)}).", ephemeral=True)
+            return
+
+        gd = GrandDuel(self, interaction.channel, me, member)
+        self.busy.update({me.id, member.id})
+        await interaction.response.send_message(
+            content=member.mention,
+            embed=gd.challenge_embed(),
+            view=GrandAcceptView(gd),
+        )
+        gd.message = await interaction.original_response()
+        gd.start_accept_timer()
 
 
 class Duel:
@@ -824,28 +1343,7 @@ class Duel:
                 return f"You cast **{SPELLS[spell]['name']}**. Waiting on your opponent…"
 
             a_spell, b_spell = self.picks[self.a.id], self.picks[self.b.id]
-            disp_a, disp_b = a_spell, b_spell
-            favored = None
-            if FAVORED_USER_ID in (self.a.id, self.b.id):
-                favored = self.a if FAVORED_USER_ID == self.a.id else self.b
-            if favored and random.random() < FAVORED_ROUND_BIAS:
-                # Don't just declare a win with a line that doesn't match any
-                # real matchup - that's the kind of thing an attentive player
-                # notices after enough duels. Instead, quietly credit the
-                # favored side with whichever of the two spells that legitimately
-                # beats the opponent's actual cast they'd need to have thrown.
-                # resolve() then produces a completely ordinary, real matchup
-                # line. Only the favored player could ever notice their shown
-                # spell doesn't match what they clicked (their own private
-                # "You cast X" confirmation still reflects the real pick) -
-                # nobody else sees anything but a normal result.
-                opp_spell = b_spell if favored is self.a else a_spell
-                counters = [w for (w, l) in BEATS if l == opp_spell]
-                winning_spell = random.choice(counters)
-                if favored is self.a:
-                    disp_a = winning_spell
-                else:
-                    disp_b = winning_spell
+            disp_a, disp_b = favor_display_spells(self.a.id, self.b.id, a_spell, b_spell)
             result, line = resolve(disp_a, disp_b)
             reveal = (f"R{self.round}: {SPELLS[disp_a]['emoji']} {SPELLS[disp_a]['name']} vs "
                       f"{SPELLS[disp_b]['emoji']} {SPELLS[disp_b]['name']} — {line}")
@@ -985,6 +1483,803 @@ class SpellButton(discord.ui.Button):
         # edits the public message, so acknowledge first and report after.
         await interaction.response.defer()
         reply = await self.view.duel.cast(interaction.user, self.key, self.view.round_no)
+        try:
+            await interaction.edit_original_response(content=reply, view=None)
+        except discord.DiscordException:
+            pass
+
+
+# ==================================================================== Trio 3v3
+
+class TrioSignup:
+    def __init__(self, cog: Duels, is_house: bool, house_a: str = None, house_b: str = None):
+        self.cog = cog
+        self.is_house = is_house
+        self.house_a = house_a
+        self.house_b = house_b
+        self.team_a: list = []   # members
+        self.team_b: list = []
+        self.started = False
+        self.cancelled = False
+        self.message = None
+        self.timer_task = None
+
+    def _side_name(self, side: str) -> str:
+        from cogs.store import HOUSES
+        if self.is_house:
+            key = self.house_a if side == "a" else self.house_b
+            return HOUSES[key]["name"]
+        return "Team A" if side == "a" else "Team B"
+
+    def embed(self) -> discord.Embed:
+        from cogs.store import HOUSES
+        if self.is_house:
+            title = (f"⚔️ Trio: {HOUSES[self.house_a]['emoji']} {HOUSES[self.house_a]['name']} vs "
+                     f"{HOUSES[self.house_b]['emoji']} {HOUSES[self.house_b]['name']}")
+        else:
+            title = "⚔️ Trio Scramble (3v3)"
+        e = discord.Embed(title=title, description="Join a side. Best of three rounds once both are full.",
+                          color=0xB8434F)
+        for side, team in (("a", self.team_a), ("b", self.team_b)):
+            e.add_field(
+                name=f"{self._side_name(side)} ({len(team)}/{TRIO_SIZE})",
+                value="\n".join(m.display_name for m in team) or "—",
+                inline=True,
+            )
+        e.set_footer(text=f"Signup closes in {TRIO_SIGNUP_TIMEOUT}s")
+        return e
+
+    async def _timeout(self):
+        try:
+            await asyncio.sleep(TRIO_SIGNUP_TIMEOUT)
+        except asyncio.CancelledError:
+            return
+        if self.started or self.cancelled or self.message is None:
+            return
+        self.cancelled = True
+        for m in self.team_a + self.team_b:
+            self.cog.busy.discard(m.id)
+        try:
+            await self.message.edit(
+                embed=discord.Embed(
+                    title="Trio signup expired",
+                    description="Not enough duelists joined in time.",
+                    color=0x7A7A7A,
+                ),
+                view=None,
+            )
+        except discord.DiscordException:
+            pass
+
+    async def join(self, interaction: discord.Interaction, side: str):
+        if self.cancelled or self.started:
+            await interaction.response.send_message("This signup is closed.", ephemeral=True)
+            return
+        uid = interaction.user.id
+        already = any(m.id == uid for m in self.team_a + self.team_b)
+        if uid in self.cog.busy and not already:
+            await interaction.response.send_message("You're already in a duel.", ephemeral=True)
+            return
+        if already:
+            await interaction.response.send_message("You're already signed up.", ephemeral=True)
+            return
+        target = self.team_a if side == "a" else self.team_b
+        if len(target) >= TRIO_SIZE:
+            await interaction.response.send_message("That side is full.", ephemeral=True)
+            return
+        if self.is_house:
+            store = self.cog.bot.get_cog("Store")
+            required = self.house_a if side == "a" else self.house_b
+            member_house = store.member_house(interaction.user) if store else None
+            if member_house != required:
+                from cogs.store import HOUSES
+                await interaction.response.send_message(
+                    f"Only members of House {HOUSES[required]['name']} can join this side.",
+                    ephemeral=True,
+                )
+                return
+        target.append(interaction.user)
+        self.cog.busy.add(uid)
+
+        if len(self.team_a) >= TRIO_SIZE and len(self.team_b) >= TRIO_SIZE:
+            self.started = True
+            if self.timer_task:
+                self.timer_task.cancel()
+            match = TrioMatch(self)
+            match.message = interaction.message
+            match.round = 1
+            await interaction.response.edit_message(embed=match.board_embed(), view=TrioCastView(match))
+            match._arm(match._round_timeout(1))
+        else:
+            await interaction.response.edit_message(embed=self.embed(), view=TrioSignupView(self))
+
+
+class TrioJoinButton(discord.ui.Button):
+    def __init__(self, side: str, label: str):
+        super().__init__(label=label,
+                         style=discord.ButtonStyle.success if side == "a" else discord.ButtonStyle.primary)
+        self.side = side
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.view.signup.join(interaction, self.side)
+
+
+class TrioSignupView(discord.ui.View):
+    def __init__(self, signup: TrioSignup):
+        super().__init__(timeout=TRIO_SIGNUP_TIMEOUT + 10)
+        self.signup = signup
+        from cogs.store import HOUSES
+        if signup.is_house:
+            a = f"Join {HOUSES[signup.house_a]['name']}"
+            b = f"Join {HOUSES[signup.house_b]['name']}"
+        else:
+            a, b = "Join Team A", "Join Team B"
+        self.add_item(TrioJoinButton("a", a))
+        self.add_item(TrioJoinButton("b", b))
+
+
+class TrioMatch:
+    def __init__(self, signup: TrioSignup):
+        self.cog = signup.cog
+        self.is_house = signup.is_house
+        self.house_a = signup.house_a
+        self.house_b = signup.house_b
+        self.team_a = list(signup.team_a)
+        self.team_b = list(signup.team_b)
+        # Fixed random pairings for the whole match.
+        a = list(self.team_a)
+        b = list(self.team_b)
+        random.shuffle(a)
+        random.shuffle(b)
+        self.pairings = list(zip(a, b))
+        self.score_a = 0
+        self.score_b = 0
+        self.round = 0
+        self.picks: dict[int, str] = {}
+        self.history: list[str] = []
+        self.state = "active"
+        self.lock = asyncio.Lock()
+        self.message = None
+        self._timer = None
+        self.channel = signup.message.channel if signup.message else None
+
+    def all_players(self):
+        return self.team_a + self.team_b
+
+    def side_name(self, side: str) -> str:
+        from cogs.store import HOUSES
+        if self.is_house:
+            key = self.house_a if side == "a" else self.house_b
+            return HOUSES[key]["name"]
+        return "Team A" if side == "a" else "Team B"
+
+    def board_embed(self, footer: str = None) -> discord.Embed:
+        lines = [f"**{self.side_name('a')}** {self.score_a} — {self.score_b} **{self.side_name('b')}**"]
+        lines.append("Pairings: " + ", ".join(
+            f"{a.display_name} vs {b.display_name}" for a, b in self.pairings
+        ))
+        if self.history:
+            lines.append("")
+            lines.extend(self.history[-5:])
+        if self.state == "active":
+            waiting = [m.display_name for m in self.all_players() if m.id not in self.picks]
+            lines.append("")
+            lines.append(f"**Round {self.round}** — "
+                         + ("waiting on " + ", ".join(waiting) if waiting else "revealing…"))
+        embed = discord.Embed(title="Trio Duel", description="\n".join(lines), color=0xB8434F)
+        embed.set_footer(text=footer or f"Press Cast to choose • {ROUND_TIMEOUT}s per round")
+        return embed
+
+    def start_round(self):
+        self.round += 1
+        self.picks = {}
+        self._arm(self._round_timeout(self.round))
+
+    def _arm(self, coro):
+        if self._timer:
+            self._timer.cancel()
+        self._timer = asyncio.create_task(coro)
+
+    async def _update(self, view=None, footer=None):
+        if self.message is None:
+            return
+        try:
+            await self.message.edit(content=None, embed=self.board_embed(footer), view=view)
+        except discord.DiscordException:
+            log.exception("Could not update trio message.")
+
+    async def _round_timeout(self, round_no: int):
+        await asyncio.sleep(ROUND_TIMEOUT)
+        async with self.lock:
+            if self.state != "active" or self.round != round_no:
+                return
+            # Non-casters forfeit their pairing.
+            for a, b in self.pairings:
+                if a.id not in self.picks and b.id in self.picks:
+                    self.picks[a.id] = None  # marker: auto-loss
+                elif b.id not in self.picks and a.id in self.picks:
+                    self.picks[b.id] = None
+            if len([m for m in self.all_players() if m.id in self.picks]) < 2:
+                self.state = "done"
+                for m in self.all_players():
+                    self.cog.busy.discard(m.id)
+                await self._update(view=None, footer="Too few casts — the trio fizzles out.")
+                return
+            await self._resolve_round()
+
+    async def cast(self, member, spell: str, round_no: int = None) -> str:
+        async with self.lock:
+            if self.state != "active":
+                return "This trio is over."
+            if round_no is not None and round_no != self.round:
+                return "That round is already over — press Cast again."
+            ids = {m.id for m in self.all_players()}
+            if member.id not in ids:
+                return "You're not in this trio."
+            if member.id in self.picks:
+                prev = self.picks[member.id]
+                if prev:
+                    return f"You've already cast {SPELLS[prev]['name']} this round."
+                return "You've already cast this round."
+            self.picks[member.id] = spell
+            if len(self.picks) < len(self.all_players()):
+                await self._update(view=TrioCastView(self))
+                return f"You cast **{SPELLS[spell]['name']}**. Waiting on your team…"
+            await self._resolve_round()
+            return f"You cast **{SPELLS[spell]['name']}**."
+
+    async def _resolve_round(self):
+        if self._timer:
+            self._timer.cancel()
+        a_pair_wins = 0
+        b_pair_wins = 0
+        bits = []
+        for pa, pb in self.pairings:
+            sa, sb = self.picks.get(pa.id), self.picks.get(pb.id)
+            if sa is None and sb is None:
+                bits.append(f"{pa.display_name} & {pb.display_name} both froze.")
+                continue
+            if sa is None:
+                b_pair_wins += 1
+                bits.append(f"{pa.display_name} froze — point to {pb.display_name}.")
+                continue
+            if sb is None:
+                a_pair_wins += 1
+                bits.append(f"{pb.display_name} froze — point to {pa.display_name}.")
+                continue
+            disp_a, disp_b = favor_display_spells(pa.id, pb.id, sa, sb)
+            result, line = resolve(disp_a, disp_b)
+            bits.append(
+                f"{SPELLS[disp_a]['emoji']} {pa.display_name} vs {SPELLS[disp_b]['emoji']} "
+                f"{pb.display_name} — {line}"
+            )
+            if result == 1:
+                a_pair_wins += 1
+            elif result == 2:
+                b_pair_wins += 1
+        self.history.append(f"**R{self.round}:** " + " | ".join(bits))
+        if a_pair_wins > b_pair_wins:
+            self.score_a += 1
+            self.history.append(f"→ **{self.side_name('a')}** takes the round ({a_pair_wins}-{b_pair_wins}).")
+        elif b_pair_wins > a_pair_wins:
+            self.score_b += 1
+            self.history.append(f"→ **{self.side_name('b')}** takes the round ({b_pair_wins}-{a_pair_wins}).")
+        else:
+            self.history.append(f"→ Round tied ({a_pair_wins}-{b_pair_wins}). Replaying.")
+
+        if self.score_a >= TRIO_ROUNDS_TO_WIN:
+            await self._finish(self.team_a, self.team_b)
+        elif self.score_b >= TRIO_ROUNDS_TO_WIN:
+            await self._finish(self.team_b, self.team_a)
+        elif self.round >= MAX_ROUNDS:
+            self.state = "done"
+            for m in self.all_players():
+                self.cog.busy.discard(m.id)
+            await self._update(view=None, footer="Too evenly matched — declared a draw.")
+        else:
+            self.round += 1
+            self.picks = {}
+            await self._update(view=TrioCastView(self))
+            self._arm(self._round_timeout(self.round))
+
+    async def _finish(self, winners, losers):
+        self.state = "done"
+        if self._timer:
+            self._timer.cancel()
+        for m in self.all_players():
+            self.cog.busy.discard(m.id)
+        outcome = self.cog.settle_trio(winners, losers)
+        from cogs.store import HOUSES
+        win_ids = {m.id for m in winners}
+        win_side = "a" if win_ids == {m.id for m in self.team_a} else "b"
+        if outcome["awarded"]:
+            h = HOUSES.get(outcome.get("house") or "", {})
+            if h:
+                tail = f"+{outcome['awarded']} to {h.get('emoji', '')} {h.get('name', '')}"
+            else:
+                tail = f"+{outcome['awarded']} house points"
+            if outcome.get("night"):
+                tail += " (Duel Night!)"
+        elif outcome.get("same_house"):
+            tail = "Same-house teams — no points"
+        elif outcome.get("capped") and not outcome.get("paid"):
+            tail = "Daily trio point cap reached"
+        else:
+            tail = "No house points this match"
+        await self._update(
+            view=None,
+            footer=f"{self.side_name(win_side)} wins the trio • {tail}",
+        )
+        notes = outcome.get("notes") or []
+        if notes and self.channel is not None:
+            try:
+                await self.channel.send("\n".join(notes))
+            except discord.DiscordException:
+                log.exception("Could not post trio announcements.")
+
+
+class TrioCastView(discord.ui.View):
+    def __init__(self, match: TrioMatch):
+        super().__init__(timeout=ROUND_TIMEOUT + 5)
+        self.match = match
+
+    @discord.ui.button(label="Cast", style=discord.ButtonStyle.primary, emoji="\U0001FA84")
+    async def cast(self, interaction: discord.Interaction, button: discord.ui.Button):
+        m = self.match
+        ids = {p.id for p in m.all_players()}
+        if interaction.user.id not in ids:
+            await interaction.response.send_message("You're watching, not duelling.", ephemeral=True)
+            return
+        if interaction.user.id in m.picks:
+            await interaction.response.send_message("You've already cast this round.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            f"Round {m.round} — choose your spell. Only you can see this.",
+            view=TrioSpellView(m),
+            ephemeral=True,
+        )
+
+
+class TrioSpellView(discord.ui.View):
+    def __init__(self, match: TrioMatch):
+        super().__init__(timeout=ROUND_TIMEOUT)
+        self.match = match
+        self.round_no = match.round
+        for key, spell in SPELLS.items():
+            self.add_item(TrioSpellButton(key, spell))
+
+
+class TrioSpellButton(discord.ui.Button):
+    def __init__(self, key: str, spell: dict):
+        super().__init__(label=spell["name"], emoji=spell["emoji"],
+                         style=discord.ButtonStyle.secondary)
+        self.key = key
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        reply = await self.view.match.cast(interaction.user, self.key, self.view.round_no)
+        try:
+            await interaction.edit_original_response(content=reply, view=None)
+        except discord.DiscordException:
+            pass
+
+
+# ==================================================================== Grand Duel
+
+class GrandDuel:
+    def __init__(self, cog: Duels, channel, challenger, opponent):
+        self.cog = cog
+        self.channel = channel
+        self.a = challenger
+        self.b = opponent
+        self.message = None
+        self.state = "pending"   # pending -> locking -> playing -> sudden -> done
+        self.sequences: dict[int, list] = {challenger.id: [], opponent.id: []}
+        self.locked: set[int] = set()
+        self.score = {challenger.id: 0, opponent.id: 0}
+        self.round = 0
+        self.history: list[str] = []
+        self.sudden_picks: dict[int, str] = {}
+        self.lock = asyncio.Lock()
+        self._timer = None
+
+    def challenge_embed(self) -> discord.Embed:
+        embed = discord.Embed(
+            title="A Grand Duel is called",
+            description=(
+                f"**{self.a.display_name}** challenges **{self.b.display_name}** to a Grand Duel.\n\n"
+                f"Both lock a blind sequence of **{GRAND_SLOTS}** spells. First to **{GRAND_TO_WIN}** "
+                f"round wins. Same spell = neither scores. A 5–5 goes to live sudden death."
+            ),
+            color=0xD4A017,
+        )
+        embed.set_footer(text=f"{self.b.display_name} has {ACCEPT_TIMEOUT // 60} minutes to answer")
+        return embed
+
+    def board_embed(self, footer: str = None) -> discord.Embed:
+        a_s, b_s = self.score[self.a.id], self.score[self.b.id]
+        lines = [f"**{self.a.display_name}** {a_s} — {b_s} **{self.b.display_name}**"]
+        if self.state == "locking":
+            for m in (self.a, self.b):
+                status = "sequence locked ✓" if m.id in self.locked else "building their sequence…"
+                lines.append(f"• {m.display_name}: {status}")
+        if self.history:
+            lines.append("")
+            lines.extend(self.history[-6:])
+        title = "Grand Duel" + (" — Sudden Death" if self.state == "sudden" else "")
+        embed = discord.Embed(title=title, description="\n".join(lines), color=0xD4A017)
+        embed.set_footer(text=footer or "The Circle is watching.")
+        return embed
+
+    def _arm(self, coro):
+        if self._timer:
+            self._timer.cancel()
+        self._timer = asyncio.create_task(coro)
+
+    def start_accept_timer(self):
+        self._arm(self._accept_timeout())
+
+    async def _accept_timeout(self):
+        await asyncio.sleep(ACCEPT_TIMEOUT)
+        async with self.lock:
+            if self.state != "pending":
+                return
+            self.state = "done"
+            self.cog.busy.difference_update({self.a.id, self.b.id})
+        try:
+            await self.message.edit(
+                content=None,
+                embed=discord.Embed(description=f"{self.b.display_name} never answered. "
+                                                "The Grand Duel is off.", color=0x7A7A7A),
+                view=None,
+            )
+        except discord.DiscordException:
+            pass
+
+    async def _update(self, view=None, footer=None):
+        if self.message is None:
+            return
+        try:
+            await self.message.edit(content=None, embed=self.board_embed(footer), view=view)
+        except discord.DiscordException:
+            log.exception("Could not update Grand Duel message.")
+
+    async def begin_locking(self):
+        self.state = "locking"
+        await self._update(view=GrandLockPromptView(self),
+                           footer="Each duelist locks a 10-spell sequence privately.")
+
+    def try_lock(self, user_id: int, sequence: list[str]) -> str:
+        if self.state != "locking":
+            return "Locking is closed."
+        if user_id not in self.sequences:
+            return "You're not in this Grand Duel."
+        if user_id in self.locked:
+            return "You've already locked your sequence."
+        if len(sequence) != GRAND_SLOTS or any(s not in SPELLS for s in sequence):
+            return f"You need exactly {GRAND_SLOTS} spells."
+        self.sequences[user_id] = list(sequence)
+        self.locked.add(user_id)
+        return "locked"
+
+    async def maybe_start_play(self):
+        if len(self.locked) < 2:
+            await self._update(view=GrandLockPromptView(self))
+            return
+        self.state = "playing"
+        await self._update(view=None, footer="Sequences locked. The Circle begins…")
+        asyncio.create_task(self._play_sequence())
+
+    async def _play_sequence(self):
+        seq_a = self.sequences[self.a.id]
+        seq_b = self.sequences[self.b.id]
+        for i in range(GRAND_SLOTS):
+            await asyncio.sleep(GRAND_PLAY_DELAY)
+            async with self.lock:
+                if self.state != "playing":
+                    return
+                self.round = i + 1
+                sa, sb = seq_a[i], seq_b[i]
+                disp_a, disp_b = favor_display_spells(self.a.id, self.b.id, sa, sb)
+                line = random.choice(GRAND_THEATRE)
+                result, detail = resolve(disp_a, disp_b)
+                who = ""
+                if result == 1:
+                    self.score[self.a.id] += 1
+                    who = f"**{self.a.display_name}** scores."
+                elif result == 2:
+                    self.score[self.b.id] += 1
+                    who = f"**{self.b.display_name}** scores."
+                else:
+                    who = "Neither scores."
+                self.history.append(
+                    f"*{line}*\n"
+                    f"**Step {self.round}:** {SPELLS[disp_a]['emoji']} {SPELLS[disp_a]['name']} vs "
+                    f"{SPELLS[disp_b]['emoji']} {SPELLS[disp_b]['name']} — {detail} {who}"
+                )
+                await self._update(view=None)
+
+        a_s, b_s = self.score[self.a.id], self.score[self.b.id]
+        if a_s > b_s and a_s >= GRAND_TO_WIN:
+            await self._finish(self.a, self.b)
+        elif b_s > a_s and b_s >= GRAND_TO_WIN:
+            await self._finish(self.b, self.a)
+        elif a_s == b_s:
+            self.state = "sudden"
+            self.sudden_picks = {}
+            self.history.append("**5–5.** Sudden death. One spell each, until someone lands a hit.")
+            await self._update(view=GrandSuddenView(self), footer="Sudden death — Cast now.")
+            self._arm(self._sudden_timeout(self.round))
+        elif a_s > b_s:
+            await self._finish(self.a, self.b)
+        else:
+            await self._finish(self.b, self.a)
+
+    async def _sudden_timeout(self, marker: int):
+        await asyncio.sleep(ROUND_TIMEOUT)
+        async with self.lock:
+            if self.state != "sudden" or self.round != marker:
+                return
+            cast = [m for m in (self.a, self.b) if m.id in self.sudden_picks]
+            if len(cast) == 1:
+                winner = cast[0]
+                loser = self.b if winner is self.a else self.a
+                self.history.append(f"*{loser.display_name} froze in sudden death.*")
+                await self._finish(winner, loser)
+            else:
+                self.state = "done"
+                self.cog.busy.difference_update({self.a.id, self.b.id})
+                await self._update(view=None, footer="Neither cast. The Grand Duel dissolves.")
+
+    async def sudden_cast(self, member, spell: str) -> str:
+        async with self.lock:
+            if self.state != "sudden":
+                return "Sudden death isn't running."
+            if member.id not in self.score:
+                return "You're not in this Grand Duel."
+            if member.id in self.sudden_picks:
+                return f"You've already cast {SPELLS[self.sudden_picks[member.id]]['name']}."
+            self.sudden_picks[member.id] = spell
+            if len(self.sudden_picks) < 2:
+                await self._update(view=GrandSuddenView(self))
+                return f"You cast **{SPELLS[spell]['name']}**. Waiting…"
+            sa, sb = self.sudden_picks[self.a.id], self.sudden_picks[self.b.id]
+            self.round += 1
+            line = random.choice(GRAND_THEATRE)
+            disp_a, disp_b = favor_display_spells(self.a.id, self.b.id, sa, sb)
+            result, detail = resolve(disp_a, disp_b)
+            self.sudden_picks = {}
+            if result == 0:
+                self.history.append(
+                    f"*{line}*\n"
+                    f"**Sudden {self.round}:** {SPELLS[disp_a]['emoji']} vs {SPELLS[disp_b]['emoji']} — "
+                    f"{detail} Again."
+                )
+                await self._update(view=GrandSuddenView(self))
+                self._arm(self._sudden_timeout(self.round))
+                return f"You cast **{SPELLS[spell]['name']}**."
+            if result == 1:
+                self.score[self.a.id] += 1
+                self.history.append(
+                    f"*{line}*\n"
+                    f"**Sudden {self.round}:** {SPELLS[disp_a]['emoji']} {SPELLS[disp_a]['name']} vs "
+                    f"{SPELLS[disp_b]['emoji']} {SPELLS[disp_b]['name']} — {detail}"
+                )
+                await self._finish(self.a, self.b)
+            else:
+                self.score[self.b.id] += 1
+                self.history.append(
+                    f"*{line}*\n"
+                    f"**Sudden {self.round}:** {SPELLS[disp_a]['emoji']} {SPELLS[disp_a]['name']} vs "
+                    f"{SPELLS[disp_b]['emoji']} {SPELLS[disp_b]['name']} — {detail}"
+                )
+                await self._finish(self.b, self.a)
+            return f"You cast **{SPELLS[spell]['name']}**."
+
+    async def _finish(self, winner, loser):
+        self.state = "done"
+        if self._timer:
+            self._timer.cancel()
+        self.cog.busy.difference_update({self.a.id, self.b.id})
+        outcome = self.cog.settle_grand(winner, loser)
+        from cogs.store import HOUSES
+        if outcome["awarded"]:
+            h = HOUSES[outcome["house"]]
+            tail = f"+{outcome['awarded']} to {h['emoji']} {h['name']}"
+            if outcome.get("night"):
+                tail += " (Duel Night!)"
+        elif outcome["reason"] == "same-house":
+            tail = "Housemates — no points"
+        elif outcome["reason"] == "daily-cap":
+            tail = f"{winner.display_name} has taken today's Grand points already"
+        else:
+            tail = "No house to credit"
+        await self._update(view=None, footer=f"{winner.display_name} wins the Grand Duel • {tail}")
+        notes = outcome.get("notes") or []
+        if notes and self.channel is not None:
+            try:
+                await self.channel.send("\n".join(notes))
+            except discord.DiscordException:
+                log.exception("Could not post Grand Duel announcements.")
+
+
+class GrandAcceptView(discord.ui.View):
+    def __init__(self, gd: GrandDuel):
+        super().__init__(timeout=ACCEPT_TIMEOUT + 5)
+        self.gd = gd
+
+    @discord.ui.button(label="Accept", style=discord.ButtonStyle.success)
+    async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
+        d = self.gd
+        if interaction.user.id != d.b.id:
+            await interaction.response.send_message("This challenge isn't yours to answer.",
+                                                    ephemeral=True)
+            return
+        async with d.lock:
+            if d.state != "pending":
+                await interaction.response.send_message("Too late for that.", ephemeral=True)
+                return
+            d.state = "locking"
+        await interaction.response.defer()
+        await d.begin_locking()
+
+    @discord.ui.button(label="Decline", style=discord.ButtonStyle.secondary)
+    async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
+        d = self.gd
+        if interaction.user.id not in (d.a.id, d.b.id):
+            await interaction.response.send_message("This isn't your duel.", ephemeral=True)
+            return
+        async with d.lock:
+            if d.state != "pending":
+                await interaction.response.send_message("Too late for that.", ephemeral=True)
+                return
+            d.state = "done"
+            d.cog.busy.difference_update({d.a.id, d.b.id})
+            if d._timer:
+                d._timer.cancel()
+        who = "withdraws" if interaction.user.id == d.a.id else "declines"
+        await interaction.response.edit_message(
+            content=None,
+            embed=discord.Embed(description=f"{interaction.user.display_name} {who}. "
+                                            "No Grand Duel today.", color=0x7A7A7A),
+            view=None,
+        )
+
+
+class GrandLockPromptView(discord.ui.View):
+    def __init__(self, gd: GrandDuel):
+        super().__init__(timeout=ACCEPT_TIMEOUT)
+        self.gd = gd
+
+    @discord.ui.button(label="Lock your sequence", style=discord.ButtonStyle.primary, emoji="📜")
+    async def lock_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        d = self.gd
+        if interaction.user.id not in d.sequences:
+            await interaction.response.send_message("You're watching, not duelling.", ephemeral=True)
+            return
+        if interaction.user.id in d.locked:
+            await interaction.response.send_message("You've already locked your sequence.", ephemeral=True)
+            return
+        if d.state != "locking":
+            await interaction.response.send_message("Locking is closed.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            f"Build your {GRAND_SLOTS}-spell sequence. Only you can see this.\n"
+            f"**Slots filled: 0/{GRAND_SLOTS}**",
+            view=GrandSequenceView(d, interaction.user.id),
+            ephemeral=True,
+        )
+
+
+class GrandSequenceView(discord.ui.View):
+    def __init__(self, gd: GrandDuel, user_id: int):
+        super().__init__(timeout=ACCEPT_TIMEOUT)
+        self.gd = gd
+        self.user_id = user_id
+        self.seq: list[str] = []
+        for key, spell in SPELLS.items():
+            self.add_item(GrandSeqSpellButton(key, spell))
+        self.add_item(GrandSeqUndoButton())
+        self.add_item(GrandSeqSubmitButton())
+
+    def status_text(self) -> str:
+        filled = " → ".join(SPELLS[s]["emoji"] + SPELLS[s]["name"] for s in self.seq) or "—"
+        return (f"Build your {GRAND_SLOTS}-spell sequence. Only you can see this.\n"
+                f"**Slots filled: {len(self.seq)}/{GRAND_SLOTS}**\n{filled}")
+
+
+class GrandSeqSpellButton(discord.ui.Button):
+    def __init__(self, key: str, spell: dict):
+        super().__init__(label=spell["name"], emoji=spell["emoji"],
+                         style=discord.ButtonStyle.secondary, row=0 if key in ("hex", "ward", "disarm") else 1)
+        self.key = key
+
+    async def callback(self, interaction: discord.Interaction):
+        v: GrandSequenceView = self.view
+        if interaction.user.id != v.user_id:
+            await interaction.response.send_message("Not your sequence.", ephemeral=True)
+            return
+        if len(v.seq) >= GRAND_SLOTS:
+            await interaction.response.send_message("Sequence full — hit Submit.", ephemeral=True)
+            return
+        v.seq.append(self.key)
+        await interaction.response.edit_message(content=v.status_text(), view=v)
+
+
+class GrandSeqUndoButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label="Undo", style=discord.ButtonStyle.secondary, row=2)
+
+    async def callback(self, interaction: discord.Interaction):
+        v: GrandSequenceView = self.view
+        if interaction.user.id != v.user_id:
+            await interaction.response.send_message("Not your sequence.", ephemeral=True)
+            return
+        if v.seq:
+            v.seq.pop()
+        await interaction.response.edit_message(content=v.status_text(), view=v)
+
+
+class GrandSeqSubmitButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label="Submit sequence", style=discord.ButtonStyle.success, row=2)
+
+    async def callback(self, interaction: discord.Interaction):
+        v: GrandSequenceView = self.view
+        if interaction.user.id != v.user_id:
+            await interaction.response.send_message("Not your sequence.", ephemeral=True)
+            return
+        if len(v.seq) != GRAND_SLOTS:
+            await interaction.response.send_message(
+                f"Need {GRAND_SLOTS} spells — you have {len(v.seq)}.", ephemeral=True)
+            return
+        result = v.gd.try_lock(v.user_id, v.seq)
+        if result != "locked":
+            await interaction.response.send_message(result, ephemeral=True)
+            return
+        await interaction.response.edit_message(
+            content="Sequence locked. Waiting on your opponent…", view=None)
+        await v.gd.maybe_start_play()
+
+
+class GrandSuddenView(discord.ui.View):
+    def __init__(self, gd: GrandDuel):
+        super().__init__(timeout=ROUND_TIMEOUT + 5)
+        self.gd = gd
+
+    @discord.ui.button(label="Cast", style=discord.ButtonStyle.danger, emoji="\U0001FA84")
+    async def cast(self, interaction: discord.Interaction, button: discord.ui.Button):
+        d = self.gd
+        if interaction.user.id not in d.score:
+            await interaction.response.send_message("You're watching, not duelling.", ephemeral=True)
+            return
+        if interaction.user.id in d.sudden_picks:
+            await interaction.response.send_message("You've already cast.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            "Sudden death — choose your spell.",
+            view=GrandSuddenSpellView(d),
+            ephemeral=True,
+        )
+
+
+class GrandSuddenSpellView(discord.ui.View):
+    def __init__(self, gd: GrandDuel):
+        super().__init__(timeout=ROUND_TIMEOUT)
+        self.gd = gd
+        for key, spell in SPELLS.items():
+            self.add_item(GrandSuddenSpellButton(key, spell))
+
+
+class GrandSuddenSpellButton(discord.ui.Button):
+    def __init__(self, key: str, spell: dict):
+        super().__init__(label=spell["name"], emoji=spell["emoji"],
+                         style=discord.ButtonStyle.secondary)
+        self.key = key
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        reply = await self.view.gd.sudden_cast(interaction.user, self.key)
         try:
             await interaction.edit_original_response(content=reply, view=None)
         except discord.DiscordException:

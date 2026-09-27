@@ -60,10 +60,34 @@ DROP_WEIGHT = {"common": 60, "uncommon": 28, "rare": 10}
 
 # Titles and how impressive they are - /title "Automatic" shows the highest.
 TITLE_SCORE = {
-    "Mythkeeper": 100, "Legend": 96, "Tri-Wizard Champion": 94, "House Cup Champion": 92,
+    "Mythkeeper": 100, "Golden God": 102, "Myth Made Flesh": 101, "Unanswerable": 99,
+    "Terror of the Dueling Floor": 98, "Wandlord": 97, "Legend": 96,
+    "Archmage of the Circle": 95, "Tri-Wizard Champion": 94, "House Cup Champion": 92,
     "Beastmaster": 90, "Master of the Circle": 86, "Champion of the Circle": 82,
     "Warden of Wild Things": 78, "Legend-Tamer": 74, "Spellblade": 62, "Beastkeeper": 60,
     "Handler": 46, "Duelist": 42, "Tracker": 36, "Apprentice": 26, "Beast-Spotter": 16, "Novice": 10,
+    # Signature spell titles (stacked tiers)
+    "The One-Trick Nightmare": 72, "The Wall Has Feelings Now": 72,
+    "Too Fast, Too Furious": 72, "Knot Theory PhD": 72, "Mirror, Mirror, Shut Up": 72,
+    "Certified Hex Menace": 60, "Human Fortress": 60, "Faster Than Your Wand": 60,
+    "Basically a Boy Scout": 60, "The Reflection Nobody Asked For": 60,
+    "the Hex Addict": 54, "the Immovable Object": 54, "Twitchy": 54,
+    "the Rope Guy": 54, "Smoke and Mirrors": 54,
+    "the Hexer": 52, "the Wall": 52, "the Quickdraw": 52, "the Binder": 52, "the Trickster": 52,
+    # Rival titles
+    "Rivals Turned Lovers": 70, "The Unfinished Duel": 55, "Eternal Opposition": 45,
+    "Bound by Sparks": 35, "Nemeses": 28, "Rivals": 20,
+    # Trio titles
+    "Three's Company": 65, "Pack Hunter": 50, "Triangle Terror": 38, "Triad Novice": 22,
+    # Grand titles
+    "Grandmaster of Inevitability": 101, "I Knew You'd Pick That": 97,
+    "Destiny's Ghostwriter": 94, "The Script Is Already Written": 89,
+    "Prophet of the Tenth Step": 80, "Grand Architect": 68, "Ten Steps Ahead": 55,
+    "Pattern Mage": 40, "Sequencer": 24,
+    # Grand rival titles
+    "Married In The Eyes Of The Circle": 71, "The Longest Grudge": 56,
+    "Mutual Destruction Pact": 46, "We Need To Stop Meeting Like This": 36,
+    "Calendar Nemeses": 29, "Scheduled Enemies": 21,
     # Wizard's Chess
     "God-Emperor of the 64 Squares": 88, "International Menace to Casual Gaming": 88,
     "Board Certified War Criminal": 64, "The Unnecessarily Sweaty Grandmaster": 64,
@@ -77,6 +101,10 @@ TITLE_SCORE = {
     "Regional Threat to Game Night": 48, "Grandmaster of Bad Intentions": 48,
     "Destroyer of Friendly Competition": 48,
     "Checker Wrecker": 30, "Minor Strategic Nuisance": 30,
+    # Marketplace (shop exclusive)
+    "Accio Self-Respect (No Response)": 40,
+    "The Sorting Hat Asked Me to Leave": 40,
+    "Emotionally Support Dementor": 40,
 }
 KEEPER_SCORE, SIGNATURE_SCORE = 66, 52
 
@@ -426,9 +454,11 @@ class Adornments(commands.Cog):
             w = duels.wins_of(uid)
             if w > 0:
                 out.append(duel_rank(w))
-            sig = duels.signature_of(uid)
-            if sig:
-                out.append(sig[1])
+            out += duels.signature_titles_of(uid)
+            out += duels.rival_titles_of(uid)
+            out += duels.trio_titles_of(uid)
+            out += duels.grand_titles_of(uid)
+            out += duels.grand_rival_titles_of(uid)
             if duels.is_champion(uid):
                 out.append("Champion of the Circle")
         if beasts:
@@ -449,6 +479,9 @@ class Adornments(commands.Cog):
         checkers_cog = self.bot.get_cog("Checkers")
         if checkers_cog:
             out += checkers_cog.titles_of(uid)
+        market = self.bot.get_cog("Marketplace")
+        if market:
+            out += market.titles_of(uid)
         seen, uniq = set(), []
         for t in out:
             if t not in seen:
@@ -483,12 +516,16 @@ class Adornments(commands.Cog):
         house = self._house(uid, member)
         meta = HOUSES.get(house) if house else None
         worn = self.worn(uid)
-        gear = {}
-        for slot, key in worn.items():
-            v = dict(GEAR[key]["visual"])
-            if v.get("color") == "house":
-                v["color"] = art.hexint(meta["color"]) if meta else "#D6A847"
-            gear[slot] = v
+        # New Mirror shows gear as side icons (not drawn on the body).
+        gear_icons = []
+        for slot, (slot_label, slot_emoji) in SLOTS.items():
+            key = worn.get(slot)
+            if key and key in GEAR:
+                gear_icons.append({
+                    "slot": slot,
+                    "emoji": slot_emoji,
+                    "name": GEAR[key]["name"],
+                })
         wands = self.bot.get_cog("Wands")
         beasts = self.bot.get_cog("Beasts")
         beast_emoji = None
@@ -507,9 +544,11 @@ class Adornments(commands.Cog):
                  ("Beasts", beasts.count_of(uid) if beasts else 0),
                  ("Gear", f"{len(owned)}/{len(GEAR)}")]
         return dict(
-            look=self.look_of(uid), user_id=uid, name=member.display_name, title=self.title_of(member),
-            house_color=meta["color"] if meta else 0x6C5CE7, house_emoji=meta["emoji"] if meta else "✨",
-            gear=gear, wand=wands.wand_of(uid) if wands else None,
+            look=self.look_of(uid), user_id=uid, name=member.display_name,
+            title=self.title_of(member), titles=self.titles_available(member),
+            house_key=house, house_color=meta["color"] if meta else 0x6C5CE7,
+            house_emoji=meta["emoji"] if meta else "✨",
+            gear_icons=gear_icons, wand=wands.wand_of(uid) if wands else None,
             beast_emoji=beast_emoji, stats=stats, stars=stars,
             motto=meta["motto"] if meta else "Not sorted yet. Anything could happen.",
             aura=self.has_perk(uid, "legend_aura"),
@@ -928,13 +967,17 @@ class Adornments(commands.Cog):
 # ==================================================================== /wizard menus
 
 PAGES = [
-    ("Body & hair", ["body", "skin", "hair", "hair_color"]),
-    ("Face", ["eyes", "eye_color", "brows", "expression"]),
-    ("Extras", ["extras", "facial_hair"]),
+    ("Body", ["gender", "skin", "clothes", "clothes_color"]),
+    ("Hair", ["hair_back", "hair_bangs", "hair_color"]),
+    ("Eyes", ["eyes", "iris_type", "iris_color"]),
+    ("Expression", ["brows", "mouth", "glasses"]),
 ]
-FIELD_LABEL = {"body": "Build", "skin": "Skin tone", "hair": "Hair style", "hair_color": "Hair colour",
-               "eyes": "Eye shape", "eye_color": "Eye colour", "brows": "Brows", "expression": "Expression",
-               "extras": "Freckles & glasses", "facial_hair": "Facial hair"}
+FIELD_LABEL = {
+    "gender": "Presentation", "skin": "Skin tone", "clothes": "Outfit", "clothes_color": "Outfit colour",
+    "hair_back": "Hair style", "hair_bangs": "Bangs", "hair_color": "Hair colour",
+    "eyes": "Eye shape", "iris_type": "Iris style", "iris_color": "Eye colour",
+    "brows": "Brows", "mouth": "Expression", "glasses": "Glasses",
+}
 
 
 class LookSelect(discord.ui.Select):

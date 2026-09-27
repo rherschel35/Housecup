@@ -53,7 +53,7 @@ PLACE_CHOICES = [
 
 # Places where searching around risks a Wild Threat showing up right there.
 DANGEROUS_PLACES = {"dungeons", "forbidden_woods"}
-MONSTER_CHANCE = 0.20
+MONSTER_CHANCE = 0.40  # per /explore or /forage in a dangerous place (was 0.20)
 
 DEFAULT_LIMITS = {"explore": 10, "forage": 5}
 HERE_MINUTES = 60          # how long you count as "in" a place after exploring it
