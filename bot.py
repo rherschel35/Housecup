@@ -87,6 +87,8 @@ INITIAL_COGS = (
     "cogs.antispam",  # before hexes so spam is deleted, not mangled
     "cogs.hexes",
     "cogs.marketplace",
+    "cogs.chess",
+    "cogs.checkers",
 )
 
 
