@@ -14,7 +14,6 @@ from __future__ import annotations
 import hashlib
 import io
 import math
-import os
 import random
 from pathlib import Path
 
@@ -47,20 +46,143 @@ GENDERS = {"male": "Masculine", "female": "Feminine"}
 
 SKINS = {str(i): f"Skin tone {i}" for i in range(1, 10)}
 
-HAIR_BACK = {str(i): f"Hair style {i}" for i in range(1, 19)}  # Back 1-18
-
-HAIR_BANGS = {"none": "No bangs", **{str(i): f"Bangs {i}" for i in range(1, 21)}}
-
-HAIR_COLORS = {
-    "1": "Color 1", "2": "Color 2", "3": "Color 3", "4": "Color 4", "5": "Color 5",
-    "6": "Color 6", "7": "Color 7", "8": "Color 8", "9": "Color 9", "10": "Color 10",
+# Hair Back = the actual cut. Labels differ by presentation; keys are pack folder numbers.
+HAIR_BACK_MALE = {
+    "1": "Soft bowl",
+    "2": "Rounded fringe",
+    "3": "Close crop",
+    "4": "Messy tufts",
+    "5": "Short spikes",
+    "6": "Textured short",
+    "7": "Smooth round",
+    "8": "Soft cap",
+    "9": "Wild spikes",
+    "10": "Soft dome",
+    "11": "Classic bowl",
+    "12": "Full fringe cut",
+    "13": "Rounded cap",
+    "14": "Soft curtain",
+    "15": "Tall spikes",
+    "16": "Messy medium",
+    "17": "Short crop",
+    "18": "Spiky volume",
+    "19": "Wispy medium",
 }
 
-EYE_TYPES = {str(i): f"Eyes {i}" for i in range(1, 7)}
+HAIR_BACK_FEMALE = {
+    "1": "Straight long",
+    "2": "Soft waves",
+    "3": "Layered",
+    "4": "Full volume",
+    "5": "Sleek",
+    "6": "Wavy mid",
+    "7": "Long cascade",
+    "8": "Soft bob",
+    "9": "Fluffy",
+    "10": "Long layers",
+    "11": "Silky",
+    "12": "Thick waves",
+    "13": "Gentle curl",
+    "14": "Long smooth",
+    "15": "Voluminous",
+    "16": "Flowing",
+    "17": "Soft length",
+    "18": "Classic long",
+}
 
-IRIS_TYPES = {"1": "Iris A", "2": "Iris B", "3": "Iris C", "4": "Iris D"}
+# Bangs = fringe overlay. Masculine menu is curated short-only so it doesn't
+# read as long hair; feminine keeps a fuller set (Discord max 25 options).
+HAIR_BANGS_MALE = {
+    "none": "No fringe (short hairline)",
+    "1": "Short clean fringe",
+    "6": "Short spikes",
+    "7": "Jagged short",
+    "9": "Choppy crop fringe",
+    "10": "Pushed-back hairline",
+}
 
-IRIS_COLORS = {str(i): f"Eye colour {i}" for i in range(1, 21)}
+HAIR_BANGS_FEMALE = {
+    "none": "No fringe (short hairline)",
+    "1": "Short fringe",
+    "2": "Side-swept",
+    "3": "Straight mid",
+    "4": "Full blunt",
+    "5": "Choppy side",
+    "6": "Spiky fringe",
+    "7": "Even spikes",
+    "8": "Center part long",
+    "9": "Short choppy",
+    "10": "Open forehead",
+    "11": "Mid with gap",
+    "12": "Long rounded",
+    "13": "Long flat",
+    "14": "Heavy side sweep",
+    "15": "Long face frame",
+    "16": "Bangs 16",
+    "17": "Bangs 17",
+    "18": "Bangs 18",
+    "19": "Bangs 19",
+    "20": "Bangs 20",
+}
+
+# In these packs the crown/front hair lives in Bangs/. Skipping that layer
+# leaves a bald scalp. "none" still draws a short hairline fill:
+BANGS_NONE_LAYER = {"male": "6", "female": "1"}
+
+# Unions used for validation / storage (either presentation may have saved a key).
+HAIR_BACK = {**HAIR_BACK_FEMALE, **HAIR_BACK_MALE}
+HAIR_BANGS = {**HAIR_BANGS_FEMALE, **HAIR_BANGS_MALE}
+
+HAIR_COLORS = {
+    "1": "Black",
+    "2": "Dark brown",
+    "3": "Auburn",
+    "4": "Light brown",
+    "5": "Wine red",
+    "6": "Pink",
+    "7": "Purple",
+    "8": "Blue",
+    "9": "Green",
+    "10": "Silver",
+}
+
+EYE_TYPES = {
+    "1": "Round",
+    "2": "Almond",
+    "3": "Soft lidded",
+    "4": "Sharp",
+    "5": "Wide",
+    "6": "Tired",
+}
+
+IRIS_TYPES = {
+    "1": "Classic",
+    "2": "Soft glow",
+    "3": "Ringed",
+    "4": "Bright",
+}
+
+IRIS_COLORS = {
+    "1": "Dark brown",
+    "2": "Plum",
+    "3": "Crimson",
+    "4": "Deep red",
+    "5": "Rose red",
+    "6": "Copper",
+    "7": "Amber",
+    "8": "Forest green",
+    "9": "Bright green",
+    "10": "Teal",
+    "11": "Steel blue",
+    "12": "Sea green",
+    "13": "Sky blue",
+    "14": "Royal blue",
+    "15": "Purple",
+    "16": "Midnight",
+    "17": "Violet",
+    "18": "Rose",
+    "19": "Grey",
+}
 
 MOUTHS = {
     "Smile": "Smile", "Smiling": "Soft smile", "Grin": "Grin", "Big Smile": "Big smile",
@@ -78,7 +200,16 @@ BROWS = {
 # Clothes 1-24 exist for both packs
 CLOTHES = {str(i): f"Outfit {i}" for i in range(1, 25)}
 
-CLOTHES_COLORS = {str(i): f"Outfit colour {i}" for i in range(1, 9)}
+CLOTHES_COLORS = {
+    "1": "Black",
+    "2": "White",
+    "3": "Blue",
+    "4": "Green",
+    "5": "Red",
+    "6": "Lavender",
+    "7": "Cream",
+    "8": "Leaf green",
+}
 
 GLASSES = {
     "none": "No glasses",
@@ -102,16 +233,45 @@ LOOK_FIELDS = {
 }
 
 
-def option_label(field: str, key: str) -> str:
-    v = LOOK_FIELDS[field][key]
+def options_for(field: str, look: dict | None = None) -> dict:
+    """Menu options for a field, filtered by presentation when it matters."""
+    look = look or {}
+    gender = look.get("gender", "female")
+    if field == "hair_back":
+        return HAIR_BACK_MALE if gender == "male" else HAIR_BACK_FEMALE
+    if field == "hair_bangs":
+        return HAIR_BANGS_MALE if gender == "male" else HAIR_BANGS_FEMALE
+    return LOOK_FIELDS[field]
+
+
+def option_label(field: str, key: str, look: dict | None = None) -> str:
+    opts = options_for(field, look) if look is not None else LOOK_FIELDS.get(field, {})
+    v = opts.get(key, LOOK_FIELDS.get(field, {}).get(key, key))
     return v[0] if isinstance(v, tuple) else v
+
+
+def clamp_hair_to_gender(look: dict) -> dict:
+    """If bangs/style aren't in the current presentation's menu, pick a sensible default."""
+    for field, fallback in (("hair_back", "17" if look.get("gender") == "male" else "1"),
+                            ("hair_bangs", "none")):
+        opts = options_for(field, look)
+        if look.get(field) not in opts:
+            look[field] = fallback if fallback in opts else next(iter(opts))
+    return look
 
 
 def default_look(user_id: int) -> dict:
     rng = random.Random(int(hashlib.sha256(str(user_id).encode()).hexdigest()[:12], 16))
     look = {f: rng.choice(sorted(opts)) for f, opts in LOOK_FIELDS.items()}
+    # Re-roll hair against the chosen presentation so masculine defaults short.
+    look["hair_back"] = rng.choice(sorted(options_for("hair_back", look)))
+    if look.get("gender") == "male":
+        look["hair_bangs"] = "none" if rng.random() < 0.75 else rng.choice(
+            [k for k in options_for("hair_bangs", look) if k != "none"] or ["none"])
+    else:
+        look["hair_bangs"] = "none" if rng.random() < 0.25 else rng.choice(
+            sorted(options_for("hair_bangs", look)))
     look["glasses"] = "none" if rng.random() < 0.7 else look["glasses"]
-    look["hair_bangs"] = "none" if rng.random() < 0.25 else look["hair_bangs"]
     return look
 
 
@@ -119,11 +279,11 @@ def clean_look(look: dict | None, user_id: int) -> dict:
     """Accept current fields; ignore legacy Pillow look keys."""
     base = default_look(user_id)
     if not look:
-        return base
+        return clamp_hair_to_gender(base)
     for f, opts in LOOK_FIELDS.items():
         if look.get(f) in opts:
             base[f] = look[f]
-    return base
+    return clamp_hair_to_gender(base)
 
 
 # ---------------------------------------------------------------- colour / fonts
@@ -306,9 +466,10 @@ def compose_portrait(look: dict) -> Image.Image:
     ])
     layers.append(mouth_p)
 
-    # 8. bangs
-    if hair_bangs != "none":
-        layers.append(root / "Hair" / "Bangs" / f"Bangs {hair_bangs}" / f"Color {hair_c}.png")
+    # 8. bangs — crown/front hair lives here; "none" still draws a short
+    # hairline fill so the scalp isn't bald.
+    bangs_id = BANGS_NONE_LAYER.get(gender, "1") if hair_bangs == "none" else hair_bangs
+    layers.append(root / "Hair" / "Bangs" / f"Bangs {bangs_id}" / f"Color {hair_c}.png")
 
     # 9. glasses (use outfit colour as a stand-in accent)
     layers.append(_glasses_path(root, glasses, clothes_c))
