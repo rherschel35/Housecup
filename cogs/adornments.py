@@ -1054,14 +1054,7 @@ class WizardView(discord.ui.View):
 
     async def _random(self, interaction):
         self.look = {f: self.cog.rng.choice(sorted(opts)) for f, opts in art.LOOK_FIELDS.items()}
-        # Hair menus are presentation-specific.
-        self.look["hair_back"] = self.cog.rng.choice(sorted(art.options_for("hair_back", self.look)))
-        bangs_opts = art.options_for("hair_bangs", self.look)
-        if self.look.get("gender") == "male":
-            self.look["hair_bangs"] = "none" if self.cog.rng.random() < 0.7 else self.cog.rng.choice(
-                [k for k in bangs_opts if k != "none"] or ["none"])
-        else:
-            self.look["hair_bangs"] = self.cog.rng.choice(sorted(bangs_opts))
+        art._roll_presentation(self.look, self.cog.rng)
         art.clamp_hair_to_gender(self.look)
         await self.refresh(interaction)
 
