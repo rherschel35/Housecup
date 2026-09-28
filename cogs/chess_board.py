@@ -18,13 +18,13 @@ import chess
 from PIL import Image, ImageDraw, ImageFont
 
 SQ = 80
-MARGIN = 52
+MARGIN = 64
 BOARD_PX = SQ * 8
 IMG_SIZE = BOARD_PX + MARGIN * 2
 
 LIGHT = (240, 217, 181)
 DARK = (181, 136, 99)
-COORD = (255, 245, 225)
+COORD = (255, 250, 235)
 LAST_MOVE = (246, 246, 105)
 SELECTED = (186, 202, 68)
 DOT = (40, 40, 40, 120)
@@ -62,7 +62,7 @@ def _load_font(paths: list[Path], size: int) -> ImageFont.FreeTypeFont | ImageFo
     return ImageFont.load_default()
 
 
-_LABEL_FONT = _load_font(_LABEL_CANDIDATES, 28)
+_LABEL_FONT = _load_font(_LABEL_CANDIDATES, 36)
 
 
 def piece_glyph(piece: chess.Piece) -> str:
