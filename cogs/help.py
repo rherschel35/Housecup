@@ -45,6 +45,8 @@ HELP = {
             ("pet", "Pet your familiar. Once a day."),
             ("play", "Play with your familiar. Once a day."),
             ("scout", "Send your familiar out to bring something back. Once a day."),
+            ("raid", "Open a 3Raid lobby — Attacker, Specialty, Tank, 10 encounters."),
+            ("raidstatus", "Your 3Raid weekly clear status."),
         ],
     },
     "explore": {
@@ -132,6 +134,7 @@ HELP = {
             ("triwizard remove", "Undo a Tri-Wizard entry made by mistake."),
             ("descentboost", "Add Descent HP / Attack / Defense points to a player."),
             ("descentreset", "Wipe someone's Descent progress back to floor 1."),
+            ("raidreset", "Clear a player's 3Raid weekly lockout, or end the active raid."),
         ],
     },
     "staff_world": {
