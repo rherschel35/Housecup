@@ -8,8 +8,11 @@ Rules:
 - Only students who belong to a house are ever tagged (the same house
   lookup the points system uses). No house, no rumors about you. Bots never.
 - The same person isn't tagged again until several others have had a turn.
-- About 1 in 5 rumors is an untagged tournament-lore rumor.
-- A student's own house sometimes flavours their rumor.
+- Rumors come in four flavors:
+    explore      - tips and secrets about exploring Velmora (untagged)
+    funny        - ridiculous student gossip ({a} / {a}+{b})
+    headmasters  - odd staff-corridor whispers (untagged)
+    ghosts       - embarrassing house-ghost gossip (untagged)
 
 The rumor bank lives in data/rumors.json - edit it freely: {a} is the first
 person tagged, {b} the second.
@@ -34,8 +37,14 @@ STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "rumor_state.json"
 
 HEADER = "📜 **A new rumor is spreading through Velmora Academy...**"
-LORE_CHANCE = 0.2
-HOUSE_FLAVOUR_CHANCE = 0.35
+
+# Weighted mix for untagged world rumors vs tagged student comedy.
+UNTAGGED_WEIGHTS = {
+    "explore": 0.28,
+    "headmasters": 0.14,
+    "ghosts": 0.14,
+}
+# Remainder (~0.44) is tagged student funny.
 TWO_PERSON_CHANCE = 0.4
 RECENT_MEMORY = 8           # how many recent targets to skip over when possible
 
@@ -60,7 +69,10 @@ class Rumors(commands.Cog):
             self.bank = json.loads(BANK_PATH.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             log.exception("Couldn't read rumors.json")
-            self.bank = {"one_person": [], "two_person": [], "house": {}, "lore": [], "lore_tagline": ""}
+            self.bank = {
+                "explore": [], "one_person": [], "two_person": [],
+                "headmasters": [], "ghosts": [], "lore_tagline": "",
+            }
         try:
             self.state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
@@ -122,30 +134,56 @@ class Rumors(commands.Cog):
         self.state["recent_templates"] = (self.state["recent_templates"] + [t])[-30:]
         return t
 
-    # ------------------------------------------------------------ building a rumor
+    def _untagged(self, key: str) -> str | None:
+        pool = self.bank.get(key) or []
+        if not pool:
+            return None
+        text = self.pick_template(pool)
+        tagline = self.bank.get("lore_tagline", "")
+        if key == "explore" and tagline:
+            return f"{text}\n\n{tagline}".strip()
+        return text
 
-    def build(self, guild):
-        """Returns the rumor text, or None if there's nobody in a house yet."""
-        b = self.bank
-        if self.rng.random() < LORE_CHANCE and b.get("lore"):
-            return f"{self.pick_template(b['lore'])}\n\n{b.get('lore_tagline', '')}".strip()
-
+    def _funny(self, guild) -> str | None:
         pool = self.housed_members(guild)
         if not pool:
             return None
-        a, a_house = self.pick_person(pool)
-
-        flavour = b.get("house", {}).get(a_house) or []
-        if flavour and self.rng.random() < HOUSE_FLAVOUR_CHANCE:
-            return self.pick_template(flavour).replace("{a}", a.mention)
-
-        if len(pool) >= 2 and self.rng.random() < TWO_PERSON_CHANCE and b.get("two_person"):
+        a, _house = self.pick_person(pool)
+        if not a:
+            return None
+        if (len(pool) >= 2 and self.rng.random() < TWO_PERSON_CHANCE
+                and self.bank.get("two_person")):
             second = self.pick_person(pool, exclude={a.id})
             if second:
-                t = self.pick_template(b["two_person"])
+                t = self.pick_template(self.bank["two_person"])
                 return t.replace("{a}", a.mention).replace("{b}", second[0].mention)
+        if not self.bank.get("one_person"):
+            return None
+        return self.pick_template(self.bank["one_person"]).replace("{a}", a.mention)
 
-        return self.pick_template(b["one_person"]).replace("{a}", a.mention)
+    # ------------------------------------------------------------ building a rumor
+
+    def build(self, guild):
+        """Returns the rumor text, or None if nothing can be said yet."""
+        roll = self.rng.random()
+        cursor = 0.0
+        for key, weight in UNTAGGED_WEIGHTS.items():
+            cursor += weight
+            if roll < cursor:
+                text = self._untagged(key)
+                if text:
+                    return text
+
+        funny = self._funny(guild)
+        if funny:
+            return funny
+
+        # Nobody housed yet (or empty funny pools) — fall back to any untagged bank.
+        for key in ("explore", "ghosts", "headmasters"):
+            text = self._untagged(key)
+            if text:
+                return text
+        return None
 
     @staticmethod
     def message(rumor: str) -> str:
@@ -162,7 +200,7 @@ class Rumors(commands.Cog):
         self.save()
         if not rumor:
             await interaction.response.send_message(
-                "Couldn't find anyone in a house to gossip about right now. Try again later.", ephemeral=True)
+                "The rumor mill is empty right now. Try again later.", ephemeral=True)
             return
         await interaction.response.send_message(
             self.message(rumor), allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False))
@@ -187,7 +225,7 @@ class Rumors(commands.Cog):
         self.state["last_post"] = time.time()
         self.save()
         if not rumor:
-            log.info("No one in a house yet - skipping this rumor.")
+            log.info("Nothing to rumor about right now - skipping.")
             return
         try:
             await channel.send(self.message(rumor),
