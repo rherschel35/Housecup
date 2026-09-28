@@ -469,7 +469,7 @@ class Chess(commands.Cog):
             last_move=m.last_move(),
             selected=selected,
             destinations=dests,
-            flip=(m.board.turn == chess.BLACK),
+            flip=False,  # always White at the bottom — don't rotate each turn
         )
         return discord.File(io.BytesIO(png), filename="chess_board.png")
 

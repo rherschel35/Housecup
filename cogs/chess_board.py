@@ -37,14 +37,14 @@ WHITE_OUTLINE = (30, 26, 22)
 BLACK_FILL = (28, 24, 22)
 BLACK_OUTLINE = (235, 230, 220)
 
-# Text labels as a mobile-friendly backup cue under the silhouette.
-PIECE_LETTER = {
-    chess.PAWN: "P",
-    chess.KNIGHT: "N",
-    chess.BISHOP: "B",
-    chess.ROOK: "R",
-    chess.QUEEN: "Q",
-    chess.KING: "K",
+# Full names for Discord select menus / slash labels.
+PIECE_NAME = {
+    chess.PAWN: "Pawn",
+    chess.KNIGHT: "Knight",
+    chess.BISHOP: "Bishop",
+    chess.ROOK: "Rook",
+    chess.QUEEN: "Queen",
+    chess.KING: "King",
 }
 
 _LABEL_CANDIDATES = [
