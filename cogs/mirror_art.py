@@ -4,7 +4,7 @@ The Mirror - player's wizard as a collectible trading card.
 Portrait is composited from layered sprite packs under
 wizard_assets/{male,female,female_full} (STATE_DIR on Railway, or data/ locally).
   - female:      Tainara-P style (Body/Head/Hair folders)
-  - female_full: Girl Sprites Premium (full-body, bust-cropped for the card)
+  - female_full: Girl Sprites Premium (full figure on the card)
   - male:        MALE1 muscular pack (flat body/hair_top/… folders) when present
 House identity is the card colour (not robes on the figure). Worn gear
 is shown as icons beside the portrait, not drawn on the body.

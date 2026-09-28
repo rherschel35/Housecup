@@ -2,8 +2,8 @@
 Girl Sprites Premium — second feminine presentation (full-body pack).
 
 Source: Premium Girl Sprites.psd (Combined layers), exported to PNG parts under
-wizard_assets/female_full/. Portrait is bust-cropped for the Mirror card, with
-no white paper background.
+wizard_assets/female_full/. The Mirror card shows the full figure (head to toe),
+with no white paper background.
 """
 
 from __future__ import annotations
@@ -14,10 +14,6 @@ from PIL import Image
 
 PACK_FORMAT = "girl_premium_v2"  # must match scripts/export_girl_premium.py
 CANVAS = (1821, 2579)
-
-# Bust window: head + torso for the Mirror card (same idea as MALE1).
-BUST_TOP = 0.0
-BUST_BOTTOM = 0.55
 
 # ---------------------------------------------------------------- menus
 # Keys are stored on the player look; labels show in /wizard.
@@ -243,7 +239,7 @@ def _paste(canvas: Image.Image, path: Path) -> None:
 
 
 def compose(root: Path, look: dict, target_size: tuple[int, int]) -> Image.Image:
-    """Stack exported parts, bust-crop, fit into target_size (SRC_W×SRC_H)."""
+    """Stack exported parts and fit the full figure into target_size (SRC_W×SRC_H)."""
     look = clamp_look(dict(look))
     canvas = Image.new("RGBA", CANVAS, (0, 0, 0, 0))
 
@@ -292,20 +288,17 @@ def compose(root: Path, look: dict, target_size: tuple[int, int]) -> Image.Image
     if look["glasses"] != "none":
         _paste(canvas, root / "accessories" / f"{look['glasses']}.png")
 
-    # Bust crop
-    w, h = canvas.size
-    top = int(h * BUST_TOP)
-    bottom = int(h * BUST_BOTTOM)
-    bust = canvas.crop((0, top, w, bottom))
-    box = bust.getbbox()
+    # Full figure — tight crop, then fit into the portrait window.
+    figure = canvas
+    box = figure.getbbox()
     if box:
-        bust = bust.crop(box)
+        figure = figure.crop(box)
 
-    # Fit into target (bottom-aligned, centered) like MALE1
     tw, th = target_size
-    scale = min(tw / bust.width, th / bust.height)
-    nw, nh = max(1, int(bust.width * scale)), max(1, int(bust.height * scale))
-    bust = bust.resize((nw, nh), Image.Resampling.LANCZOS)
+    scale = min(tw / figure.width, th / figure.height)
+    nw, nh = max(1, int(figure.width * scale)), max(1, int(figure.height * scale))
+    figure = figure.resize((nw, nh), Image.Resampling.LANCZOS)
     out = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
-    out.alpha_composite(bust, ((tw - nw) // 2, th - nh))
+    # Center in the window so head and feet both stay in frame.
+    out.alpha_composite(figure, ((tw - nw) // 2, (th - nh) // 2))
     return out
