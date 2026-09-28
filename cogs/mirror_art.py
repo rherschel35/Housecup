@@ -2,9 +2,10 @@
 The Mirror - player's wizard as a collectible trading card.
 
 Portrait is composited from layered sprite packs under
-wizard_assets/{male,female} (STATE_DIR on Railway, or data/ locally).
-  - female: Tainara-P style (Body/Head/Hair folders)
-  - male:   MALE1 muscular pack (flat body/hair_top/… folders) when present
+wizard_assets/{male,female,female_full} (STATE_DIR on Railway, or data/ locally).
+  - female:      Tainara-P style (Body/Head/Hair folders)
+  - female_full: Girl Sprites Premium (full-body, bust-cropped for the card)
+  - male:        MALE1 muscular pack (flat body/hair_top/… folders) when present
 House identity is the card colour (not robes on the figure). Worn gear
 is shown as icons beside the portrait, not drawn on the body.
 
@@ -21,8 +22,9 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFont
 
-from cogs.wizard_assets_bootstrap import assets_root, crests_root
+from cogs.wizard_assets_bootstrap import assets_root, crests_root, female_full_ready
 from cogs import mirror_male1 as male1
+from cogs import mirror_girl_premium as girl_full
 
 FONT_DIR = Path(__file__).resolve().parent.parent / "data" / "fonts"
 ASSETS = assets_root()
@@ -45,7 +47,23 @@ SRC_W, SRC_H = 1400, 1200
 # Keys are what we store on the player. Labels are what /wizard shows.
 # Discord selects max out at 25 choices, so lists stay under that.
 
-GENDERS = {"male": "Masculine", "female": "Feminine"}
+GENDERS = {
+    "male": "Masculine",
+    "female": "Feminine",
+    "female_full": "Feminine (full body)",
+}
+
+
+def available_genders() -> dict:
+    """Presentations offered in /wizard."""
+    out = {"male": GENDERS["male"], "female": GENDERS["female"]}
+    if female_full_ready(ASSETS):
+        out["female_full"] = GENDERS["female_full"]
+    return out
+
+
+def _is_feminine(gender: str) -> bool:
+    return gender in ("female", "female_full")
 
 SKINS = {str(i): f"Skin tone {i}" for i in range(1, 10)}
 
@@ -122,7 +140,7 @@ HAIR_BANGS_FEMALE = {
 
 # In these packs the crown/front hair lives in Bangs/. Skipping that layer
 # leaves a bald scalp. "none" still draws a short hairline fill:
-BANGS_NONE_LAYER = {"male": "6", "female": "1"}
+BANGS_NONE_LAYER = {"male": "6", "female": "1", "female_full": "hair_1"}
 
 # Unions used for validation / storage (either presentation may have saved a key).
 HAIR_BACK = {**HAIR_BACK_FEMALE, **HAIR_BACK_MALE, **male1.HAIR_BACK}
@@ -275,12 +293,16 @@ def options_for(field: str, look: dict | None = None) -> dict:
     """Menu options for a field, filtered by presentation when it matters."""
     look = look or {}
     gender = look.get("gender", "female")
+    if field == "gender":
+        return available_genders()
+    if gender == "female_full" and girl_full.is_girl_premium_root(ASSETS / "female_full"):
+        g = girl_full.options(field)
+        if g:
+            return g
     if gender == "male" and _use_male1():
         m1 = male1.options(field)
         if m1:
             return m1
-        if field == "gender":
-            return GENDERS
         if field == "skin":
             return male1.SKINS
     if field == "hair_back":
@@ -309,6 +331,10 @@ DEFAULT_FIELD_LABEL = {
 def field_label(field: str, look: dict | None = None) -> str:
     """Human placeholder for a /wizard select."""
     look = look or {}
+    if look.get("gender") == "female_full":
+        override = girl_full.field_label(field)
+        if override:
+            return override
     if look.get("gender") == "male" and _use_male1():
         override = male1.field_label(field)
         if override:
@@ -318,6 +344,8 @@ def field_label(field: str, look: dict | None = None) -> str:
 
 def clamp_hair_to_gender(look: dict) -> dict:
     """Drop styles/outfits that aren't in the current presentation's menu."""
+    if look.get("gender") == "female_full":
+        return girl_full.clamp_look(look)
     if look.get("gender") == "male" and _use_male1():
         return male1.clamp_look(look)
     male = look.get("gender") == "male"
@@ -335,6 +363,16 @@ def clamp_hair_to_gender(look: dict) -> dict:
 
 def _roll_presentation(look: dict, rng: random.Random) -> dict:
     """Re-roll presentation-specific fields for the active pack."""
+    if look.get("gender") == "female_full":
+        for field in ("skin", "hair_back", "hair_bangs", "hair_color", "eyes",
+                      "iris_type", "iris_color", "brows", "mouth",
+                      "clothes", "clothes_color"):
+            opts = options_for(field, look)
+            if opts:
+                look[field] = rng.choice(sorted(opts))
+        look["glasses"] = "none" if rng.random() < 0.55 else rng.choice(
+            [k for k in options_for("glasses", look) if k != "none"] or ["none"])
+        return look
     if look.get("gender") == "male" and _use_male1():
         for field in ("skin", "hair_back", "hair_bangs", "hair_color", "eyes",
                       "iris_type", "iris_color", "brows", "mouth",
@@ -382,7 +420,15 @@ def clean_look(look: dict | None, user_id: int) -> dict:
     base = default_look(user_id)
     if not look:
         return clamp_hair_to_gender(base)
-    for f, opts in LOOK_FIELDS.items():
+    genders = available_genders()
+    if look.get("gender") in genders:
+        base["gender"] = look["gender"]
+    elif look.get("gender") == "female_full" and "female_full" not in genders:
+        base["gender"] = "female"
+    for f in LOOK_FIELDS:
+        if f == "gender":
+            continue
+        opts = options_for(f, base)
         if look.get(f) in opts:
             base[f] = look[f]
     return clamp_hair_to_gender(base)
@@ -463,7 +509,11 @@ def paste_center(base, im, x, y):
 # ---------------------------------------------------------------- asset paths
 
 def _root(gender: str) -> Path:
-    return ASSETS / ("female" if gender == "female" else "male")
+    if gender == "female_full":
+        return ASSETS / "female_full"
+    if _is_feminine(gender):
+        return ASSETS / "female"
+    return ASSETS / "male"
 
 
 def _open_layer(path: Path) -> Image.Image | None:
@@ -511,6 +561,8 @@ def compose_portrait(look: dict) -> Image.Image:
     """Stack sprite layers into a portrait (typically ~1400x1200)."""
     gender = look.get("gender", "male")
     root = _root(gender)
+    if gender == "female_full" and girl_full.is_girl_premium_root(root):
+        return girl_full.compose(root, look, (SRC_W, SRC_H))
     if gender == "male" and male1.is_male1_root(root):
         return male1.compose(root, look, (SRC_W, SRC_H))
 
