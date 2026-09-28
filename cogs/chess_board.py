@@ -18,13 +18,13 @@ import chess
 from PIL import Image, ImageDraw, ImageFont
 
 SQ = 80
-MARGIN = 34
+MARGIN = 52
 BOARD_PX = SQ * 8
 IMG_SIZE = BOARD_PX + MARGIN * 2
 
 LIGHT = (240, 217, 181)
 DARK = (181, 136, 99)
-COORD = (220, 205, 185)
+COORD = (255, 245, 225)
 LAST_MOVE = (246, 246, 105)
 SELECTED = (186, 202, 68)
 DOT = (40, 40, 40, 120)
@@ -62,7 +62,7 @@ def _load_font(paths: list[Path], size: int) -> ImageFont.FreeTypeFont | ImageFo
     return ImageFont.load_default()
 
 
-_LABEL_FONT = _load_font(_LABEL_CANDIDATES, 16)
+_LABEL_FONT = _load_font(_LABEL_CANDIDATES, 28)
 
 
 def piece_glyph(piece: chess.Piece) -> str:
@@ -199,7 +199,7 @@ def render_board(
                 color = tuple(round((base[i] + SELECTED[i]) / 2) for i in range(3))
             draw.rectangle([x, y, x + SQ - 1, y + SQ - 1], fill=color)
 
-    # coordinates
+    # coordinates — large + high-contrast for Discord mobile
     files = "abcdefgh"
     ranks = "12345678"
     for i in range(8):
