@@ -82,6 +82,7 @@ INITIAL_COGS = (
     "cogs.adornments",
     "cogs.reaction_roles",
     "cogs.descent",
+    "cogs.threeraid",
     "cogs.quidditch",
     "cogs.potions",
     "cogs.antispam",  # before hexes so spam is deleted, not mangled
