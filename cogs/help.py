@@ -31,7 +31,7 @@ HELP = {
             ("bean", "Spend 1 point on a mystery bean. Might pay 5. Might be Mordy's socks."),
             ("market browse", "The Marketplace catalogue — ingredients, scrolls, titles, Room."),
             ("market buy", "Buy a common (3 pts) or uncommon (6 pts) ingredient."),
-            ("market sell", "Sell a set for 3 pts — forage ×3, Descent materials ×25 (21/day cap)."),
+            ("market sell", "Sell 3 of the same common/uncommon for 3 pts (21/day cap)."),
             ("market scroll", "Buy a Hex Scroll (30 pts)."),
             ("market title", "Buy an exclusive Marketplace title (50 pts)."),
             ("market room", "Buy the Room of Requirement (100 pts). Pings Headmasters."),
