@@ -12,7 +12,7 @@ from pathlib import Path
 
 from PIL import Image
 
-PACK_FORMAT = "girl_premium"
+PACK_FORMAT = "girl_premium_v2"  # must match scripts/export_girl_premium.py
 CANVAS = (1821, 2579)
 
 # Bust window: head + torso for the Mirror card (same idea as MALE1).
@@ -55,15 +55,35 @@ HAIR_FRONT = {
     "none": "None",
 }
 
+# Every menu outfit must cover the body — no bare / top-only / bottom-only
+# choices. Partials from the PSD are paired into full looks below.
 CLOTHES = {
     "uniform2_brown": "School uniform (brown)",
     "uniform2_black": "School uniform (black)",
-    "hoodie_long": "Long hoodie",
-    "hoodie_short": "Short hoodie",
+    "hoodie_long_jeans": "Long hoodie + jeans",
+    "hoodie_short_shorts": "Short hoodie + shorts",
     "one_piece": "One-piece dress",
-    "jeans": "Jeans",
-    "shorts": "Shorts",
     "pe": "PE clothes",
+}
+
+# Paint order: bottoms first, then tops / full outfits.
+OUTFIT_LAYERS = {
+    "uniform2_brown": ("uniform2_brown",),
+    "uniform2_black": ("uniform2_black",),
+    "hoodie_long_jeans": ("jeans", "hoodie_long"),
+    "hoodie_short_shorts": ("shorts", "hoodie_short"),
+    "one_piece": ("one_piece",),
+    "pe": ("pe",),
+}
+
+# Old single-piece keys → full outfits (saves + surprise-me leftovers).
+_LEGACY_CLOTHES = {
+    "hoodie_long": "hoodie_long_jeans",
+    "hoodie_short": "hoodie_short_shorts",
+    "jeans": "hoodie_long_jeans",
+    "shorts": "hoodie_short_shorts",
+    "none": "uniform2_brown",
+    "": "uniform2_brown",
 }
 
 SHOES = {
@@ -129,12 +149,15 @@ EXTRAS = {
 
 
 def is_girl_premium_root(root: Path) -> bool:
+    """True only for the current pack format — older exports mis-placed layers."""
     marker = root / ".pack_format"
     try:
-        if marker.is_file() and marker.read_text(encoding="utf-8").strip() == PACK_FORMAT:
-            return (root / "body").is_dir() and (root / "clothes").is_dir()
+        if not marker.is_file():
+            return False
+        if marker.read_text(encoding="utf-8").strip() != PACK_FORMAT:
+            return False
     except OSError:
-        pass
+        return False
     return (root / "body" / "body.png").is_file() and (root / "clothes").is_dir()
 
 
@@ -170,6 +193,13 @@ def field_label(field: str) -> str | None:
 
 
 def clamp_look(look: dict) -> dict:
+    # Upgrade bare / partial outfits before the usual menu clamp.
+    clothes = look.get("clothes")
+    if clothes in _LEGACY_CLOTHES:
+        look["clothes"] = _LEGACY_CLOTHES[clothes]
+    elif clothes not in CLOTHES:
+        look["clothes"] = "uniform2_brown"
+
     fallbacks = {
         "skin": "body",
         "hair_back": "long_let_down",
@@ -233,8 +263,11 @@ def compose(root: Path, look: dict, target_size: tuple[int, int]) -> Image.Image
     if extra in ("choker", "gloves", "heart", "beauty_mark", "beauty_mark_2"):
         _paste(canvas, root / "accessories" / f"{extra}.png")
 
-    # 4. clothes + shoes
-    _paste(canvas, root / "clothes" / f"{look['clothes']}.png")
+    # 4. clothes + shoes — always a full outfit (never bare body).
+    outfit = look["clothes"]
+    layers = OUTFIT_LAYERS.get(outfit) or OUTFIT_LAYERS["uniform2_brown"]
+    for part in layers:
+        _paste(canvas, root / "clothes" / f"{part}.png")
     shoes = look["clothes_color"]
     if shoes != "none":
         _paste(canvas, root / "shoes" / f"{shoes}.png")

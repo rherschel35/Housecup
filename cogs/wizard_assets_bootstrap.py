@@ -280,11 +280,15 @@ def _ensure_female_full(root: Path) -> bool:
         log.info("Full-body feminine pack ready at %s", dest)
         return True
 
+    # Stale exports (pre girl_premium_v2) placed hair/clothes at (0,0). Wipe
+    # so we re-copy or re-export with corrected layer offsets.
+    if dest.exists():
+        log.info("Refreshing female_full pack (stale/incomplete) at %s", dest)
+        shutil.rmtree(dest)
+
     repo = DATA_DIR / "wizard_assets" / "female_full"
     if _is_female_full(repo):
         log.info("Copying female_full wizard assets from repo → %s", dest)
-        if dest.exists():
-            shutil.rmtree(dest)
         shutil.copytree(repo, dest)
         return _is_female_full(dest)
 
