@@ -38,7 +38,7 @@ HELP = {
             ("hexscroll", "Cast a Hex Scroll on someone (30 min, random curse)."),
             ("wand", "Give any three words and a wand chooses you. Yours for good."),
             ("patronus", "Your patronus, cast from the same three words as your wand."),
-            ("rumor", "Start a rumor about someone in Velmora. Believe nothing."),
+            ("rumor", "Explore secrets, ridiculous student gossip, odd headmaster whispers, embarrassing ghosts."),
             ("cast", "Banish whatever's in this channel. Needs a patronus already cast."),
             ("familiar", "Adopt a familiar (once, for good), name it, or see the one you have."),
             ("feed", "Feed your familiar. Once a day."),
