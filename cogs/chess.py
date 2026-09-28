@@ -478,6 +478,12 @@ class Chess(commands.Cog):
         dests = self._dest_choices(m.board, selected)
         return MatchView(self, key, player_id, selected=selected, dest_choices=dests)
 
+    def _turn_ping(self, m: Match, *, ended: Optional[str] = None) -> Optional[str]:
+        """Mention whose turn it is so Discord notifies them. Embeds don't ping."""
+        if ended:
+            return None
+        return f"<@{m.turn_id()}> — your move."
+
     async def refresh_match_message(self, interaction: discord.Interaction, m: Match, *,
                                     selected: Optional[int] = None, page: int = 0,
                                     respond: bool = True, ended: Optional[str] = None):
@@ -485,9 +491,12 @@ class Chess(commands.Cog):
         file = self._board_file(m, selected=selected if not ended else None)
         embed = self._match_embed(interaction, m, ended=ended)
         view = None if ended else self._match_view(m, selected=selected, page=page)
+        content = self._turn_ping(m, ended=ended)
+        allowed = discord.AllowedMentions(users=True, roles=False, everyone=False)
         if respond and not interaction.response.is_done():
             await interaction.response.edit_message(
-                content=None, embed=embed, attachments=[file], view=view)
+                content=content, embed=embed, attachments=[file], view=view,
+                allowed_mentions=allowed)
             try:
                 msg = await interaction.original_response()
                 m.message_id = msg.id
@@ -502,13 +511,15 @@ class Chess(commands.Cog):
         if channel and m.message_id:
             try:
                 msg = await channel.fetch_message(m.message_id)
-                await msg.edit(content=None, embed=embed, attachments=[file], view=view)
+                await msg.edit(content=content, embed=embed, attachments=[file], view=view,
+                               allowed_mentions=allowed)
                 return
             except discord.DiscordException:
                 log.exception("Could not edit chess board message")
         # Fallback: post a fresh board message.
         if channel:
-            msg = await channel.send(embed=embed, file=file, view=view)
+            msg = await channel.send(content=content, embed=embed, file=file, view=view,
+                                     allowed_mentions=allowed)
             m.message_id = msg.id
             m.channel_id = msg.channel.id
 
