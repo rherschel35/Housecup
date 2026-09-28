@@ -12,7 +12,7 @@ from pathlib import Path
 
 from PIL import Image
 
-PACK_FORMAT = "girl_premium"
+PACK_FORMAT = "girl_premium_v2"  # must match scripts/export_girl_premium.py
 CANVAS = (1821, 2579)
 
 # Bust window: head + torso for the Mirror card (same idea as MALE1).
@@ -129,12 +129,15 @@ EXTRAS = {
 
 
 def is_girl_premium_root(root: Path) -> bool:
+    """True only for the current pack format — older exports mis-placed layers."""
     marker = root / ".pack_format"
     try:
-        if marker.is_file() and marker.read_text(encoding="utf-8").strip() == PACK_FORMAT:
-            return (root / "body").is_dir() and (root / "clothes").is_dir()
+        if not marker.is_file():
+            return False
+        if marker.read_text(encoding="utf-8").strip() != PACK_FORMAT:
+            return False
     except OSError:
-        pass
+        return False
     return (root / "body" / "body.png").is_file() and (root / "clothes").is_dir()
 
 

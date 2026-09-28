@@ -11,7 +11,8 @@ from pathlib import Path
 from PIL import Image
 from psd_tools import PSDImage
 
-PACK_FORMAT = "girl_premium"
+# Bump when export layout/placement changes so bootstraps refresh stale packs.
+PACK_FORMAT = "girl_premium_v2"
 
 
 def _slug(name: str) -> str:
@@ -69,25 +70,43 @@ def _render_layer(layer, size: tuple[int, int]) -> Image.Image:
     """Composite a layer/group onto a transparent full-canvas image.
 
     Invisible layers still export — we force-visible, composite, then restore.
+
+    Offsets must be read *while* the layer is force-visible: hidden groups in
+    this PSD report bbox (0,0,0,0), and restoring visibility before reading
+    left/top pasted hair/clothes at the origin (floating upper-left on card).
     """
     canvas = Image.new("RGBA", size, (0, 0, 0, 0))
     undo = _force_visible(layer)
+    im = None
+    x = y = 0
     try:
+        # Full-document viewport places pixels correctly without manual offset.
+        try:
+            im = layer.composite(viewport=(0, 0, size[0], size[1]))
+        except TypeError:
+            im = None
+        except Exception:
+            im = None
+        if im is not None:
+            return im.convert("RGBA")
+
         try:
             im = layer.composite()
         except Exception:
             im = None
-        if im is None and layer.kind == "pixel":
+        if im is None and getattr(layer, "kind", None) == "pixel":
             try:
                 im = layer.topil()
             except Exception:
                 im = None
+        # Capture offset before restore — hidden groups snap back to 0,0.
+        x, y = int(layer.left), int(layer.top)
     finally:
         _restore(undo)
+
     if im is None:
         return canvas
     im = im.convert("RGBA")
-    x, y = int(layer.left), int(layer.top)
     if x < 0 or y < 0:
         cx, cy = max(0, -x), max(0, -y)
         im = im.crop((cx, cy, im.width, im.height))
