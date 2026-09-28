@@ -4,6 +4,8 @@ Beasts of Velmora. 70 creatures, 14 in each place, to find and befriend.
     /approach                 - befriend the beast that's here, if you have what it wants
     /bestiary [member]        - every beast you've befriended, and the ones still out there
     /summon <beast>           - call one of your beasts to do something cute or cool (just for show)
+    /study <beast>            - study a befriended beast (once a day); unlocks journal pages
+    /journal [beast]          - your Beast Journal (overview, or one full entry)
     /beastadmin spawn [beast] - (staff) make a beast appear right now
     /beastadmin channel #ch   - (staff) where beasts appear
     /beastadmin status        - (staff) what's out there, and when the next one comes
@@ -18,6 +20,10 @@ Rarer beasts turn up less often, and a few only appear after dark
 only the first time you befriend that particular beast - up to 5 beast
 points per person per day. /summon is purely for fun: no points, no
 advantage.
+
+/study fills a personal Beast Journal: three pages per beast (field notes,
+habits, bond). One study per student per day. Finishing all three pages
+pays 5 house points once per beast. /journal reads what you've written.
 
 Collector ranks rise with how many different beasts you've befriended, and
 titles are earned for finishing a place, taming a legendary, or taming all
@@ -62,6 +68,9 @@ DAILY_POINT_CAP = 5
 WINDOW = 24 * 3600
 SUMMON_COOLDOWN = 60
 LINGER_GRACE = 120           # Lingering Charm: wearers can still approach this long after a beast leaves
+JOURNAL_PAGES = 3            # studies needed to complete one beast's journal entry
+STUDY_WINDOW = 24 * 3600     # one study action per student per day
+JOURNAL_COMPLETE_POINTS = 5  # house points when a beast's journal is finished (once)
 
 PLACES = {
     "garden": "The Garden",
@@ -135,11 +144,12 @@ class Beasts(commands.Cog):
         except (OSError, json.JSONDecodeError):
             log.exception("Beast state unreadable - starting fresh.")
             state = {}
-        for key in ("collections", "paid", "rank_seen", "titles_seen"):
+        for key in ("collections", "paid", "rank_seen", "titles_seen", "journals"):
             state.setdefault(key, {})
         state.setdefault("sighting", None)
         state.setdefault("channel_id", None)
         state.setdefault("next_at", time.time() + self._gap())
+        state.setdefault("study_day", {})  # uid -> {date, at}
         return state
 
     def save(self) -> None:
@@ -162,6 +172,58 @@ class Beasts(commands.Cog):
 
     def count_of(self, user_id: int) -> int:
         return len(self.collection(user_id))
+
+    def journal_of(self, user_id: int) -> dict:
+        return self.state["journals"].setdefault(str(user_id), {})
+
+    def journal_entry(self, user_id: int, key: str) -> dict:
+        journal = self.journal_of(user_id)
+        if key not in journal:
+            journal[key] = {"pages": 0, "notes": [], "last_study": 0.0, "rewarded": False}
+        journal[key].setdefault("rewarded", False)
+        return journal[key]
+
+    def _studied_today(self, user_id: int, now: float) -> bool:
+        rec = self.state["study_day"].get(str(user_id), {})
+        return bool(rec) and (now - float(rec.get("at", 0))) < STUDY_WINDOW
+
+    def _mark_studied(self, user_id: int, now: float):
+        self.state["study_day"][str(user_id)] = {"at": now}
+
+    def _page_text(self, key: str, page: int) -> str:
+        """Build journal page text from beast data (no per-beast lore bank needed)."""
+        b = self.beasts[key]
+        place = PLACES.get(b["place"], b["place"])
+        world = self.bot.get_cog("World")
+        wants = []
+        if world:
+            for iid in b.get("wants", []):
+                item = world.world.items.get(iid, {})
+                wants.append(f"{item.get('emoji', '')} {item.get('name', iid)}".strip())
+        wants_line = ", ".join(wants) if wants else "nothing in particular"
+
+        if page == 1:
+            return (
+                f"**Field notes.** {b['desc']} "
+                f"Spotted around {place}. "
+                f"Rarity: {RARITY_LABEL[b['rarity']]}. "
+                f"Accepts offerings of {wants_line}."
+            )
+        if page == 2:
+            when = "mostly after dark" if b.get("night") else "in ordinary hours"
+            return (
+                f"**Habits.** Prefers to appear {when}. "
+                f"Field sighting: *{b.get('sighting', 'Keeps its own counsel.')}* "
+                f"It returns to {place} when left alone."
+            )
+        # page 3
+        bond = self.rng.choice(b.get("summons") or [
+            "{owner}'s beast regards them with quiet recognition."
+        ]).replace("{owner}", "its keeper")
+        return (
+            f"**Bond.** After enough quiet watching, the entry writes itself: "
+            f"*{bond}* — Journal complete."
+        )
 
     def titles_of(self, user_id: int) -> list[str]:
         have = set(self.collection(user_id))
@@ -434,7 +496,16 @@ class Beasts(commands.Cog):
     @app_commands.command(name="bestiary", description="Every beast you've befriended - or anyone's.")
     @app_commands.describe(member="Whose bestiary (leave blank for your own)")
     async def bestiary(self, interaction: discord.Interaction, member: discord.Member = None):
-        embed = self.bestiary_embed(member or interaction.user)
+        target = member or interaction.user
+        embed = self.bestiary_embed(target)
+        journal = self.journal_of(target.id)
+        complete = sum(1 for e in journal.values() if e.get("pages", 0) >= JOURNAL_PAGES)
+        started = sum(1 for e in journal.values() if e.get("pages", 0) > 0)
+        if started:
+            embed.description += (
+                f"\n📓 Journal: **{complete}** complete · **{started}** started "
+                f"(`/journal` · `/study`)"
+            )
         adorn = self.bot.get_cog("Adornments")
         if (member is None or member.id == interaction.user.id) and adorn and adorn.has_perk(interaction.user.id, "tracker"):
             s = self.state.get("sighting")
@@ -446,6 +517,216 @@ class Beasts(commands.Cog):
                 hint = f"the next beast should turn up around <t:{at}:t> (<t:{at}:R>)."
             embed.description += f"\n💍 Your Tracker's Band hums: {hint}"
         await interaction.response.send_message(embed=embed)
+
+    # -------------------------------------------------------- study / journal
+
+    @app_commands.command(name="study", description="Study a befriended beast and add a page to your Beast Journal.")
+    @app_commands.describe(beast="Which of your befriended beasts to study")
+    async def study(self, interaction: discord.Interaction, beast: str):
+        if beast not in self.collection(interaction.user.id) or beast not in self.beasts:
+            await interaction.response.send_message(
+                "You can only study beasts you've befriended. `/bestiary` shows yours.",
+                ephemeral=True,
+            )
+            return
+        now = time.time()
+        if self._studied_today(interaction.user.id, now):
+            rec = self.state["study_day"].get(str(interaction.user.id), {})
+            ready = float(rec.get("at", 0)) + STUDY_WINDOW
+            await interaction.response.send_message(
+                f"You've already studied today. Next notebook page <t:{int(ready)}:R>.",
+                ephemeral=True,
+            )
+            return
+
+        entry = self.journal_entry(interaction.user.id, beast)
+        if entry["pages"] >= JOURNAL_PAGES:
+            await interaction.response.send_message(
+                f"Your journal on the **{self.beasts[beast]['name']}** is already complete. "
+                f"Pick another beast, or open `/journal beast:{self.beasts[beast]['name']}`.",
+                ephemeral=True,
+            )
+            return
+
+        page = entry["pages"] + 1
+        note = self._page_text(beast, page)
+        entry["pages"] = page
+        entry["notes"].append(note)
+        entry["last_study"] = now
+        self._mark_studied(interaction.user.id, now)
+
+        b = self.beasts[beast]
+        done = page >= JOURNAL_PAGES
+        reward_line = ""
+        if done and not entry.get("rewarded"):
+            store = self.bot.get_cog("Store")
+            house = store.member_house(interaction.user) if store else None
+            if store and house:
+                store.record(
+                    house=house,
+                    delta=JOURNAL_COMPLETE_POINTS,
+                    actor_id=self.bot.user.id if self.bot.user else 0,
+                    target_id=interaction.user.id,
+                    reason=f"Beast Journal complete: {b['name']}",
+                )
+                entry["rewarded"] = True
+                from cogs.store import HOUSES
+                h = HOUSES[house]
+                reward_line = (
+                    f"\n\n✅ **Journal complete!** +{JOURNAL_COMPLETE_POINTS} to "
+                    f"{h['emoji']} {h['name']}."
+                )
+            elif not house:
+                reward_line = (
+                    "\n\n✅ **Journal complete!** (No house role — points weren't awarded.)"
+                )
+            else:
+                entry["rewarded"] = True
+                reward_line = f"\n\n✅ **Journal complete!**"
+
+        self.save()
+
+        embed = discord.Embed(
+            title=f"📓 Studied — {b['emoji']} {b['name']}",
+            description=note + reward_line,
+            color=RARITY_COLORS.get(b["rarity"], 0x5B8C5A),
+        )
+        embed.set_footer(
+            text=(f"Journal complete ({JOURNAL_PAGES}/{JOURNAL_PAGES})."
+                  if done else f"Page {page}/{JOURNAL_PAGES} · one study per day")
+        )
+        await interaction.response.send_message(embed=embed)
+
+    @study.autocomplete("beast")
+    async def _study_autocomplete(self, interaction: discord.Interaction, current: str):
+        col = self.collection(interaction.user.id)
+        journal = self.journal_of(interaction.user.id)
+        q = current.lower()
+        out = []
+        for key in sorted(col, key=lambda k: self.beasts[k]["name"]):
+            b = self.beasts[key]
+            pages = journal.get(key, {}).get("pages", 0)
+            if pages >= JOURNAL_PAGES:
+                mark = "✓ complete"
+            elif pages:
+                mark = f"{pages}/{JOURNAL_PAGES}"
+            else:
+                mark = "new"
+            label = f"{b['emoji']} {b['name']} ({mark})"
+            if q and q not in b["name"].lower() and q not in key:
+                continue
+            out.append(app_commands.Choice(name=label[:100], value=key))
+            if len(out) >= 25:
+                break
+        return out
+
+    def journal_overview_embed(self, member) -> discord.Embed:
+        journal = self.journal_of(member.id)
+        col = self.collection(member.id)
+        started = [(k, e) for k, e in journal.items() if e.get("pages", 0) > 0 and k in self.beasts]
+        complete = sum(1 for _, e in started if e["pages"] >= JOURNAL_PAGES)
+        embed = discord.Embed(
+            title=f"📓 {member.display_name}'s Beast Journal",
+            description=(
+                f"**{complete}** complete · **{len(started)}** started · "
+                f"**{len(col)}** beasts befriended\n"
+                f"Use `/study` once a day. Open an entry with `/journal beast:`."
+            ),
+            color=0x3D5A45,
+        )
+        if not started:
+            embed.add_field(
+                name="Empty pages",
+                value="Befriend a beast, then `/study` it to begin an entry.",
+                inline=False,
+            )
+            return embed
+
+        order = {"common": 0, "uncommon": 1, "rare": 2, "legendary": 3}
+        started.sort(key=lambda pair: (
+            order[self.beasts[pair[0]]["rarity"]],
+            self.beasts[pair[0]]["name"],
+        ))
+        lines = []
+        for key, entry in started[:30]:
+            b = self.beasts[key]
+            pages = entry["pages"]
+            mark = "✓" if pages >= JOURNAL_PAGES else f"{pages}/{JOURNAL_PAGES}"
+            lines.append(f"{b['emoji']} **{b['name']}** — {mark}")
+        if len(started) > 30:
+            lines.append(f"…and {len(started) - 30} more.")
+        embed.add_field(name="Entries", value="\n".join(lines), inline=False)
+        return embed
+
+    def journal_entry_embed(self, member, key: str) -> discord.Embed:
+        b = self.beasts[key]
+        entry = self.journal_entry(member.id, key)
+        pages = entry.get("pages", 0)
+        embed = discord.Embed(
+            title=f"📓 {b['emoji']} {b['name']}",
+            description=(
+                f"{RARITY_LABEL[b['rarity']]} · {PLACES.get(b['place'], b['place'])}\n"
+                f"Pages **{pages}/{JOURNAL_PAGES}**"
+                + (" · **Complete**" if pages >= JOURNAL_PAGES else "")
+            ),
+            color=RARITY_COLORS.get(b["rarity"], 0x3D5A45),
+        )
+        if not entry.get("notes"):
+            embed.add_field(
+                name="No notes yet",
+                value=f"You haven't studied this beast. `/study beast:{b['name']}`",
+                inline=False,
+            )
+            return embed
+        for i, note in enumerate(entry["notes"], start=1):
+            embed.add_field(name=f"Page {i}", value=note, inline=False)
+        return embed
+
+    @app_commands.command(name="journal", description="Open your Beast Journal — overview, or one beast's entry.")
+    @app_commands.describe(beast="Open this beast's entry (leave blank for the full journal)",
+                           member="Whose journal (leave blank for your own)")
+    async def journal(self, interaction: discord.Interaction,
+                      beast: str = None, member: discord.Member = None):
+        target = member or interaction.user
+        if beast:
+            if beast not in self.beasts:
+                await interaction.response.send_message("That's not a beast I know.", ephemeral=True)
+                return
+            if beast not in self.collection(target.id) and target.id == interaction.user.id:
+                await interaction.response.send_message(
+                    "You haven't befriended that beast yet.", ephemeral=True)
+                return
+            if beast not in self.collection(target.id):
+                await interaction.response.send_message(
+                    f"{target.display_name} hasn't befriended that beast.", ephemeral=True)
+                return
+            await interaction.response.send_message(embed=self.journal_entry_embed(target, beast))
+            return
+        await interaction.response.send_message(embed=self.journal_overview_embed(target))
+
+    @journal.autocomplete("beast")
+    async def _journal_autocomplete(self, interaction: discord.Interaction, current: str):
+        # Prefer beasts the caller has journal notes on; fall back to collection.
+        member = interaction.namespace.member or interaction.user
+        col = self.collection(member.id if hasattr(member, "id") else interaction.user.id)
+        journal = self.journal_of(member.id if hasattr(member, "id") else interaction.user.id)
+        keys = list(journal.keys()) if journal else list(col.keys())
+        if not keys:
+            keys = list(col.keys())
+        q = current.lower()
+        out = []
+        for key in sorted(keys, key=lambda k: self.beasts.get(k, {}).get("name", k)):
+            if key not in self.beasts:
+                continue
+            b = self.beasts[key]
+            pages = journal.get(key, {}).get("pages", 0)
+            label = f"{b['emoji']} {b['name']} ({pages}/{JOURNAL_PAGES})"
+            if q and q not in b["name"].lower() and q not in key:
+                continue
+            out.append(app_commands.Choice(name=label[:100], value=key))
+            if len(out) >= 25:
+                break
+        return out
 
     # --------------------------------------------------------------- summon
 

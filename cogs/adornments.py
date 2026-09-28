@@ -310,8 +310,9 @@ class Adornments(commands.Cog):
                 got.add("legendary_beast")
             if sum(1 for k in col if allb.get(k, {}).get("night")) >= 3:
                 got.add("night_beasts")
-            nibblers = {k for k, b in allb.items() if "nibbler" in b["name"].lower()}
-            if nibblers and nibblers <= col:
+            # Keys stay *_nibbler for save compatibility; display names are Nifflers.
+            nifflers = {k for k in allb if k.endswith("_nibbler")}
+            if nifflers and nifflers <= col:
                 got.add("all_nibblers")
             for need, key in ((10, "beasts_10"), (20, "beasts_20"), (35, "beasts_35")):
                 if n >= need:

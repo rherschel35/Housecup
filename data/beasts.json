@@ -170,7 +170,7 @@
   ]
  },
  "dewdrop_nibbler": {
-  "name": "Dewdrop Nibbler",
+  "name": "Dewdrop Niffler",
   "emoji": "✨",
   "place": "garden",
   "rarity": "uncommon",
@@ -178,12 +178,12 @@
    "moonstone_chip"
   ],
   "night": false,
-  "desc": "A fuzzy little nibbler that steals anything shiny - dewdrops, moonstones, your earrings - and stuffs it in its belly pouch.",
+  "desc": "A fuzzy little niffler that steals anything shiny - dewdrops, moonstones, your earrings - and stuffs it in its belly pouch.",
   "sighting": "It's rummaging through the flower beds, pouch already bulging with shiny things.",
   "summons": [
-   "{owner}'s Dewdrop Nibbler pulls a moonstone, three dewdrops, and a silver spoon out of its pouch. Nobody knows whose spoon it is.",
-   "The Dewdrop Nibbler eyes someone's earrings with enormous interest. {owner} gently picks it up before anything happens.",
-   "{owner}'s Dewdrop Nibbler rolls onto its back to have its belly rubbed. Coins fall out of its pouch everywhere."
+   "{owner}'s Dewdrop Niffler pulls a moonstone, three dewdrops, and a silver spoon out of its pouch. Nobody knows whose spoon it is.",
+   "The Dewdrop Niffler eyes someone's earrings with enormous interest. {owner} gently picks it up before anything happens.",
+   "{owner}'s Dewdrop Niffler rolls onto its back to have its belly rubbed. Coins fall out of its pouch everywhere."
   ]
  },
  "starthistle_fox": {
@@ -412,7 +412,7 @@
   ]
  },
  "gilt_nibbler": {
-  "name": "Gilt Nibbler",
+  "name": "Gilt Niffler",
   "emoji": "✨",
   "place": "library",
   "rarity": "uncommon",
@@ -423,9 +423,9 @@
   "desc": "Peels the gold leaf off book spines and hoards it. Has stolen at least three reading glasses.",
   "sighting": "It's peeling gold leaf off a book spine and stuffing it in its pouch.",
   "summons": [
-   "{owner}'s Gilt Nibbler produces a gold letter 'G', a pair of reading glasses, and someone's ring from its pouch. It looks innocent.",
-   "The Gilt Nibbler polishes a gold coin on {owner}'s sleeve until it gleams, then hides it again.",
-   "{owner}'s Gilt Nibbler spots something shiny across the room and freezes, trembling with longing."
+   "{owner}'s Gilt Niffler produces a gold letter 'G', a pair of reading glasses, and someone's ring from its pouch. It looks innocent.",
+   "The Gilt Niffler polishes a gold coin on {owner}'s sleeve until it gleams, then hides it again.",
+   "{owner}'s Gilt Niffler spots something shiny across the room and freezes, trembling with longing."
   ]
  },
  "rememberowl": {
@@ -654,7 +654,7 @@
   ]
  },
  "coinpurse_nibbler": {
-  "name": "Coinpurse Nibbler",
+  "name": "Coinpurse Niffler",
   "emoji": "✨",
   "place": "dungeons",
   "rarity": "uncommon",
@@ -665,9 +665,9 @@
   "desc": "Its pouch jingles with old coins. It will absolutely try to pick your pocket.",
   "sighting": "It's sniffing around the old cells, its pouch jingling with stolen coins.",
   "summons": [
-   "{owner}'s Coinpurse Nibbler empties its pouch: coins, a spoon, a key, and somebody's wedding ring. It puts it all back fast.",
-   "The Coinpurse Nibbler tries to pick {owner}'s pocket, gets caught, and pretends it was a hug.",
-   "{owner}'s Coinpurse Nibbler balances on its tail and juggles three stolen coins."
+   "{owner}'s Coinpurse Niffler empties its pouch: coins, a spoon, a key, and somebody's wedding ring. It puts it all back fast.",
+   "The Coinpurse Niffler tries to pick {owner}'s pocket, gets caught, and pretends it was a hug.",
+   "{owner}'s Coinpurse Niffler balances on its tail and juggles three stolen coins."
   ]
  },
  "hinge_hound": {
@@ -896,7 +896,7 @@
   ]
  },
  "glimmer_nibbler": {
-  "name": "Glimmer Nibbler",
+  "name": "Glimmer Niffler",
   "emoji": "✨",
   "place": "forbidden_woods",
   "rarity": "uncommon",
@@ -907,9 +907,9 @@
   "desc": "Collects anything that glints in the dark - fangs, beetle shells, lost buckles - and buries them in a secret hoard.",
   "sighting": "It's rooting around the old hunting blind, stuffing anything that glints into its pouch.",
   "summons": [
-   "{owner}'s Glimmer Nibbler digs up its secret hoard: fangs, beetle shells, a lost buckle, and someone's missing spoon.",
-   "The Glimmer Nibbler eyes the shiny clasp on {owner}'s robes. {owner} holds it closed. The Nibbler sulks.",
-   "{owner}'s Glimmer Nibbler finds a single glinting pebble and treats it like the treasure of the century."
+   "{owner}'s Glimmer Niffler digs up its secret hoard: fangs, beetle shells, a lost buckle, and someone's missing spoon.",
+   "The Glimmer Niffler eyes the shiny clasp on {owner}'s robes. {owner} holds it closed. The Niffler sulks.",
+   "{owner}'s Glimmer Niffler finds a single glinting pebble and treats it like the treasure of the century."
   ]
  },
  "lanternback_stag": {
@@ -1138,7 +1138,7 @@
   ]
  },
  "stardust_nibbler": {
-  "name": "Stardust Nibbler",
+  "name": "Stardust Niffler",
   "emoji": "✨",
   "place": "observatory",
   "rarity": "uncommon",
@@ -1149,9 +1149,9 @@
   "desc": "Sneaks up to the roof to steal fallen stardust. Its pouch glows faintly at night.",
   "sighting": "It's sneaking across the roof, scooping fallen stardust into its glowing pouch.",
   "summons": [
-   "{owner}'s Stardust Nibbler opens its pouch and a cloud of glittering stardust puffs out. It quickly stuffs it back in.",
-   "The Stardust Nibbler steals a sparkle from the nearest candle flame. Nobody knows how.",
-   "{owner}'s Stardust Nibbler hands {owner} a single speck of stardust, then immediately tries to take it back."
+   "{owner}'s Stardust Niffler opens its pouch and a cloud of glittering stardust puffs out. It quickly stuffs it back in.",
+   "The Stardust Niffler steals a sparkle from the nearest candle flame. Nobody knows how.",
+   "{owner}'s Stardust Niffler hands {owner} a single speck of stardust, then immediately tries to take it back."
   ]
  },
  "cometail_hare": {

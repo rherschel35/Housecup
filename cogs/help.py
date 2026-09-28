@@ -71,6 +71,8 @@ HELP = {
             ("approach", "Befriend the beast that's here, if you have what it wants."),
             ("bestiary", "Every beast you've befriended - and the ones still out there."),
             ("summon", "Call one of your beasts to show off. Just for fun."),
+            ("study", "Study a befriended beast (once a day). Full notes = 5 house points."),
+            ("journal", "Open your Beast Journal — overview, or one beast's entry."),
         ],
     },
     "adornments": {
