@@ -70,8 +70,8 @@ _SQUARE_COORD_FONT = _load_font(_LABEL_CANDIDATES, 32)
 
 
 def piece_glyph(piece: chess.Piece) -> str:
-    """Short letter used in slash-command choice labels (not board art)."""
-    return PIECE_LETTER[piece.piece_type]
+    """Piece name for Discord select / slash labels (not board art)."""
+    return PIECE_NAME[piece.piece_type]
 
 
 def _sq_xy(square: int, flip: bool) -> tuple[int, int]:
