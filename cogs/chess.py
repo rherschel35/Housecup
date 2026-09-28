@@ -703,10 +703,11 @@ class Chess(commands.Cog):
                         *, from_ephemeral: bool = False):
         """Applies a legal move (menu or typed command) and refreshes the board message."""
         san = m.board.san(mv)
+        spoken = describe_move(m.board, mv)
         flavor = self._flavor_for(m.board, mv)
         m.board.push(mv)
         m.last_move_at = time.time()
-        m.last_san = san
+        m.last_san = spoken  # shown on the board embed ("Knight g8 to f6")
         m.last_flavor = flavor or None
         m.log.append(san)
 

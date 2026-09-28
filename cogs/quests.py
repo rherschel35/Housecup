@@ -8,7 +8,7 @@ first three members to answer correctly earn points for their house.
 
 Three tiers, each on its own schedule:
 
-    Daily   1 point   a lore question
+    Daily   1 point   every 24 hours (pings @everyone) - a lore question
     Trial   3 points  every 3 days - harder lore, or a scrambled word
     Rite    5 points  weekly - a pattern to work out, or a blank to fill
 
@@ -51,9 +51,11 @@ TIERS = {
               "blurb": "Once a week. Hardest of the three.", "color": 0xD9A441},
 }
 
-# A tier is due when this much time has passed. Kept a little under the
-# nominal period so a challenge never drifts an hour later each cycle.
+# Trial/Rite: a little under the nominal period so they never drift an
+# hour later each cycle. Daily uses a strict 24h check in the scheduler.
 def _due_after(tier: str) -> float:
+    if tier == "daily":
+        return 24 * 3600
     return TIERS[tier]["every"] * 24 * 3600 - 2 * 3600
 
 
@@ -344,7 +346,7 @@ class Quests(commands.Cog):
             )
         return embed
 
-    async def post_challenge(self, tier: str, channel) -> bool:
+    async def post_challenge(self, tier: str, channel, *, mention_everyone: bool = False) -> bool:
         """Close whatever was running for this tier and post a fresh one."""
         old = self.state["active"].get(tier)
         if old and not old.get("closed"):
@@ -367,8 +369,16 @@ class Quests(commands.Cog):
         }
 
         view = ChallengeView(self, tier)
+        content = "@everyone" if mention_everyone else None
+        allowed = (discord.AllowedMentions(everyone=True, users=False, roles=False)
+                   if mention_everyone else discord.AllowedMentions.none())
         try:
-            message = await channel.send(embed=self.public_embed(tier), view=view)
+            message = await channel.send(
+                content=content,
+                embed=self.public_embed(tier),
+                view=view,
+                allowed_mentions=allowed,
+            )
         except discord.DiscordException:
             log.exception("Could not post the %s challenge.", tier)
             self.state["active"].pop(tier, None)
@@ -406,12 +416,20 @@ class Quests(commands.Cog):
             return
 
         now = datetime.datetime.now(datetime.timezone.utc)
+        now_ts = time.time()
+
+        # Daily: strict 24h since last post (any hour), and ping @everyone.
+        last_daily = self.state["last_posted"].get("daily", 0)
+        if now_ts - last_daily >= _due_after("daily"):
+            await self.post_challenge("daily", channel, mention_everyone=True)
+
+        # Trial / Rite still fire in the configured hour window.
         if now.hour != self.settings.get("hour", 18):
             return
 
-        for tier in ("daily", "trial", "rite"):
+        for tier in ("trial", "rite"):
             last = self.state["last_posted"].get(tier, 0)
-            if time.time() - last < _due_after(tier):
+            if now_ts - last < _due_after(tier):
                 continue
             if tier == "rite" and now.weekday() != self.settings.get("weekday", 6):
                 continue
@@ -449,7 +467,11 @@ class Quests(commands.Cog):
         await interaction.response.send_message(
             f"Posting the {TIERS[tier.value]['label'].lower()}.", ephemeral=True
         )
-        posted = await self.post_challenge(tier.value, interaction.channel)
+        posted = await self.post_challenge(
+            tier.value,
+            interaction.channel,
+            mention_everyone=(tier.value == "daily"),
+        )
         if not posted:
             await interaction.followup.send(
                 "That didn't post — check the logs.", ephemeral=True
@@ -480,8 +502,9 @@ class Quests(commands.Cog):
         day = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
                "Sunday")[self.settings["weekday"]]
         await interaction.response.send_message(
-            f"Challenges will post in {channel.mention} at {hour:02d}:00 UTC — "
-            f"daily every day, the Trial every 3 days, and the Rite on {day}s.",
+            f"Challenges will post in {channel.mention}. "
+            f"**Daily** every 24 hours (pings @everyone). "
+            f"**Trial** every 3 days and **Rite** on {day}s at {hour:02d}:00 UTC.",
             ephemeral=True,
         )
 
