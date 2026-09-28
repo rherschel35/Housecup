@@ -39,7 +39,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from cogs.chess_board import piece_glyph, render_board
+from cogs.chess_board import describe_move, piece_glyph, render_board
 
 log = logging.getLogger("velmora.chess")
 

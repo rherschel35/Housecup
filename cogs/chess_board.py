@@ -74,6 +74,27 @@ def piece_glyph(piece: chess.Piece) -> str:
     return PIECE_NAME[piece.piece_type]
 
 
+def describe_move(board: chess.Board, mv: chess.Move) -> str:
+    """Human-readable move, e.g. 'Knight g8 to f6'. Call before board.push(mv)."""
+    if board.is_kingside_castling(mv):
+        return "King castles kingside"
+    if board.is_queenside_castling(mv):
+        return "King castles queenside"
+    piece = board.piece_at(mv.from_square)
+    name = PIECE_NAME[piece.piece_type] if piece else "Piece"
+    fr = chess.square_name(mv.from_square)
+    to = chess.square_name(mv.to_square)
+    if board.is_en_passant(mv):
+        text = f"{name} {fr} takes on {to} (en passant)"
+    elif board.is_capture(mv):
+        text = f"{name} {fr} takes on {to}"
+    else:
+        text = f"{name} {fr} to {to}"
+    if mv.promotion:
+        text += f", promotes to {PIECE_NAME[mv.promotion]}"
+    return text
+
+
 def _sq_xy(square: int, flip: bool) -> tuple[int, int]:
     file = chess.square_file(square)
     rank = chess.square_rank(square)
