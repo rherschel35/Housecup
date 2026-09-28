@@ -2,18 +2,21 @@
 Bootstrap Mirror sprite packs onto the persistent volume.
 
 Licensed packs stay out of git. On Railway they live under
-STATE_DIR/wizard_assets/{male,female}. If that tree is missing or empty,
-we download the Dropbox zips from env vars once and unpack them.
+STATE_DIR/wizard_assets/{male,female,female_full}. If that tree is missing
+or empty, we download the Dropbox zips from env vars once and unpack them.
 
 Env (all optional; skip download if unset):
     WIZARD_PACK_FEMALE
     WIZARD_PACK_FEMALE_UPDATE
+    WIZARD_PACK_FEMALE_FULL         - Girl Sprites Premium zip (PSD); exported on boot
+    WIZARD_PACK_FEMALE_FULL_UPDATE
     WIZARD_PACK_MALE          - overrides the default MALE1 muscular pack URL
     WIZARD_PACK_MALE_UPDATE
     WIZARD_ASSETS_DIR         - override destination (default STATE_DIR/wizard_assets)
 
 On every boot:
   - female is left alone if already present
+  - female_full is built from the Premium Girl Sprites PSD when missing
   - male is replaced whenever it is not the MALE1 muscular format
     (hair_top/ + body/), using WIZARD_PACK_MALE* or the built-in Dropbox URL
 """
@@ -40,9 +43,17 @@ DEFAULT_MALE1_URL = (
     "?rlkey=3ybjz1332k00a8b01eiokqa3s&dl=1"
 )
 
+# Girl Sprites Premium 1 — full-body feminine pack (PSD → PNG export).
+DEFAULT_FEMALE_FULL_URL = (
+    "https://www.dropbox.com/scl/fi/lmtvapy4h19h1acpikexe/Girl-Sprites-Premium-1.zip"
+    "?rlkey=wkelzyhllz750s6058za0oexf&dl=1"
+)
+
 PACK_ENVS = (
     ("female", "WIZARD_PACK_FEMALE"),
     ("female", "WIZARD_PACK_FEMALE_UPDATE"),
+    ("female_full", "WIZARD_PACK_FEMALE_FULL"),
+    ("female_full", "WIZARD_PACK_FEMALE_FULL_UPDATE"),
     ("male", "WIZARD_PACK_MALE"),
     ("male", "WIZARD_PACK_MALE_UPDATE"),
 )
@@ -72,8 +83,24 @@ def _is_male1(gender_root: Path) -> bool:
     return (gender_root / "hair_top").is_dir() and (gender_root / "body").is_dir()
 
 
+def _is_female_full(gender_root: Path) -> bool:
+    try:
+        from cogs.mirror_girl_premium import is_girl_premium_root
+        return is_girl_premium_root(gender_root)
+    except Exception:
+        return (gender_root / "body" / "body.png").is_file() and (gender_root / "clothes").is_dir()
+
+
+def female_full_ready(root: Path | None = None) -> bool:
+    root = root or assets_root()
+    return _is_female_full(root / "female_full")
+
+
 def assets_ready(root: Path | None = None) -> bool:
-    """Female = Tainara; male must be MALE1 (old soft male pack counts as not ready)."""
+    """Female = Tainara; male must be MALE1 (old soft male pack counts as not ready).
+
+    female_full is optional — Mirror hides that presentation if missing.
+    """
     root = root or assets_root()
     female_ok = _is_tainara(root / "female")
     male_ok = _is_male1(root / "male")
@@ -216,6 +243,85 @@ def _ensure_male1(root: Path) -> bool:
     return False
 
 
+def _female_full_urls() -> list[str]:
+    urls = _env_urls_for("female_full")
+    default = _normalize_dropbox(DEFAULT_FEMALE_FULL_URL)
+    if default not in urls:
+        urls.append(default)
+    return urls
+
+
+def _export_female_full_from_psd(psd_path: Path, dest: Path) -> bool:
+    try:
+        from scripts.export_girl_premium import export_psd
+    except ImportError:
+        # Boot path: scripts/ may not be a package — load by file.
+        import importlib.util
+        script = Path(__file__).resolve().parent.parent / "scripts" / "export_girl_premium.py"
+        spec = importlib.util.spec_from_file_location("export_girl_premium", script)
+        if spec is None or spec.loader is None:
+            log.error("Could not load export_girl_premium.py")
+            return False
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        export_psd = mod.export_psd
+    try:
+        export_psd(psd_path, dest)
+    except Exception:
+        log.exception("Failed exporting Girl Sprites Premium → %s", dest)
+        return False
+    return _is_female_full(dest)
+
+
+def _ensure_female_full(root: Path) -> bool:
+    """Install Girl Sprites Premium as wizard_assets/female_full (PNG parts)."""
+    dest = root / "female_full"
+    if _is_female_full(dest):
+        log.info("Full-body feminine pack ready at %s", dest)
+        return True
+
+    # Stale exports (pre girl_premium_v2) placed hair/clothes at (0,0). Wipe
+    # so we re-copy or re-export with corrected layer offsets.
+    if dest.exists():
+        log.info("Refreshing female_full pack (stale/incomplete) at %s", dest)
+        shutil.rmtree(dest)
+
+    repo = DATA_DIR / "wizard_assets" / "female_full"
+    if _is_female_full(repo):
+        log.info("Copying female_full wizard assets from repo → %s", dest)
+        shutil.copytree(repo, dest)
+        return _is_female_full(dest)
+
+    root.mkdir(parents=True, exist_ok=True)
+    for url in _female_full_urls():
+        with tempfile.TemporaryDirectory(prefix="girl_premium_") as tmp:
+            tmp_path = Path(tmp)
+            zip_path = tmp_path / "pack.zip"
+            try:
+                _download(url, zip_path)
+            except Exception:
+                log.exception("Failed to download female_full pack")
+                continue
+            extract_to = tmp_path / "out"
+            extract_to.mkdir()
+            try:
+                with zipfile.ZipFile(zip_path, "r") as zf:
+                    zf.extractall(extract_to)
+            except zipfile.BadZipFile:
+                log.exception("female_full pack is not a valid zip")
+                continue
+            psds = list(extract_to.rglob("Premium Girl Sprites.psd"))
+            if not psds:
+                psds = list(extract_to.rglob("*.psd"))
+            if not psds:
+                log.error("No PSD found in female_full zip")
+                continue
+            if _export_female_full_from_psd(psds[0], dest):
+                return True
+    log.warning("Full-body feminine pack unavailable — /wizard will hide that option")
+    return False
+
+
 def ensure_wizard_assets() -> bool:
     """Make sure STATE_DIR (or override) has male+female packs. Returns ready?"""
     root = assets_root()
@@ -239,8 +345,11 @@ def ensure_wizard_assets() -> bool:
             if _install_zip(url, "female", root):
                 break
 
+    _ensure_female_full(root)
+
     if assets_ready(root):
-        log.info("Wizard assets ready at %s (male=MALE1)", root)
+        log.info("Wizard assets ready at %s (male=MALE1 female_full=%s)",
+                 root, _is_female_full(root / "female_full"))
         return True
 
     log.error(

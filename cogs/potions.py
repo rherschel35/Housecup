@@ -109,11 +109,11 @@ RECIPES = {
         "blurb": "A private encounter from a place you pick.",
     },
     "nibblers_bait": {
-        "name": "Nibbler's Bait", "emoji": "✨", "tier": "rare",
+        "name": "Niffler's Bait", "emoji": "✨", "tier": "rare",
         "ingredients": ["frog_gold", "glowshroom"],
         "effect": {"type": "beast_bonus", "skew": "nibbler"},
         "sequence": ["stir", "simmer", "heat"],
-        "blurb": "A private encounter, guaranteed to be a shiny-stealing Nibbler.",
+        "blurb": "A private encounter, guaranteed to be a shiny-stealing Niffler.",
     },
     "draught_of_fury": {
         "name": "Draught of Fury", "emoji": "🔥", "tier": "common",

@@ -235,8 +235,8 @@ GEAR = {
     },
     "magpies_eye": {
         "name": "Magpie's Eye Necklace", "slot": "necklace", "rarity": "rare",
-        "desc": "Every Nibbler in Velmora chipped in something shiny. It notices things.",
-        "earn": "all_nibblers", "earn_text": "Befriend all five Nibblers.",
+        "desc": "Every Niffler in Velmora chipped in something shiny. It notices things.",
+        "earn": "all_nibblers", "earn_text": "Befriend all five Nifflers.",
         "perk": "double_find", "perk_text": "Sometimes you find two of something instead of one.",
         "visual": {"chain": "gold", "pendant": "eye", "color": "#3FA0E0"},
     },
