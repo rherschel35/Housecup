@@ -17,14 +17,17 @@ from typing import Iterable, Optional
 import chess
 from PIL import Image, ImageDraw, ImageFont
 
-SQ = 80
-MARGIN = 64
+SQ = 96
+MARGIN = 72
 BOARD_PX = SQ * 8
 IMG_SIZE = BOARD_PX + MARGIN * 2
 
 LIGHT = (240, 217, 181)
 DARK = (181, 136, 99)
 COORD = (255, 250, 235)
+# In-square coords (scale with the board when Discord shrinks the image on mobile)
+COORD_ON_LIGHT = (60, 40, 20)
+COORD_ON_DARK = (255, 245, 225)
 LAST_MOVE = (246, 246, 105)
 SELECTED = (186, 202, 68)
 DOT = (40, 40, 40, 120)
@@ -62,7 +65,8 @@ def _load_font(paths: list[Path], size: int) -> ImageFont.FreeTypeFont | ImageFo
     return ImageFont.load_default()
 
 
-_LABEL_FONT = _load_font(_LABEL_CANDIDATES, 36)
+_LABEL_FONT = _load_font(_LABEL_CANDIDATES, 52)
+_SQUARE_COORD_FONT = _load_font(_LABEL_CANDIDATES, 32)
 
 
 def piece_glyph(piece: chess.Piece) -> str:
@@ -187,6 +191,9 @@ def render_board(
     img = Image.new("RGB", (IMG_SIZE, IMG_SIZE), (48, 42, 36))
     draw = ImageDraw.Draw(img, "RGBA")
 
+    files = "abcdefgh"
+    ranks = "12345678"
+
     for rank in range(8):
         for file in range(8):
             square = chess.square(file, rank)
@@ -199,9 +206,17 @@ def render_board(
                 color = tuple(round((base[i] + SELECTED[i]) / 2) for i in range(3))
             draw.rectangle([x, y, x + SQ - 1, y + SQ - 1], fill=color)
 
-    # coordinates — large + high-contrast for Discord mobile
-    files = "abcdefgh"
-    ranks = "12345678"
+            # Large coords on the visible left column + bottom row (scale with Discord compression)
+            col = 7 - file if flip else file
+            row = rank if flip else 7 - rank
+            ink = COORD_ON_LIGHT if (file + rank) % 2 == 0 else COORD_ON_DARK
+            if col == 0:
+                draw.text((x + 5, y + 3), ranks[rank], font=_SQUARE_COORD_FONT, fill=ink, anchor="lt")
+            if row == 7:
+                draw.text((x + SQ - 5, y + SQ - 3), files[file], font=_SQUARE_COORD_FONT,
+                          fill=ink, anchor="rb")
+
+    # Outer file/rank strip (extra large for desktop / zoomed views)
     for i in range(8):
         file_idx = 7 - i if flip else i
         rank_idx = i if flip else 7 - i
