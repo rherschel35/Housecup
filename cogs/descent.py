@@ -539,21 +539,24 @@ class FightView(discord.ui.View):
 
 class StatButton(discord.ui.Button):
     def __init__(self, stat: str, label: str, emoji: str):
-        super().__init__(label=label, emoji=emoji, style=discord.ButtonStyle.primary)
+        # Stable custom_ids so the picker survives bot restarts (registered
+        # once in Descent.cog_load). Spending always applies to the clicker.
+        super().__init__(label=label, emoji=emoji, style=discord.ButtonStyle.primary,
+                         custom_id=f"descent:statup:{stat}")
         self.stat = stat
 
     async def callback(self, interaction: discord.Interaction):
-        if interaction.user.id != self.view.owner_id:
-            await interaction.response.send_message("That's not your stat point to spend.", ephemeral=True)
-            return
         await self.view.cog.pick_stat(interaction, self.stat)
 
 
 class StatUpView(discord.ui.View):
-    def __init__(self, cog: "Descent", owner_id: int):
+    """Persistent view — unspent Descent picks must still be clickable after
+    a redeploy, otherwise players grind practice forever with a stuck
+    pending_statup and never roll another +1."""
+
+    def __init__(self, cog: "Descent"):
         super().__init__(timeout=None)
         self.cog = cog
-        self.owner_id = owner_id
         self.add_item(StatButton("hp", "Max HP", "❤️"))
         self.add_item(StatButton("atk", "Attack", "⚔️"))
         self.add_item(StatButton("def", "Defense", "🛡️"))
@@ -565,6 +568,9 @@ class Descent(commands.Cog):
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         self.state = self._load()
         self.fights: dict[int, Fight] = {}
+
+    async def cog_load(self):
+        self.bot.add_view(StatUpView(self))
 
     def _load(self) -> dict:
         if STATE_PATH.exists():
@@ -866,7 +872,7 @@ class Descent(commands.Cog):
             else:
                 desc += "\n\nYou've earned a stat point for clearing the floor - pick where it goes."
             embed = discord.Embed(title=f"{fight.emoji} Victory!", description=desc, color=0x2ECC71)
-            await interaction.edit_original_response(embed=embed, view=StatUpView(self, interaction.user.id))
+            await interaction.edit_original_response(embed=embed, view=StatUpView(self))
             return
 
         rec["monster_index"] = cleared_index + 1
@@ -884,7 +890,7 @@ class Descent(commands.Cog):
             rec["pending_statup"] = 1
             self.save()
             embed.description += "\n\nYou've earned a stat point - pick where it goes."
-            await interaction.edit_original_response(embed=embed, view=StatUpView(self, interaction.user.id))
+            await interaction.edit_original_response(embed=embed, view=StatUpView(self))
         else:
             embed.description += "\nUse `/descend` to keep going."
             await interaction.edit_original_response(embed=embed, view=None)
@@ -898,17 +904,25 @@ class Descent(commands.Cog):
         desc += "\nA material dropped!" if got_loot else "\nNo material dropped this time."
 
         chance = practice_statup_chance(rec["floor"], fight.floor)
-        if pending_statup_picks(rec) == 0 and random.random() < chance:
+        pct = max(1, int(round(chance * 100)))
+        pending = pending_statup_picks(rec)
+        if pending > 0:
+            # Should be rare (practice is gated on spend), but keep the picker
+            # attached so a stuck pick can still be cleared from a win message.
+            desc += (f"\n\nYou still have **{pending}** unspent stat pick"
+                     f"{'s' if pending != 1 else ''} — spend "
+                     f"{'them' if pending != 1 else 'it'} before practice can sharpen you again.")
+        elif random.random() < chance:
             rec["pending_statup"] = 1
-            self.save()
+            pending = 1
             desc += "\n\nThis grind sharpened you - pick a stat to raise."
-            embed = discord.Embed(title=f"{fight.emoji} Practice victory!", description=desc, color=0x2ECC71)
-            await interaction.edit_original_response(embed=embed, view=StatUpView(self, interaction.user.id))
-            return
+        else:
+            desc += f"\n\nNo free stat this time ({pct}% chance on this floor)."
 
         self.save()
         embed = discord.Embed(title=f"{fight.emoji} Practice victory!", description=desc, color=0x2ECC71)
-        await interaction.edit_original_response(embed=embed, view=None)
+        view = StatUpView(self) if pending > 0 else None
+        await interaction.edit_original_response(embed=embed, view=view)
 
     async def _on_loss(self, interaction: discord.Interaction, fight: Fight):
         del self.fights[interaction.user.id]
@@ -960,7 +974,7 @@ class Descent(commands.Cog):
                                  f"{'s' if remaining != 1 else ''} left — choose another."),
                     color=0x6C5CE7,
                 ),
-                view=StatUpView(self, interaction.user.id),
+                view=StatUpView(self),
             )
             return
         await interaction.response.edit_message(
@@ -968,6 +982,20 @@ class Descent(commands.Cog):
                                 color=0x6C5CE7),
             view=None,
         )
+
+    async def _prompt_statup(self, interaction: discord.Interaction, rec: dict) -> bool:
+        """If the player still owes a pick, show the picker and return True."""
+        left = pending_statup_picks(rec)
+        if left <= 0:
+            return False
+        tip = "Pick your remaining stat points first." if left > 1 else "Pick your stat point first."
+        desc = f"{left} picks remaining." if left > 1 else None
+        await interaction.response.send_message(
+            tip,
+            embed=discord.Embed(title="Choose a stat to raise", description=desc, color=0x6C5CE7),
+            view=StatUpView(self),
+        )
+        return True
 
     # ----------------------------------------------------------- commands
 
@@ -993,6 +1021,10 @@ class Descent(commands.Cog):
                 await interaction.response.send_message("Boss floors can't be replayed for practice.",
                                                          ephemeral=True)
                 return
+            # Same gate as a real descend: an unspent pick silently blocked
+            # practice +1 rolls forever, which looked like the grind was broken.
+            if await self._prompt_statup(interaction, rec):
+                return
             await self._start_practice_fight(interaction, rec, floor)
             return
 
@@ -1003,14 +1035,7 @@ class Descent(commands.Cog):
             await interaction.response.send_message(
                 f"Floor {rec['floor']} is locked after 3 losses. Try again in {h}h {m}m.", ephemeral=True)
             return
-        if pending_statup_picks(rec) > 0:
-            left = pending_statup_picks(rec)
-            tip = "Pick your remaining stat points first." if left > 1 else "Pick your stat point first."
-            await interaction.response.send_message(
-                tip, embed=discord.Embed(
-                    title="Choose a stat to raise",
-                    description=f"{left} pick{'s' if left != 1 else ''} remaining." if left > 1 else None,
-                    color=0x6C5CE7), view=StatUpView(self, interaction.user.id))
+        if await self._prompt_statup(interaction, rec):
             return
         if interaction.user.id in self.fights:
             fight = self.fights[interaction.user.id]
