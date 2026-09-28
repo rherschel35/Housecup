@@ -116,9 +116,6 @@ EYES = {
     "no_reflection": "No reflection",
 }
 
-# Packed into iris_type (no separate /wizard page for lashes).
-LASH_KEYS = LASHES
-
 EXTRAS = {
     "none": "None",
     "star": "Star clip",
