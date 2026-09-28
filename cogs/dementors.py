@@ -119,12 +119,14 @@ CREATURES = {
         "name": "Dementor", "emoji": "🖤", "color": DARK, "weak": "patronus",
         "pack": 1, "points": 3, "wander": False,
         "image": "Dementor.png",
+        "defeat_image": "Dementor_Defeat.png",
         "arrivals": ARRIVALS,
     },
     "shadow_wolf": {
         "name": "Shadow Wolf", "emoji": "🐺", "color": 0x2B2B33, "weak": "hex",
         "pack": 1, "points": 3, "wander": False,
         "image": "Shadow_Wolf.png",
+        "defeat_image": "Shadow_Wolf_Defeat.png",
         "arrivals": [
             "Something low and fast slips between people's feet, all teeth and no sound.",
             "A shadow peels off the wall and starts circling. It hasn't decided who yet.",
@@ -140,6 +142,7 @@ CREATURES = {
         "name": "Wisp Swarm", "emoji": "🌫️", "color": 0x9AA7B0, "weak": "mirror",
         "pack": 1, "points": 3, "wander": False,
         "image": "Wisp_Swarm.png",
+        "defeat_image": "Wisp_Swarm_Defeat.png",
         "arrivals": [
             "A cluster of pale lights drifts in through the window, humming faintly.",
             "The air fills with soft floating wisps. They don't seem hostile. They also don't leave.",
@@ -155,6 +158,7 @@ CREATURES = {
         "name": "Storm Sprite", "emoji": "⚡", "color": 0x4B6EF5, "weak": "ward",
         "pack": 1, "points": 5, "wander": True,
         "image": "Storm_Sprite.png",
+        "defeat_image": "Storm_Sprite_Defeat.png",
         "arrivals": [
             "A crackle of static runs along the ceiling and drops, grinning, into the room.",
             "The lights flicker once. Something small, bright, and extremely pleased with itself has arrived.",
@@ -173,6 +177,7 @@ CREATURES = {
         "name": "Stone Golem", "emoji": "🪨", "color": 0x6E6455, "weak": "bind",
         "pack": 2, "points": 4, "wander": False,
         "image": "Stone_Golem.png",
+        "defeat_image": "Stone_Golem_Defeat.png",
         "arrivals": [
             "Something heavy grinds to a halt in the doorway. It's not going anywhere on its own.",
             "A shape built out of loose stone hauls itself upright and just... stands there. Ominously.",
@@ -188,6 +193,7 @@ CREATURES = {
         "name": "Nightweaver", "emoji": "🕷️", "color": 0x2E1A33, "weak": "disarm",
         "pack": 2, "points": 4, "wander": False,
         "image": "Nightweaver.png",
+        "defeat_image": "Nightweaver_Defeat.png",
         "arrivals": [
             "Thread-thin shadows stitch themselves across the ceiling, and something with too many legs waits at the center.",
             "A web that wasn't there a moment ago now stretches corner to corner. Something's home.",
@@ -279,9 +285,9 @@ class Dementors(commands.Cog):
 
     # ------------------------------------------------------------ spawning
 
-    def _creature_file(self, creature_id: str) -> discord.File | None:
-        """Attachable portrait for a Wild Threat arrival, or None if missing."""
-        image = CREATURES.get(creature_id, {}).get("image")
+    def _creature_file(self, creature_id: str, *, field: str = "image") -> discord.File | None:
+        """Attachable portrait (arrival or defeat), or None if missing."""
+        image = CREATURES.get(creature_id, {}).get(field)
         if not image:
             return None
         path = ASSETS_DIR / image
@@ -290,19 +296,23 @@ class Dementors(commands.Cog):
             return None
         return discord.File(path, filename="monster.png")
 
+    def _attach_art(self, embed: discord.Embed, creature_id: str, *, field: str = "image") -> discord.File | None:
+        """Set embed image + return the File to send with it, if art exists."""
+        file = self._creature_file(creature_id, field=field)
+        if file:
+            embed.set_image(url="attachment://monster.png")
+        return file
+
     def embed_arrival(self, creature_id: str) -> discord.Embed:
         c = CREATURES[creature_id]
         desc = self.rng.choice(c["arrivals"])
         if creature_id == "dementor":
             desc += "\n\nOnly a cast patronus can drive it out - `/cast spell:Patronus`."
-        embed = discord.Embed(
+        return discord.Embed(
             title=f"{c['emoji']} A {c['name']} has appeared",
             description=desc,
             color=THREAT_ALERT_COLOR,
         )
-        if c.get("image") and (ASSETS_DIR / c["image"]).is_file():
-            embed.set_image(url="attachment://monster.png")
-        return embed
 
     async def spawn(self, channel_id: int = None, creature_id: str = None) -> discord.TextChannel | None:
         """Make a creature appear. Picks a random configured channel if none
@@ -320,7 +330,7 @@ class Dementors(commands.Cog):
         if creature_id is None:
             creature_id = "dementor"
         embed = self.embed_arrival(creature_id)
-        file = self._creature_file(creature_id)
+        file = self._attach_art(embed, creature_id)
         try:
             msg = await channel.send(embed=embed, file=file) if file else await channel.send(embed=embed)
         except discord.HTTPException:
@@ -373,7 +383,7 @@ class Dementors(commands.Cog):
             return
         creature_id = active["creature"]
         embed = self.embed_arrival(creature_id)
-        file = self._creature_file(creature_id)
+        file = self._attach_art(embed, creature_id)
         try:
             msg = (await new_channel.send(embed=embed, file=file) if file
                    else await new_channel.send(embed=embed))
@@ -489,7 +499,11 @@ class Dementors(commands.Cog):
         ]
         if footer_parts:
             embed.set_footer(text=" • ".join(footer_parts))
-        await interaction.response.send_message(embed=embed)
+        file = self._attach_art(embed, creature_id, field="defeat_image")
+        if file:
+            await interaction.response.send_message(embed=embed, file=file)
+        else:
+            await interaction.response.send_message(embed=embed)
 
     async def _cast_dementor(self, interaction, spell, active):
         """The original Dementor flow, unchanged: needs an already-cast
@@ -534,7 +548,11 @@ class Dementors(commands.Cog):
         if awarded:
             from cogs.store import HOUSES
             embed.set_footer(text=f"+{awarded} points for House {HOUSES[house]['name']}")
-        await interaction.response.send_message(embed=embed)
+        file = self._attach_art(embed, "dementor", field="defeat_image")
+        if file:
+            await interaction.response.send_message(embed=embed, file=file)
+        else:
+            await interaction.response.send_message(embed=embed)
 
     # ------------------------------------------------------- event: /cast
 
@@ -575,7 +593,11 @@ class Dementors(commands.Cog):
             )
             embed = discord.Embed(title="✨ The Dementor is banished", description=line, color=0xC4CCD6)
             embed.set_footer(text=f"+{creature['points']} rep - ⚔️ {event['name']}")
-            await interaction.response.send_message(embed=embed)
+            file = self._attach_art(embed, "dementor", field="defeat_image")
+            if file:
+                await interaction.response.send_message(embed=embed, file=file)
+            else:
+                await interaction.response.send_message(embed=embed)
             return
 
         if spell.value != creature["weak"]:
@@ -611,7 +633,11 @@ class Dementors(commands.Cog):
 
         embed = discord.Embed(title=f"✨ The {creature['name']} is defeated", description=line, color=creature["color"])
         embed.set_footer(text=f"+{creature['points']} rep each - ⚔️ {event['name']}")
-        await interaction.response.send_message(embed=embed)
+        file = self._attach_art(embed, creature_id, field="defeat_image")
+        if file:
+            await interaction.response.send_message(embed=embed, file=file)
+        else:
+            await interaction.response.send_message(embed=embed)
 
     # ------------------------------------------------------- event: spawns
 
@@ -625,7 +651,7 @@ class Dementors(commands.Cog):
             creature_id = self._roll_creature()
             embed = self.embed_arrival(creature_id)
             embed.set_footer(text=f"⚔️ {event['name']}")
-            file = self._creature_file(creature_id)
+            file = self._attach_art(embed, creature_id)
             try:
                 msg = (await channel.send(embed=embed, file=file) if file
                        else await channel.send(embed=embed))
