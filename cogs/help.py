@@ -51,7 +51,7 @@ HELP = {
         "entries": [
             ("market browse", "The Marketplace catalogue — ingredients, scrolls, titles, Room."),
             ("market buy", "Buy a common (3 pts) or uncommon (6 pts) ingredient."),
-            ("market sell", "Sell 3 of the same common/uncommon for 3 pts (21/day cap)."),
+            ("market sell", "Sell ingredients (3→3 pts) or Descent mats (25→3 pts); batches optional. 21/day cap."),
             ("market scroll", "Buy a Hex Scroll (30 pts)."),
             ("market title", "Buy an exclusive Marketplace title (50 pts)."),
             ("market room", "Buy the Room of Requirement (100 pts). Pings Headmasters."),

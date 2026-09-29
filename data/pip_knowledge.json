@@ -210,7 +210,7 @@
         "hex scroll",
         "room of requirement"
       ],
-      "answer": "`/market browse` is the catalogue. Buy common/uncommon with `/market buy`; sell sets of 3 common/uncommon with `/market sell` (21 pts/day cap). Also scrolls, titles, an' the Room.",
+      "answer": "`/market browse` is the catalogue. Buy common/uncommon with `/market buy`. Sell place ingredients in sets of 3, or Descent materials in sets of 25, for 3 pts each batch — add `batches:` to sell several at once (21 pts/day cap). Also scrolls, titles, an' the Room.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {
