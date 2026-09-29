@@ -90,6 +90,7 @@ INITIAL_COGS = (
     "cogs.marketplace",
     "cogs.chess",
     "cogs.checkers",
+    "cogs.pip_wick",
 )
 
 

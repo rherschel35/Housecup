@@ -47,6 +47,7 @@ HELP = {
             ("scout", "Send your familiar out to bring something back. Once a day."),
             ("raid", "Open a 3Raid lobby — Attacker, Specialty, Tank, 10 encounters."),
             ("raidstatus", "Your 3Raid weekly clear status."),
+            ("piphowdoi", "Ask Pip Wick how to do something — public hearthling answer from help + Compendium."),
         ],
     },
     "explore": {
