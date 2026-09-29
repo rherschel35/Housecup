@@ -8,6 +8,7 @@ The Velmora Marketplace — spend (and sell for) house points.
     /market title               - buy an exclusive shop title (50 pts)
     /market room                - Room of Requirement (100 pts); pings @headmasters
     /hexscroll member           - cast one owned Hex Scroll (30 min, random effect)
+    /marketsellreset member     - (staff) clear someone's daily sell-points cap
 
 Every spend deducts from the member's season contribution AND the house total
 (same honesty as /bean). Sell earnings go to both, capped at 21 pts/day.
@@ -125,6 +126,13 @@ class Marketplace(commands.Cog):
             rec = {"date": today_str(), "earned": 0}
         rec["earned"] = int(rec.get("earned", 0)) + pts
         self.state["sell_day"][key] = rec
+
+    def _clear_sell_day(self, user_id: int) -> int:
+        """Wipe today's sell earnings. Returns how many points were cleared."""
+        key = str(user_id)
+        had = self._sell_earned_today(user_id)
+        self.state["sell_day"].pop(key, None)
+        return had
 
     def _charge(self, member, cost: int, reason: str) -> dict:
         """Deduct house points from member + house. Returns ok dict or {error}."""
@@ -522,6 +530,28 @@ class Marketplace(commands.Cog):
                         f"**{SCROLL_DURATION_MIN}** minutes.",
             color=0x8B5CF6,
         ).set_footer(text=f"Scrolls left: {self.scroll_count(interaction.user.id)}"))
+
+    @app_commands.command(
+        name="marketsellreset",
+        description="(staff) Clear someone's daily Marketplace sell-points cap.",
+    )
+    @app_commands.describe(member="Whose sell attempts to reset")
+    async def marketsellreset(self, interaction: discord.Interaction, member: discord.Member):
+        store = self._store()
+        if not store or not store.is_staff(interaction.user):
+            await interaction.response.send_message("Staff only.", ephemeral=True)
+            return
+        had = self._clear_sell_day(member.id)
+        self.save()
+        if had:
+            msg = (f"Cleared **{member.display_name}**'s market sell record "
+                   f"(was **{had}/{SELL_DAILY_CAP}** pts earned today). "
+                   f"They can sell again up to **{SELL_DAILY_CAP}**.")
+        else:
+            msg = (f"**{member.display_name}** had nothing on today's sell cap — "
+                   f"still clear. They can sell up to **{SELL_DAILY_CAP}** pts.")
+        await interaction.response.send_message(msg, ephemeral=True)
+        log.info("marketsellreset by %s for %s (had %s)", interaction.user.id, member.id, had)
 
 
 async def setup(bot: commands.Bot):

@@ -177,6 +177,7 @@ HELP = {
             ("descentunlock", "Clear the 3-loss Descent lockout without wiping progress."),
             ("descentreset", "Wipe someone's Descent progress back to floor 1."),
             ("raidreset", "Clear a player's 3Raid weekly lockout, or end the active raid."),
+            ("marketsellreset", "Clear someone's daily Marketplace sell-points cap."),
             ("hex", "Curse a student's messages with a prank spell."),
             ("unhex", "Lift a hex early."),
             ("hexlist", "Show who's currently hexed."),
