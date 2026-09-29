@@ -161,6 +161,7 @@ HELP = {
         "staff": False,
         "entries": [
             ("profile", "Your Mirror, wand, patronus, points, duel rank, beasts and honours - or anyone's."),
+            ("checklist", "What you can still do today for house points, with reset timers."),
             ("points", "Your points (or anyone's), this season and all time."),
             ("standings", "The House Cup table."),
             ("leaderboard", "The top earners."),
