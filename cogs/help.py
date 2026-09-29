@@ -188,6 +188,7 @@ HELP = {
             ("triwizard crown", "Record a Tri-Wizard Tournament winner."),
             ("triwizard remove", "Undo a Tri-Wizard entry made by mistake."),
             ("descentboost", "Add Descent HP / Attack / Defense points to a player."),
+            ("descentunlock", "Clear the 3-loss Descent lockout without wiping progress."),
             ("descentreset", "Wipe someone's Descent progress back to floor 1."),
             ("raidreset", "Clear a player's 3Raid weekly lockout, or end the active raid."),
             ("chess reset", "Wipe someone's chess record and drop their active matches."),
