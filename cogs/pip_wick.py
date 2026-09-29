@@ -28,7 +28,7 @@ AVATAR_PATH = Path(__file__).resolve().parent.parent / "pip_wick_assets" / "pip_
 
 PIP_NAME = "Pip Wick"
 PIP_WEBHOOK_NAME = "Pip Wick"
-COMPENDIUM_HOME = "https://everything-velmora-andmore.netlify.app"
+COMPENDIUM_HOME = "https://everything-velmora.netlify.app"
 
 # Soft cool-down so Pip isn't summoned every two seconds.
 USER_COOLDOWN = 8.0
