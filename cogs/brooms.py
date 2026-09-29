@@ -35,6 +35,29 @@ ASSETS_DIR = Path(__file__).resolve().parent.parent / "broom_art_assets"
 MODEL = os.getenv("BROOM_MODEL", "claude-haiku-4-5-20251001")
 BROOM_COLOR = 0x6B4F3A
 
+# Hard-assign specific brooms to Discord user IDs. Those models stay out of
+# everyone else's pool. Extra pairs via BROOM_RESERVED="id:Model,id2:Model2".
+RESERVED_BROOMS: dict[int, str] = {
+    555141900802457630: "Moonflare",  # Headmaster Gon Vale
+}
+
+
+def _load_reserved() -> dict[int, str]:
+    out = dict(RESERVED_BROOMS)
+    raw = os.getenv("BROOM_RESERVED", "").strip()
+    if not raw:
+        return out
+    for part in raw.split(","):
+        part = part.strip()
+        if ":" not in part:
+            continue
+        uid_s, model = part.split(":", 1)
+        uid_s, model = uid_s.strip(), model.strip()
+        if uid_s.isdigit() and model:
+            out[int(uid_s)] = model
+    return out
+
+
 # 100 named brooms — each image is broom_art_assets/<Name>.png
 BROOMS = {
     "Cinderbolt":   "built for speed and show; loves a dramatic takeoff",
@@ -140,6 +163,11 @@ BROOMS = {
 }
 
 assert len(BROOMS) == 100
+
+RESERVED_BROOMS = {
+    uid: model for uid, model in _load_reserved().items() if model in BROOMS
+}
+RESERVED_MODELS = set(RESERVED_BROOMS.values())
 
 SERIOUS_STATS = ("speed", "altitude")
 SILLY_STATS = (
@@ -323,23 +351,53 @@ class Brooms(commands.Cog):
             self.save()
         return gone
 
-    def assign_model(self, words: str) -> str | None:
+    def reserved_held(self) -> set[str]:
+        """Models reserved for someone else (held out of the open pool)."""
+        claimed = self.claimed_models()
+        held: set[str] = set()
+        for uid, model in RESERVED_BROOMS.items():
+            owner = claimed.get(model)
+            if owner is None or owner == str(uid):
+                held.add(model)
+        return held
+
+    def assign_model(self, words: str, user_id: int | None = None) -> str | None:
         """Closest preferred broom that nobody else owns yet."""
+        if user_id is not None and user_id in RESERVED_BROOMS:
+            model = RESERVED_BROOMS[user_id]
+            owner = self.claimed_models().get(model)
+            if owner is None or owner == str(user_id):
+                return model
+
         taken = set(self.claimed_models())
+        # Keep other players' reserved brooms out of the open pool.
+        for uid, model in RESERVED_BROOMS.items():
+            if user_id is None or uid != user_id:
+                taken.add(model)
+
         for model in preference_rank(words):
             if model not in taken:
                 return model
         return None
 
-    async def fit(self, words: str) -> dict | None:
-        model = self.assign_model(words)
+    async def fit(self, words: str, user_id: int | None = None) -> dict | None:
+        # Reserved assignment skips the AI shortlist — the broom is fixed.
+        if user_id is not None and user_id in RESERVED_BROOMS:
+            model = self.assign_model(words, user_id=user_id)
+            if model == RESERVED_BROOMS[user_id]:
+                return fallback_broom(words, model)
+
+        model = self.assign_model(words, user_id=user_id)
         if model is None:
             return None
 
         # Offer the fitter a short ranked list of still-available brooms
         # (closest first) so Claude stays near the word-match without
         # naming a claimed one.
-        ranked = [m for m in preference_rank(words) if m in set(self.available_models())][:12]
+        open_models = set(self.available_models()) - (
+            self.reserved_held() - ({RESERVED_BROOMS[user_id]} if user_id in RESERVED_BROOMS else set())
+        )
+        ranked = [m for m in preference_rank(words) if m in open_models][:12]
         if model not in ranked:
             ranked = [model] + ranked
 
@@ -365,7 +423,7 @@ class Brooms(commands.Cog):
                         claimed = self.claimed_models()
                         if result["model"] not in claimed:
                             return result
-                        alt = self.assign_model(words)
+                        alt = self.assign_model(words, user_id=user_id)
                         if alt:
                             return fallback_broom(words, alt)
                 log.warning("Broom reading came back unusable; using the fallback.")
@@ -373,7 +431,7 @@ class Brooms(commands.Cog):
                 log.exception("Broom reading failed; using the fallback.")
 
         # Fallback always uses the unique closest available model
-        pick = self.assign_model(words)
+        pick = self.assign_model(words, user_id=user_id)
         return fallback_broom(words, pick) if pick else None
 
     def portrait_file(self, broom: dict) -> discord.File | None:
@@ -452,7 +510,12 @@ class Brooms(commands.Cog):
             )
             return
 
-        if not self.available_models():
+        reserved = RESERVED_BROOMS.get(target.id)
+        open_left = [
+            m for m in self.available_models()
+            if m not in self.reserved_held() or m == reserved
+        ]
+        if not open_left and not reserved:
             await interaction.response.send_message(
                 "Every broom in Velmora has already been claimed. "
                 "A staff `/wandreset` frees one if someone releases their words.",
@@ -461,8 +524,11 @@ class Brooms(commands.Cog):
             return
 
         await interaction.response.defer(thinking=True)
-        preferred = preference_rank(wand["words"])[0]
-        result = await self.fit(wand["words"])
+        preferred = (
+            reserved if reserved
+            else preference_rank(wand["words"])[0]
+        )
+        result = await self.fit(wand["words"], user_id=target.id)
         if not result:
             await interaction.followup.send(
                 "Every broom in Velmora has already been claimed.", ephemeral=True
@@ -472,7 +538,7 @@ class Brooms(commands.Cog):
         # Final claim guard (concurrent /broom)
         claimed = self.claimed_models()
         if result["model"] in claimed and claimed[result["model"]] != str(target.id):
-            alt = self.assign_model(wand["words"])
+            alt = self.assign_model(wand["words"], user_id=target.id)
             if not alt:
                 await interaction.followup.send(
                     "Every broom in Velmora has already been claimed.", ephemeral=True
