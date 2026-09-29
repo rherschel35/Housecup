@@ -68,9 +68,9 @@ def _when_points_free(payments: list[tuple[float, int]], window: float,
     return int(live[0][0] + window) if live else None
 
 
-def _line(available: bool, label: str, detail: str, reset_ts: Optional[int],
+def _line(done: bool, label: str, detail: str, reset_ts: Optional[int],
           reset_note: str = "resets") -> str:
-    mark = "✅" if available else "⬜"
+    mark = "✅" if done else "⬜"
     timer = f"{reset_note} <t:{reset_ts}:R>" if reset_ts else "ready now"
     return f"{mark} **{label}** — {detail} · {timer}"
 
@@ -99,13 +99,13 @@ class Checklist(commands.Cog):
             explore_left = max(0, explore_cap - int(day.get("explore", 0)))
             forage_left = max(0, forage_cap - int(day.get("forage", 0)))
             lines.append(_line(
-                pts_left > 0, "Explore points",
+                pts_left == 0, "Explore points",
                 f"**{pts_left}/{POINTS_PER_DAY}** pts left", chi_reset, "day resets"))
             lines.append(_line(
-                explore_left > 0, "Explore visits",
+                explore_left == 0, "Explore visits",
                 f"**{explore_left}/{explore_cap}** left", chi_reset, "day resets"))
             lines.append(_line(
-                forage_left > 0, "Forage",
+                forage_left == 0, "Forage",
                 f"**{forage_left}/{forage_cap}** left", chi_reset, "day resets"))
 
         # ---- Beans (rolling 24h) ----
@@ -116,7 +116,7 @@ class Checklist(commands.Cog):
             left = max(0, BEANS_PER_DAY - len(eaten))
             reset = _next_rolling_slot(eaten, WINDOW, BEANS_PER_DAY, now)
             lines.append(_line(
-                left > 0, "Beans",
+                left == 0, "Beans",
                 f"**{left}/{BEANS_PER_DAY}** left", reset,
                 "next bean" if left == 0 else "oldest clears"))
 
@@ -136,7 +136,7 @@ class Checklist(commands.Cog):
                 left = max(0, cap - len(stamps))
                 reset = _next_rolling_slot(stamps, WINDOW, cap, now)
                 lines.append(_line(
-                    left > 0, label,
+                    left == 0, label,
                     f"**{left}/{cap}** paid wins left", reset,
                     "next slot" if left == 0 else "oldest clears"))
 
@@ -149,7 +149,7 @@ class Checklist(commands.Cog):
             used = int(daily.get("count", 0)) if daily.get("date") == today_str() else 0
             left = max(0, DAILY_WIN_CAP - used)
             lines.append(_line(
-                left > 0, "Chess",
+                left == 0, "Chess",
                 f"**{left}/{DAILY_WIN_CAP}** point wins left ({POINTS_PER_WIN} pts each)",
                 utc_reset, "day resets"))
 
@@ -161,7 +161,7 @@ class Checklist(commands.Cog):
             used = int(daily.get("count", 0)) if daily.get("date") == today_str() else 0
             left = max(0, DAILY_WIN_CAP - used)
             lines.append(_line(
-                left > 0, "Checkers",
+                left == 0, "Checkers",
                 f"**{left}/{DAILY_WIN_CAP}** point wins left ({POINTS_PER_WIN} pt each)",
                 utc_reset, "day resets"))
 
@@ -174,7 +174,7 @@ class Checklist(commands.Cog):
             used = int(daily.get("count", 0)) if daily.get("date") == today_str() else 0
             left = max(0, DAILY_HOUSE_WIN_CAP - used)
             lines.append(_line(
-                left > 0, "Quidditch (house match)",
+                left == 0, "Quidditch (house match)",
                 f"**{left}/{DAILY_HOUSE_WIN_CAP}** point wins left ({HOUSE_POINTS_PER_WIN} pts each)",
                 utc_reset, "day resets"))
 
@@ -188,7 +188,7 @@ class Checklist(commands.Cog):
                         if now - r[0] < WINDOW]
             reset = _when_points_free(payments, WINDOW, DAILY_POINT_CAP, now)
             lines.append(_line(
-                left > 0, "Beast befriends",
+                left == 0, "Beast befriends",
                 f"**{left}/{DAILY_POINT_CAP}** pts left", reset,
                 "cap frees" if left == 0 else "oldest clears"))
 
@@ -197,7 +197,7 @@ class Checklist(commands.Cog):
             study_ready = (now - last_study) >= STUDY_WINDOW or last_study <= 0
             study_reset = None if study_ready else int(last_study + STUDY_WINDOW)
             lines.append(_line(
-                study_ready, "Beast study",
+                not study_ready, "Beast study",
                 "ready (`/study`)" if study_ready else "done for now",
                 study_reset, "ready"))
 
@@ -208,7 +208,7 @@ class Checklist(commands.Cog):
             used = market._sell_earned_today(member.id)
             left = max(0, SELL_DAILY_CAP - used)
             lines.append(_line(
-                left > 0, "Market sell",
+                left == 0, "Market sell",
                 f"**{left}/{SELL_DAILY_CAP}** pts left from selling",
                 utc_reset, "day resets"))
 
@@ -224,10 +224,10 @@ class Checklist(commands.Cog):
                 care_left = sum(1 for k in ("fed", "pet", "played") if not day.get(k))
                 scout_ready = not day.get("scouted")
                 lines.append(_line(
-                    care_left > 0, "Familiar care",
+                    care_left == 0, "Familiar care",
                     f"**{care_left}/3** left (feed/pet/play)", chi_reset, "day resets"))
                 lines.append(_line(
-                    scout_ready, "Familiar scout",
+                    not scout_ready, "Familiar scout",
                     "ready (small chance of bonus pts)" if scout_ready else "already sent",
                     chi_reset, "day resets"))
             else:
@@ -248,9 +248,9 @@ class Checklist(commands.Cog):
                 if won:
                     open_bits.append(f"✅ {meta['label']} (you scored)")
                 elif attempted:
-                    open_bits.append(f"⬜ {meta['label']} (attempt used)")
+                    open_bits.append(f"✅ {meta['label']} (attempt used)")
                 else:
-                    open_bits.append(f"✅ {meta['label']} open — try it!")
+                    open_bits.append(f"⬜ {meta['label']} open — try it!")
             if open_bits:
                 lines.append("**Challenges open now**\n" + "\n".join(open_bits))
             else:
@@ -260,7 +260,7 @@ class Checklist(commands.Cog):
             title=f"{member.display_name}'s daily checklist",
             description=(
                 "What you can still do for house points (and a few daily habits).\n"
-                "✅ = something left · ⬜ = done / capped for now\n\n"
+                "✅ = done / capped · ⬜ = still open\n\n"
                 + "\n".join(lines)
             ),
             color=0x6C5CE7,
