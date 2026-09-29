@@ -32,7 +32,7 @@ HELP = {
             ("bean", "Spend 1 point on a mystery bean. Might pay 5. Might be Mordy's socks."),
             ("wand", "Give any three words and a wand chooses you. Yours for good."),
             ("patronus", "Your patronus, cast from the same three words as your wand."),
-            ("broom", "Your broom from the same three words — 100 combos, portrait, silly stats. Purely cosmetic."),
+            ("broom", "Your broom from the same three words — fixed portrait + silly stats. Purely cosmetic."),
             ("rumor", "Explore secrets, student gossip, odd headmaster whispers, embarrassing ghosts."),
             ("cast", "Banish a wild threat in this channel. Needs a patronus already cast."),
             ("familiar", "Adopt a familiar (once, for good), name it, or see the one you have."),

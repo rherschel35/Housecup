@@ -199,14 +199,13 @@ class Profile(commands.Cog):
         brooms_cog = self.bot.get_cog("Brooms")
         broom = brooms_cog.broom_of(member.id) if brooms_cog else None
         if broom:
-            from cogs.brooms import combo_name, _ensure_stats
-            broom = _ensure_stats(dict(broom))
-            name = combo_name(broom["shaft"], broom["bristles"], broom["binding"])
+            from cogs.brooms import _ensure
+            broom = _ensure(dict(broom))
             speed = broom.get("stats", {}).get("speed", "?")
             alt = broom.get("stats", {}).get("altitude", "?")
             embed.add_field(
                 name="Broom",
-                value=f"**{name}**\nSpeed {speed}/10 · Altitude {alt}/10",
+                value=f"**The {broom['model']}**\nSpeed {speed}/10 · Altitude {alt}/10",
                 inline=True,
             )
         elif wand:

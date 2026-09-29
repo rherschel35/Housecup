@@ -5,9 +5,8 @@ your wand (and cast your patronus).
     /broom            - claim yours, or see it again
     /broom @member    - see someone else's
 
-100 combos (10 shafts × 5 bristles × 2 bindings), each with a unique
-portrait, Speed / Altitude (0–10), and a handful of ridiculous stats.
-No flying, no races — looking cool is the whole point.
+Fixed portraits (like Descent monsters) — players don't customize.
+Each broom has Speed, Altitude, and ridiculous 0–10 stats for bragging.
 /wandreset releases the broom with the wand and patronus.
 """
 
@@ -25,47 +24,50 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from cogs import broom_art
-
 log = logging.getLogger("velmora.brooms")
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 BROOMS_PATH = STATE_DIR / "brooms.json"
+ASSETS_DIR = Path(__file__).resolve().parent.parent / "broom_art_assets"
 
 MODEL = os.getenv("BROOM_MODEL", "claude-haiku-4-5-20251001")
 BROOM_COLOR = 0x6B4F3A
 
-# 10 × 5 × 2 = 100 unique brooms
-SHAFTS = {
-    "Ashrail":      {"blurb": "steady oak-ash hybrid; hates drama mid-flight", "color": "#8B5A2B", "grain": "#C4A574"},
-    "Cinderhaft":   {"blurb": "warm to the touch; smoulders a little on takeoff", "color": "#6B2E1F", "grain": "#C45C2A"},
-    "Moonwillow":   {"blurb": "pale and quiet; prefers night air", "color": "#C9C4B0", "grain": "#E8E4D4"},
-    "Thornspur":    {"blurb": "competitive grain; leans into sharp turns", "color": "#4A3A28", "grain": "#7A5A38"},
-    "Glasspine":    {"blurb": "almost translucent; whispers when it banks", "color": "#7A9A9A", "grain": "#C0D8D8"},
-    "Ironbark":     {"blurb": "heavy, stubborn, refuses to drop you", "color": "#3A322C", "grain": "#6A5A4A"},
-    "Starlatch":    {"blurb": "restless; fidgets if left propped too long", "color": "#2A2848", "grain": "#7A78B0"},
-    "Hearthbeam":   {"blurb": "homey and reliable; smells faintly of toast", "color": "#A06838", "grain": "#D4A060"},
-    "Riverreed":    {"blurb": "flexible; forgives clumsy landings", "color": "#5A7A48", "grain": "#A0C080"},
-    "Gloamwood":    {"blurb": "half-light specialist; sulks at noon", "color": "#3A3040", "grain": "#8A7090"},
+# Named brooms with fixed art — same idea as monster_art_assets.
+BROOMS = {
+    "Cinderbolt":   {"blurb": "built for speed and show; loves a dramatic takeoff", "image": "Cinderbolt.png"},
+    "Moonrake":     {"blurb": "quiet night flyer; drawn to loners and lookouts", "image": "Moonrake.png"},
+    "Stormneedle":  {"blurb": "cuts through weather; a little wild", "image": "Stormneedle.png"},
+    "Glassgale":    {"blurb": "light and almost silent; favours the precise", "image": "Glassgale.png"},
+    "Ironwhisk":    {"blurb": "sturdy workhorse; never drops you mid-air", "image": "Ironwhisk.png"},
+    "Thornspur":    {"blurb": "sharp handling; for the competitive", "image": "Thornspur.png"},
+    "Hearthsweep":  {"blurb": "warm and reliable; a first broom that never leaves the heart", "image": "Hearthsweep.png"},
+    "Silverhaft":   {"blurb": "elegant and rare; wants someone who won't waste it", "image": "Silverhaft.png"},
+    "Oakrail":      {"blurb": "steady climber; patient turns, solid landings", "image": "Oakrail.png"},
+    "Wispwing":     {"blurb": "barely there; for the quick and the clever", "image": "Wispwing.png"},
+    "Vaultbreaker": {"blurb": "heavy and powerful; built for force, not finesse", "image": "Vaultbreaker.png"},
+    "Riverreed":    {"blurb": "flexible and forgiving; teaches as it flies", "image": "Riverreed.png"},
+    "Nightcompass": {"blurb": "always finds its way home", "image": "Nightcompass.png"},
+    "Bellringer":   {"blurb": "loud and proud; arrives before you do", "image": "Bellringer.png"},
+    "Ashfeather":   {"blurb": "light wood, soft landing; gentle hands", "image": "Ashfeather.png"},
+    "Emberhaft":    {"blurb": "runs warm under the grip; for the fierce and the fond", "image": "Emberhaft.png"},
+    "Frostquill":   {"blurb": "cool and exact; never oversteers", "image": "Frostquill.png"},
+    "Starlatch":    {"blurb": "restless traveller's broom; hates sitting still", "image": "Starlatch.png"},
+    "Kindling":     {"blurb": "simple, honest ash and twig; nothing to prove", "image": "Kindling.png"},
+    "Gloamrunner":  {"blurb": "at home in the half-light between day and night", "image": "Gloamrunner.png"},
+    "Hollowreed":   {"blurb": "hollow and haunting; hums in empty corridors", "image": "Hollowreed.png"},
+    "Sunlatch":     {"blurb": "bright and bold; refuses cloudy excuses", "image": "Sunlatch.png"},
+    "Mirebrush":    {"blurb": "cunning fen flyer; tracks mud into every hall", "image": "Mirebrush.png"},
+    "Cloudknit":    {"blurb": "soft sky-dweller; altitude is a lifestyle", "image": "Cloudknit.png"},
+    "Ravenquill":   {"blurb": "sleek messenger; keeps secrets in the grain", "image": "Ravenquill.png"},
+    "Rosebriar":    {"blurb": "beautiful and sharp; never apologize for the thorns", "image": "Rosebriar.png"},
+    "Cobaltspur":   {"blurb": "sporty and loud; painted for the finish line", "image": "Cobaltspur.png"},
+    "Gravemoss":    {"blurb": "ancient and solemn; older than the pitch", "image": "Gravemoss.png"},
+    "Pixiedrift":   {"blurb": "mischief on a stick; glitter is not optional", "image": "Pixiedrift.png"},
+    "Dreadkeel":    {"blurb": "prestige and menace; arrives like a storm front", "image": "Dreadkeel.png"},
 }
 
-BRISTLES = {
-    "Storm-twig":   {"blurb": "crackles in humidity", "color": "#4A6080", "accent": "#A0C8F0", "style": "wild"},
-    "Goldwhisk":    {"blurb": "showy; catches every sunset", "color": "#C9A84C", "accent": "#F2E0A0", "style": "fan"},
-    "Softmoss":     {"blurb": "absurdly gentle landings", "color": "#6A8A58", "accent": "#B0D090", "style": "soft"},
-    "Nightbristle": {"blurb": "drinks moonlight; slightly judgmental", "color": "#2A2438", "accent": "#8070A8", "style": "tight"},
-    "Emberreed":    {"blurb": "tips glow when you show off", "color": "#A04020", "accent": "#F08040", "style": "wild"},
-}
-
-BINDINGS = {
-    "Copper wire":  {"blurb": "warm wraps; good for gripping mid-boast", "color": "#B87333", "spark": "#E8A060"},
-    "Silver twine": {"blurb": "polite and shiny; never frays on purpose", "color": "#C0C8D0", "spark": "#F0F4F8"},
-}
-
-assert len(SHAFTS) * len(BRISTLES) * len(BINDINGS) == 100
-
-# Serious-looking stats + ridiculous ones. All 0–10, all cosmetic.
 SERIOUS_STATS = ("speed", "altitude")
 SILLY_STATS = (
     "drama",
@@ -86,27 +88,19 @@ STAT_LABELS = {
     "how_much_it_judges_you": "How Much It Judges You",
 }
 
-READING_PROMPT = """You are the broom-fitter of Velmora. Brooms are personal and cosmetic — no races, no real flying advantage. A student once gave the wandmaker three words. You read those SAME words for how they would look on a broom: style, daring, patience, and show.
+READING_PROMPT = """You are the broom-fitter of Velmora. Brooms are personal and cosmetic — no races, no real flying advantage. A student once gave the wandmaker three words. You read those SAME words for how they would look on a broom.
 
-Do NOT match their words literally. Choose exactly one of each:
-
-SHAFTS:
-{shafts}
-
-BRISTLES:
-{bristles}
-
-BINDINGS:
-{bindings}
+Do NOT match their words literally. Choose exactly one broom from this list:
+{brooms}
 
 Then write:
 - "finish": one short line on how this broom looks/feels in the hand.
-- "reading": two or three sentences to the student on why this combo chose them. Warm, a little uncanny. Mention that the stats are for bragging only.
+- "reading": two or three sentences to the student on why this broom chose them. Warm, a little uncanny. Mention the stats are for bragging only.
 
 The student's words: "{words}"
 
 Reply with ONLY JSON:
-{{"shaft": "...", "bristles": "...", "binding": "...", "finish": "...", "reading": "..."}}"""
+{{"model": "...", "finish": "...", "reading": "..."}}"""
 
 
 def _words_key(words: str) -> str:
@@ -119,10 +113,9 @@ def _digest(words: str) -> bytes:
 
 
 def _stat_block(digest: bytes) -> dict:
-    """Map digest bytes onto 0–10 stats. Deterministic for the same words."""
     stats = {}
     for i, key in enumerate(SERIOUS_STATS + SILLY_STATS):
-        stats[key] = digest[4 + i] % 11  # 0..10 inclusive
+        stats[key] = digest[4 + i] % 11
     return stats
 
 
@@ -131,76 +124,54 @@ def _bar(n: int, width: int = 10) -> str:
     return "█" * n + "░" * (width - n) + f" {n}/10"
 
 
-def combo_name(shaft: str, bristles: str, binding: str) -> str:
-    return f"{shaft} · {bristles} · {binding}"
-
-
-def all_combos() -> list[tuple[str, str, str]]:
-    return [(s, b, d) for s in sorted(SHAFTS) for b in sorted(BRISTLES) for d in sorted(BINDINGS)]
-
-
 def fallback_broom(words: str) -> dict:
     digest = _digest(words)
-    shafts = sorted(SHAFTS)
-    bristles = sorted(BRISTLES)
-    bindings = sorted(BINDINGS)
-    shaft = shafts[digest[0] % len(shafts)]
-    bristle = bristles[digest[1] % len(bristles)]
-    binding = bindings[digest[2] % len(bindings)]
-    stats = _stat_block(digest)
+    models = sorted(BROOMS)
+    model = models[digest[0] % len(models)]
     return {
-        "shaft": shaft,
-        "bristles": bristle,
-        "binding": binding,
-        "finish": f"The {combo_name(shaft, bristle, binding)} settles into your hand like it had been waiting.",
+        "model": model,
+        "finish": f"The {model} settles into your hand like it had been waiting.",
         "reading": (
-            f"{SHAFTS[shaft]['blurb'].capitalize()}. Bristles of {bristle.lower()} — "
-            f"{BRISTLES[bristle]['blurb']}. Bound in {binding.lower()}. "
+            f"The {model} is {BROOMS[model]['blurb']}. "
             "It will not make you faster. It will make you look like yourself."
         ),
-        "stats": stats,
+        "stats": _stat_block(digest),
     }
 
 
 def _clean(raw: dict, words: str) -> dict | None:
     try:
-        shaft = str(raw["shaft"]).strip()
-        bristles = str(raw["bristles"]).strip()
-        binding = str(raw["binding"]).strip()
+        model = str(raw["model"]).strip()
         finish = str(raw["finish"]).strip()
         reading = str(raw["reading"]).strip()
     except (KeyError, TypeError):
         return None
-    shaft_m = next((s for s in SHAFTS if s.lower() == shaft.lower()), None)
-    bristle_m = next((b for b in BRISTLES if b.lower() == bristles.lower()), None)
-    bind_m = next((d for d in BINDINGS if d.lower() == binding.lower()), None)
-    if not shaft_m or not bristle_m or not bind_m or not finish or not reading:
+    match = next((m for m in BROOMS if m.lower() == model.lower()), None)
+    if not match or not finish or not reading:
         return None
     return {
-        "shaft": shaft_m,
-        "bristles": bristle_m,
-        "binding": bind_m,
+        "model": match,
         "finish": finish[:300],
         "reading": reading[:600],
         "stats": _stat_block(_digest(words)),
     }
 
 
-def _ensure_stats(broom: dict, words: str | None = None) -> dict:
-    """Back-fill stats/parts for any older broom records."""
-    if "stats" not in broom or not isinstance(broom.get("stats"), dict):
-        seed = words or broom.get("model") or broom.get("finish") or "broom"
-        broom["stats"] = _stat_block(_digest(str(seed)))
-    # Legacy single-model brooms → map onto a combo via hash
-    if "shaft" not in broom or broom["shaft"] not in SHAFTS:
-        fb = fallback_broom(words or broom.get("model") or "legacy")
-        broom.setdefault("shaft", fb["shaft"])
-        broom.setdefault("bristles", fb["bristles"])
-        broom.setdefault("binding", fb["binding"])
-        broom.setdefault("finish", fb["finish"])
-        broom.setdefault("reading", broom.get("reading") or fb["reading"])
-        broom["stats"] = fb["stats"]
-    return broom
+def _ensure(broom: dict, words: str | None = None) -> dict:
+    """Normalize older combo-style records onto the fixed named catalog."""
+    out = dict(broom)
+    model = out.get("model")
+    if model not in BROOMS:
+        # Legacy shaft×bristle×binding → hash onto a named broom
+        seed = words or out.get("finish") or out.get("shaft") or "legacy"
+        fb = fallback_broom(str(seed))
+        out["model"] = fb["model"]
+        out.setdefault("finish", fb["finish"])
+        out.setdefault("reading", out.get("reading") or fb["reading"])
+        out["stats"] = fb["stats"]
+    if "stats" not in out or not isinstance(out.get("stats"), dict):
+        out["stats"] = _stat_block(_digest(words or out["model"]))
+    return out
 
 
 class Brooms(commands.Cog):
@@ -232,7 +203,7 @@ class Brooms(commands.Cog):
         raw = self.brooms.get(str(user_id))
         if not raw:
             return None
-        return _ensure_stats(dict(raw))
+        return _ensure(raw)
 
     def release(self, user_id: int) -> bool:
         gone = self.brooms.pop(str(user_id), None) is not None
@@ -245,14 +216,12 @@ class Brooms(commands.Cog):
         client = getattr(wands, "client", None)
         if client is not None:
             prompt = READING_PROMPT.format(
-                shafts="\n".join(f"- {k}: {v['blurb']}" for k, v in SHAFTS.items()),
-                bristles="\n".join(f"- {k}: {v['blurb']}" for k, v in BRISTLES.items()),
-                bindings="\n".join(f"- {k}: {v['blurb']}" for k, v in BINDINGS.items()),
+                brooms="\n".join(f"- {k}: {v['blurb']}" for k, v in BROOMS.items()),
                 words=words.replace('"', "'")[:200],
             )
             try:
                 response = await client.messages.create(
-                    model=MODEL, max_tokens=450,
+                    model=MODEL, max_tokens=400,
                     messages=[{"role": "user", "content": prompt}],
                 )
                 text = "".join(getattr(b, "text", "") for b in response.content)
@@ -266,16 +235,21 @@ class Brooms(commands.Cog):
                 log.exception("Broom reading failed; using the fallback.")
         return fallback_broom(words)
 
-    def portrait_png(self, broom: dict) -> bytes:
-        shaft = SHAFTS[broom["shaft"]]
-        bristles = BRISTLES[broom["bristles"]]
-        binding = BINDINGS[broom["binding"]]
-        seed = combo_name(broom["shaft"], broom["bristles"], broom["binding"])
-        return broom_art.render(shaft, bristles, binding, seed)
+    def portrait_file(self, broom: dict) -> discord.File | None:
+        broom = _ensure(broom)
+        meta = BROOMS.get(broom["model"])
+        if not meta:
+            return None
+        path = ASSETS_DIR / meta["image"]
+        if not path.exists():
+            log.warning("Missing broom art %s", path)
+            return None
+        data = path.read_bytes()
+        return discord.File(io.BytesIO(data), filename="broom.png")
 
     def embed_for(self, member, broom: dict, fresh: bool = False) -> discord.Embed:
-        broom = _ensure_stats(broom)
-        name = combo_name(broom["shaft"], broom["bristles"], broom["binding"])
+        broom = _ensure(broom)
+        model = broom["model"]
         stats = broom["stats"]
         serious = "\n".join(
             f"**{STAT_LABELS[k]}** {_bar(stats.get(k, 0))}" for k in SERIOUS_STATS
@@ -286,26 +260,23 @@ class Brooms(commands.Cog):
         embed = discord.Embed(
             title=("A broom answers your grip…" if fresh
                    else f"{member.display_name}'s broom"),
-            description=(f"**{name}**\n*{broom['finish']}*\n\n{broom['reading']}"),
+            description=(f"**The {model}**\n*{broom['finish']}*\n\n{broom['reading']}"),
             color=BROOM_COLOR,
         )
         embed.add_field(name="Flight (for show)", value=serious, inline=False)
         embed.add_field(name="Also (deeply scientific)", value=silly, inline=False)
-        embed.set_image(url="attachment://broom.png")
+        if (ASSETS_DIR / BROOMS[model]["image"]).exists():
+            embed.set_image(url="attachment://broom.png")
         if fresh:
-            embed.set_footer(text=f"{member.display_name}'s broom • 1 of 100 combos • "
+            embed.set_footer(text=f"{member.display_name}'s broom • fixed portrait • "
                                   "stats are decorative")
         else:
-            embed.set_footer(text="1 of 100 combos • purely cosmetic • looking cool is the point")
+            embed.set_footer(text="Purely cosmetic • looking cool is the point")
         return embed
-
-    def file_for(self, broom: dict) -> discord.File:
-        png = self.portrait_png(broom)
-        return discord.File(io.BytesIO(png), filename="broom.png")
 
     @app_commands.command(
         name="broom",
-        description="Claim your broom from the words that chose your wand. 100 combos, silly stats, just for looking cool.",
+        description="Claim your broom from the words that chose your wand. Fixed portrait + silly stats — just for looking cool.",
     )
     @app_commands.describe(member="Whose broom to see (leave blank for your own)")
     async def broom(self, interaction: discord.Interaction, member: discord.Member = None):
@@ -315,7 +286,11 @@ class Brooms(commands.Cog):
         if existing:
             await interaction.response.defer()
             embed = self.embed_for(target, existing)
-            await interaction.followup.send(embed=embed, file=self.file_for(existing))
+            file = self.portrait_file(existing)
+            kwargs = {"embed": embed}
+            if file:
+                kwargs["file"] = file
+            await interaction.followup.send(**kwargs)
             return
 
         if member and member.id != interaction.user.id:
@@ -339,7 +314,11 @@ class Brooms(commands.Cog):
         self.brooms[str(target.id)] = result
         self.save()
         embed = self.embed_for(target, result, fresh=True)
-        await interaction.followup.send(embed=embed, file=self.file_for(result))
+        file = self.portrait_file(result)
+        kwargs = {"embed": embed}
+        if file:
+            kwargs["file"] = file
+        await interaction.followup.send(**kwargs)
 
 
 async def setup(bot: commands.Bot):
