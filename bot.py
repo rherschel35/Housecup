@@ -91,6 +91,7 @@ INITIAL_COGS = (
     "cogs.chess",
     "cogs.checkers",
     "cogs.pip_wick",
+    "cogs.checklist",
 )
 
 

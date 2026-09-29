@@ -3,39 +3,87 @@
   "entries": [
     {
       "id": "wand",
-      "keywords": ["wand", "get a wand", "choose wand", "three words", "get wand"],
-      "answer": "Aye — dig out three words ye fancy an' cast `/wand`. A wand chooses ye for good. Same three words unlock `/patronus` after.",
+      "keywords": [
+        "wand",
+        "get a wand",
+        "choose wand",
+        "three words",
+        "get wand"
+      ],
+      "answer": "Aye \u2014 dig out three words ye fancy an' cast `/wand`. A wand chooses ye for good. Same three words unlock `/patronus` after.",
       "link": "https://everything-velmora.netlify.app/magic"
     },
     {
       "id": "patronus",
-      "keywords": ["patronus", "cast patronus", "spirit animal"],
+      "keywords": [
+        "patronus",
+        "cast patronus",
+        "spirit animal"
+      ],
       "answer": "Yer `/patronus` is cast from the same three words ye gave `/wand`. No wand yet? Start there first, then come back for the glow.",
       "link": "https://everything-velmora.netlify.app/magic"
     },
     {
       "id": "wizard_mirror",
-      "keywords": ["wizard", "mirror", "trading card", "avatar", "design wizard", "look", "feminine", "full body"],
-      "answer": "Design yer look with `/wizard` — there's Masculine, Feminine, an' Feminine (full body). Show it off anytime with `/mirror`.",
+      "keywords": [
+        "wizard",
+        "mirror",
+        "trading card",
+        "avatar",
+        "design wizard",
+        "look",
+        "feminine",
+        "full body"
+      ],
+      "answer": "Design yer look with `/wizard` \u2014 there's Masculine, Feminine, an' Feminine (full body). Show it off anytime with `/mirror`.",
       "link": "https://everything-velmora.netlify.app/cards"
     },
     {
       "id": "familiar",
-      "keywords": ["familiar", "adopt familiar", "feed familiar", "scout", "salamander", "raven", "fox"],
-      "answer": "`/familiar` adopts one for good — salamander, raven, or fox. Feed, pet, an' play once a day, an' send it `/scout` for a lil' find.",
+      "keywords": [
+        "familiar",
+        "adopt familiar",
+        "feed familiar",
+        "scout",
+        "salamander",
+        "raven",
+        "fox"
+      ],
+      "answer": "`/familiar` adopts one for good \u2014 salamander, raven, or fox. Feed, pet, an' play once a day, an' send it `/scout` for a lil' find.",
       "link": "https://everything-velmora.netlify.app/magic"
     },
     {
       "id": "explore",
-      "keywords": ["explore", "forage", "satchel", "places", "garden", "library", "woods", "observatory", "dungeons place", "offering", "offer"],
-      "answer": "Each place has its own channel. Use `/explore` (up to 10/day per place) an' `/forage` (up to 5/day). Check `/satchel`, try `/use`, leave an `/offer`. `/places` shows where ye can go — places remember how ye treat 'em.",
+      "keywords": [
+        "explore",
+        "forage",
+        "satchel",
+        "places",
+        "garden",
+        "library",
+        "woods",
+        "observatory",
+        "dungeons place",
+        "offering",
+        "offer"
+      ],
+      "answer": "Each place has its own channel. Use `/explore` (up to 10/day per place) an' `/forage` (up to 5/day). Check `/satchel`, try `/use`, leave an `/offer`. `/places` shows where ye can go \u2014 places remember how ye treat 'em.",
       "link": "https://everything-velmora.netlify.app/explore"
     },
     {
       "id": "beasts_approach",
       "keywords": [
-        "beast", "beasts", "creature", "creatures", "approach", "befriend",
-        "bestiary", "summon beast", "wild animal", "catch a beast", "find a beast"
+        "beast",
+        "beasts",
+        "creature",
+        "creatures",
+        "approach",
+        "befriend",
+        "bestiary",
+        "summon beast",
+        "wild animal",
+        "catch a beast",
+        "find a beast"
       ],
       "answer": "Beasts wander into the explore channel an' say what they want. First to `/approach` with those things befriends 'em. See yer collection with `/bestiary`, show one off with `/summon`. Want notes on one ye already have? That's `/study`.",
       "link": "https://everything-velmora.netlify.app/beasts"
@@ -43,119 +91,266 @@
     {
       "id": "study_journal",
       "keywords": [
-        "study", "learn", "journal", "beast journal", "study beast", "learn beast",
-        "study creature", "learn creature", "learn about a creature", "learn about a beast",
-        "learn about", "journal pages", "study a beast", "notes on a beast"
+        "study",
+        "learn",
+        "journal",
+        "beast journal",
+        "study beast",
+        "learn beast",
+        "study creature",
+        "learn creature",
+        "learn about a creature",
+        "learn about a beast",
+        "learn about",
+        "journal pages",
+        "study a beast",
+        "notes on a beast"
       ],
-      "answer": "Got a befriended beast? `/study` it once a day — three pages fills yer notes. Read 'em with `/journal`. Finish all three an' yer house gets **5** points once for that beast.",
+      "answer": "Got a befriended beast? `/study` it once a day \u2014 three pages fills yer notes. Read 'em with `/journal`. Finish all three an' yer house gets **5** points once for that beast.",
       "link": "https://everything-velmora.netlify.app/beasts"
     },
     {
       "id": "niffler",
-      "keywords": ["niffler", "nibbler", "shiny", "niffler's bait", "niffler bait"],
-      "answer": "Nifflers are the shiny-thievin' beasts — one uncommon per place. Spot 'em in `/bestiary`, or brew **Niffler's Bait** if ye want a private encounter with one.",
+      "keywords": [
+        "niffler",
+        "nibbler",
+        "shiny",
+        "niffler's bait",
+        "niffler bait"
+      ],
+      "answer": "Nifflers are the shiny-thievin' beasts \u2014 one uncommon per place. Spot 'em in `/bestiary`, or brew **Niffler's Bait** if ye want a private encounter with one.",
       "link": "https://everything-velmora.netlify.app/beasts"
     },
     {
       "id": "duel",
-      "keywords": ["duel", "dueling", "challenge duel", "spells", "hex ward", "best of three", "grand duel", "trio"],
-      "answer": "`/duel` is best of three — both pick a spell in secret. Hex, Ward, Disarm, Bind, Mirror; each beats two an' loses to two. There's also `/trio scramble`, `/trio housematch`, an' `/grand` for the big leagues.",
+      "keywords": [
+        "duel",
+        "dueling",
+        "challenge duel",
+        "spells",
+        "hex ward",
+        "best of three",
+        "grand duel",
+        "trio"
+      ],
+      "answer": "`/duel` is best of three \u2014 both pick a spell in secret. Hex, Ward, Disarm, Bind, Mirror; each beats two an' loses to two. There's also `/trio scramble`, `/trio housematch`, an' `/grand` for the big leagues.",
       "link": "https://everything-velmora.netlify.app/duels"
     },
     {
       "id": "wild_threats",
-      "keywords": ["dementor", "wild threat", "wild threats", "banish", "cast patronus channel", "nightweaver", "stone golem"],
-      "answer": "When a wild threat crawls into a channel, ye need a patronus ready — then `/cast` to banish it. Check `/help` under Play for the cast command.",
+      "keywords": [
+        "dementor",
+        "wild threat",
+        "wild threats",
+        "banish",
+        "cast patronus channel",
+        "nightweaver",
+        "stone golem"
+      ],
+      "answer": "When a wild threat crawls into a channel, ye need a patronus ready \u2014 then `/cast` to banish it. Check `/help` under Play for the cast command.",
       "link": "https://everything-velmora.netlify.app/duels"
     },
     {
       "id": "descent",
-      "keywords": ["descent", "descend", "dungeon", "floor", "practice floor", "descentstatus", "solo dungeon", "action points", "ap"],
+      "keywords": [
+        "descent",
+        "descend",
+        "dungeon",
+        "floor",
+        "practice floor",
+        "descentstatus",
+        "solo dungeon",
+        "action points",
+        "ap"
+      ],
       "answer": "The Descent is a hundred-floor solo dungeon. `/descend` fights yer next monster; `/descend floor:n` replays a cleared floor for practice an' loot. `/descentstatus` shows floor, stats, an' lockouts. Three losses on a floor locks ye out 24 hours.",
       "link": "https://everything-velmora.netlify.app/descent"
     },
     {
       "id": "descent_practice",
-      "keywords": ["practice", "stat point practice", "sharpen", "practice +1", "replay floor"],
-      "answer": "Replay a cleared floor with `/descend floor:n` (not bosses). Practice can sharpen ye with a free stat pick — closer floors more often. Spend any pending stat pick first, or the grind won't award another.",
+      "keywords": [
+        "practice",
+        "stat point practice",
+        "sharpen",
+        "practice +1",
+        "replay floor"
+      ],
+      "answer": "Replay a cleared floor with `/descend floor:n` (not bosses). Practice can sharpen ye with a free stat pick \u2014 closer floors more often. Spend any pending stat pick first, or the grind won't award another.",
       "link": "https://everything-velmora.netlify.app/descent"
     },
     {
       "id": "quidditch",
-      "keywords": ["quidditch", "snitch", "scramble quidditch", "house match"],
-      "answer": "Quidditch runs house matches an' scrambles — five rounds, an' a Snitch that can end it all. Peek `/help` or the Compendium Quidditch page for the commands.",
+      "keywords": [
+        "quidditch",
+        "snitch",
+        "scramble quidditch",
+        "house match"
+      ],
+      "answer": "Quidditch runs house matches an' scrambles \u2014 five rounds, an' a Snitch that can end it all. Peek `/help` or the Compendium Quidditch page for the commands.",
       "link": "https://everything-velmora.netlify.app/quidditch"
     },
     {
       "id": "raid",
-      "keywords": ["raid", "3raid", "three raid", "raidstatus"],
-      "answer": "`/raid` opens a 3Raid lobby — Attacker, Specialty, Tank, ten encounters. `/raidstatus` shows yer weekly clear.",
+      "keywords": [
+        "raid",
+        "3raid",
+        "three raid",
+        "raidstatus"
+      ],
+      "answer": "`/raid` opens a 3Raid lobby \u2014 Attacker, Specialty, Tank, ten encounters. `/raidstatus` shows yer weekly clear.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {
       "id": "market",
-      "keywords": ["market", "marketplace", "sell ingredients", "buy ingredients", "hex scroll", "room of requirement"],
+      "keywords": [
+        "market",
+        "marketplace",
+        "sell ingredients",
+        "buy ingredients",
+        "hex scroll",
+        "room of requirement"
+      ],
       "answer": "`/market browse` is the catalogue. Buy common/uncommon with `/market buy`; sell sets of 3 common/uncommon with `/market sell` (21 pts/day cap). Also scrolls, titles, an' the Room.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {
       "id": "potions",
-      "keywords": ["potion", "potions", "brew", "cauldron", "ingredients"],
-      "answer": "Brewin' lives with yer ingredients from forage an' the market. Check `/help` for potion commands in yer server — gather bits in yer `/satchel` first.",
+      "keywords": [
+        "potion",
+        "potions",
+        "brew",
+        "cauldron",
+        "ingredients"
+      ],
+      "answer": "Brewin' lives with yer ingredients from forage an' the market. Check `/help` for potion commands in yer server \u2014 gather bits in yer `/satchel` first.",
       "link": "https://everything-velmora.netlify.app/explore"
     },
     {
       "id": "gear",
-      "keywords": ["gear", "jewelbox", "craft", "wear", "adornment", "title", "cheer", "whistle"],
+      "keywords": [
+        "gear",
+        "jewelbox",
+        "craft",
+        "wear",
+        "adornment",
+        "title",
+        "cheer",
+        "whistle"
+      ],
       "answer": "`/jewelbox` shows what ye own. `/craft` makes pieces from satchel materials; `/wear` an' `/remove` kit ye out. `/title` picks which earned title shows under yer name.",
       "link": "https://everything-velmora.netlify.app/cards"
     },
     {
       "id": "houses_cup",
-      "keywords": ["house", "houses", "house cup", "standings", "points", "season", "thornmere", "moonveil", "veyren", "caldrin", "vashara"],
+      "keywords": [
+        "house",
+        "houses",
+        "house cup",
+        "standings",
+        "points",
+        "season",
+        "thornmere",
+        "moonveil",
+        "veyren",
+        "caldrin",
+        "vashara"
+      ],
       "answer": "Five houses chase one Cup. Almost everythin' ye do earns points for yer house. `/standings` shows the table; `/points` shows yer own; `/profile` is the full picture.",
       "link": "https://everything-velmora.netlify.app/houses"
     },
     {
       "id": "challenges",
-      "keywords": ["challenge", "daily challenge", "trial", "rite", "challengestatus"],
-      "answer": "Challenges post for everyone — first three correct answers win points. Daily is every 24 hours (pings @everyone); Trial an' Rite on their schedule. `/challengestatus` shows what's open.",
+      "keywords": [
+        "challenge",
+        "daily challenge",
+        "trial",
+        "rite",
+        "challengestatus"
+      ],
+      "answer": "Challenges post for everyone \u2014 first three correct answers win points. Daily is every 24 hours (pings @everyone); Trial an' Rite on their schedule. `/challengestatus` shows what's open.",
       "link": "https://everything-velmora.netlify.app/houses"
     },
     {
       "id": "chess",
-      "keywords": ["chess", "checkers", "board game"],
-      "answer": "Chess an' checkers are in the bot — challenge a classmate an' play on the board embeds. Wins can earn house points (with a daily cap). Peek `/help` for the chess commands.",
+      "keywords": [
+        "chess",
+        "checkers",
+        "board game"
+      ],
+      "answer": "Chess an' checkers are in the bot \u2014 challenge a classmate an' play on the board embeds. Wins can earn house points (with a daily cap). Peek `/help` for the chess commands.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {
       "id": "bean",
-      "keywords": ["bean", "mystery bean", "mordy"],
+      "keywords": [
+        "bean",
+        "mystery bean",
+        "mordy"
+      ],
       "answer": "`/bean` spends 1 point on a mystery bean. Might pay 5. Might be Mordy's socks. Aye, really.",
       "link": "https://everything-velmora.netlify.app/houses"
     },
     {
       "id": "rumor",
-      "keywords": ["rumor", "rumour", "gossip"],
-      "answer": "`/rumor` conjures a whisper from the mill — explore secrets, student gossip, odd headmaster talk, embarrassín' ghosts. Believe nothin'.",
+      "keywords": [
+        "rumor",
+        "rumour",
+        "gossip"
+      ],
+      "answer": "`/rumor` conjures a whisper from the mill \u2014 explore secrets, student gossip, odd headmaster talk, embarrass\u00edn' ghosts. Believe nothin'.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {
       "id": "ghosts",
-      "keywords": ["ghost", "ghosts", "mordy", "maynard", "finley", "sebastian", "cassy", "founders"],
-      "answer": "The founders never quite left. Their stories live on the Compendium Ghosts page — an' sometimes in a `/rumor` if the mill's feelin' cheeky.",
+      "keywords": [
+        "ghost",
+        "ghosts",
+        "mordy",
+        "maynard",
+        "finley",
+        "sebastian",
+        "cassy",
+        "founders"
+      ],
+      "answer": "The founders never quite left. Their stories live on the Compendium Ghosts page \u2014 an' sometimes in a `/rumor` if the mill's feelin' cheeky.",
       "link": "https://everything-velmora.netlify.app/ghosts"
     },
     {
       "id": "help",
-      "keywords": ["help", "commands", "what can i do", "how does the bot work", "list commands"],
+      "keywords": [
+        "help",
+        "commands",
+        "what can i do",
+        "how does the bot work",
+        "list commands"
+      ],
       "answer": "Tap `/help` for everythin' the bot can do, grouped an' clickable. Or browse Every Command on the Compendium if ye want the big map.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {
       "id": "profile",
-      "keywords": ["profile", "my stats", "standing", "leaderboard", "duelrecord"],
-      "answer": "`/profile` is yer whole sheet — Mirror, wand, points, ranks, beasts. `/standings` is the Cup table; `/leaderboard` the top earners; `/duelrecord` yer duel sheet.",
+      "keywords": [
+        "profile",
+        "my stats",
+        "standing",
+        "leaderboard",
+        "duelrecord"
+      ],
+      "answer": "`/profile` is yer whole sheet \u2014 Mirror, wand, points, ranks, beasts. `/standings` is the Cup table; `/leaderboard` the top earners; `/duelrecord` yer duel sheet.",
+      "link": "https://everything-velmora.netlify.app/commands"
+    },
+    {
+      "id": "checklist",
+      "keywords": [
+        "checklist",
+        "daily checklist",
+        "what can i do today",
+        "points left today",
+        "daily points",
+        "what have i done today",
+        "reset timers"
+      ],
+      "answer": "Aye \u2014 cast `/checklist` for yer daily board: explore, beans, duels, boards, beasts, market sell, familiar, an' open challenges, each with how many ye've got left an' when it resets.",
       "link": "https://everything-velmora.netlify.app/commands"
     }
   ]
