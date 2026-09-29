@@ -51,7 +51,7 @@ HELP = {
         "entries": [
             ("market browse", "The Marketplace catalogue — ingredients, scrolls, titles, Room."),
             ("market buy", "Buy a common (3 pts) or uncommon (6 pts) ingredient."),
-            ("market sell", "Sell 3 of the same common/uncommon for 3 pts (21/day cap)."),
+            ("market sell", "Sell ingredients (3→3 pts) or Descent mats (25→3 pts); batches optional. 21/day cap."),
             ("market scroll", "Buy a Hex Scroll (30 pts)."),
             ("market title", "Buy an exclusive Marketplace title (50 pts)."),
             ("market room", "Buy the Room of Requirement (100 pts). Pings Headmasters."),
@@ -177,6 +177,7 @@ HELP = {
             ("descentunlock", "Clear the 3-loss Descent lockout without wiping progress."),
             ("descentreset", "Wipe someone's Descent progress back to floor 1."),
             ("raidreset", "Clear a player's 3Raid weekly lockout, or end the active raid."),
+            ("marketsellreset", "Clear someone's daily Marketplace sell-points cap."),
             ("hex", "Curse a student's messages with a prank spell."),
             ("unhex", "Lift a hex early."),
             ("hexlist", "Show who's currently hexed."),

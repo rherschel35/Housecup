@@ -3,15 +3,17 @@ The Velmora Marketplace — spend (and sell for) house points.
 
     /market browse              - the catalogue and your scrolls / sell room today
     /market buy ingredient qty  - common 3 pts, uncommon 6 pts (rare+ not sold)
-    /market sell ingredient     - trade in 3 of the same common/uncommon for 3 pts
+    /market sell ingredient [batches] - sell ingredient sets (3) or Descent mats (25)
     /market scroll              - buy a Hex Scroll (30 pts)
     /market title               - buy an exclusive shop title (50 pts)
     /market room                - Room of Requirement (100 pts); pings @headmasters
     /hexscroll member           - cast one owned Hex Scroll (30 min, random effect)
+    /marketsellreset member     - (staff) clear someone's daily sell-points cap
 
 Every spend deducts from the member's season contribution AND the house total
 (same honesty as /bean). Sell earnings go to both, capped at 21 pts/day.
-Rare, very_rare, and legendary ingredients cannot be bought or sold.
+Rare, very_rare, and legendary place-ingredients cannot be bought or sold.
+Descent materials (any zone drop / boss sigil) sell in batches of 25 → 3 pts.
 """
 
 from __future__ import annotations
@@ -37,9 +39,11 @@ STATE_PATH = STATE_DIR / "marketplace.json"
 HEADMASTER_ROLE_NAME = "headmasters"
 
 BUY_PRICE = {"common": 3, "uncommon": 6}
-SELL_SET_SIZE = 3
-SELL_SET_PAYOUT = 3
+SELL_SET_SIZE = 3                 # place ingredients (common/uncommon)
+DESCENT_SELL_SET_SIZE = 25        # any Descent material
+SELL_SET_PAYOUT = 3               # points per batch (either kind)
 SELL_DAILY_CAP = 21
+SELL_MAX_BATCHES = SELL_DAILY_CAP // SELL_SET_PAYOUT  # 7
 SCROLL_PRICE = 30
 SCROLL_DURATION_MIN = 30
 TITLE_PRICE = 50
@@ -51,7 +55,16 @@ SHOP_TITLES = [
     "Emotionally Support Dementor",
 ]
 
-TRADEABLE = frozenset(BUY_PRICE.keys())  # common + uncommon only
+TRADEABLE = frozenset(BUY_PRICE.keys())  # common + uncommon place ingredients
+# Descent drops — sellable in 25s, never bought from the shop.
+DESCENT_SELLABLE = frozenset({
+    "descent_poison_ichor",
+    "descent_ember_shard",
+    "descent_frost_core",
+    "descent_storm_relic",
+    "descent_light_dust",
+    "descent_sigil",
+})
 
 
 def today_str() -> str:
@@ -126,6 +139,13 @@ class Marketplace(commands.Cog):
         rec["earned"] = int(rec.get("earned", 0)) + pts
         self.state["sell_day"][key] = rec
 
+    def _clear_sell_day(self, user_id: int) -> int:
+        """Wipe today's sell earnings. Returns how many points were cleared."""
+        key = str(user_id)
+        had = self._sell_earned_today(user_id)
+        self.state["sell_day"].pop(key, None)
+        return had
+
     def _charge(self, member, cost: int, reason: str) -> dict:
         """Deduct house points from member + house. Returns ok dict or {error}."""
         store = self._store()
@@ -164,9 +184,12 @@ class Marketplace(commands.Cog):
         return {"house": house, "pts": pts}
 
     def _tradeable_ids(self, rarity: str | None = None) -> list[str]:
+        """Place ingredients the shop buys/sells — not Descent materials."""
         items = self._items()
         out = []
         for iid, meta in items.items():
+            if iid in DESCENT_SELLABLE:
+                continue
             r = meta.get("rarity")
             if r not in TRADEABLE:
                 continue
@@ -174,6 +197,26 @@ class Marketplace(commands.Cog):
                 continue
             out.append(iid)
         out.sort(key=lambda i: (items[i]["rarity"], items[i]["name"].lower()))
+        return out
+
+    def _sell_set_size(self, item_id: str) -> int | None:
+        """Batch size for a sellable item, or None if it can't be sold."""
+        if item_id in DESCENT_SELLABLE:
+            return DESCENT_SELL_SET_SIZE
+        meta = self._items().get(item_id)
+        if meta and meta.get("rarity") in TRADEABLE:
+            return SELL_SET_SIZE
+        return None
+
+    def _sellable_ids(self) -> list[str]:
+        """Everything `/market sell` accepts (place ingredients + Descent mats)."""
+        items = self._items()
+        out = self._tradeable_ids() + [iid for iid in DESCENT_SELLABLE if iid in items]
+        out.sort(key=lambda i: (
+            0 if i not in DESCENT_SELLABLE else 1,
+            items[i]["rarity"],
+            items[i]["name"].lower(),
+        ))
         return out
 
     def _item_choice_label(self, iid: str) -> str:
@@ -200,8 +243,9 @@ class Marketplace(commands.Cog):
             "**🧪 Ingredients**",
             f"Buy · Common **{BUY_PRICE['common']}** pts each · Uncommon **{BUY_PRICE['uncommon']}** pts each",
             "Rare / very rare / legendary — not sold. Find them yourself.",
-            f"Sell · **{SELL_SET_SIZE}** of the same common or uncommon → **{SELL_SET_PAYOUT}** pts "
-            f"(up to **{SELL_DAILY_CAP}** pts/day from selling)",
+            f"Sell · **{SELL_SET_SIZE}** of the same common/uncommon → **{SELL_SET_PAYOUT}** pts per batch",
+            f"Descent materials · **{DESCENT_SELL_SET_SIZE}** of the same → **{SELL_SET_PAYOUT}** pts per batch",
+            f"(use `batches:` to sell several at once · up to **{SELL_DAILY_CAP}** pts/day from selling)",
             "",
             "**📜 Hex Scroll**",
             f"**{SCROLL_PRICE}** pts — cast with `/hexscroll` on a classmate. Lasts "
@@ -284,64 +328,96 @@ class Marketplace(commands.Cog):
 
     # ================================================================ sell
 
-    @group.command(name="sell", description="Sell 3 of the same common/uncommon ingredient for 3 points.")
-    @app_commands.describe(ingredient="Which material (must have 3 of the same)")
-    async def sell(self, interaction: discord.Interaction, ingredient: str):
+    @group.command(
+        name="sell",
+        description="Sell ingredients (3→3 pts) or Descent materials (25→3 pts). Optional batches.",
+    )
+    @app_commands.describe(
+        ingredient="Which material to sell",
+        batches="How many batches to sell at once (default 1)",
+    )
+    async def sell(
+        self,
+        interaction: discord.Interaction,
+        ingredient: str,
+        batches: app_commands.Range[int, 1, SELL_MAX_BATCHES] = 1,
+    ):
         items = self._items()
         meta = items.get(ingredient)
-        if not meta or meta.get("rarity") not in TRADEABLE:
+        set_size = self._sell_set_size(ingredient)
+        if not meta or set_size is None:
             await interaction.response.send_message(
-                "You can only sell **common** and **uncommon** ingredients, "
-                "and only in sets of 3 of the same item.", ephemeral=True)
+                "You can sell **common/uncommon** place ingredients "
+                f"(**{SELL_SET_SIZE}** → **{SELL_SET_PAYOUT}** pts) or **Descent materials** "
+                f"(**{DESCENT_SELL_SET_SIZE}** → **{SELL_SET_PAYOUT}** pts).",
+                ephemeral=True,
+            )
             return
         world = self._world()
         if not world:
             await interaction.response.send_message("The satchels are out of reach right now.", ephemeral=True)
             return
 
+        payout = SELL_SET_PAYOUT * batches
+        need = set_size * batches
         earned = self._sell_earned_today(interaction.user.id)
-        if earned + SELL_SET_PAYOUT > SELL_DAILY_CAP:
+        if earned + payout > SELL_DAILY_CAP:
+            room = max(0, SELL_DAILY_CAP - earned)
+            max_batches = room // SELL_SET_PAYOUT
+            tip = (f" You still have room for **{max_batches}** batch"
+                   f"{'' if max_batches == 1 else 'es'}." if max_batches
+                   else " Come back tomorrow.")
             await interaction.response.send_message(
-                f"You've hit today's sell cap (**{SELL_DAILY_CAP}** points from selling). "
-                "Come back tomorrow.", ephemeral=True)
+                f"**{batches}** batch{'' if batches == 1 else 'es'} would pay **{payout}** pts, "
+                f"but today's sell cap is **{SELL_DAILY_CAP}** "
+                f"(you've earned **{earned}**).{tip}",
+                ephemeral=True,
+            )
             return
 
         async with world.lock:
             student = world.student(interaction.user)
             have = student.get("items", {}).get(ingredient, 0)
-            if have < SELL_SET_SIZE:
+            if have < need:
                 await interaction.response.send_message(
-                    f"You need **{SELL_SET_SIZE}** × {meta['emoji']} **{meta['name']}** "
-                    f"to sell a set (you have {have}).", ephemeral=True)
+                    f"You need **{need}** × {meta['emoji']} **{meta['name']}** "
+                    f"to sell **{batches}** batch{'' if batches == 1 else 'es'} "
+                    f"of {set_size} (you have {have}).",
+                    ephemeral=True,
+                )
                 return
-            if not world.world.take(student, ingredient, SELL_SET_SIZE):
+            if not world.world.take(student, ingredient, need):
                 await interaction.response.send_message(
                     "Something moved in your satchel — try again.", ephemeral=True)
                 return
             world.save()
 
-        paid = self._pay(interaction.user, SELL_SET_PAYOUT,
-                         f"Marketplace: sold {meta['name']} ×{SELL_SET_SIZE}")
+        paid = self._pay(
+            interaction.user, payout,
+            f"Marketplace: sold {meta['name']} ×{need}"
+            + (f" ({batches} batches)" if batches > 1 else ""),
+        )
         if "error" in paid:
             # Refund the items if the ledger failed after we took them.
             async with world.lock:
                 student = world.student(interaction.user)
-                world.world.give(student, ingredient, SELL_SET_SIZE)
+                world.world.give(student, ingredient, need)
                 world.save()
             await interaction.response.send_message(paid["error"], ephemeral=True)
             return
 
-        self._add_sell_earned(interaction.user.id, SELL_SET_PAYOUT)
+        self._add_sell_earned(interaction.user.id, payout)
         self.save()
 
         from cogs.store import HOUSES
         h = HOUSES[paid["house"]]
         left_cap = SELL_DAILY_CAP - self._sell_earned_today(interaction.user.id)
+        batch_note = (f" ({batches} × {set_size})" if batches > 1 else "")
         await interaction.response.send_message(embed=discord.Embed(
             title="🏪 Sold",
             description=f"{interaction.user.display_name} sells "
-                        f"{world.world.item_line(ingredient, SELL_SET_SIZE)}.\n\n"
-                        f"**+{SELL_SET_PAYOUT}** to {h['emoji']} {h['name']}.",
+                        f"{world.world.item_line(ingredient, need)}{batch_note}.\n\n"
+                        f"**+{payout}** to {h['emoji']} {h['name']}.",
             color=h["color"],
         ).set_footer(text=f"{left_cap} sell-points left today" if left_cap
                      else "Sell cap reached for today"))
@@ -354,12 +430,19 @@ class Marketplace(commands.Cog):
         if world:
             have = world.student(interaction.user).get("items", {})
         out = []
-        for iid in self._tradeable_ids():
+        for iid in self._sellable_ids():
+            set_size = self._sell_set_size(iid)
+            if set_size is None:
+                continue
             n = have.get(iid, 0)
-            if n < SELL_SET_SIZE:
+            if n < set_size:
                 continue
             it = self._items()[iid]
-            label = f"{it['emoji']} {it['name']} ×{n} (sell {SELL_SET_SIZE} → {SELL_SET_PAYOUT} pts)"[:100]
+            can_batches = n // set_size
+            label = (f"{it['emoji']} {it['name']} ×{n} "
+                     f"(sell {set_size} → {SELL_SET_PAYOUT} pts"
+                     + (f", up to {can_batches} batches" if can_batches > 1 else "")
+                     + ")")[:100]
             if q and q not in label.lower() and q not in iid:
                 continue
             out.append(app_commands.Choice(name=label, value=iid))
@@ -522,6 +605,28 @@ class Marketplace(commands.Cog):
                         f"**{SCROLL_DURATION_MIN}** minutes.",
             color=0x8B5CF6,
         ).set_footer(text=f"Scrolls left: {self.scroll_count(interaction.user.id)}"))
+
+    @app_commands.command(
+        name="marketsellreset",
+        description="(staff) Clear someone's daily Marketplace sell-points cap.",
+    )
+    @app_commands.describe(member="Whose sell attempts to reset")
+    async def marketsellreset(self, interaction: discord.Interaction, member: discord.Member):
+        store = self._store()
+        if not store or not store.is_staff(interaction.user):
+            await interaction.response.send_message("Staff only.", ephemeral=True)
+            return
+        had = self._clear_sell_day(member.id)
+        self.save()
+        if had:
+            msg = (f"Cleared **{member.display_name}**'s market sell record "
+                   f"(was **{had}/{SELL_DAILY_CAP}** pts earned today). "
+                   f"They can sell again up to **{SELL_DAILY_CAP}**.")
+        else:
+            msg = (f"**{member.display_name}** had nothing on today's sell cap — "
+                   f"still clear. They can sell up to **{SELL_DAILY_CAP}** pts.")
+        await interaction.response.send_message(msg, ephemeral=True)
+        log.info("marketsellreset by %s for %s (had %s)", interaction.user.id, member.id, had)
 
 
 async def setup(bot: commands.Bot):
