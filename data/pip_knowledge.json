@@ -10,7 +10,7 @@
         "three words",
         "get wand"
       ],
-      "answer": "Aye \u2014 dig out three words ye fancy an' cast `/wand`. A wand chooses ye for good. Same three words unlock `/patronus` after.",
+      "answer": "Aye \u2014 dig out three words ye fancy an' cast `/wand`. A wand chooses ye for good. Same three words unlock `/patronus` an' `/broom` after.",
       "link": "https://everything-velmora.netlify.app/magic"
     },
     {
@@ -22,6 +22,17 @@
       ],
       "answer": "Yer `/patronus` is cast from the same three words ye gave `/wand`. No wand yet? Start there first, then come back for the glow.",
       "link": "https://everything-velmora.netlify.app/magic"
+    },
+    {
+      "id": "broom",
+      "keywords": [
+        "broom",
+        "get a broom",
+        "my broom",
+        "flying broom"
+      ],
+      "answer": "Yer `/broom` is fit from the same three words as yer wand. Purely for lookin' sharp — no races, no stats. Need a wand first.",
+      "link": "https://everything-velmora.netlify.app/commands"
     },
     {
       "id": "wizard_mirror",
