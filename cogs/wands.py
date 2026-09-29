@@ -260,7 +260,7 @@ class Wands(commands.Cog):
 
     @app_commands.command(
         name="wandreset",
-        description="Let a wand choose someone again (their patronus and broom go too).",
+        description="Let a wand choose someone again (their patronus goes too; broom stays — use /broomreset).",
     )
     @app_commands.describe(member="Whose wand to release")
     async def wandreset(self, interaction: discord.Interaction, member: discord.Member):
@@ -274,17 +274,11 @@ class Wands(commands.Cog):
             )
             return
         self.save()
-        # Patronus and broom are read from the wand's words, so they go too.
+        # Patronus is read from the wand's words, so it goes too.
+        # Broom has its own /broomreset so wand resets don't free broom claims.
         patronus = self.bot.get_cog("Patronus")
         released_patronus = patronus.release(member.id) if patronus else False
-        brooms = self.bot.get_cog("Brooms")
-        released_broom = brooms.release(member.id) if brooms else False
-        extras = []
-        if released_patronus:
-            extras.append("patronus")
-        if released_broom:
-            extras.append("broom")
-        extra = (" — and their " + " and ".join(extras) + " with it") if extras else ""
+        extra = " — and their patronus with it" if released_patronus else ""
         await interaction.response.send_message(
             f"{member.display_name}'s wand has been released{extra}. They can be chosen again.",
             ephemeral=True,

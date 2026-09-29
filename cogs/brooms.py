@@ -4,11 +4,12 @@ your wand (and cast your patronus).
 
     /broom            - claim yours, or see it again
     /broom @member    - see someone else's
+    /broomreset @x    - staff, free someone's broom claim (wand stays)
 
 100 fixed painted portraits (like Descent monsters). Each broom can be
 claimed by only ONE player; if your words point at a taken broom, you get
 the next-closest available one. Stats are decorative (Speed, Altitude, and
-ridiculous 0–10 meters). /wandreset frees the claim.
+ridiculous 0–10 meters). /broomreset frees the claim without touching the wand.
 """
 
 from __future__ import annotations
@@ -518,7 +519,7 @@ class Brooms(commands.Cog):
         if not open_left and not reserved:
             await interaction.response.send_message(
                 "Every broom in Velmora has already been claimed. "
-                "A staff `/wandreset` frees one if someone releases their words.",
+                "A staff `/broomreset` frees a claim without touching their wand.",
                 ephemeral=True,
             )
             return
@@ -555,6 +556,27 @@ class Brooms(commands.Cog):
         if file:
             kwargs["file"] = file
         await interaction.followup.send(**kwargs)
+
+    @app_commands.command(
+        name="broomreset",
+        description="Free someone's broom claim so they can /broom again (wand and patronus stay).",
+    )
+    @app_commands.describe(member="Whose broom to release")
+    async def broomreset(self, interaction: discord.Interaction, member: discord.Member):
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That one's for staff.", ephemeral=True)
+            return
+        if not self.release(member.id):
+            await interaction.response.send_message(
+                f"{member.display_name} doesn't have a broom to release.", ephemeral=True
+            )
+            return
+        await interaction.response.send_message(
+            f"{member.display_name}'s broom has been released. "
+            "Their wand and patronus are untouched — they can `/broom` again.",
+            ephemeral=True,
+        )
 
 
 async def setup(bot: commands.Bot):
