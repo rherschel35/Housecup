@@ -34,6 +34,8 @@ DEV_GUILD_ID = os.getenv("DEV_GUILD_ID")  # optional: instant command sync while
 # tree actually changed. Set FORCE_COMMAND_SYNC=1 to push anyway.
 FORCE_COMMAND_SYNC = os.getenv("FORCE_COMMAND_SYNC", "").strip() in ("1", "true", "True", "yes")
 SYNC_TIMEOUT_SECONDS = int(os.getenv("COMMAND_SYNC_TIMEOUT", "45"))
+# Chess & checkers stay unloaded until ready. Set ENABLE_BOARD_GAMES=1 to ship them.
+ENABLE_BOARD_GAMES = os.getenv("ENABLE_BOARD_GAMES", "").strip() in ("1", "true", "True", "yes")
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
@@ -88,8 +90,7 @@ INITIAL_COGS = (
     "cogs.antispam",  # before hexes so spam is deleted, not mangled
     "cogs.hexes",
     "cogs.marketplace",
-    "cogs.chess",
-    "cogs.checkers",
+    *(("cogs.chess", "cogs.checkers") if ENABLE_BOARD_GAMES else ()),
     "cogs.pip_wick",
     "cogs.checklist",
 )

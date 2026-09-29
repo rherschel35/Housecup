@@ -275,10 +275,10 @@ class Checklist(commands.Cog):
         name="checklist",
         description="What you can still do today for house points, with reset timers.",
     )
-    @app_commands.describe(member="Whose checklist to show (default: you)")
-    async def checklist(self, interaction: discord.Interaction, member: discord.Member = None):
-        target = member or interaction.user
-        await interaction.response.send_message(embed=self._build(target), ephemeral=True)
+    async def checklist(self, interaction: discord.Interaction):
+        # Public so the channel can see it — but only your own board.
+        # Checking someone else isn't offered; they run /checklist themselves.
+        await interaction.response.send_message(embed=self._build(interaction.user))
 
 
 async def setup(bot: commands.Bot):
