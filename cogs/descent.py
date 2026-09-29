@@ -151,11 +151,12 @@ BOSS_NAMES = {
     30: ("The Rime Empress", "❄️", "humanoid"),
     40: ("Stormcaller Vessel", "⚡", "orb"),
     50: ("The Hollow Saint", "✨", "humanoid"),
-    60: ("The Sovereign, Reborn", "🍄", "blob"),
-    70: ("Ashgrave, Undying", "🔥", "humanoid"),
-    80: ("The Rime Empress, Unbound", "❄️", "humanoid"),
-    90: ("Vessel of the Last Storm", "⚡", "orb"),
-    100: ("The Hollow Saint, Ascendant", "✨", "humanoid"),
+    # Lower Reach+ — unique bosses (not reskins of floors 10–50)
+    60: ("Blightmother Veil", "☠️", "humanoid"),
+    70: ("Slagheart Tyrant", "🔥", "humanoid"),
+    80: ("The Glacier Colossus", "🧊", "humanoid"),
+    90: ("The Arc Spire", "⚡", "orb"),
+    100: ("The Vault Eternal", "🚪", "humanoid"),
 }
 
 # real art, supplied by the user - filename per monster name / boss floor
@@ -201,24 +202,24 @@ BOSS_SUMMONS = {
         "Every candle in the room burns gold instead of orange the moment the Hollow Saint appears for {owner}.",
     ],
     60: [
-        "The Sovereign, Reborn claws up through the floorboards themselves - twice the horror it was the first time {owner} beat it.",
-        "The poison this time doesn't just curl the grass, it kills it. The Sovereign, Reborn has come, and it only answers to {owner}.",
+        "The veils part before anyone sees her move - Blightmother Veil answers {owner}, and the air fills with the sweet rot of a hundred funeral blooms.",
+        "Moss creeps up the walls the instant Blightmother Veil arrives for {owner}. She offers a dripping chalice to no one else.",
     ],
     70: [
-        "Ashgrave, Undying doesn't erupt from the floor this time - it simply is, all fire and fury, standing exactly where {owner} pointed.",
-        "The whole room holds its breath as Ashgrave, Undying answers {owner}. It burned once already, and came back anyway.",
+        "The floor groans like a furnace door - Slagheart Tyrant settles onto its throne of slag at {owner}'s call, molten heart blazing open.",
+        "Heat rolls off Slagheart Tyrant in waves. The anvil in its fist glows white for {owner} alone.",
     ],
     80: [
-        "The Rime Empress, Unbound arrives without the hush this time - ice cracks the floor outright at {owner}'s call.",
-        "Every light in the room dims to blue. The Rime Empress, Unbound has come, and it only ever comes for {owner}.",
+        "The room drops twenty degrees as The Glacier Colossus answers {owner} - a walking cliff of ancient ice, bones frozen deep inside it.",
+        "Snow doesn't fall so much as arrive already settled. The Glacier Colossus has come, and it only ever comes for {owner}.",
     ],
     90: [
-        "The sky doesn't need to be visible for Vessel of the Last Storm to bring the thunder - {owner} calls, and it cracks directly overhead.",
-        "Vessel of the Last Storm arrives already mid-strike, lightning still crawling off it, obedient only to {owner}.",
+        "A needle of black crystal punches up through the floor - The Arc Spire answers {owner}, its single storm-eye already crackling.",
+        "Every metal thing in the room hums. The Arc Spire has arrived for {owner}, lightning crowning it like a living antenna.",
     ],
     100: [
-        "The last thing standing between anyone and the bottom of the Descent now answers to {owner} alone. The Hollow Saint, Ascendant arrives in total silence, and the whole room feels it.",
-        "The Hollow Saint, Ascendant doesn't erupt, doesn't roar - it simply arrives, and everyone in the room understands, all at once, exactly what {owner} accomplished to earn this.",
+        "The last lock at the bottom of the Descent wakes for {owner} alone. The Vault Eternal's doors part a finger's width - light pours out, and the whole room feels judged.",
+        "Key-sigils orbit in silence as The Vault Eternal answers {owner}. Not a saint. Not a monster. The door itself.",
     ],
 }
 
@@ -228,11 +229,11 @@ BOSS_IMAGE = {
     30: "Floor_30_The_Rime_Empress.png",
     40: "Floor_40_Stormcaller_Vessel.png",
     50: "Floor_50_The_Hollow_Saint.png",
-    60: "Floor_60_The_Sovereign_Reborn.png",
-    70: "Floor_70_Ashgrave_Undying.png",
-    80: "Floor_80_The_Rime_Empress_Unbound.png",
-    90: "Floor_90_Vessel_of_the_Last_Storm.png",
-    100: "Floor_100_The_Hollow_Saint_Ascendant.png",
+    60: "Floor_60_Blightmother_Veil.png",
+    70: "Floor_70_Slagheart_Tyrant.png",
+    80: "Floor_80_The_Glacier_Colossus.png",
+    90: "Floor_90_The_Arc_Spire.png",
+    100: "Floor_100_The_Vault_Eternal.png",
 }
 
 # material each zone element drops, and the one-off boss drop
