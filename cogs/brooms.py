@@ -5,9 +5,10 @@ your wand (and cast your patronus).
     /broom            - claim yours, or see it again
     /broom @member    - see someone else's
 
-Fixed portraits (like Descent monsters) — players don't customize.
-Each broom has Speed, Altitude, and ridiculous 0–10 stats for bragging.
-/wandreset releases the broom with the wand and patronus.
+100 fixed painted portraits (like Descent monsters). Each broom can be
+claimed by only ONE player; if your words point at a taken broom, you get
+the next-closest available one. Stats are decorative (Speed, Altitude, and
+ridiculous 0–10 meters). /wandreset frees the claim.
 """
 
 from __future__ import annotations
@@ -34,39 +35,111 @@ ASSETS_DIR = Path(__file__).resolve().parent.parent / "broom_art_assets"
 MODEL = os.getenv("BROOM_MODEL", "claude-haiku-4-5-20251001")
 BROOM_COLOR = 0x6B4F3A
 
-# Named brooms with fixed art — same idea as monster_art_assets.
+# 100 named brooms — each image is broom_art_assets/<Name>.png
 BROOMS = {
-    "Cinderbolt":   {"blurb": "built for speed and show; loves a dramatic takeoff", "image": "Cinderbolt.png"},
-    "Moonrake":     {"blurb": "quiet night flyer; drawn to loners and lookouts", "image": "Moonrake.png"},
-    "Stormneedle":  {"blurb": "cuts through weather; a little wild", "image": "Stormneedle.png"},
-    "Glassgale":    {"blurb": "light and almost silent; favours the precise", "image": "Glassgale.png"},
-    "Ironwhisk":    {"blurb": "sturdy workhorse; never drops you mid-air", "image": "Ironwhisk.png"},
-    "Thornspur":    {"blurb": "sharp handling; for the competitive", "image": "Thornspur.png"},
-    "Hearthsweep":  {"blurb": "warm and reliable; a first broom that never leaves the heart", "image": "Hearthsweep.png"},
-    "Silverhaft":   {"blurb": "elegant and rare; wants someone who won't waste it", "image": "Silverhaft.png"},
-    "Oakrail":      {"blurb": "steady climber; patient turns, solid landings", "image": "Oakrail.png"},
-    "Wispwing":     {"blurb": "barely there; for the quick and the clever", "image": "Wispwing.png"},
-    "Vaultbreaker": {"blurb": "heavy and powerful; built for force, not finesse", "image": "Vaultbreaker.png"},
-    "Riverreed":    {"blurb": "flexible and forgiving; teaches as it flies", "image": "Riverreed.png"},
-    "Nightcompass": {"blurb": "always finds its way home", "image": "Nightcompass.png"},
-    "Bellringer":   {"blurb": "loud and proud; arrives before you do", "image": "Bellringer.png"},
-    "Ashfeather":   {"blurb": "light wood, soft landing; gentle hands", "image": "Ashfeather.png"},
-    "Emberhaft":    {"blurb": "runs warm under the grip; for the fierce and the fond", "image": "Emberhaft.png"},
-    "Frostquill":   {"blurb": "cool and exact; never oversteers", "image": "Frostquill.png"},
-    "Starlatch":    {"blurb": "restless traveller's broom; hates sitting still", "image": "Starlatch.png"},
-    "Kindling":     {"blurb": "simple, honest ash and twig; nothing to prove", "image": "Kindling.png"},
-    "Gloamrunner":  {"blurb": "at home in the half-light between day and night", "image": "Gloamrunner.png"},
-    "Hollowreed":   {"blurb": "hollow and haunting; hums in empty corridors", "image": "Hollowreed.png"},
-    "Sunlatch":     {"blurb": "bright and bold; refuses cloudy excuses", "image": "Sunlatch.png"},
-    "Mirebrush":    {"blurb": "cunning fen flyer; tracks mud into every hall", "image": "Mirebrush.png"},
-    "Cloudknit":    {"blurb": "soft sky-dweller; altitude is a lifestyle", "image": "Cloudknit.png"},
-    "Ravenquill":   {"blurb": "sleek messenger; keeps secrets in the grain", "image": "Ravenquill.png"},
-    "Rosebriar":    {"blurb": "beautiful and sharp; never apologize for the thorns", "image": "Rosebriar.png"},
-    "Cobaltspur":   {"blurb": "sporty and loud; painted for the finish line", "image": "Cobaltspur.png"},
-    "Gravemoss":    {"blurb": "ancient and solemn; older than the pitch", "image": "Gravemoss.png"},
-    "Pixiedrift":   {"blurb": "mischief on a stick; glitter is not optional", "image": "Pixiedrift.png"},
-    "Dreadkeel":    {"blurb": "prestige and menace; arrives like a storm front", "image": "Dreadkeel.png"},
+    "Cinderbolt":   "built for speed and show; loves a dramatic takeoff",
+    "Moonrake":     "quiet night flyer; drawn to loners and lookouts",
+    "Stormneedle":  "cuts through weather; a little wild",
+    "Glassgale":    "light and almost silent; favours the precise",
+    "Ironwhisk":    "sturdy workhorse; never drops you mid-air",
+    "Thornspur":    "sharp handling; for the competitive",
+    "Hearthsweep":  "warm and reliable; a first broom that never leaves the heart",
+    "Silverhaft":   "elegant and rare; wants someone who won't waste it",
+    "Oakrail":      "steady climber; patient turns, solid landings",
+    "Wispwing":     "barely there; for the quick and the clever",
+    "Vaultbreaker": "heavy and powerful; built for force, not finesse",
+    "Riverreed":    "flexible and forgiving; teaches as it flies",
+    "Nightcompass": "always finds its way home",
+    "Bellringer":   "loud and proud; arrives before you do",
+    "Ashfeather":   "light wood, soft landing; gentle hands",
+    "Emberhaft":    "runs warm under the grip; for the fierce and the fond",
+    "Frostquill":   "cool and exact; never oversteers",
+    "Starlatch":    "restless traveller's broom; hates sitting still",
+    "Kindling":     "simple, honest ash and twig; nothing to prove",
+    "Gloamrunner":  "at home in the half-light between day and night",
+    "Hollowreed":   "hollow and haunting; hums in empty corridors",
+    "Sunlatch":     "bright and bold; refuses cloudy excuses",
+    "Mirebrush":    "cunning fen flyer; tracks mud into every hall",
+    "Cloudknit":    "soft sky-dweller; altitude is a lifestyle",
+    "Ravenquill":   "sleek messenger; keeps secrets in the grain",
+    "Rosebriar":    "beautiful and sharp; never apologize for the thorns",
+    "Cobaltspur":   "sporty and loud; painted for the finish line",
+    "Gravemoss":    "ancient and solemn; older than the pitch",
+    "Pixiedrift":   "mischief on a stick; glitter is not optional",
+    "Dreadkeel":    "prestige and menace; arrives like a storm front",
+    "Mirthspire":   "cheer carved into the grain; laughs on takeoff",
+    "Gallopwick":   "horsehair speed; born for open sky",
+    "Spindlehaze":  "spins fog behind it; hard to follow",
+    "Quartzflare":  "crystal shaft; catches every scrap of light",
+    "Bramblehook":  "hooks the wind and won't let go",
+    "Tidewhisper":  "sea-salt soft; talks like the tide",
+    "Emberlace":    "filigree fire; delicate and dangerous",
+    "Nightskein":   "unspools starlight as it flies",
+    "Copperfinch":  "bright metal song; never quiet on approach",
+    "Velvetreach":  "plush and far-reaching; theatrical landings",
+    "Ashmantle":    "cloaked in ash; understated power",
+    "Stormpetal":   "petals in a tempest; pretty until it isn't",
+    "Glimmershank": "shimmers at the edge of vision",
+    "Foxfire":      "trickster green flame; hard to catch",
+    "Driftwillow":  "lazy curves; somehow still on time",
+    "Ironpetal":    "steel bloom; beauty with weight",
+    "Moonspindle":  "winds moonlight into the grip",
+    "Thistlewake":  "leaves a prickly trail of sparks",
+    "Crystalspur":  "sharp glass speed; no second chances",
+    "Hearthfang":   "home's bite; protective and hot",
+    "Wavecrest":    "rides invisible surf",
+    "Shadowloom":   "weaves shade under its path",
+    "Brightkeel":   "keeps a level sunny course",
+    "Duskrake":     "scrapes the last light from the day",
+    "Sparrowhaft":  "small, quick, endlessly brave",
+    "Goldenthorn":  "gilded and pointed; vanity with teeth",
+    "Mistrail":     "lays a misty railway through the air",
+    "Frostbark":    "winter wood; breath fogs on contact",
+    "Sunbriar":     "sunny thorns; cheerful aggression",
+    "Nightforge":   "hammered in darkness; holds a spark",
+    "Mapleflare":   "autumn fire along the shaft",
+    "Grimquill":    "writes grim stories in the wind",
+    "Silkreed":     "impossibly smooth; whispers apologies",
+    "Thunderlatch": "clicks once, then the sky answers",
+    "Palehook":     "ghost-white catch; reels you home",
+    "Coralwhisk":   "reef colours; salt and sparkle",
+    "Starfen":      "marsh and constellation; odd but true",
+    "Dawnspindle":  "spins the morning into being",
+    "Witchbroom":   "classic silhouette; owns the stereotype",
+    "Hollowspark":  "empty core, bright spit of light",
+    "Jadekeel":     "jade-green balance; calm and costly",
+    "Rumblerush":   "loud low flyer; rattles windows",
+    "Pearlwisp":    "pearl sheen and soft wisp bristles",
+    "Cinderfen":    "smoulders over wet ground without dying",
+    "Ghostrail":    "leaves a pale track nobody else can see",
+    "Brightmoss":   "living green glow; soft landings",
+    "Stormlace":    "lightning in lacework; formal chaos",
+    "Emberquill":   "writes in heat; warm to the tip",
+    "Silverfen":    "misty silver wetlands energy",
+    "Oakwhisper":   "old oak secrets; slow advice",
+    "Glintspur":    "catches light like a dare",
+    "Voidreed":     "drinks colour; silhouette of absence",
+    "Firemantle":   "cloak of flame when showing off",
+    "Snowlatch":    "locks onto cold air; crisp turns",
+    "Briarfinch":   "songbird thorns; cheerful menace",
+    "Deepsky":      "altitude snob; hates low ceilings",
+    "Hearthquill":  "writes home; smells like toast",
+    "Mistforge":    "hammered fog; soft but solid",
+    "Thornlace":    "pretty pattern, real spikes",
+    "Cloudspindle": "spins cotton-cloud wake",
+    "Ravenfen":     "black feathers over black water",
+    "Glowbark":     "bioluminescent wood grain",
+    "Ironlace":     "metal filigree; heavy elegance",
+    "Moonflare":    "lunar flash on banked turns",
+    "Wavecutter":   "splits the air like a bow wave",
+    "Pixiekeel":    "tiny chaos with a keel of glitter",
+    "Dreadmoss":    "velvet dread; soft and awful",
+    "Cobaltquill":  "ink-blue speed lines",
+    "Rosewake":     "rose-petal trail; romantic flex",
+    "Glassfinch":   "fragile look, fierce flight",
 }
+
+assert len(BROOMS) == 100
 
 SERIOUS_STATS = ("speed", "altitude")
 SILLY_STATS = (
@@ -88,18 +161,21 @@ STAT_LABELS = {
     "how_much_it_judges_you": "How Much It Judges You",
 }
 
-READING_PROMPT = """You are the broom-fitter of Velmora. Brooms are personal and cosmetic — no races, no real flying advantage. A student once gave the wandmaker three words. You read those SAME words for how they would look on a broom.
+READING_PROMPT = """You are the broom-fitter of Velmora. Brooms are personal and cosmetic. A student once gave the wandmaker three words. Read those SAME words and choose which broom would choose them.
 
-Do NOT match their words literally. Choose exactly one broom from this list:
-{brooms}
+Do NOT match words literally. Prefer this ranked shortlist (best match first) — pick the first name on the list:
+{ranked}
 
-Then write:
-- "finish": one short line on how this broom looks/feels in the hand.
-- "reading": two or three sentences to the student on why this broom chose them. Warm, a little uncanny. Mention the stats are for bragging only.
+Blurbs:
+{blurbs}
 
-The student's words: "{words}"
+Write:
+- "finish": one short line on how it looks/feels.
+- "reading": two or three sentences to the student. Mention stats are for bragging only.
 
-Reply with ONLY JSON:
+Words: "{words}"
+
+ONLY JSON:
 {{"model": "...", "finish": "...", "reading": "..."}}"""
 
 
@@ -113,10 +189,7 @@ def _digest(words: str) -> bytes:
 
 
 def _stat_block(digest: bytes) -> dict:
-    stats = {}
-    for i, key in enumerate(SERIOUS_STATS + SILLY_STATS):
-        stats[key] = digest[4 + i] % 11
-    return stats
+    return {k: digest[4 + i] % 11 for i, k in enumerate(SERIOUS_STATS + SILLY_STATS)}
 
 
 def _bar(n: int, width: int = 10) -> str:
@@ -124,53 +197,67 @@ def _bar(n: int, width: int = 10) -> str:
     return "█" * n + "░" * (width - n) + f" {n}/10"
 
 
-def fallback_broom(words: str) -> dict:
+def image_name(model: str) -> str:
+    return f"{model}.png"
+
+
+def preference_rank(words: str) -> list[str]:
+    """All brooms ordered from closest to furthest match for these words."""
     digest = _digest(words)
-    models = sorted(BROOMS)
-    model = models[digest[0] % len(models)]
+    key = _words_key(words)
+
+    def score(model: str) -> tuple:
+        h = hashlib.sha256(f"{key}|{model}".encode()).digest()
+        dist = sum(abs(h[i] - digest[i]) for i in range(12))
+        # Stable tie-break by name
+        return (dist, model)
+
+    return sorted(BROOMS, key=score)
+
+
+def fallback_broom(words: str, model: str) -> dict:
+    digest = _digest(words + "|" + model)
     return {
         "model": model,
         "finish": f"The {model} settles into your hand like it had been waiting.",
         "reading": (
-            f"The {model} is {BROOMS[model]['blurb']}. "
+            f"The {model} is {BROOMS[model]}. "
             "It will not make you faster. It will make you look like yourself."
         ),
         "stats": _stat_block(digest),
     }
 
 
-def _clean(raw: dict, words: str) -> dict | None:
+def _clean(raw: dict, words: str, allowed: set[str]) -> dict | None:
     try:
         model = str(raw["model"]).strip()
         finish = str(raw["finish"]).strip()
         reading = str(raw["reading"]).strip()
     except (KeyError, TypeError):
         return None
-    match = next((m for m in BROOMS if m.lower() == model.lower()), None)
+    match = next((m for m in allowed if m.lower() == model.lower()), None)
     if not match or not finish or not reading:
         return None
     return {
         "model": match,
         "finish": finish[:300],
         "reading": reading[:600],
-        "stats": _stat_block(_digest(words)),
+        "stats": _stat_block(_digest(words + "|" + match)),
     }
 
 
 def _ensure(broom: dict, words: str | None = None) -> dict:
-    """Normalize older combo-style records onto the fixed named catalog."""
     out = dict(broom)
-    model = out.get("model")
-    if model not in BROOMS:
-        # Legacy shaft×bristle×binding → hash onto a named broom
+    if out.get("model") not in BROOMS:
         seed = words or out.get("finish") or out.get("shaft") or "legacy"
-        fb = fallback_broom(str(seed))
+        model = preference_rank(str(seed))[0]
+        fb = fallback_broom(str(seed), model)
         out["model"] = fb["model"]
         out.setdefault("finish", fb["finish"])
         out.setdefault("reading", out.get("reading") or fb["reading"])
         out["stats"] = fb["stats"]
     if "stats" not in out or not isinstance(out.get("stats"), dict):
-        out["stats"] = _stat_block(_digest(words or out["model"]))
+        out["stats"] = _stat_block(_digest((words or "") + "|" + out["model"]))
     return out
 
 
@@ -182,12 +269,18 @@ class Brooms(commands.Cog):
     def _load(self) -> dict:
         try:
             with open(BROOMS_PATH, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
         except FileNotFoundError:
-            return {}
+            return {"owners": {}}
         except (OSError, json.JSONDecodeError):
             log.exception("Broom records unreadable - starting empty.")
-            return {}
+            return {"owners": {}}
+        # Migrate flat user-id map → {"owners": {...}}
+        if "owners" not in data:
+            owners = {uid: rec for uid, rec in data.items() if isinstance(rec, dict)}
+            return {"owners": owners}
+        data.setdefault("owners", {})
+        return data
 
     def save(self) -> None:
         try:
@@ -199,24 +292,63 @@ class Brooms(commands.Cog):
         except OSError:
             log.exception("Could not save broom records.")
 
+    @property
+    def owners(self) -> dict:
+        return self.brooms.setdefault("owners", {})
+
+    def claimed_models(self) -> dict[str, str]:
+        """model -> user_id for every currently owned broom."""
+        out: dict[str, str] = {}
+        for uid, rec in self.owners.items():
+            if not isinstance(rec, dict):
+                continue
+            model = rec.get("model")
+            if model in BROOMS and model not in out:
+                out[model] = uid
+        return out
+
+    def available_models(self) -> list[str]:
+        taken = set(self.claimed_models())
+        return [m for m in BROOMS if m not in taken]
+
     def broom_of(self, user_id: int) -> dict | None:
-        raw = self.brooms.get(str(user_id))
+        raw = self.owners.get(str(user_id))
         if not raw:
             return None
         return _ensure(raw)
 
     def release(self, user_id: int) -> bool:
-        gone = self.brooms.pop(str(user_id), None) is not None
+        gone = self.owners.pop(str(user_id), None) is not None
         if gone:
             self.save()
         return gone
 
-    async def fit(self, words: str) -> dict:
+    def assign_model(self, words: str) -> str | None:
+        """Closest preferred broom that nobody else owns yet."""
+        taken = set(self.claimed_models())
+        for model in preference_rank(words):
+            if model not in taken:
+                return model
+        return None
+
+    async def fit(self, words: str) -> dict | None:
+        model = self.assign_model(words)
+        if model is None:
+            return None
+
+        # Offer the fitter a short ranked list of still-available brooms
+        # (closest first) so Claude stays near the word-match without
+        # naming a claimed one.
+        ranked = [m for m in preference_rank(words) if m in set(self.available_models())][:12]
+        if model not in ranked:
+            ranked = [model] + ranked
+
         wands = self.bot.get_cog("Wands")
         client = getattr(wands, "client", None)
         if client is not None:
             prompt = READING_PROMPT.format(
-                brooms="\n".join(f"- {k}: {v['blurb']}" for k, v in BROOMS.items()),
+                ranked=", ".join(ranked),
+                blurbs="\n".join(f"- {m}: {BROOMS[m]}" for m in ranked),
                 words=words.replace('"', "'")[:200],
             )
             try:
@@ -227,27 +359,33 @@ class Brooms(commands.Cog):
                 text = "".join(getattr(b, "text", "") for b in response.content)
                 match = re.search(r"\{.*\}", text, re.S)
                 if match:
-                    result = _clean(json.loads(match.group(0)), words)
+                    result = _clean(json.loads(match.group(0)), words, set(ranked))
                     if result:
-                        return result
+                        # Re-check claim in case of race; fall back to assign_model
+                        claimed = self.claimed_models()
+                        if result["model"] not in claimed:
+                            return result
+                        alt = self.assign_model(words)
+                        if alt:
+                            return fallback_broom(words, alt)
                 log.warning("Broom reading came back unusable; using the fallback.")
             except Exception:
                 log.exception("Broom reading failed; using the fallback.")
-        return fallback_broom(words)
+
+        # Fallback always uses the unique closest available model
+        pick = self.assign_model(words)
+        return fallback_broom(words, pick) if pick else None
 
     def portrait_file(self, broom: dict) -> discord.File | None:
         broom = _ensure(broom)
-        meta = BROOMS.get(broom["model"])
-        if not meta:
-            return None
-        path = ASSETS_DIR / meta["image"]
+        path = ASSETS_DIR / image_name(broom["model"])
         if not path.exists():
             log.warning("Missing broom art %s", path)
             return None
-        data = path.read_bytes()
-        return discord.File(io.BytesIO(data), filename="broom.png")
+        return discord.File(io.BytesIO(path.read_bytes()), filename="broom.png")
 
-    def embed_for(self, member, broom: dict, fresh: bool = False) -> discord.Embed:
+    def embed_for(self, member, broom: dict, fresh: bool = False,
+                  redirected_from: str | None = None) -> discord.Embed:
         broom = _ensure(broom)
         model = broom["model"]
         stats = broom["stats"]
@@ -257,26 +395,31 @@ class Brooms(commands.Cog):
         silly = "\n".join(
             f"**{STAT_LABELS[k]}** {_bar(stats.get(k, 0))}" for k in SILLY_STATS
         )
+        note = ""
+        if redirected_from and redirected_from != model:
+            note = (f"\n\n-# {redirected_from} was already claimed — "
+                    f"the next-closest broom found you instead.")
         embed = discord.Embed(
             title=("A broom answers your grip…" if fresh
                    else f"{member.display_name}'s broom"),
-            description=(f"**The {model}**\n*{broom['finish']}*\n\n{broom['reading']}"),
+            description=(f"**The {model}**\n*{broom['finish']}*\n\n"
+                         f"{broom['reading']}{note}"),
             color=BROOM_COLOR,
         )
         embed.add_field(name="Flight (for show)", value=serious, inline=False)
         embed.add_field(name="Also (deeply scientific)", value=silly, inline=False)
-        if (ASSETS_DIR / BROOMS[model]["image"]).exists():
+        if (ASSETS_DIR / image_name(model)).exists():
             embed.set_image(url="attachment://broom.png")
+        left = len(self.available_models())
         if fresh:
-            embed.set_footer(text=f"{member.display_name}'s broom • fixed portrait • "
-                                  "stats are decorative")
+            embed.set_footer(text=f"Yours alone • {left} brooms still unclaimed • stats are decorative")
         else:
-            embed.set_footer(text="Purely cosmetic • looking cool is the point")
+            embed.set_footer(text=f"Unique claim • {left} brooms still unclaimed • purely cosmetic")
         return embed
 
     @app_commands.command(
         name="broom",
-        description="Claim your broom from the words that chose your wand. Fixed portrait + silly stats — just for looking cool.",
+        description="Claim your unique broom from your wand words — fixed portrait, silly stats, one owner each.",
     )
     @app_commands.describe(member="Whose broom to see (leave blank for your own)")
     async def broom(self, interaction: discord.Interaction, member: discord.Member = None):
@@ -309,11 +452,38 @@ class Brooms(commands.Cog):
             )
             return
 
+        if not self.available_models():
+            await interaction.response.send_message(
+                "Every broom in Velmora has already been claimed. "
+                "A staff `/wandreset` frees one if someone releases their words.",
+                ephemeral=True,
+            )
+            return
+
         await interaction.response.defer(thinking=True)
+        preferred = preference_rank(wand["words"])[0]
         result = await self.fit(wand["words"])
-        self.brooms[str(target.id)] = result
+        if not result:
+            await interaction.followup.send(
+                "Every broom in Velmora has already been claimed.", ephemeral=True
+            )
+            return
+
+        # Final claim guard (concurrent /broom)
+        claimed = self.claimed_models()
+        if result["model"] in claimed and claimed[result["model"]] != str(target.id):
+            alt = self.assign_model(wand["words"])
+            if not alt:
+                await interaction.followup.send(
+                    "Every broom in Velmora has already been claimed.", ephemeral=True
+                )
+                return
+            result = fallback_broom(wand["words"], alt)
+
+        self.owners[str(target.id)] = result
         self.save()
-        embed = self.embed_for(target, result, fresh=True)
+        redirected = preferred if preferred != result["model"] else None
+        embed = self.embed_for(target, result, fresh=True, redirected_from=redirected)
         file = self.portrait_file(result)
         kwargs = {"embed": embed}
         if file:
