@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The Descent · Velmora</title><meta name="description" content="A hundred-floor solo dungeon beneath Velmora. Action points, elemental spells, real monsters, and a wall on every tenth floor.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Alegreya:ital,wght@0,400;0,500;0,700;1,400&family=Alegreya+Sans+SC:wght@500;700&display=swap"><link rel="stylesheet" href="style.css">
+<script>try{var t=localStorage.getItem('vc-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head><body>
+<header class="top"><div class="top-in"><a class="brand" href="index.html">Velmora <span>Compendium</span></a>
+<nav class="nav" aria-label="Sections"><a href="index.html">Home</a><a href="houses.html">Houses &amp; Cup</a><a href="ghosts.html">Ghosts</a><a href="explore.html">Explore</a><a href="beasts.html">Beasts</a><a href="duels.html">Duels &amp; Threats</a><a href="descent.html" aria-current="page">Descent</a><a href="quidditch.html">Quidditch</a><a href="magic.html">Wands &amp; Familiars</a><a href="cards.html">Cards &amp; Gear</a><a href="tales.html">Tales</a><a href="commands.html">Commands</a></nav>
+<button class="theme" type="button" onclick="(function(){var d=document.documentElement,n=(d.dataset.theme==='dark'||(!d.dataset.theme&&matchMedia('(prefers-color-scheme: dark)').matches))?'light':'dark';d.dataset.theme=n;try{localStorage.setItem('vc-theme',n)}catch(e){}})()">Light / dark</button>
+</div></header>
+<main class="wrap">
+<div class="head"><p class="eyebrow">Velmora · beneath the school</p><h1>The Descent</h1><p class="lede">A hundred floors down, and something new to fight on every one. No shared runs, no shortcuts - just you, your action points, and whatever's waiting on the next floor.</p><nav class="jump" aria-label="On this page"><a href="#overview">Overview</a><a href="#rules">How a floor works</a><a href="#combat">Combat</a><a href="#weaknesses">Weaknesses</a><a href="#replay">Practice &amp; replay</a><a href="#zones">The ten zones</a><a href="#loot">Loot &amp; gear</a><a href="#commands">Commands</a></nav></div>
+
+<section id="overview"><h2>What it is</h2>
+<p>The Descent is a solo dungeon beneath Velmora - one hundred floors, each guarded by a gauntlet of ten monsters. Every player has their own run: your floor, your losses, your gear are yours alone. There's no racing anyone else down, only the next monster in front of you. Every monster and boss has its own hand-drawn portrait shown right in the fight - no two floors look alike.</p></section>
+
+<section id="rules"><h2>How a floor works</h2>
+<div class="grid wide">
+<div class="card"><h3>Ten monsters, one at a time</h3><p>Each floor is ten monsters, fought one after another. Win all ten and you advance to the next floor.</p></div>
+<div class="card"><h3>A loss costs nothing</h3><p>Lose a fight and you simply face that same monster again - a single loss doesn't cost you any floor progress.</p></div>
+<div class="card"><h3>Three losses, a lockout</h3><p>Lose three times on the same floor and you're locked out of it for 24 hours. When the lockout lifts, that floor restarts at monster #1.</p></div>
+<div class="card"><h3>A stat point at monster five</h3><p>Beat the fifth monster on any attempt and you earn a stat point to spend - Max HP, Attack, or Defense. A hard floor may take several tries, and that adds up: repeated attempts are real, permanent progress.</p></div>
+<div class="card"><h3>Boss floors</h3><p>Every 10th floor ends in a boss - tougher than a regular monster, and worth a floor-clear bonus in House Cup points for whichever house you belong to.</p></div>
+<div class="card"><h3>Max AP grows on bosses</h3><p>Your Max AP only goes up on a boss floor - clearing floor 10, 20, 30 and so on each grants +1. Regular floors don't increase it.</p></div>
+</div>
+<p class="sub">Some floors are meant to be a genuine wall the first time you meet them. Grinding stat points out of repeated attempts is the intended way through, not a failure state.</p></section>
+
+<section id="combat"><h2>Combat: action points</h2>
+<p>Every fight runs on AP. Your AP and HP both refill completely at the start of each new fight - nothing carries over between monsters, so every encounter starts on equal footing. Five things you can do on your turn:</p>
+<div class="tbl"><table><thead><tr><th>Action</th><th>Cost</th><th>What it does</th></tr></thead><tbody>
+<tr><td>✨ Cast</td><td>3 AP</td><td>Your only source of elemental damage.</td></tr>
+<tr><td>🗡️ Strike</td><td>Free</td><td>A guaranteed weak-tier hit - useful when you're out of AP.</td></tr>
+<tr><td>💚 Heal</td><td>3 AP</td><td>Restore 50% of your missing HP, but you take the monster's full attack with no mitigation that round.</td></tr>
+<tr><td>🛡️ Defend</td><td>Free</td><td>Cut the monster's hit that round by half.</td></tr>
+<tr><td>🌀 Rest</td><td>Free</td><td>Instantly refill your AP to max, but the monster hits 10% harder that round.</td></tr>
+</tbody></table></div>
+<p>AP also regenerates naturally by +1 every round, on top of anything Rest or a free action gives you. Cast is the only action that costs real AP - everything else is free, so there's rarely a reason not to lean on Defend when you're low.</p></section>
+
+<section id="weaknesses"><h2>Elemental weaknesses</h2>
+<p>Every monster resists its own home element and is vulnerable to exactly <b>one</b> other - but you won't find that written on its profile. Casting the wrong spell gets you a normal hit, resisting it costs you damage, and finding its true weakness hits hard. The only way to learn a monster's weakness is to test spells on it and watch the fight log for <b>resisted</b> or <b>super effective</b>.</p>
+<p>Floors aren't locked to a single element either - most floors mix in monsters of a second element alongside the zone's main one, so a strategy that only accounts for one element won't carry you through a whole floor.</p>
+<div class="note"><p>Every fight plays out publicly in its channel, so anyone watching can learn a monster's pattern too - even if it isn't their turn.</p></div></section>
+
+<section id="replay"><h2>Practice &amp; replaying floors</h2>
+<p>Already cleared a floor? Replay it with <code>/descend floor:&lt;number&gt;</code> for loot — and a chance to sharpen a free stat pick. Practice fights don&#x27;t advance your floor and never count toward lockouts.</p>
+<ul class="cmds">
+<li>Replayed floors always have a chance to drop that zone&#x27;s material, same as a first-time clear.</li>
+<li>Clearing a practice floor can grant a free Max HP / Attack / Defense pick. Odds scale with how far behind you are: <b>20%</b> within 5 floors, <b>10%</b> within 6–20, <b>5%</b> farther back.</li>
+<li>Spend any pending stat pick before you grind again — a stuck pick blocks new practice awards.</li>
+<li>Boss floors can&#x27;t be practiced this way — only the ten regular floors in each zone.</li>
+</ul></section>
+
+<section id="zones"><h2>The ten zones</h2>
+<p class="sub">Ten zones of ten floors each. Every zone belongs to one element, and its boss floor closes it out.</p>
+<div class="grid wide">
+<div class="card"><h3>☠️ The Overgrown Entrance</h3><p class="meta">Floors 1-10 · Poison</p><p>🍄 Bloatcap Crawler · 🐍 Weeping Adder · 🧟 Fen Wretch<br>👑 Boss: The Bloated Sovereign</p></div>
+<div class="card"><h3>🔥 The Ember Vaults</h3><p class="meta">Floors 11-20 · Fire</p><p>🐕 Ember Hound · 🔥 Cinder Wisp · 🗿 Forge Golem<br>👑 Boss: Cinderlord Ashgrave</p></div>
+<div class="card"><h3>❄️ The Frozen Depths</h3><p class="meta">Floors 21-30 · Ice</p><p>👻 Frostbite Wraith · 🐺 Glacier Stalker · 🕷️ Rime Widow<br>👑 Boss: The Rime Empress</p></div>
+<div class="card"><h3>⚡ The Storm Cistern</h3><p class="meta">Floors 31-40 · Lightning</p><p>⚡ Static Hollow · 🐦‍⬛ Storm-Touched Raven · 🐉 Volt Serpent<br>👑 Boss: Stormcaller Vessel</p></div>
+<div class="card"><h3>✨ The Hollow Sanctum</h3><p class="meta">Floors 41-50 · Light</p><p>🕊️ Hollow Choirling · 💀 Radiant Husk · 🛡️ Vault Warden<br>👑 Boss: The Hollow Saint</p></div>
+<div class="card"><h3>☠️ The Overgrown Entrance - Lower Reach</h3><p class="meta">Floors 51-60 · Poison</p><p>🍄 Bloatcap Crawler · 🐍 Weeping Adder · 🧟 Fen Wretch<br>👑 Boss: The Sovereign, Reborn</p></div>
+<div class="card"><h3>🔥 The Ember Vaults - Deep Forge</h3><p class="meta">Floors 61-70 · Fire</p><p>🐕 Ember Hound · 🔥 Cinder Wisp · 🗿 Forge Golem<br>👑 Boss: Ashgrave, Undying</p></div>
+<div class="card"><h3>❄️ The Frozen Depths - Abyssal Ice</h3><p class="meta">Floors 71-80 · Ice</p><p>👻 Frostbite Wraith · 🐺 Glacier Stalker · 🕷️ Rime Widow<br>👑 Boss: The Rime Empress, Unbound</p></div>
+<div class="card"><h3>⚡ The Storm Cistern - Undertow</h3><p class="meta">Floors 81-90 · Lightning</p><p>⚡ Static Hollow · 🐦‍⬛ Storm-Touched Raven · 🐉 Volt Serpent<br>👑 Boss: Vessel of the Last Storm</p></div>
+<div class="card"><h3>✨ The Hollow Sanctum - Last Vault</h3><p class="meta">Floors 91-100 · Light</p><p>🕊️ Hollow Choirling · 💀 Radiant Husk · 🛡️ Vault Warden<br>👑 Boss: The Hollow Saint, Ascendant - the last thing standing between you and the bottom.</p></div>
+</div></section>
+
+<section id="loot"><h2>Loot &amp; gear</h2>
+<p>Winning fights has a chance to drop that zone's material, and clearing a floor always drops some. Bosses leave behind a rarer prize instead: a Vault Sigil.</p>
+<div class="tbl"><table><thead><tr><th>Material</th><th>From</th><th>Rarity</th></tr></thead><tbody>
+<tr><td><span class="em">☠️</span>Vial of Poison Ichor</td><td>The Overgrown Entrance</td><td><span class="tag r-common">Common</span></td></tr>
+<tr><td><span class="em">🔥</span>Ember Shard</td><td>The Ember Vaults</td><td><span class="tag r-common">Common</span></td></tr>
+<tr><td><span class="em">❄️</span>Frost Core</td><td>The Frozen Depths</td><td><span class="tag r-uncommon">Uncommon</span></td></tr>
+<tr><td><span class="em">⚡</span>Storm Relic</td><td>The Storm Cistern</td><td><span class="tag r-uncommon">Uncommon</span></td></tr>
+<tr><td><span class="em">✨</span>Vault Light Dust</td><td>The Hollow Sanctum</td><td><span class="tag r-rare">Rare</span></td></tr>
+<tr><td><span class="em">🛡️</span>Vault Sigil</td><td>Any boss floor</td><td><span class="tag r-very_rare">Very Rare</span></td></tr>
+</tbody></table></div>
+<h3>Craftable gear</h3>
+<div class="grid wide">
+<div class="card"><h3>Ichor-Ember Choker</h3><p class="meta">Necklace · Uncommon</p><p>2× Poison Ichor, 1× Ember Shard</p></div>
+<div class="card"><h3>Frost Core Bracelet</h3><p class="meta">Bracelet · Uncommon</p><p>2× Frost Core</p></div>
+<div class="card"><h3>Storm Relic Ring</h3><p class="meta">Ring · Rare</p><p>2× Storm Relic, 1× Vault Light Dust</p></div>
+<div class="card"><h3>Warden's Talisman</h3><p class="meta">Talisman · Legendary</p><p>3× Vault Sigil, 2× Vault Light Dust</p></div>
+</div></section>
+
+<section id="commands"><h2>Commands</h2>
+<ul class="cmds">
+<li><code>/descend</code> Fight the next monster on your current floor, or resume a fight already in progress.</li>
+<li><code>/descend floor:&lt;n&gt;</code> Practice a floor you&#x27;ve already cleared — loot, and a chance to sharpen if it&#x27;s nearby.</li>
+<li><code>/descentstatus</code> Check your floor, monster progress, stats, Max AP, and any active lockout.</li>
+</ul>
+<div class="note"><p>The Descent only runs in its Descent channels — commands used elsewhere won&#x27;t start a fight.</p></div></section>
+
+<footer class="site">Kept by the House Cup. Everything here comes straight from the bots that run Velmora. The secrets are not written down anywhere. You'll have to find those yourself.</footer>
+</main><script>(function(){var h=document.querySelector('.top');function s(){document.documentElement.style.setProperty('--tb',h.offsetHeight+'px')}s();addEventListener('resize',s);var n=document.querySelector('.nav'),c=n&&n.querySelector('[aria-current]');if(c&&n.scrollWidth>n.clientWidth)n.scrollLeft=(c.offsetLeft-n.offsetLeft)-n.clientWidth/2+c.clientWidth/2;})();</script></body></html>

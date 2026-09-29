@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Every Command · Velmora</title><meta name="description" content="Every command a student can use. Staff commands are left out.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Alegreya:ital,wght@0,400;0,500;0,700;1,400&family=Alegreya+Sans+SC:wght@500;700&display=swap"><link rel="stylesheet" href="style.css">
+<script>try{var t=localStorage.getItem('vc-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head><body>
+<header class="top"><div class="top-in"><a class="brand" href="index.html">Velmora <span>Compendium</span></a>
+<nav class="nav" aria-label="Sections"><a href="index.html">Home</a><a href="houses.html">Houses &amp; Cup</a><a href="ghosts.html">Ghosts</a><a href="explore.html">Explore</a><a href="beasts.html">Beasts</a><a href="duels.html">Duels &amp; Threats</a><a href="descent.html">Descent</a><a href="quidditch.html">Quidditch</a><a href="magic.html">Wands &amp; Familiars</a><a href="cards.html">Cards &amp; Gear</a><a href="tales.html">Tales</a><a href="commands.html" aria-current="page">Commands</a></nav>
+<button class="theme" type="button" onclick="(function(){var d=document.documentElement,n=(d.dataset.theme==='dark'||(!d.dataset.theme&&matchMedia('(prefers-color-scheme: dark)').matches))?'light':'dark';d.dataset.theme=n;try{localStorage.setItem('vc-theme',n)}catch(e){}})()">Light / dark</button>
+</div></header>
+<main class="wrap">
+<div class="head"><p class="eyebrow">Velmora · quick reference</p><h1>Every Command</h1><p class="lede">Every command a student can use. Staff commands are left out.</p><nav class="jump" aria-label="On this page"><a href="#play">Play</a><a href="#market">Marketplace</a><a href="#descent">The Descent</a><a href="#potions">Potions</a><a href="#boards">Chess &amp; Checkers</a><a href="#quidditch">Quidditch</a><a href="#explore">Explore Velmora</a><a href="#beasts">Beasts</a><a href="#adornments">Your wizard &amp; gear</a><a href="#challenges">Challenges</a><a href="#standing">Your standing</a></nav></div>
+
+<section id="play"><h2>Play</h2><ul class="cmds">
+<li><code>/duel</code> Challenge someone. Best of three, spells chosen in secret.</li>
+<li><code>/trio scramble</code> Open a casual 3v3 trio duel — any houses, join either side.</li>
+<li><code>/trio housematch</code> Open a house-vs-house 3v3 trio duel (house role gated).</li>
+<li><code>/grand</code> Challenge someone to a Grand Duel (both need 50+ 1v1 wins).</li>
+<li><code>/houseduels</code> Each house&#x27;s overall duelling win/loss record.</li>
+<li><code>/bean</code> Spend 1 point on a mystery bean. Might pay 5. Might be Mordy&#x27;s socks.</li>
+<li><code>/wand</code> Give any three words and a wand chooses you. Yours for good.</li>
+<li><code>/patronus</code> Your patronus, cast from the same three words as your wand.</li>
+<li><code>/rumor</code> Explore secrets, student gossip, odd headmaster whispers, embarrassing ghosts.</li>
+<li><code>/cast</code> Banish a wild threat in this channel. Needs a patronus already cast.</li>
+<li><code>/familiar</code> Adopt a familiar (once, for good), name it, or see the one you have.</li>
+<li><code>/feed</code> Feed your familiar. Once a day.</li>
+<li><code>/pet</code> Pet your familiar. Once a day.</li>
+<li><code>/play</code> Play with your familiar. Once a day.</li>
+<li><code>/scout</code> Send your familiar out to bring something back. Once a day.</li>
+<li><code>/raid</code> Open a 3Raid lobby — Attacker, Specialty, Tank, 10 encounters.</li>
+<li><code>/raidstatus</code> Your 3Raid weekly clear status.</li>
+<li><code>/piphowdoi</code> Ask Pip Wick how to do something (public hearthling answer from help + Compendium).</li>
+</ul></section>
+
+<section id="market"><h2>Marketplace</h2>
+<p class="sub">Spend house points on ingredients, scrolls, titles, and the Room. Selling pays points back (daily cap).</p>
+<ul class="cmds">
+<li><code>/market browse</code> The Marketplace catalogue — ingredients, scrolls, titles, Room.</li>
+<li><code>/market buy</code> Buy a common (3 pts) or uncommon (6 pts) ingredient.</li>
+<li><code>/market sell</code> Sell 3 of the same common/uncommon for 3 pts (21/day cap).</li>
+<li><code>/market scroll</code> Buy a Hex Scroll (30 pts).</li>
+<li><code>/market title</code> Buy an exclusive Marketplace title (50 pts).</li>
+<li><code>/market room</code> Buy the Room of Requirement (100 pts). Pings Headmasters.</li>
+<li><code>/hexscroll</code> Cast a Hex Scroll on someone (30 min, random curse).</li>
+</ul></section>
+
+<section id="descent"><h2>The Descent</h2>
+<p class="sub">Solo 100-floor dungeon — only in Descent channels. Practice cleared floors with <code>/descend floor:n</code> for loot; nearby floors can sharpen a free stat pick.</p>
+<ul class="cmds">
+<li><code>/descend</code> Fight the next monster on your floor (or resume an open fight).</li>
+<li><code>/descend floor:&lt;n&gt;</code> Replay a floor you&#x27;ve already cleared, for loot (and a chance to sharpen if it&#x27;s in range).</li>
+<li><code>/descentstatus</code> Your floor, monster progress, stats, Max AP, and lockout.</li>
+</ul></section>
+
+<section id="potions"><h2>Potions</h2>
+<p class="sub">Brew from satchel ingredients. Some potions help in the Descent; others call private beast encounters.</p>
+<ul class="cmds">
+<li><code>/brew</code> Spend two ingredients and try to brew a potion.</li>
+<li><code>/drink</code> Drink a brewed potion from your satchel to activate it.</li>
+<li><code>/potions</code> Your Potion Rep, discovered recipes, and brewed potions.</li>
+</ul></section>
+
+<section id="boards"><h2>Chess &amp; Checkers</h2>
+<p class="sub">Played in the chess channel. Wins can earn house points (daily cap). Beating your own house never pays.</p>
+<ul class="cmds">
+<li><code>/chess challenge</code> Challenge someone to Wizard&#x27;s Chess.</li>
+<li><code>/chess move</code> Make a move (squares, or piece → square on the board).</li>
+<li><code>/chess resign</code> Concede a chess match in progress.</li>
+<li><code>/chessstats</code> Chess wins, losses, title, and active games.</li>
+<li><code>/checkers challenge</code> Challenge someone to Wizard&#x27;s Checkers.</li>
+<li><code>/checkers move</code> Make a checkers move.</li>
+<li><code>/checkers resign</code> Concede a checkers match.</li>
+<li><code>/checkersstats</code> Checkers wins, losses, title, and active games.</li>
+</ul></section>
+
+<section id="quidditch"><h2>Quidditch</h2><ul class="cmds">
+<li><code>/quidditch scramble</code> Start a casual pickup match — any houses, either side.</li>
+<li><code>/quidditch housematch</code> Start a house-vs-house Quidditch match.</li>
+<li><code>/quidditchstats</code> Your Quidditch record and title.</li>
+</ul></section>
+
+<section id="explore"><h2>Explore Velmora</h2>
+<p class="sub">Places remember how you treat them. Not everything you can do is listed here.</p>
+<ul class="cmds">
+<li><code>/places</code> Where you can go, and what&#x27;s happening there.</li>
+<li><code>/explore</code> Go somewhere and see what you find.</li>
+<li><code>/forage</code> Search for ingredients and strange things.</li>
+<li><code>/satchel</code> What you&#x27;re carrying. Only you can see it.</li>
+<li><code>/use</code> Try something from your satchel where you are.</li>
+<li><code>/offer</code> Leave an offering where you are.</li>
+</ul></section>
+
+<section id="beasts"><h2>Beasts</h2>
+<p class="sub">A few times a day a beast wanders into the explore channel and says what it wants. First to bring it befriends it. 70 to find — including Nifflers — some only after dark.</p>
+<ul class="cmds">
+<li><code>/approach</code> Befriend the beast that&#x27;s here, if you have what it wants.</li>
+<li><code>/bestiary</code> Every beast you&#x27;ve befriended - and the ones still out there.</li>
+<li><code>/summon</code> Call one of your beasts to show off. Just for fun.</li>
+<li><code>/study</code> Study a befriended beast (once a day). Three pages = 5 house points once.</li>
+<li><code>/journal</code> Open your Beast Journal — overview, or one beast&#x27;s entry.</li>
+</ul></section>
+
+<section id="adornments"><h2>Your wizard &amp; gear</h2>
+<p class="sub">Design your look in <code>/wizard</code> — Masculine, Feminine, or Feminine (full body). 40 gear pieces to craft or earn; earned pieces have perks while worn (never for duels or points).</p>
+<ul class="cmds">
+<li><code>/wizard</code> Design how your wizard looks (including Feminine full-body).</li>
+<li><code>/mirror</code> Your wizard trading card (or anyone&#x27;s): look, gear, title and stats.</li>
+<li><code>/jewelbox</code> What you own, what you&#x27;re wearing, what you can craft.</li>
+<li><code>/craft</code> Make a piece from materials in your satchel.</li>
+<li><code>/wear</code> Put on a piece you own.</li>
+<li><code>/remove</code> Take off whatever&#x27;s in a slot.</li>
+<li><code>/title</code> Choose which earned title shows under your name.</li>
+<li><code>/cheer</code> House Cup Bracelet: a celebration for your house.</li>
+<li><code>/whistle</code> Beastcaller&#x27;s Whistle: call the next beast now. Once a week.</li>
+<li><code>/secrets</code> Keeper&#x27;s Talisman: how many secrets you haven&#x27;t found.</li>
+<li><code>/nightwatch</code> Nightwatch Pendant: night-beast heads-up on or off.</li>
+</ul></section>
+
+<section id="challenges"><h2>Challenges</h2>
+<p class="sub">Posted for everyone at once — first three correct answers win points. Daily every 24 hours (pings @everyone); Trial and Rite on their schedule.</p>
+<ul class="cmds">
+<li><code>/challengestatus</code> What&#x27;s open right now, and when the next ones come.</li>
+</ul></section>
+
+<section id="standing"><h2>Your standing</h2><ul class="cmds">
+<li><code>/profile</code> Your Mirror, wand, patronus, points, duel rank, beasts and honours - or anyone&#x27;s.</li>
+<li><code>/points</code> Your points (or anyone&#x27;s), this season and all time.</li>
+<li><code>/standings</code> The House Cup table.</li>
+<li><code>/leaderboard</code> The top earners.</li>
+<li><code>/duelrecord</code> Your duel rank, wins, streak, rivals, trio/grand records, and today&#x27;s duel points left.</li>
+<li><code>/history</code> Recent points activity.</li>
+<li><code>/housecup</code> Past seasons and their champions.</li>
+<li><code>/triwizard history</code> Every Tri-Wizard champion so far.</li>
+<li><code>/season list</code> Every season so far.</li>
+<li><code>/countdown status</code> How long until the next big thing.</li>
+</ul></section>
+
+<div class="note"><p>Type <code>/help</code> in Discord any time for this list with clickable commands. Stuck on how to do something? Ask Pip with <code>/piphowdoi</code>.</p></div>
+<footer class="site">Kept by the House Cup. Everything here comes straight from the bots that run Velmora. The secrets are not written down anywhere. You'll have to find those yourself.</footer>
+</main><script>(function(){var h=document.querySelector('.top');function s(){document.documentElement.style.setProperty('--tb',h.offsetHeight+'px')}s();addEventListener('resize',s);var n=document.querySelector('.nav'),c=n&&n.querySelector('[aria-current]');if(c&&n.scrollWidth>n.clientWidth)n.scrollLeft=(c.offsetLeft-n.offsetLeft)-n.clientWidth/2+c.clientWidth/2;})();</script></body></html>
