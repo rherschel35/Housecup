@@ -54,6 +54,34 @@ def _norm(text: str) -> str:
     return text
 
 
+# Everyday wording → Pip's keyword vocabulary (applied to the question).
+_SYNONYMS = {
+    "learn": "study",
+    "learning": "study",
+    "learnt": "study",
+    "learned": "study",
+    "creature": "beast",
+    "creatures": "beasts",
+    "critter": "beast",
+    "critters": "beasts",
+}
+
+
+def _expand_query(text: str) -> str:
+    """Normalize and fold synonyms so 'learn' matches 'study', etc."""
+    q = _norm(text)
+    if not q:
+        return q
+    parts = []
+    for word in q.split():
+        parts.append(_SYNONYMS.get(word, word))
+    expanded = " ".join(parts)
+    # Keep original words too so exact keyword phrases still hit.
+    if expanded != q:
+        return f"{q} {expanded}"
+    return q
+
+
 def _load_knowledge() -> dict:
     try:
         return json.loads(KNOWLEDGE_PATH.read_text(encoding="utf-8"))
@@ -64,7 +92,7 @@ def _load_knowledge() -> dict:
 
 def _score(query: str, entry: dict) -> int:
     """Higher is better. Longer keyword hits weigh more."""
-    q = _norm(query)
+    q = _expand_query(query)
     if not q:
         return 0
     best = 0
