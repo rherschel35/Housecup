@@ -33,13 +33,20 @@
     },
     {
       "id": "beasts_approach",
-      "keywords": ["beast", "beasts", "approach", "befriend", "bestiary", "summon beast", "wild animal"],
-      "answer": "Beasts wander into the explore channel an' say what they want. First to `/approach` with those things befriends 'em. See yer collection with `/bestiary`, show one off with `/summon`.",
+      "keywords": [
+        "beast", "beasts", "creature", "creatures", "approach", "befriend",
+        "bestiary", "summon beast", "wild animal", "catch a beast", "find a beast"
+      ],
+      "answer": "Beasts wander into the explore channel an' say what they want. First to `/approach` with those things befriends 'em. See yer collection with `/bestiary`, show one off with `/summon`. Want notes on one ye already have? That's `/study`.",
       "link": "https://everything-velmora-andmore.netlify.app/beasts"
     },
     {
       "id": "study_journal",
-      "keywords": ["study", "journal", "beast journal", "study beast", "journal pages"],
+      "keywords": [
+        "study", "learn", "journal", "beast journal", "study beast", "learn beast",
+        "study creature", "learn creature", "learn about a creature", "learn about a beast",
+        "learn about", "journal pages", "study a beast", "notes on a beast"
+      ],
       "answer": "Got a befriended beast? `/study` it once a day — three pages fills yer notes. Read 'em with `/journal`. Finish all three an' yer house gets **5** points once for that beast.",
       "link": "https://everything-velmora-andmore.netlify.app/beasts"
     },
