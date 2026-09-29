@@ -277,7 +277,7 @@
         "checkers",
         "board game"
       ],
-      "answer": "Chess an' checkers are in the bot \u2014 challenge a classmate an' play on the board embeds. Wins can earn house points (with a daily cap). Peek `/help` for the chess commands.",
+      "answer": "Chess an' checkers aren't ready yet \u2014 the boards are still bein' polished. Pip'll tell ye when ye can challenge a classmate.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {
@@ -356,7 +356,7 @@
         "what can I still do",
         "what can i still do"
       ],
-      "answer": "Aye \u2014 cast `/checklist` for yer daily board: explore, beans, duels, boards, beasts, market sell, familiar, an' open challenges, each with how many ye've got left an' when it resets. It's public, but only yer own \u2014 nobody else can pull it for ye.",
+      "answer": "Aye \u2014 cast `/checklist` for yer daily board: explore, beans, duels, beasts, market sell, familiar, an' open challenges, each with how many ye've got left an' when it resets. It's public, but only yer own \u2014 nobody else can pull it for ye.",
       "link": "https://everything-velmora.netlify.app/commands"
     }
   ]
