@@ -28,18 +28,12 @@ HELP = {
             ("trio scramble", "Open a casual 3v3 trio duel — any houses, join either side."),
             ("trio housematch", "Open a house-vs-house 3v3 trio duel (house role gated)."),
             ("grand", "Challenge someone to a Grand Duel (both need 50+ 1v1 wins)."),
+            ("houseduels", "Each house's overall duelling win/loss record."),
             ("bean", "Spend 1 point on a mystery bean. Might pay 5. Might be Mordy's socks."),
-            ("market browse", "The Marketplace catalogue — ingredients, scrolls, titles, Room."),
-            ("market buy", "Buy a common (3 pts) or uncommon (6 pts) ingredient."),
-            ("market sell", "Sell 3 of the same common/uncommon for 3 pts (21/day cap)."),
-            ("market scroll", "Buy a Hex Scroll (30 pts)."),
-            ("market title", "Buy an exclusive Marketplace title (50 pts)."),
-            ("market room", "Buy the Room of Requirement (100 pts). Pings Headmasters."),
-            ("hexscroll", "Cast a Hex Scroll on someone (30 min, random curse)."),
             ("wand", "Give any three words and a wand chooses you. Yours for good."),
             ("patronus", "Your patronus, cast from the same three words as your wand."),
-            ("rumor", "Explore secrets, ridiculous student gossip, odd headmaster whispers, embarrassing ghosts."),
-            ("cast", "Banish whatever's in this channel. Needs a patronus already cast."),
+            ("rumor", "Explore secrets, student gossip, odd headmaster whispers, embarrassing ghosts."),
+            ("cast", "Banish a wild threat in this channel. Needs a patronus already cast."),
             ("familiar", "Adopt a familiar (once, for good), name it, or see the one you have."),
             ("feed", "Feed your familiar. Once a day."),
             ("pet", "Pet your familiar. Once a day."),
@@ -47,7 +41,65 @@ HELP = {
             ("scout", "Send your familiar out to bring something back. Once a day."),
             ("raid", "Open a 3Raid lobby — Attacker, Specialty, Tank, 10 encounters."),
             ("raidstatus", "Your 3Raid weekly clear status."),
-            ("piphowdoi", "Ask Pip Wick how to do something — public hearthling answer from help + Compendium."),
+            ("piphowdoi", "Ask Pip Wick how to do something (public hearthling answer from help + Compendium)."),
+        ],
+    },
+    "market": {
+        "title": "Marketplace",
+        "staff": False,
+        "note": "Spend house points on ingredients, scrolls, titles, and the Room. Selling pays points back (daily cap).",
+        "entries": [
+            ("market browse", "The Marketplace catalogue — ingredients, scrolls, titles, Room."),
+            ("market buy", "Buy a common (3 pts) or uncommon (6 pts) ingredient."),
+            ("market sell", "Sell 3 of the same common/uncommon for 3 pts (21/day cap)."),
+            ("market scroll", "Buy a Hex Scroll (30 pts)."),
+            ("market title", "Buy an exclusive Marketplace title (50 pts)."),
+            ("market room", "Buy the Room of Requirement (100 pts). Pings Headmasters."),
+            ("hexscroll", "Cast a Hex Scroll on someone (30 min, random curse)."),
+        ],
+    },
+    "descent": {
+        "title": "The Descent",
+        "staff": False,
+        "note": ("Solo 100-floor dungeon — only in Descent channels. "
+                 "Practice cleared floors with `/descend floor:n` for loot; nearby floors can sharpen a free stat pick."),
+        "entries": [
+            ("descend", "Fight the next monster on your floor (or resume an open fight)."),
+            ("descentstatus", "Your floor, monster progress, stats, Max AP, and lockout."),
+        ],
+    },
+    "potions": {
+        "title": "Potions",
+        "staff": False,
+        "note": "Brew from satchel ingredients. Some potions help in the Descent; others call private beast encounters.",
+        "entries": [
+            ("brew", "Spend two ingredients and try to brew a potion."),
+            ("drink", "Drink a brewed potion from your satchel to activate it."),
+            ("potions", "Your Potion Rep, discovered recipes, and brewed potions."),
+        ],
+    },
+    "boards": {
+        "title": "Chess & Checkers",
+        "staff": False,
+        "note": "Played in the chess channel. Wins can earn house points (daily cap). Beating your own house never pays.",
+        "entries": [
+            ("chess challenge", "Challenge someone to Wizard's Chess."),
+            ("chess move", "Make a move (squares, or piece → square on the board)."),
+            ("chess resign", "Concede a chess match in progress."),
+            ("chessstats", "Chess wins, losses, title, and active games."),
+            ("checkers challenge", "Challenge someone to Wizard's Checkers."),
+            ("checkers move", "Make a checkers move."),
+            ("checkers resign", "Concede a checkers match."),
+            ("checkersstats", "Checkers wins, losses, title, and active games."),
+        ],
+    },
+    "quidditch": {
+        "title": "Quidditch",
+        "staff": False,
+        "entries": [
+            ("quidditch scramble", "Start a casual pickup match — any houses, either side."),
+            ("quidditch housematch", "Start a house-vs-house Quidditch match."),
+            ("quidditchstats", "Your Quidditch record and title."),
         ],
     },
     "explore": {
@@ -67,22 +119,22 @@ HELP = {
         "title": "Beasts",
         "staff": False,
         "note": ("A few times a day a beast wanders into the explore channel and says what it wants. "
-                 "First to bring it befriends it. 70 to find - some only come out after dark."),
+                 "First to bring it befriends it. 70 to find — including Nifflers — some only after dark."),
         "entries": [
             ("approach", "Befriend the beast that's here, if you have what it wants."),
             ("bestiary", "Every beast you've befriended - and the ones still out there."),
             ("summon", "Call one of your beasts to show off. Just for fun."),
-            ("study", "Study a befriended beast (once a day). Full notes = 5 house points."),
+            ("study", "Study a befriended beast (once a day). Three pages = 5 house points once."),
             ("journal", "Open your Beast Journal — overview, or one beast's entry."),
         ],
     },
     "adornments": {
         "title": "Your wizard & gear",
         "staff": False,
-        "note": ("40 pieces to collect: craft them from your satchel, or earn the rare ones. "
-                 "Earned pieces have perks while you wear them (never for duels or points)."),
+        "note": ("Design your look in `/wizard` — Masculine, Feminine, or Feminine (full body). "
+                 "40 gear pieces to craft or earn; earned pieces have perks while worn (never for duels or points)."),
         "entries": [
-            ("wizard", "Design how your wizard looks."),
+            ("wizard", "Design how your wizard looks (including Feminine full-body)."),
             ("mirror", "Your wizard trading card (or anyone's): look, gear, title and stats."),
             ("jewelbox", "What you own, what you're wearing, what you can craft."),
             ("craft", "Make a piece from materials in your satchel."),
@@ -98,8 +150,8 @@ HELP = {
     "challenges": {
         "title": "Challenges",
         "staff": False,
-        "note": ("Challenges are posted in the channel for everyone at once. "
-                 "The **first three** to answer correctly win points - one attempt each."),
+        "note": ("Posted for everyone at once — first three correct answers win points. "
+                 "Daily every 24 hours (pings @everyone); Trial and Rite on their schedule."),
         "entries": [
             ("challengestatus", "What's open right now, and when the next ones come."),
         ],
@@ -139,6 +191,10 @@ HELP = {
             ("descentreset", "Wipe someone's Descent progress back to floor 1."),
             ("raidreset", "Clear a player's 3Raid weekly lockout, or end the active raid."),
             ("chess reset", "Wipe someone's chess record and drop their active matches."),
+            ("checkers reset", "Wipe someone's checkers record and drop their active matches."),
+            ("hex", "Curse a student's messages with a prank spell."),
+            ("unhex", "Lift a hex early."),
+            ("hexlist", "Show who's currently hexed."),
         ],
     },
     "staff_world": {

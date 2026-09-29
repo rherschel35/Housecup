@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Quidditch · Velmora</title><meta name="description" content="Grab three players, pick a side, and take to the pitch. Five rounds, real choices every round, and a Snitch that can end it all in an instant.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Alegreya:ital,wght@0,500;0,700;1,400&family=Alegreya+Sans+SC:wght@500;700&display=swap"><link rel="stylesheet" href="style.css">
+<script>try{var t=localStorage.getItem('vc-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head><body>
+<header class="top"><div class="top-in"><a class="brand" href="index.html">Velmora <span>Compendium</span></a>
+<nav class="nav" aria-label="Sections"><a href="index.html">Home</a><a href="houses.html">Houses &amp; Cup</a><a href="ghosts.html">Ghosts</a><a href="explore.html">Explore</a><a href="beasts.html">Beasts</a><a href="duels.html">Duels &amp; Threats</a><a href="descent.html">Descent</a><a href="quidditch.html" aria-current="page">Quidditch</a><a href="magic.html">Wands &amp; Familiars</a><a href="cards.html">Cards &amp; Gear</a><a href="tales.html">Tales</a><a href="commands.html">Commands</a></nav>
+<button class="theme" type="button" onclick="(function(){var d=document.documentElement,n=(d.dataset.theme==='dark'||(!d.dataset.theme&&matchMedia('(prefers-color-scheme: dark)').matches))?'light':'dark';d.dataset.theme=n;try{localStorage.setItem('vc-theme',n)}catch(e){}})()">Light / dark</button>
+</div></header>
+<main class="wrap">
+<div class="head"><p class="eyebrow">Velmora · the pitch</p><h1>Quidditch</h1><p class="lede">Grab three players, pick a side, and take to the pitch. Five rounds, real choices every round, and a Snitch that can end it all in an instant.</p><nav class="jump" aria-label="On this page"><a href="#overview">Overview</a><a href="#modes">Modes</a><a href="#rounds">How a match plays out</a><a href="#timing">Timing</a><a href="#rewards">Points &amp; titles</a><a href="#commands">Commands</a></nav></div>
+
+<section id="overview"><h2>What it is</h2>
+<p>Quidditch is Velmora's team sport: two sides of equal size face off over five rounds, choosing an action each round and watching the score add up. Throw together a casual pickup match with anyone, or settle it house-to-house for real House Cup points.</p></section>
+
+<section id="modes"><h2>Two ways to play</h2>
+<div class="grid wide">
+<div class="card"><h3>🌀 Scramble</h3><p>A casual pickup match - any houses, either side. Two players sign up for Team A, two (or four, for a 4v4) for Team B. Wins and losses only update your personal scramble record. No points, no loot - just bragging rights.</p></div>
+<div class="card"><h3>🏆 House Match</h3><p>Pick two different houses to face off. Members join their own house's side. A win updates your personal house record <b>and</b> earns your house real House Cup points.</p></div>
+</div>
+<p class="sub">Both modes support 2v2 or 4v4 - pick your size when you start the match.</p></section>
+
+<section id="rounds"><h2>How a match plays out</h2>
+<p>A match is 5 rounds. Every round, each player privately picks one action, then everyone's choice is revealed and scored together:</p>
+<div class="grid"><div class="card"><h3>🧹 Attack</h3><p>Try to score a goal.</p></div><div class="card"><h3>🛡️ Block</h3><p>Cancel out an enemy attacker.</p></div><div class="card"><h3>✨ Chase Snitch</h3><p>Go for the game-ending catch.</p></div></div>
+<h3>Scoring</h3>
+<p>Each side's goals for the round come out to <b>(your attackers - their blockers) × 10 points</b>, floored at zero. Three attackers against one blocker nets two goals worth of points; three attackers against three blockers nets nothing. Blocking only cancels the other team's attackers - it doesn't score you anything on its own.</p>
+<h3>The Snitch</h3>
+<p>Every player chasing the Snitch has a <b>12% chance</b>, per round, of catching it. The moment someone does, their side gets a flat <b>+30 point</b> bonus and the match ends immediately, whatever the score was - so a chase is always a gamble against however many goals you're giving up by not attacking or blocking that round.</p>
+<p>If no one's caught it after 5 rounds, whoever has the higher score wins. A tied score is a draw - no wins or points recorded for either side.</p>
+<div class="note"><p>After every round, the match posts a full recap - who attacked, who blocked, who chased, and the exact math behind each side's score - so everyone can see exactly why the score is what it is. That recap stays visible on the final result too.</p></div></section>
+
+<section id="timing"><h2>Timing</h2>
+<ul class="cmds">
+<li>Once a match request goes up, it expires after <b>60 seconds</b> if both sides haven't filled up - no waiting around indefinitely for one more player.</li>
+<li>Once a match is underway, each round auto-resolves after <b>60 seconds</b> even if someone hasn't chosen yet, so a match can never get permanently stuck.</li>
+</ul></section>
+
+<section id="rewards"><h2>Points &amp; titles</h2>
+<p>Winning a house match earns every player on the winning side <b>+3 House Cup points</b> for their house. You can play as many house matches as you want in a day, but only your first <b>3</b> point-earning wins each day actually pay out - after that, the win still counts toward your record, just without the points.</p>
+<h3>Title ladder</h3>
+<p class="sub">House match wins (not scramble wins) climb you up a personal title ladder:</p>
+<div class="tbl"><table><thead><tr><th>Title</th><th class="n">House match wins</th></tr></thead><tbody>
+<tr><td>Rising Chaser</td><td class="n">5</td></tr>
+<tr><td>Storm Breaker</td><td class="n">15</td></tr>
+<tr><td>Pitch Veteran</td><td class="n">30</td></tr>
+<tr><td>Legend of the Pitch</td><td class="n">50</td></tr>
+</tbody></table></div></section>
+
+<section id="commands"><h2>Commands</h2>
+<ul class="cmds">
+<li><code>/quidditch scramble</code> Start a casual pickup match. Choose 2v2 or 4v4.</li>
+<li><code>/quidditch housematch</code> Start a house-vs-house match - pick both houses and the size.</li>
+<li><code>/quidditchstats</code> Your scramble and house-match record, daily point count, and current title.</li>
+</ul>
+<div class="note"><p>Quidditch only runs in its own channel in the server - commands used elsewhere won't start a match.</p></div></section>
+
+<footer class="site">Kept by the House Cup. Everything here comes straight from the bots that run Velmora. The secrets are not written down anywhere. You'll have to find those yourself.</footer>
+</main><script>(function(){var h=document.querySelector('.top');function s(){document.documentElement.style.setProperty('--tb',h.offsetHeight+'px')}s();addEventListener('resize',s);var n=document.querySelector('.nav'),c=n&&n.querySelector('[aria-current]');if(c&&n.scrollWidth>n.clientWidth)n.scrollLeft=(c.offsetLeft-n.offsetLeft)-n.clientWidth/2+c.clientWidth/2;})();</script></body></html>

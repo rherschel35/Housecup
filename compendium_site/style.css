@@ -1,0 +1,196 @@
+/* The Velmora Compendium */
+:root{
+  --bg:#F2EBDD; --surface:#FBF7EE; --surface-2:#EAE0CC; --ink:#241C17; --muted:#6A5D4E;
+  --line:#D9CBAF; --gold:#8E6A26; --gold-soft:#B98F3E; --accent:#6C3A5C;
+  --thornmere:#3E8E5A; --moonveil:#4F9CC9; --veyren:#B8434F; --caldrin:#C99A22; --vashara:#8B5FBF;
+  --common:#6E7C6A; --uncommon:#2F7A93; --rare:#7C4FA8; --very_rare:#B0552E; --legendary:#A8741A;
+  --display:'Cinzel',Georgia,'Times New Roman',serif;
+  --body:'Alegreya',Georgia,'Times New Roman',serif;
+  --label:'Alegreya Sans SC','Trebuchet MS',system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141019; --surface:#1D1822; --surface-2:#262030; --ink:#EDE4D3; --muted:#A99E8E;
+    --line:#352D3D; --gold:#D8B461; --gold-soft:#B39352; --accent:#C99BC0;
+    --thornmere:#6CC08A; --moonveil:#7CC4EC; --veyren:#E07884; --caldrin:#E8C25A; --vashara:#B893E8;
+    --common:#A7B4A2; --uncommon:#6FBBD2; --rare:#B793E0; --very_rare:#E58F66; --legendary:#E8BD5B;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141019; --surface:#1D1822; --surface-2:#262030; --ink:#EDE4D3; --muted:#A99E8E;
+  --line:#352D3D; --gold:#D8B461; --gold-soft:#B39352; --accent:#C99BC0;
+  --thornmere:#6CC08A; --moonveil:#7CC4EC; --veyren:#E07884; --caldrin:#E8C25A; --vashara:#B893E8;
+  --common:#A7B4A2; --uncommon:#6FBBD2; --rare:#B793E0; --very_rare:#E58F66; --legendary:#E8BD5B;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.6;
+  -webkit-font-smoothing:antialiased}
+a{color:var(--gold)}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+img{max-width:100%;height:auto}
+
+/* ---------- top bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--bg);
+  border-bottom:1px solid var(--line)}
+.top-in{max-width:1120px;margin:0 auto;padding-inline:16px;display:flex;align-items:center;gap:18px;min-height:56px}
+.brand{font-family:var(--display);font-weight:700;letter-spacing:.06em;color:var(--ink);text-decoration:none;font-size:18px;white-space:nowrap}
+.brand span{color:var(--gold)}
+.nav{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-block:10px}
+.nav::-webkit-scrollbar{display:none}
+.nav a{font-family:var(--label);font-size:15px;letter-spacing:.04em;color:var(--muted);text-decoration:none;
+  padding:5px 11px;border-radius:999px;white-space:nowrap}
+.nav a:hover{color:var(--ink);background:var(--surface-2)}
+.nav a[aria-current="page"]{color:var(--ink);background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line)}
+
+/* ---------- page */
+.wrap{max-width:1120px;margin:0 auto;padding-inline:16px;padding-block:0 72px}
+.head{padding-block:44px 26px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.eyebrow{font-family:var(--label);letter-spacing:.1em;font-size:14px;color:var(--gold);margin:0 0 6px}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(34px,6vw,54px);line-height:1.05;margin:0;text-wrap:balance}
+.lede{max-width:64ch;color:var(--muted);font-size:18.5px;margin:14px 0 0}
+section{padding-top:40px;scroll-margin-top:calc(var(--tb,57px) + 14px)}
+h2{font-family:var(--display);font-weight:700;font-size:clamp(24px,3.6vw,32px);line-height:1.15;margin:0 0 8px;text-wrap:balance}
+h3{font-family:var(--display);font-weight:600;font-size:21px;margin:26px 0 6px;line-height:1.2}
+.sub{color:var(--muted);max-width:66ch;margin:0 0 18px}
+p{max-width:70ch}
+.jump{display:flex;flex-wrap:wrap;gap:6px 14px;margin:18px 0 0;font-family:var(--label);letter-spacing:.04em}
+.jump a{color:var(--muted);text-decoration:none;border-bottom:1px solid var(--line)}
+.jump a:hover{color:var(--ink);border-color:var(--gold)}
+code,.cmd{font-family:ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;font-size:.86em;background:var(--surface-2);
+  border:1px solid var(--line);border-radius:4px;padding:0 5px;white-space:nowrap;color:var(--ink)}
+
+/* ---------- grids + cards */
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.grid.five{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+.grid.wide{grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px 18px}
+.card h3{margin:0 0 4px;font-size:19px}
+.card p{margin:6px 0 0;font-size:16px}
+.card .meta{font-family:var(--label);font-size:13.5px;letter-spacing:.05em;color:var(--muted)}
+a.card{display:block;text-decoration:none;color:inherit;transition:border-color .15s}
+a.card:hover{border-color:var(--gold-soft)}
+a.card .go{font-family:var(--label);color:var(--gold);font-size:14px;letter-spacing:.05em;margin-top:10px;display:inline-block}
+
+.house{border-top:4px solid var(--hc);}
+.house .crest{font-size:30px;line-height:1}
+.house h3{color:var(--hc)}
+.motto{font-style:italic}
+.hc-thornmere{--hc:var(--thornmere)} .hc-moonveil{--hc:var(--moonveil)} .hc-veyren{--hc:var(--veyren)}
+.hc-caldrin{--hc:var(--caldrin)} .hc-vashara{--hc:var(--vashara)} .hc-velmora{--hc:var(--gold)}
+
+.tag{display:inline-block;font-family:var(--label);font-size:12.5px;letter-spacing:.06em;border:1px solid currentColor;
+  border-radius:3px;padding:0 6px;line-height:1.5;margin:2px 4px 0 0;white-space:nowrap}
+.r-common{color:var(--common)} .r-uncommon{color:var(--uncommon)} .r-rare{color:var(--rare)}
+.r-very_rare{color:var(--very_rare)} .r-legendary{color:var(--legendary)} .t-night{color:var(--accent)} .t-gold{color:var(--gold)}
+
+/* ---------- tables */
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:16px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font-family:var(--label);font-weight:500;letter-spacing:.05em;color:var(--muted);font-size:14px;background:var(--surface-2)}
+td.n,th.n{text-align:right;white-space:nowrap}
+td .em{font-size:18px;margin-right:4px}
+
+/* ---------- command list */
+.cmds{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px 22px;margin:10px 0 0;padding:0;list-style:none}
+.cmds li{padding:9px 0;border-bottom:1px dashed var(--line)}
+.cmds li code{margin-right:6px}
+
+/* ---------- callout */
+.note{background:var(--surface-2);border-left:3px solid var(--gold);border-radius:0 6px 6px 0;padding:12px 16px;margin:16px 0;max-width:78ch}
+.note p{margin:0}
+
+/* ---------- Pip Wick home feature */
+.pip-feature{display:grid;gap:22px;align-items:center;padding:28px 0 8px;
+  border-bottom:1px solid var(--line);margin-bottom:8px}
+.pip-portrait{margin:0;border-radius:8px;overflow:hidden;border:1px solid var(--line);
+  background:var(--surface);aspect-ratio:1;max-width:280px;justify-self:start}
+.pip-portrait img{display:block;width:100%;height:100%;object-fit:cover}
+.pip-copy h2{margin:0 0 8px}
+.pip-copy .sub{margin-bottom:14px}
+.pip-cmd{font-size:18px;margin:0 0 8px}
+.pip-cmd code{font-size:1.05em;padding:3px 8px}
+.pip-cmd span{color:var(--muted);font-style:italic;margin-left:6px}
+.pip-copy .meta{font-family:var(--label);font-size:14px;letter-spacing:.04em;color:var(--muted);margin:0}
+@media (min-width:720px){
+  .pip-feature{grid-template-columns:minmax(180px,240px) 1fr;gap:28px;padding:32px 0 12px}
+  .pip-portrait{max-width:none}
+}
+
+/* ---------- beasts filter */
+.controls{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--tb,57px));z-index:5;background:var(--bg);padding-block:10px;
+  border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{font-family:var(--label);font-size:14px;letter-spacing:.04em;border:1px solid var(--line);background:var(--surface);
+  color:var(--ink);border-radius:999px;padding:4px 12px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--gold);color:var(--bg);border-color:var(--gold)}
+.controls input{font-family:var(--body);font-size:16px;background:var(--surface);color:var(--ink);border:1px solid var(--line);
+  border-radius:6px;padding:5px 10px;flex:1 1 180px;max-width:300px;min-width:0}
+.shown{margin-left:auto;font-family:var(--label);color:var(--muted);font-size:14px}
+.beast{display:flex;flex-direction:column;gap:6px}
+.bh{display:flex;gap:12px;align-items:center}
+.bem{font-size:34px;line-height:1;width:42px;text-align:center;flex:none}
+.seen{font-style:italic;color:var(--muted);font-size:15.5px}
+.beast.legendary{border-color:var(--legendary)}
+
+/* ---------- lore (ghost codex) */
+.entry{padding-top:44px;scroll-margin-top:calc(var(--tb,57px) + 14px)}
+.entry-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.entry-house{font-family:var(--label);letter-spacing:.1em;font-size:14px;color:var(--hc,var(--gold))}
+.entry-name{font-family:var(--display);font-size:clamp(26px,4vw,34px);margin:0}
+.entry-sub{font-style:italic;color:var(--muted);border-left:2px solid var(--hc,var(--line));padding-left:14px;max-width:66ch}
+.fact-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin:14px 0 18px}
+.fact{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 12px;display:flex;flex-direction:column}
+.fact-k{font-family:var(--label);font-size:13px;letter-spacing:.06em;color:var(--muted)}
+.fact-v{font-size:16px}
+.lore .part{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px 20px;margin:0 0 12px;max-width:78ch}
+.lore .part h3{margin:0 0 6px;font-size:19px}
+.lore .part p{margin:0 0 10px}
+.lore .part p:last-child{margin:0}
+.part-label{font-family:var(--label);letter-spacing:.1em;font-size:13px;color:var(--gold);margin:0 0 2px}
+.lore .part.twist{border-color:var(--accent);background:var(--surface-2)}
+hr.div{border:0;border-top:1px solid var(--line);margin:34px 0 0}
+
+/* ---------- tales */
+.tales .rule{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:0 8px 8px 0;
+  padding:18px 22px;margin:24px 0;max-width:78ch}
+.tales .rule h2{font-size:24px}
+.tales .fine{color:var(--muted);font-size:15px}
+.tales nav.places{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.tales nav.places a{font-family:var(--label);font-size:14px;color:var(--muted);text-decoration:none;background:var(--surface);
+  border:1px solid var(--line);border-radius:999px;padding:5px 12px}
+.tale{padding-top:40px;max-width:78ch}
+.tale .kicker{font-family:var(--label);letter-spacing:.1em;font-size:13px;color:var(--gold);margin:0}
+.intro{font-style:italic;color:var(--muted)}
+.leaf{padding:20px 0;border-top:1px solid var(--line)}
+.sig{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;margin:0 0 8px}
+.who{font-family:var(--label);letter-spacing:.1em;font-size:13.5px;color:var(--gold)}
+.when{font-style:italic;color:var(--muted);font-size:14.5px}
+.leaf p{margin:0 0 12px;line-height:1.75}
+.leaf.old p{font-style:italic}
+.strange{margin-top:30px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:18px 20px 4px}
+
+/* ---------- figure */
+figure{margin:18px 0}
+figcaption{font-size:15px;color:var(--muted);font-style:italic;margin-top:6px}
+
+footer.site{border-top:1px solid var(--line);margin-top:60px;padding-top:18px;color:var(--muted);font-size:15px}
+.theme{background:none;border:1px solid var(--line);color:var(--muted);border-radius:999px;font-family:var(--label);
+  font-size:13px;padding:3px 10px;cursor:pointer;margin-left:auto;white-space:nowrap}
+@media (max-width:640px){
+  .top-in{gap:10px}
+  .brand{font-size:16px}
+  .theme{display:none}
+  body{font-size:16.5px}
+}
+
+@media (min-width:900px){
+  .top-in{flex-wrap:wrap;row-gap:0;padding-top:8px}
+  .nav{order:3;flex-basis:100%;flex-wrap:wrap;overflow:visible;padding-block:4px 10px;margin-left:-9px;gap:2px}
+  .nav a{padding:5px 9px;font-size:14.5px}
+}
