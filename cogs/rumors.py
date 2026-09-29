@@ -1,5 +1,5 @@
 """
-The Velmora rumor mill (moved here from the old whisper bot).
+The Velmora rumor mill.
 
 - /rumor           - anyone can conjure a rumor on demand.
 - Every RUMOR_INTERVAL_HOURS (default 6) a rumor is posted in RUMOR_CHANNEL_ID.
