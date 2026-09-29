@@ -4,6 +4,7 @@ The Descent - a 100-floor solo dungeon crawl.
     /descend             - fight the next monster on your current Descent floor
     /descend floor:<n>   - replay a floor you've already cleared, for practice/loot
     /descentstatus        - your floor, stats, AP, and lockout status
+    /descentunlock        - (staff) clear the 3-loss lockout without wiping progress
 
 Ten zones of ten floors each, one primary element per zone plus a second
 element mixed in (about 30% of non-boss monsters), so a floor is never a
@@ -1090,6 +1091,45 @@ class Descent(commands.Cog):
         who = "Your" if target.id == interaction.user.id else f"{target.display_name}'s"
         await interaction.response.send_message(
             f"{who} Descent progress has been wiped - back to floor 1, monster 1.", ephemeral=True)
+
+    @app_commands.command(
+        name="descentunlock",
+        description="(staff) Clear the 3-loss lockout without wiping Descent progress.",
+    )
+    @app_commands.describe(member="Whose lockout to clear (leave blank for your own)")
+    async def descentunlock(self, interaction: discord.Interaction, member: discord.Member = None):
+        """Lift the 24h floor lockout and reset the loss counter.
+
+        Keeps floor, monster progress, stats, Max AP, and highest cleared.
+        """
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        target = member or interaction.user
+        rec = self.record(target.id)
+        was_locked = rec.get("locked_until", 0) > time.time()
+        prior_losses = int(rec.get("losses", 0) or 0)
+        rec["locked_until"] = 0.0
+        rec["losses"] = 0
+        # Drop a stuck fight so the next /descend starts clean on this floor.
+        self.fights.pop(target.id, None)
+        self.save()
+
+        who = "Your" if target.id == interaction.user.id else f"{target.display_name}'s"
+        if was_locked:
+            detail = "24h lockout lifted"
+        elif prior_losses:
+            detail = f"loss counter cleared ({prior_losses}/{MAX_LOSSES})"
+        else:
+            detail = "no lockout or losses were active"
+        await interaction.response.send_message(
+            f"{who} Descent is unlocked — {detail}. "
+            f"Still on floor **{rec['floor']}**, monster "
+            f"**{rec['monster_index']}/{MONSTERS_PER_FLOOR}**. "
+            f"Stats and Max AP untouched.",
+            ephemeral=True,
+        )
 
     @app_commands.command(
         name="descentboost",
