@@ -348,7 +348,13 @@
         "points left today",
         "daily points",
         "what have i done today",
-        "reset timers"
+        "reset timers",
+        "what's left today",
+        "whats left today",
+        "points checklist",
+        "daily points left",
+        "what can I still do",
+        "what can i still do"
       ],
       "answer": "Aye \u2014 cast `/checklist` for yer daily board: explore, beans, duels, boards, beasts, market sell, familiar, an' open challenges, each with how many ye've got left an' when it resets.",
       "link": "https://everything-velmora.netlify.app/commands"
