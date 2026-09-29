@@ -149,7 +149,7 @@ BOSS_NAMES = {
     10: ("The Bloated Sovereign", "🍄", "blob"),
     20: ("Cinderlord Ashgrave", "🔥", "humanoid"),
     30: ("The Rime Empress", "❄️", "humanoid"),
-    40: ("Stormcaller Vessel", "⚡", "orb"),
+    40: ("Stormcaller Vessel", "⚡", "humanoid"),
     50: ("The Hollow Saint", "✨", "humanoid"),
     # Lower Reach+ — unique bosses (not reskins of floors 10–50)
     60: ("Blightmother Veil", "☠️", "humanoid"),
