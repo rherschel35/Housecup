@@ -92,42 +92,42 @@ RECIPES = {
         "ingredients": ["moth_dust", "sunbell"],
         "effect": {"type": "beast_bonus", "skew": None},
         "sequence": ["stir", "heat", "simmer"],
-        "blurb": "A private beast encounter, just for you.",
+        "blurb": "Triggers a private beast encounter, just for you.",
     },
     "whiskers_luck_draught": {
         "name": "Whisker's Luck Draught", "emoji": "🐇", "tier": "uncommon",
         "ingredients": ["hare_whisker", "starthistle"],
         "effect": {"type": "beast_bonus", "skew": "rare_up"},
         "sequence": ["heat", "stir", "stir"],
-        "blurb": "A private encounter, skewed toward something rarer.",
+        "blurb": "Triggers a private beast encounter skewed toward something rarer.",
     },
     "draught_of_the_hunter": {
         "name": "Draught of the Hunter", "emoji": "🏹", "tier": "rare",
         "ingredients": ["raven_feather", "comet_dust_vial"],
         "effect": {"type": "beast_bonus", "skew": "choose_place"},
         "sequence": ["simmer", "heat", "stir"],
-        "blurb": "A private encounter from a place you pick.",
+        "blurb": "Triggers a private beast encounter from a place you pick.",
     },
     "nibblers_bait": {
         "name": "Niffler's Bait", "emoji": "✨", "tier": "rare",
         "ingredients": ["frog_gold", "glowshroom"],
         "effect": {"type": "beast_bonus", "skew": "nibbler"},
         "sequence": ["stir", "simmer", "heat"],
-        "blurb": "A private encounter, guaranteed to be a shiny-stealing Niffler.",
+        "blurb": "Triggers a private encounter guaranteed to be a shiny-stealing Niffler.",
     },
     "draught_of_fury": {
         "name": "Draught of Fury", "emoji": "🔥", "tier": "common",
         "ingredients": ["descent_ember_shard", "emberleaf"],
         "effect": {"type": "atk_mult", "value": 1.15},
         "sequence": ["heat", "heat", "stir"],
-        "blurb": "Bonus Strike/Cast damage in your next Descent fight(s).",
+        "blurb": "+15% Strike/Cast damage in your next Descent fight(s).",
     },
     "frost_ward_draught": {
         "name": "Frost Ward Draught", "emoji": "❄️", "tier": "common",
         "ingredients": ["descent_frost_core", "cracked_crystal"],
         "effect": {"type": "def_mult", "value": 1.20},
         "sequence": ["simmer", "stir", "heat"],
-        "blurb": "Extra incoming-damage reduction in your next Descent fight(s).",
+        "blurb": "+20% damage reduction (incoming) in your next Descent fight(s).",
     },
     "storm_focus_draught": {
         "name": "Storm Focus Draught", "emoji": "⚡", "tier": "uncommon",
@@ -141,56 +141,56 @@ RECIPES = {
         "ingredients": ["descent_light_dust", "dew_diamond"],
         "effect": {"type": "heal_mult", "value": 1.5},
         "sequence": ["simmer", "simmer", "stir"],
-        "blurb": "Heal restores more in your next Descent fight(s).",
+        "blurb": "Heal restores +50% more in your next Descent fight(s).",
     },
     "steady_hand_draught": {
         "name": "Steady Hand Draught", "emoji": "🛡️", "tier": "common",
         "ingredients": ["silverleaf", "dewmint"],
         "effect": {"type": "defend_mult", "value": 0.25},
         "sequence": ["stir", "stir", "heat"],
-        "blurb": "Defend blocks 75% instead of 50% in your next Descent fight(s).",
+        "blurb": "Defend blocks 75% of the hit (instead of 50%) in your next Descent fight(s).",
     },
     "draught_of_second_wind": {
         "name": "Draught of Second Wind", "emoji": "😮‍💨", "tier": "uncommon",
         "ingredients": ["sleeping_acorn", "wandering_seed"],
         "effect": {"type": "rest_no_penalty", "value": True},
         "sequence": ["heat", "simmer", "stir"],
-        "blurb": "Rest no longer leaves you exposed, in your next Descent fight(s).",
+        "blurb": "Rest no longer adds the usual +10% incoming damage, in your next Descent fight(s).",
     },
     "giants_draught": {
         "name": "Giant's Draught", "emoji": "💪", "tier": "rare",
         "ingredients": ["dragon_scale", "tree_amber"],
         "effect": {"type": "hp_bonus", "value": 25},
         "sequence": ["heat", "stir", "simmer"],
-        "blurb": "Extra max HP in your next Descent fight(s).",
+        "blurb": "+25 max HP (and current HP) in your next Descent fight(s).",
     },
     "owls_eye_draught": {
         "name": "Owl's Eye Draught", "emoji": "🦉", "tier": "common",
         "ingredients": ["owl_feather", "moonglass_lens"],
         "effect": {"type": "reveal_weakness", "value": True},
         "sequence": ["simmer", "heat", "heat"],
-        "blurb": "See the monster's weak element up front, in your next Descent fight.",
+        "blurb": "See the monster's weak element up front in your next Descent fight.",
     },
     "ironhide_draught": {
         "name": "Ironhide Draught", "emoji": "🦾", "tier": "uncommon",
         "ingredients": ["shed_fang", "standing_stone_chip"],
         "effect": {"type": "boss_dmg_mult", "value": 0.85, "boss_only": True},
         "sequence": ["stir", "heat", "simmer"],
-        "blurb": "Extra damage reduction specifically vs. bosses, next boss fight.",
+        "blurb": "15% less damage from bosses in your next boss fight.",
     },
     "draught_of_fortune": {
         "name": "Draught of Fortune", "emoji": "🍀", "tier": "rare",
         "ingredients": ["snail_pearl", "star_chart_fragment"],
         "effect": {"type": "loot_boost", "value": 2},
         "sequence": ["simmer", "stir", "stir"],
-        "blurb": "Boosted material drop on your next floor clear.",
+        "blurb": "+2 bonus material(s) on your next Descent floor clear (one-shot).",
     },
     "phoenix_tears": {
         "name": "Phoenix Tears", "emoji": "🪽", "tier": "legendary",
         "ingredients": ["phoenix_down", "ghost_orchid"],
         "effect": {"type": "revive_once", "value": True},
         "sequence": ["heat", "simmer", "heat"],
-        "blurb": "Survive at 1 HP the first time you'd be defeated in the Descent.",
+        "blurb": "Survive at 1 HP the first time you'd be defeated in the Descent (one-shot).",
     },
 }
 
@@ -198,6 +198,50 @@ BEAST_EFFECT_TYPES = {"beast_bonus"}
 FIGHT_EFFECT_TYPES = {"atk_mult", "def_mult", "ap_bonus", "heal_mult", "defend_mult",
                       "rest_no_penalty", "hp_bonus", "reveal_weakness", "boss_dmg_mult"}
 ONE_SHOT_TYPES = {"loot_boost", "revive_once"}
+
+
+def effect_desc(recipe: dict) -> str:
+    """Plain-English what the potion does, with the real numbers."""
+    e = recipe["effect"]
+    t = e["type"]
+    if t == "beast_bonus":
+        skew = e.get("skew")
+        if skew == "rare_up":
+            return "Triggers a private beast encounter skewed toward something rarer."
+        if skew == "choose_place":
+            return "Triggers a private beast encounter from a place you pick."
+        if skew == "nibbler":
+            return "Triggers a private encounter guaranteed to be a shiny-stealing Niffler."
+        return "Triggers a private beast encounter, just for you."
+    if t == "atk_mult":
+        pct = int(round((e["value"] - 1) * 100))
+        return f"+{pct}% Strike/Cast damage in your next Descent fight(s)."
+    if t == "def_mult":
+        pct = int(round((e["value"] - 1) * 100))
+        return f"+{pct}% damage reduction (incoming) in your next Descent fight(s)."
+    if t == "ap_bonus":
+        return f"+{e['value']} max AP in your next Descent fight(s)."
+    if t == "heal_mult":
+        pct = int(round((e["value"] - 1) * 100))
+        return f"Heal restores +{pct}% more in your next Descent fight(s)."
+    if t == "defend_mult":
+        # value is residual damage fraction while defending (0.25 → block 75%).
+        blocked = int(round((1 - e["value"]) * 100))
+        return f"Defend blocks {blocked}% of the hit (instead of 50%) in your next Descent fight(s)."
+    if t == "rest_no_penalty":
+        return "Rest no longer adds the usual +10% incoming damage, in your next Descent fight(s)."
+    if t == "hp_bonus":
+        return f"+{e['value']} max HP (and current HP) in your next Descent fight(s)."
+    if t == "reveal_weakness":
+        return "See the monster's weak element up front in your next Descent fight."
+    if t == "boss_dmg_mult":
+        pct = int(round((1 - e["value"]) * 100))
+        return f"{pct}% less damage from bosses in your next boss fight."
+    if t == "loot_boost":
+        return f"+{e['value']} bonus material(s) on your next Descent floor clear (one-shot)."
+    if t == "revive_once":
+        return "Survive at 1 HP the first time you'd be defeated in the Descent (one-shot)."
+    return recipe.get("blurb") or "A temporary edge."
 
 
 def rank_info(xp: int) -> tuple[int, str, float]:
@@ -286,6 +330,23 @@ class Potions(commands.Cog):
             return " + ".join(item_ids)
         return " + ".join(world.world.item_line(i) for i in item_ids)
 
+    def ingredients_owned_line(self, item_ids: list[str], have: dict) -> str:
+        """Per-ingredient 🟢/🔴 so you can see what's missing at a glance."""
+        world = self.bot.get_cog("World")
+        parts = []
+        for item_id in item_ids:
+            owned = have.get(item_id, 0) >= 1
+            mark = "🟢" if owned else "🔴"
+            if world and item_id in world.world.items:
+                it = world.world.items[item_id]
+                label = f"{it['emoji']} **{it['name']}**"
+                if owned and have.get(item_id, 0) > 1:
+                    label += f" ×{have[item_id]}"
+            else:
+                label = f"**{item_id}**"
+            parts.append(f"{mark} {label}")
+        return " · ".join(parts)
+
     async def _has_ingredients(self, member, ingredients: list[str]) -> bool:
         world = self.bot.get_cog("World")
         if not world:
@@ -334,8 +395,12 @@ class Potions(commands.Cog):
             return
 
         if not await self._has_ingredients(interaction.user, recipe["ingredients"]):
+            world = self.bot.get_cog("World")
+            have = world.student(interaction.user).get("items", {}) if world else {}
             await interaction.response.send_message(
-                f"You need {self.items_line(recipe['ingredients'])} to brew that.", ephemeral=True)
+                f"You're short on ingredients for **{recipe['name']}**:\n"
+                f"{self.ingredients_owned_line(recipe['ingredients'], have)}",
+                ephemeral=True)
             return
 
         if not await self._consume_ingredients(interaction.user, recipe["ingredients"]):
@@ -450,7 +515,10 @@ class Potions(commands.Cog):
         await interaction.response.send_message(
             embed=discord.Embed(
                 title=f"{recipe['emoji']} You drink the {recipe['name']}",
-                description=f"{recipe['blurb']} ({charges} fight{'s' if charges != 1 else ''} in the Descent).",
+                description=(
+                    f"{effect_desc(recipe)} "
+                    f"({charges} fight{'s' if charges != 1 else ''} in the Descent)."
+                ),
                 color=TIER_COLOR[recipe["tier"]],
             ))
 
@@ -549,17 +617,37 @@ class Potions(commands.Cog):
         world = self.bot.get_cog("World")
         have = world.student(interaction.user).get("items", {}) if world else {}
 
-        known_lines = []
+        # Split by tier so each embed field stays under Discord's 1024-char limit.
+        by_tier: dict[str, list[str]] = {t: [] for t in ("common", "uncommon", "rare", "legendary")}
         for key, r in RECIPES.items():
             gated = idx < TIER_MIN_RANK[r["tier"]]
             known = key in rec["discovered"]
             tag = "🔓 known" if known else ("🔒 locked" if gated else "❔ undiscovered")
             ready = all(have.get(i, 0) >= 1 for i in r["ingredients"])
-            readiness = " • 🟢 you have everything for this" if ready else ""
-            known_lines.append(f"{r['emoji']} **{r['name']}** ({TIER_LABEL[r['tier']]}) - {tag}{readiness}\n"
-                              f"　{self.items_line(r['ingredients'])} - {r['blurb']}")
-        embed.add_field(name="📖 Recipes (🟢 = you can brew this right now)", value="\n".join(known_lines),
-                        inline=False)
+            brewable = " • ✅ brewable" if ready and not gated else ""
+            line = (
+                f"{r['emoji']} **{r['name']}** — {tag}{brewable}\n"
+                f"　{self.ingredients_owned_line(r['ingredients'], have)}\n"
+                f"　*{effect_desc(r)}*"
+            )
+            by_tier[r["tier"]].append(line)
+
+        tier_titles = {
+            "common": "📖 Common",
+            "uncommon": "📖 Uncommon",
+            "rare": "📖 Rare",
+            "legendary": "📖 Legendary",
+        }
+        for tier, lines in by_tier.items():
+            if not lines:
+                continue
+            value = "\n".join(lines)
+            if len(value) > 1024:
+                # Hard trim with a note rather than failing the whole /potions reply.
+                value = value[:1000].rstrip() + "\n…*(list trimmed)*"
+            embed.add_field(name=tier_titles[tier], value=value, inline=False)
+
+        embed.set_footer(text="🟢 you have it · 🔴 missing · ✅ brewable = every ingredient ready")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     # ------------------------------------------------------- Descent hooks
