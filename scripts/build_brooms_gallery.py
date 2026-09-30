@@ -29,9 +29,8 @@ def _bar_html(n: int) -> str:
 
 
 def _card(model: str, blurb: str, brooms_mod) -> str:
-    # Catalog showcase stats — same shape as Discord; personal /broom rolls from wand words.
-    digest = brooms_mod._digest(f"catalog|{model}")
-    stats = brooms_mod._stat_block(digest)
+    # Same sheet Discord uses: stats are fixed per broom model.
+    stats = brooms_mod.stats_for_model(model)
     finish = f"The {model} settles into your hand like it had been waiting."
     reading = (
         f"The {model} is {blurb}. "
@@ -77,7 +76,7 @@ def main() -> int:
 </div></header>
 <main class="wrap">
 <div class="head"><p class="eyebrow">Velmora · the magic</p><h1>The Brooms</h1><p class="lede">One hundred fixed portraits. <code>/broom</code> claims yours from the same three words as your wand — one owner each, next-closest if taken. Purely cosmetic.</p>
-<p class="sub">Each card mirrors what Discord shows: a short reading of why it fits, plus bragging stats. Catalog stats below are a sample for that broom; yours roll from your wand words when you claim. Jump by name, e.g. <a href="#Moonflare"><code>#Moonflare</code></a>.</p></div>
+<p class="sub">Each card is the same sheet Discord shows: a short reading of why it fits, plus that broom&#x27;s fixed bragging stats. Words pick which broom finds you; the stats belong to the broom. Jump by name, e.g. <a href="#Hearthfang"><code>#Hearthfang</code></a>.</p></div>
 <section id="gallery">
 <div class="grid broom-grid">{cards}</div>
 </section>
