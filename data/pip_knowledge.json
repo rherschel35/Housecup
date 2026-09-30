@@ -29,10 +29,81 @@
         "broom",
         "get a broom",
         "my broom",
-        "flying broom"
+        "flying broom",
+        "claim broom",
+        "broom portrait"
       ],
-      "answer": "Yer `/broom` comes from the same three words as yer wand — 100 fixed portraits, one owner each. If that broom's taken, ye get the next-closest. Silly stats for braggin' only. Need a wand first. Staff `/broomreset` frees a claim without touchin' the wand. Full gallery's on the Compendium Brooms page.",
+      "answer": "Yer `/broom` comes from the same three words as yer wand \u2014 100 fixed portraits, one owner each. If that broom's taken, ye get the next-closest. Base Speed an' Altitude are fixed per model (same on the Compendium); ye can upgrade 'em toward 10 with `/broomupgrade`. Need a wand first. Staff `/broomreset` frees a claim without touchin' the wand. Full gallery's on the Compendium Brooms page.",
       "link": "https://everything-velmora.netlify.app/brooms"
+    },
+    {
+      "id": "broom_upgrade",
+      "keywords": [
+        "upgrade my broom",
+        "how do i upgrade broom",
+        "how to upgrade broom",
+        "broom upgrade",
+        "upgrade broom",
+        "broomupgrade",
+        "raise broom speed",
+        "raise broom altitude",
+        "speed upgrade",
+        "altitude upgrade",
+        "pitch resin",
+        "broom speed",
+        "broom altitude",
+        "broom control",
+        "broom token"
+      ],
+      "answer": "Tune flight with `/broomupgrade` \u2014 Speed or Altitude / control, toward 10. Pay with Pitch Resin \u00d75 (forage in the Garden or Forbidden Woods; never on market), any Descent material \u00d7100, or one Marketplace broom token (`/market broomtoken`, cost max(1, current\u22126) pts). Optional `member:` upgrades someone else's broom while ye pay. Staff free bumps: `/upgrade broom`.",
+      "link": "https://everything-velmora.netlify.app/brooms"
+    },
+    {
+      "id": "broom_race",
+      "keywords": [
+        "broom race",
+        "broomrace",
+        "race broom",
+        "broom challenge",
+        "challenge broom",
+        "racetrack",
+        "broom course",
+        "quidditch broom race"
+      ],
+      "answer": "`/broomrace` on the Quidditch pitch \u2014 private 6-stage picks on one o' 100 courses. Higher Speed/Altitude means fewer choices (the broom filters noise). Solo: 5 learning races a day (UTC) that unlock study notes. Challenge someone with `/broomrace opponent:@member` on the same track anytime \u2014 lowest time lost wins; winner gets 3 house points up to 5 wins/day, then free play with no points. Check leftovers on `/checklist`.",
+      "link": "https://everything-velmora.netlify.app/quidditch"
+    },
+    {
+      "id": "broom_notes",
+      "keywords": [
+        "broom notes",
+        "broomnotes",
+        "study notes broom",
+        "course notes",
+        "broom study"
+      ],
+      "answer": "Finish a course with `/broomrace` an' ye unlock a permanent study note \u2014 read 'em with `/broomnotes`. Studied courses mark traps ye know with \u26a0 when ye race that track again.",
+      "link": "https://everything-velmora.netlify.app/brooms"
+    },
+    {
+      "id": "checklist",
+      "keywords": [
+        "checklist",
+        "daily checklist",
+        "what can i do today",
+        "daily points",
+        "what's left today",
+        "points left today",
+        "what have i done today",
+        "reset timers",
+        "whats left today",
+        "points checklist",
+        "daily points left",
+        "what can I still do",
+        "what can i still do"
+      ],
+      "answer": "`/checklist` is yer daily points board \u2014 what's left for house points an' habits, with reset timers. Includes duels, Quidditch house-match wins, broom solo learning races (5/day), broom challenge point-wins (5/day at 3 pts), beasts, market sells, an' more.",
+      "link": "https://everything-velmora.netlify.app/commands"
     },
     {
       "id": "wizard_mirror",
@@ -219,9 +290,12 @@
         "sell ingredients",
         "buy ingredients",
         "hex scroll",
-        "room of requirement"
+        "room of requirement",
+        "broom token",
+        "broomtoken",
+        "upgrade token"
       ],
-      "answer": "`/market browse` is the catalogue. Buy common/uncommon with `/market buy`. Sell place ingredients in sets of 3, or Descent materials in sets of 25, for 3 pts each batch — add `batches:` to sell several at once (21 pts/day cap). Also scrolls, titles, an' the Room.",
+      "answer": "`/market browse` is the catalogue. Buy common/uncommon with `/market buy`. Sell place ingredients in sets of 3, or Descent materials in sets of 25, for 3 pts each batch \u2014 add `batches:` to sell several at once (21 pts/day cap). `/market broomtoken` buys a Speed or Altitude broom upgrade token (costs max(1, yer current\u22126) pts) \u2014 spend it with `/broomupgrade`. Also scrolls, titles, an' the Room. Pitch Resin is forage-only \u2014 never sold.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {
@@ -348,26 +422,6 @@
         "duelrecord"
       ],
       "answer": "`/profile` is yer whole sheet \u2014 Mirror, wand, points, ranks, beasts. `/standings` is the Cup table; `/leaderboard` the top earners; `/duelrecord` yer duel sheet.",
-      "link": "https://everything-velmora.netlify.app/commands"
-    },
-    {
-      "id": "checklist",
-      "keywords": [
-        "checklist",
-        "daily checklist",
-        "what can i do today",
-        "points left today",
-        "daily points",
-        "what have i done today",
-        "reset timers",
-        "what's left today",
-        "whats left today",
-        "points checklist",
-        "daily points left",
-        "what can I still do",
-        "what can i still do"
-      ],
-      "answer": "Aye \u2014 cast `/checklist` for yer daily board: explore, beans, duels, beasts, market sell, familiar, an' open challenges, each with how many ye've got left an' when it resets. It's public, but only yer own \u2014 nobody else can pull it for ye.",
       "link": "https://everything-velmora.netlify.app/commands"
     }
   ]
