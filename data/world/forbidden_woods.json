@@ -9,7 +9,8 @@
     "root_charm",
     "blackened_acorn",
     "standing_stone_chip",
-    "witchlight_oil"
+    "witchlight_oil",
+    "pitch_resin"
   ],
   "areas": [
     {
@@ -22,7 +23,8 @@
       "time": "any",
       "drops": [
         "blackened_acorn",
-        "raven_feather"
+        "raven_feather",
+        "pitch_resin"
       ]
     },
     {
@@ -48,7 +50,8 @@
       "time": "any",
       "drops": [
         "shed_fang",
-        "raven_feather"
+        "raven_feather",
+        "pitch_resin"
       ]
     },
     {
@@ -87,7 +90,8 @@
       "time": "any",
       "drops": [
         "blackened_acorn",
-        "shed_fang"
+        "shed_fang",
+        "pitch_resin"
       ]
     },
     {
@@ -100,7 +104,8 @@
       "time": "any",
       "drops": [
         "root_charm",
-        "raven_feather"
+        "raven_feather",
+        "pitch_resin"
       ]
     },
     {

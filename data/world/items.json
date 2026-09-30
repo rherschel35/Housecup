@@ -413,6 +413,12 @@
     "rarity": "very_rare",
     "desc": "Sound doesn't seem to travel near it."
   },
+  "pitch_resin": {
+    "name": "Pitch Resin",
+    "emoji": "\ud83e\udeb5",
+    "rarity": "rare",
+    "desc": "Sticky broom-pitch from living timber. Softens the shaft for upgrades \u2014 never sold at market."
+  },
   "descent_poison_ichor": {
     "name": "Vial of Poison Ichor",
     "emoji": "\u2620\ufe0f",

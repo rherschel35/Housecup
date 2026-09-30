@@ -1,16 +1,18 @@
 """
-Brooms. Purely cosmetic - chosen from the same three words that chose
-your wand (and cast your patronus).
+Brooms. Chosen from the same three words that chose your wand
+(and cast your patronus). Portraits stay unique; flight stats can be upgraded.
 
-    /broom            - claim yours, or see it again
-    /broom @member    - see someone else's
-    /broomreset @x    - staff, free someone's broom claim (wand stays)
+    /broom                 - claim yours, or see it again
+    /broom @member         - see someone else's
+    /broomupgrade          - raise Speed or Altitude (resin / Descent / token)
+    /upgrade broom         - (staff) free Speed or Altitude bump
+    /broomreset @x         - staff, free someone's broom claim (wand stays)
 
 100 fixed painted portraits (like Descent monsters). Each broom can be
 claimed by only ONE player; if your words point at a taken broom, you get
-the next-closest available one. Stats are decorative and fixed per broom
-model (Speed, Altitude, and ridiculous 0–10 meters) so Discord matches the
-Compendium. /broomreset frees the claim without touching the wand.
+the next-closest available one. Base Speed/Altitude are fixed per model so
+Discord matches the Compendium; upgrades add bonuses toward 10 via Pitch
+Resin (forage), Descent materials, or Marketplace broom tokens.
 """
 
 from __future__ import annotations
@@ -192,6 +194,39 @@ STAT_LABELS = {
     "how_much_it_judges_you": "How Much It Judges You",
 }
 
+MAX_STAT = 10
+PITCH_RESIN_ID = "pitch_resin"
+RESIN_PER_UPGRADE = 5
+DESCENT_MATS_PER_UPGRADE = 100
+DESCENT_MAT_IDS = (
+    "descent_poison_ichor",
+    "descent_ember_shard",
+    "descent_frost_core",
+    "descent_storm_relic",
+    "descent_light_dust",
+    "descent_sigil",
+)
+
+
+def bonus_field(stat: str) -> str:
+    return f"{stat}_bonus"
+
+
+def token_point_cost(current: int) -> int:
+    """Marketplace token price for the next bump of this stat."""
+    return max(1, int(current) - 6)
+
+
+def effective_stats(broom: dict) -> dict:
+    """Base model sheet + upgrade bonuses, capped at MAX_STAT."""
+    model = broom.get("model")
+    base = stats_for_model(model) if model in BROOMS else dict(broom.get("stats") or {})
+    out = dict(base)
+    for k in SERIOUS_STATS:
+        bonus = max(0, int(broom.get(bonus_field(k), 0) or 0))
+        out[k] = min(MAX_STAT, int(base.get(k, 0)) + bonus)
+    return out
+
 READING_PROMPT = """You are the broom-fitter of Velmora. Brooms are personal and cosmetic. A student once gave the wandmaker three words. Read those SAME words and choose which broom would choose them.
 
 Do NOT match words literally. Prefer this ranked shortlist (best match first) — pick the first name on the list:
@@ -292,6 +327,11 @@ def _ensure(broom: dict, words: str | None = None) -> dict:
         out.setdefault("reading", out.get("reading") or fb["reading"])
     # Always re-derive so Discord stays in lockstep with the Compendium sheet.
     out["stats"] = stats_for_model(out["model"])
+    for k in SERIOUS_STATS:
+        field = bonus_field(k)
+        base = int(out["stats"].get(k, 0))
+        raw = max(0, int(out.get(field, 0) or 0))
+        out[field] = min(raw, max(0, MAX_STAT - base))
     return out
 
 
@@ -457,12 +497,18 @@ class Brooms(commands.Cog):
                   redirected_from: str | None = None) -> discord.Embed:
         broom = _ensure(broom)
         model = broom["model"]
-        stats = broom["stats"]
-        serious = "\n".join(
-            f"**{STAT_LABELS[k]}** {_bar(stats.get(k, 0))}" for k in SERIOUS_STATS
-        )
+        base = broom["stats"]
+        eff = effective_stats(broom)
+        serious_lines = []
+        for k in SERIOUS_STATS:
+            bonus = int(broom.get(bonus_field(k), 0) or 0)
+            line = f"**{STAT_LABELS[k]}** {_bar(eff.get(k, 0))}"
+            if bonus:
+                line += f"  *(base {base.get(k, 0)} +{bonus})*"
+            serious_lines.append(line)
+        serious = "\n".join(serious_lines)
         silly = "\n".join(
-            f"**{STAT_LABELS[k]}** {_bar(stats.get(k, 0))}" for k in SILLY_STATS
+            f"**{STAT_LABELS[k]}** {_bar(base.get(k, 0))}" for k in SILLY_STATS
         )
         note = ""
         if redirected_from and redirected_from != model:
@@ -475,16 +521,50 @@ class Brooms(commands.Cog):
                          f"{broom['reading']}{note}"),
             color=BROOM_COLOR,
         )
-        embed.add_field(name="Flight (for show)", value=serious, inline=False)
+        embed.add_field(name="Flight", value=serious, inline=False)
         embed.add_field(name="Also (deeply scientific)", value=silly, inline=False)
         if (ASSETS_DIR / image_name(model)).exists():
             embed.set_image(url="attachment://broom.png")
         left = len(self.available_models())
         if fresh:
-            embed.set_footer(text=f"Yours alone • {left} brooms still unclaimed • stats are decorative")
+            embed.set_footer(
+                text=f"Yours alone • {left} brooms still unclaimed • /broomupgrade toward 10"
+            )
         else:
-            embed.set_footer(text=f"Unique claim • {left} brooms still unclaimed • purely cosmetic")
+            embed.set_footer(
+                text=f"Unique claim • {left} brooms still unclaimed • /broomupgrade toward 10"
+            )
         return embed
+
+    def can_upgrade(self, broom: dict, stat: str) -> tuple[bool, str]:
+        if stat not in SERIOUS_STATS:
+            return False, "Pick **Speed** or **Altitude**."
+        broom = _ensure(broom)
+        if effective_stats(broom).get(stat, 0) >= MAX_STAT:
+            return False, f"**{STAT_LABELS[stat]}** is already maxed at **{MAX_STAT}/10**."
+        return True, ""
+
+    def apply_upgrade(self, user_id: int, stat: str, amount: int = 1) -> dict | None:
+        """Add upgrade bonus(es). Returns updated broom or None if missing/capped."""
+        raw = self.owners.get(str(user_id))
+        if not raw:
+            return None
+        broom = _ensure(raw)
+        ok, _ = self.can_upgrade(broom, stat)
+        if not ok:
+            return None
+        field = bonus_field(stat)
+        base = int(broom["stats"].get(stat, 0))
+        have = int(broom.get(field, 0) or 0)
+        room = MAX_STAT - (base + have)
+        gain = max(0, min(int(amount), room))
+        if gain <= 0:
+            return None
+        broom[field] = have + gain
+        broom = _ensure(broom)
+        self.owners[str(user_id)] = broom
+        self.save()
+        return broom
 
     @app_commands.command(
         name="broom",
@@ -570,6 +650,275 @@ class Brooms(commands.Cog):
         if file:
             kwargs["file"] = file
         await interaction.followup.send(**kwargs)
+
+    @app_commands.command(
+        name="broomupgrade",
+        description="Raise your broom's Speed or Altitude toward 10 (resin, Descent mats, or a market token).",
+    )
+    @app_commands.describe(
+        stat="Speed or Altitude (control)",
+        pay_with="How you'll pay for this bump",
+        descent_mat="Required when paying with Descent materials (100 of one kind)",
+    )
+    @app_commands.choices(
+        stat=[
+            app_commands.Choice(name="Speed", value="speed"),
+            app_commands.Choice(name="Altitude / control", value="altitude"),
+        ],
+        pay_with=[
+            app_commands.Choice(
+                name=f"Pitch Resin ×{RESIN_PER_UPGRADE} (forage)",
+                value="resin",
+            ),
+            app_commands.Choice(
+                name=f"Descent material ×{DESCENT_MATS_PER_UPGRADE}",
+                value="descent",
+            ),
+            app_commands.Choice(name="Marketplace broom token ×1", value="token"),
+        ],
+    )
+    async def broomupgrade(
+        self,
+        interaction: discord.Interaction,
+        stat: app_commands.Choice[str],
+        pay_with: app_commands.Choice[str],
+        descent_mat: str | None = None,
+    ):
+        hexes = self.bot.get_cog("Hexes")
+        if hexes and await hexes.deny_if_limp_wand(interaction):
+            return
+
+        stat_key = stat.value
+        method = pay_with.value
+        broom = self.broom_of(interaction.user.id)
+        if not broom:
+            await interaction.response.send_message(
+                "You need a broom first — `/broom`.", ephemeral=True
+            )
+            return
+        ok, why = self.can_upgrade(broom, stat_key)
+        if not ok:
+            await interaction.response.send_message(why, ephemeral=True)
+            return
+
+        world = self.bot.get_cog("World")
+        market = self.bot.get_cog("Marketplace")
+        label = STAT_LABELS[stat_key]
+        before = effective_stats(broom)[stat_key]
+
+        if method == "resin":
+            if not world:
+                await interaction.response.send_message(
+                    "Satchels are out of reach right now.", ephemeral=True
+                )
+                return
+            async with world.lock:
+                student = world.student(interaction.user)
+                have = student.get("items", {}).get(PITCH_RESIN_ID, 0)
+                if have < RESIN_PER_UPGRADE:
+                    await interaction.response.send_message(
+                        f"You need **{RESIN_PER_UPGRADE}** × Pitch Resin "
+                        f"(forage in the Garden or Forbidden Woods). "
+                        f"You have **{have}**.",
+                        ephemeral=True,
+                    )
+                    return
+                if not world.world.take(student, PITCH_RESIN_ID, RESIN_PER_UPGRADE):
+                    await interaction.response.send_message(
+                        "Something stuck in the resin — try again.", ephemeral=True
+                    )
+                    return
+                world.save()
+            paid = f"**{RESIN_PER_UPGRADE}** × Pitch Resin"
+
+        elif method == "descent":
+            if not world:
+                await interaction.response.send_message(
+                    "Satchels are out of reach right now.", ephemeral=True
+                )
+                return
+            if descent_mat not in DESCENT_MAT_IDS:
+                await interaction.response.send_message(
+                    f"Pick a Descent material and bring "
+                    f"**{DESCENT_MATS_PER_UPGRADE}** of it.",
+                    ephemeral=True,
+                )
+                return
+            meta = world.world.items.get(descent_mat) if world else None
+            if not meta:
+                await interaction.response.send_message(
+                    "That material isn't recognized.", ephemeral=True
+                )
+                return
+            async with world.lock:
+                student = world.student(interaction.user)
+                have = student.get("items", {}).get(descent_mat, 0)
+                if have < DESCENT_MATS_PER_UPGRADE:
+                    await interaction.response.send_message(
+                        f"You need **{DESCENT_MATS_PER_UPGRADE}** × "
+                        f"{meta['emoji']} **{meta['name']}** (you have **{have}**).",
+                        ephemeral=True,
+                    )
+                    return
+                if not world.world.take(student, descent_mat, DESCENT_MATS_PER_UPGRADE):
+                    await interaction.response.send_message(
+                        "Something moved in your satchel — try again.", ephemeral=True
+                    )
+                    return
+                world.save()
+            paid = (
+                f"**{DESCENT_MATS_PER_UPGRADE}** × {meta['emoji']} **{meta['name']}**"
+            )
+
+        elif method == "token":
+            if not market:
+                await interaction.response.send_message(
+                    "The Marketplace isn't loaded.", ephemeral=True
+                )
+                return
+            if market.broom_token_count(interaction.user.id, stat_key) < 1:
+                cost = token_point_cost(before)
+                await interaction.response.send_message(
+                    f"You don't have a **{label}** broom token. "
+                    f"Buy one with `/market broomtoken` "
+                    f"(**{cost}** pts for your next bump).",
+                    ephemeral=True,
+                )
+                return
+            if not market.spend_broom_token(interaction.user.id, stat_key):
+                await interaction.response.send_message(
+                    "That token slipped away — try again.", ephemeral=True
+                )
+                return
+            paid = f"1 × Marketplace **{label}** token"
+
+        else:
+            await interaction.response.send_message(
+                "Unknown payment method.", ephemeral=True
+            )
+            return
+
+        updated = self.apply_upgrade(interaction.user.id, stat_key, 1)
+        if not updated:
+            # Refund best-effort if the upgrade somehow failed after payment.
+            if method == "resin" and world:
+                async with world.lock:
+                    world.world.give(
+                        world.student(interaction.user), PITCH_RESIN_ID, RESIN_PER_UPGRADE
+                    )
+                    world.save()
+            elif method == "descent" and world and descent_mat:
+                async with world.lock:
+                    world.world.give(
+                        world.student(interaction.user),
+                        descent_mat,
+                        DESCENT_MATS_PER_UPGRADE,
+                    )
+                    world.save()
+            elif method == "token" and market:
+                market.grant_broom_token(interaction.user.id, stat_key)
+            await interaction.response.send_message(
+                f"**{label}** couldn't be raised further — payment returned.",
+                ephemeral=True,
+            )
+            return
+
+        after = effective_stats(updated)[stat_key]
+        embed = discord.Embed(
+            title=f"🧹 {updated['model']} upgraded",
+            description=(
+                f"{interaction.user.display_name} tunes **{label}**: "
+                f"**{before}/10** → **{after}/10**.\n\nPaid with {paid}."
+            ),
+            color=BROOM_COLOR,
+        )
+        embed.set_footer(text="Base model sheet unchanged • upgrades stack toward 10")
+        await interaction.response.send_message(embed=embed)
+
+    @broomupgrade.autocomplete("descent_mat")
+    async def _broomupgrade_descent_ac(
+        self, interaction: discord.Interaction, current: str
+    ):
+        world = self.bot.get_cog("World")
+        q = (current or "").lower()
+        have = {}
+        items = {}
+        if world:
+            have = world.student(interaction.user).get("items", {})
+            items = world.world.items
+        out = []
+        for iid in DESCENT_MAT_IDS:
+            meta = items.get(iid)
+            if not meta:
+                continue
+            n = int(have.get(iid, 0))
+            label = f"{meta['emoji']} {meta['name']} ×{n}"[:100]
+            if q and q not in label.lower() and q not in iid:
+                continue
+            out.append(app_commands.Choice(name=label, value=iid))
+        return out[:25]
+
+    upgrade = app_commands.Group(
+        name="upgrade",
+        description="(staff) Free upgrades.",
+    )
+
+    @upgrade.command(
+        name="broom",
+        description="(staff) Freely raise a member's broom Speed or Altitude / control.",
+    )
+    @app_commands.describe(
+        member="Whose broom to upgrade",
+        stat="Speed or Altitude (control)",
+        amount="How many points to add (default 1)",
+    )
+    @app_commands.choices(
+        stat=[
+            app_commands.Choice(name="Speed", value="speed"),
+            app_commands.Choice(name="Altitude / control", value="altitude"),
+        ],
+    )
+    async def upgrade_broom(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        stat: app_commands.Choice[str],
+        amount: app_commands.Range[int, 1, 10] = 1,
+    ):
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That one's for staff.", ephemeral=True)
+            return
+        broom = self.broom_of(member.id)
+        if not broom:
+            await interaction.response.send_message(
+                f"{member.display_name} hasn't claimed a broom yet.", ephemeral=True
+            )
+            return
+        stat_key = stat.value
+        ok, why = self.can_upgrade(broom, stat_key)
+        if not ok:
+            await interaction.response.send_message(why, ephemeral=True)
+            return
+        before = effective_stats(broom)[stat_key]
+        updated = self.apply_upgrade(member.id, stat_key, int(amount))
+        if not updated:
+            await interaction.response.send_message(
+                f"Couldn't raise **{STAT_LABELS[stat_key]}** further.", ephemeral=True
+            )
+            return
+        after = effective_stats(updated)[stat_key]
+        await interaction.response.send_message(
+            embed=discord.Embed(
+                title=f"🧹 Staff upgrade — {updated['model']}",
+                description=(
+                    f"**{STAT_LABELS[stat_key]}** for {member.display_name}: "
+                    f"**{before}/10** → **{after}/10**."
+                ),
+                color=BROOM_COLOR,
+            ),
+            ephemeral=True,
+        )
 
     @app_commands.command(
         name="broomreset",
