@@ -20,7 +20,7 @@ import math
 import random
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 from cogs.wizard_assets_bootstrap import assets_root, crests_root, female_full_ready
 from cogs import mirror_male1 as male1
@@ -781,7 +781,7 @@ def render(*, look: dict, user_id: int, name: str, title: str | None = None,
     if aura:
         glow = Image.new("RGBA", port.size, (255, 214, 110, 0))
         glow.putalpha(port.getchannel("A"))
-        g = glow.filter(__import__("PIL.ImageFilter", fromlist=["ImageFilter"]).ImageFilter.GaussianBlur(14))
+        g = glow.filter(ImageFilter.GaussianBlur(14))
         card.alpha_composite(g, (ox - 4, oy - 4))
 
     layer = Image.new("RGBA", card.size, (0, 0, 0, 0))

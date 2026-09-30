@@ -525,42 +525,72 @@ class Potions(commands.Cog):
 
     # -------------------------------------------------------------- info
 
+    @staticmethod
+    def _chunk_field_lines(lines: list[str], limit: int = 1000) -> list[str]:
+        """Pack lines into Discord field values (max 1024 chars each)."""
+        chunks: list[str] = []
+        cur: list[str] = []
+        size = 0
+        for line in lines:
+            add = len(line) + (1 if cur else 0)
+            if cur and size + add > limit:
+                chunks.append("\n".join(cur))
+                cur = [line]
+                size = len(line)
+            else:
+                cur.append(line)
+                size += add
+        if cur:
+            chunks.append("\n".join(cur))
+        return chunks
+
     @app_commands.command(name="potions", description="Your Potion Rep, discovered recipes, and brewed potions.")
     async def potions_cmd(self, interaction: discord.Interaction):
         if interaction.channel_id != POTIONS_CHANNEL_ID:
             await interaction.response.send_message(
                 f"Potions only runs in <#{POTIONS_CHANNEL_ID}>.", ephemeral=True)
             return
-        rec = self.record(interaction.user.id)
-        idx, name, mult = rank_info(rec["rep_xp"])
-        nxt = next_rank(idx)
+        await interaction.response.defer(ephemeral=True)
+        try:
+            rec = self.record(interaction.user.id)
+            idx, name, mult = rank_info(rec["rep_xp"])
+            nxt = next_rank(idx)
 
-        desc = [f"**{name}** • {rec['rep_xp']} Rep", f"Buff duration/charges ×{mult:g}"]
-        if nxt:
-            desc.append(f"{nxt[0] - rec['rep_xp']} Rep to **{nxt[1]}**")
+            desc = [f"**{name}** • {rec['rep_xp']} Rep", f"Buff duration/charges ×{mult:g}"]
+            if nxt:
+                desc.append(f"{nxt[0] - rec['rep_xp']} Rep to **{nxt[1]}**")
 
-        embed = discord.Embed(title=f"{interaction.user.display_name}'s Potions", description="\n".join(desc),
-                              color=0x6C5CE7)
+            embed = discord.Embed(title=f"{interaction.user.display_name}'s Potions", description="\n".join(desc),
+                                  color=0x6C5CE7)
 
-        inv_lines = [f"{RECIPES[k]['emoji']} {RECIPES[k]['name']} ×{n}" for k, n in rec["inventory"].items() if n > 0]
-        embed.add_field(name="🧪 Satchel", value="\n".join(inv_lines) if inv_lines else "*Nothing brewed yet.*",
-                        inline=False)
+            inv_lines = [f"{RECIPES[k]['emoji']} {RECIPES[k]['name']} ×{n}"
+                         for k, n in rec["inventory"].items() if n > 0]
+            embed.add_field(name="🧪 Satchel", value="\n".join(inv_lines) if inv_lines else "*Nothing brewed yet.*",
+                            inline=False)
 
-        world = self.bot.get_cog("World")
-        have = world.student(interaction.user).get("items", {}) if world else {}
+            world = self.bot.get_cog("World")
+            have = world.student(interaction.user).get("items", {}) if world else {}
 
-        known_lines = []
-        for key, r in RECIPES.items():
-            gated = idx < TIER_MIN_RANK[r["tier"]]
-            known = key in rec["discovered"]
-            tag = "🔓 known" if known else ("🔒 locked" if gated else "❔ undiscovered")
-            ready = all(have.get(i, 0) >= 1 for i in r["ingredients"])
-            readiness = " • 🟢 you have everything for this" if ready else ""
-            known_lines.append(f"{r['emoji']} **{r['name']}** ({TIER_LABEL[r['tier']]}) - {tag}{readiness}\n"
-                              f"　{self.items_line(r['ingredients'])} - {r['blurb']}")
-        embed.add_field(name="📖 Recipes (🟢 = you can brew this right now)", value="\n".join(known_lines),
-                        inline=False)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+            known_lines = []
+            for key, r in RECIPES.items():
+                gated = idx < TIER_MIN_RANK[r["tier"]]
+                known = key in rec["discovered"]
+                tag = "🔓 known" if known else ("🔒 locked" if gated else "❔ undiscovered")
+                ready = all(have.get(i, 0) >= 1 for i in r["ingredients"])
+                readiness = " • 🟢 you have everything for this" if ready else ""
+                known_lines.append(
+                    f"{r['emoji']} **{r['name']}** ({TIER_LABEL[r['tier']]}) - {tag}{readiness}\n"
+                    f"　{self.items_line(r['ingredients'])} - {r['blurb']}"
+                )
+            chunks = self._chunk_field_lines(known_lines)
+            for i, chunk in enumerate(chunks):
+                label = "📖 Recipes (🟢 = you can brew this right now)" if i == 0 else f"📖 Recipes (cont. {i + 1})"
+                embed.add_field(name=label, value=chunk, inline=False)
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception:
+            log.exception("Failed to build /potions for %s", interaction.user.id)
+            await interaction.followup.send(
+                "The cauldron notes are a mess right now. Try again in a moment.", ephemeral=True)
 
     # ------------------------------------------------------- Descent hooks
 
