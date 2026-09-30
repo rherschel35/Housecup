@@ -142,6 +142,14 @@ def gear_line(key: str, with_slot: bool = False) -> str:
     return f"{slot}{RARITY_DOT[g['rarity']]} **{g['name']}**"
 
 
+def gear_benefit(key: str) -> str:
+    """Short player-facing benefit line for jewelbox / wear / craft."""
+    g = GEAR[key]
+    if g.get("perk") and g.get("perk_text"):
+        return f"Perk: {g['perk_text']}"
+    return "Looks only — purely cosmetic."
+
+
 class Adornments(commands.Cog):
     admin = app_commands.Group(name="adornadmin", description="(staff) Gear and the Mirror.")
 
@@ -628,18 +636,22 @@ class Adornments(commands.Cog):
                 g = GEAR[k]
                 if k in owned:
                     mark = " ← *wearing*" if worn.get(slot) == k else ""
-                    lines.append(f"{gear_line(k)}{mark}")
+                    lines.append(f"{gear_line(k)}{mark}\n　*{gear_benefit(k)}*")
                 elif viewer_is_owner and "recipe" in g and all(have.get(i, 0) >= n for i, n in g["recipe"].items()):
-                    lines.append(f"🔨 {g['name']} — *ready to craft*")
+                    lines.append(f"🔨 {g['name']} — *ready to craft*\n　*{gear_benefit(k)}*")
             hidden = sum(1 for k in by_slot(slot) if k not in owned)
             if hidden:
                 lines.append(f"-# {hidden} more to find")
-            embed.add_field(name=f"{emoji} {label}s", value="\n".join(lines) or "—", inline=True)
+            value = "\n".join(lines) or "—"
+            if len(value) > 1024:
+                value = value[:1000].rstrip() + "\n…*(list trimmed)*"
+            # Stacked (not inline) so perk blurbs stay readable on mobile.
+            embed.add_field(name=f"{emoji} {label}s", value=value, inline=False)
         if viewer_is_owner:
             embed.set_footer(text="/craft to make one • /wear to put it on • /mirror to see it")
         return embed
 
-    @app_commands.command(name="jewelbox", description="Your gear: what you own, what you're wearing, what you can craft.")
+    @app_commands.command(name="jewelbox", description="Your gear: what you own, perks, what you're wearing, what you can craft.")
     @app_commands.describe(member="Whose jewel box (leave blank for your own)")
     async def jewelbox(self, interaction: discord.Interaction, member: discord.Member = None):
         target = member or interaction.user
@@ -698,7 +710,8 @@ class Adornments(commands.Cog):
         self.save()
         embed = discord.Embed(
             title=f"🔨 {interaction.user.display_name} crafts the {g['name']}",
-            description=(f"{g['desc']}\n\n*Used:* {self.recipe_text(piece)}\n"
+            description=(f"{g['desc']}\n\n**{gear_benefit(piece)}**\n\n"
+                         f"*Used:* {self.recipe_text(piece)}\n"
                          + ("It's on — see it with `/mirror`." if wearing
                             else f"It's in your jewel box. `/wear` it to swap it in.")),
             color=RARITY_COLOR[g["rarity"]])
@@ -737,8 +750,13 @@ class Adornments(commands.Cog):
         r["worn"][g["slot"]] = piece
         self.save()
         swap = f" (swapped out the {GEAR[old]['name']})" if old and old != piece and old in GEAR else ""
-        perk = f"\n**Perk active:** {g['perk_text']}" if g.get("perk") else ""
-        await interaction.response.send_message(f"You put on the **{g['name']}**{swap}.{perk}", ephemeral=True)
+        if g.get("perk") and g.get("perk_text"):
+            benefit = f"\n**Perk active:** {g['perk_text']}"
+        else:
+            benefit = f"\n*{gear_benefit(piece)}*"
+        await interaction.response.send_message(
+            f"You put on the **{g['name']}**{swap}.{benefit}", ephemeral=True
+        )
 
     @wear.autocomplete("piece")
     async def _owned(self, interaction: discord.Interaction, current: str):
