@@ -425,6 +425,10 @@ class Dementors(commands.Cog):
     @app_commands.describe(spell="Which spell to cast")
     @app_commands.choices(spell=CAST_CHOICES)
     async def cast(self, interaction: discord.Interaction, spell: app_commands.Choice[str]):
+        hexes = self.bot.get_cog("Hexes")
+        if hexes and await hexes.deny_if_limp_wand(interaction):
+            return
+
         async with self.lock:
             event = self.state.get("event")
             key = str(interaction.channel_id)

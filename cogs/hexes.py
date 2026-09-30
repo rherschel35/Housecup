@@ -9,7 +9,7 @@ without warning, whatever they type comes out cursed — or their wand goes limp
 Most curses mangle chat: the bot deletes the cursed member's message and
 reposts it through a per-channel webhook wearing their name and avatar.
 Limp Wand is different — it leaves chat alone and blocks /wand, /patronus,
-and /broom for one hour.
+/broom, and /cast for one hour.
 
 Needs the bot to hold Manage Messages (to delete the original) and Manage
 Webhooks (to create/reuse the relay webhook) in this server.
