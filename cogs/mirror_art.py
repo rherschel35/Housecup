@@ -20,7 +20,7 @@ import math
 import random
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 from cogs.wizard_assets_bootstrap import assets_root, crests_root, female_full_ready
 from cogs import mirror_male1 as male1
