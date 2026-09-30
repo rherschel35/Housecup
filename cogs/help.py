@@ -77,7 +77,7 @@ HELP = {
         "entries": [
             ("brew", "Spend two ingredients and try to brew a potion."),
             ("drink", "Drink a brewed potion from your satchel to activate it."),
-            ("potions", "Your Potion Rep, discovered recipes, and brewed potions."),
+            ("potions", "Potion Rep, recipes with effect text, and 🟢/🔴 ingredients you have."),
         ],
     },
     "quidditch": {
