@@ -207,8 +207,8 @@ footer.site{border-top:1px solid var(--line);margin-top:60px;padding-top:18px;co
 .broom-stats .stat-group{margin:6px 0 2px;font-family:var(--sans-sc,"Alegreya Sans SC",sans-serif);font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 .broom-stats .stat-group:first-child{margin-top:0}
 .broom-stats .stat{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.2fr) auto;align-items:center;gap:8px;font-size:13.5px}
-.broom-stats .stat-label{color:var(--text);font-weight:500;line-height:1.2}
-.broom-stats .stat-bar{display:block;height:7px;border-radius:999px;background:rgba(127,127,127,.22);overflow:hidden}
-.broom-stats .stat-fill{display:block;height:100%;border-radius:inherit;background:var(--gold-soft,var(--gold,#c4a35a))}
+.broom-stats .stat-label{color:var(--ink);font-weight:500;line-height:1.2}
+.broom-stats .stat-bar{display:block;height:7px;border-radius:999px;background:var(--surface-2);overflow:hidden;box-shadow:inset 0 0 0 1px var(--line)}
+.broom-stats .stat-fill{display:block;height:100%;border-radius:inherit;background:var(--gold-soft)}
 .broom-stats .stat-n{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12.5px;min-width:2.6em;text-align:right}
 .broom-card:target{box-shadow:0 0 0 2px var(--gold-soft);border-color:var(--gold-soft)}
