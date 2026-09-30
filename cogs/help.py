@@ -123,9 +123,9 @@ HELP = {
         "entries": [
             ("wizard", "Design how your wizard looks (including Feminine full-body)."),
             ("mirror", "Your wizard trading card (or anyone's): look, gear, title and stats."),
-            ("jewelbox", "What you own, what you're wearing, what you can craft."),
+            ("jewelbox", "What you own (with perk / looks-only), what you're wearing, what you can craft."),
             ("craft", "Make a piece from materials in your satchel."),
-            ("wear", "Put on a piece you own."),
+            ("wear", "Put on a piece you own — shows its perk if it has one."),
             ("remove", "Take off whatever's in a slot."),
             ("title", "Choose which earned title shows under your name."),
             ("cheer", "House Cup Bracelet: a celebration for your house."),
