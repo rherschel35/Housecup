@@ -53,13 +53,18 @@ REWARD_POINTS = 1
 REWARDED_PER_DAY = 3
 WINDOW = 24 * 3600
 
-# Optional, off by default: a single Discord user ID who quietly wins duel
-# exchanges more often than the spells alone would give them. Applies to
-# 1v1 rounds, trio pairings, and Grand steps/sudden death. Set
-# DUEL_FAVORED_USER_ID in the environment to turn it on for that account.
-# When unset, every mode is decided purely by resolve() below.
-FAVORED_USER_ID = os.getenv("DUEL_FAVORED_USER_ID")
-FAVORED_USER_ID = int(FAVORED_USER_ID) if FAVORED_USER_ID and FAVORED_USER_ID.isdigit() else None
+# Optional: a single Discord user ID who quietly wins duel exchanges more
+# often than the spells alone would give them. Applies to 1v1 rounds, trio
+# pairings, and Grand steps/sudden death. Needs DUEL_FAVORED_USER_ID in the
+# environment AND FAVORED_ENABLED True. Flip FAVORED_ENABLED to pause/resume
+# without clearing the Railway variable.
+FAVORED_ENABLED = False  # paused — set True to restore the edge
+_raw_favored = os.getenv("DUEL_FAVORED_USER_ID")
+FAVORED_USER_ID = (
+    int(_raw_favored)
+    if FAVORED_ENABLED and _raw_favored and _raw_favored.isdigit()
+    else None
+)
 # Chance, PER exchange, that the favored user's side is decided in their
 # favor regardless of what either side cast. Exchanges that don't trigger
 # this fall through to the real rock-paper-scissors-of-five above, which
