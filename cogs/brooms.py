@@ -4,8 +4,8 @@ Brooms. Chosen from the same three words that chose your wand
 
     /broom                 - claim yours, or see it again
     /broom @member         - see someone else's
-    /broomupgrade          - raise Speed or Altitude (resin / Descent / token)
-    /upgrade broom         - (staff) free Speed or Altitude bump
+    /broomupgrade          - raise Speed or Altitude (yours or @member; you pay)
+    /upgrade broom         - (staff) free Speed or Altitude bump on anyone
     /broomreset @x         - staff, free someone's broom claim (wand stays)
 
 100 fixed painted portraits (like Descent monsters). Each broom can be
@@ -653,11 +653,12 @@ class Brooms(commands.Cog):
 
     @app_commands.command(
         name="broomupgrade",
-        description="Raise your broom's Speed or Altitude toward 10 (resin, Descent mats, or a market token).",
+        description="Raise a broom's Speed or Altitude toward 10 (yours or @member — you pay).",
     )
     @app_commands.describe(
         stat="Speed or Altitude (control)",
         pay_with="How you'll pay for this bump",
+        member="Whose broom to upgrade (leave blank for your own)",
         descent_mat="Required when paying with Descent materials (100 of one kind)",
     )
     @app_commands.choices(
@@ -682,23 +683,33 @@ class Brooms(commands.Cog):
         interaction: discord.Interaction,
         stat: app_commands.Choice[str],
         pay_with: app_commands.Choice[str],
+        member: discord.Member | None = None,
         descent_mat: str | None = None,
     ):
         hexes = self.bot.get_cog("Hexes")
         if hexes and await hexes.deny_if_limp_wand(interaction):
             return
 
+        target = member or interaction.user
+        payer = interaction.user
         stat_key = stat.value
         method = pay_with.value
-        broom = self.broom_of(interaction.user.id)
+        broom = self.broom_of(target.id)
         if not broom:
-            await interaction.response.send_message(
-                "You need a broom first — `/broom`.", ephemeral=True
-            )
+            if target.id == payer.id:
+                await interaction.response.send_message(
+                    "You need a broom first — `/broom`.", ephemeral=True
+                )
+            else:
+                await interaction.response.send_message(
+                    f"{target.display_name} hasn't claimed a broom yet.",
+                    ephemeral=True,
+                )
             return
         ok, why = self.can_upgrade(broom, stat_key)
         if not ok:
-            await interaction.response.send_message(why, ephemeral=True)
+            msg = why if target.id == payer.id else f"{target.display_name}'s broom: {why}"
+            await interaction.response.send_message(msg, ephemeral=True)
             return
 
         world = self.bot.get_cog("World")
@@ -713,7 +724,7 @@ class Brooms(commands.Cog):
                 )
                 return
             async with world.lock:
-                student = world.student(interaction.user)
+                student = world.student(payer)
                 have = student.get("items", {}).get(PITCH_RESIN_ID, 0)
                 if have < RESIN_PER_UPGRADE:
                     await interaction.response.send_message(
@@ -751,7 +762,7 @@ class Brooms(commands.Cog):
                 )
                 return
             async with world.lock:
-                student = world.student(interaction.user)
+                student = world.student(payer)
                 have = student.get("items", {}).get(descent_mat, 0)
                 if have < DESCENT_MATS_PER_UPGRADE:
                     await interaction.response.send_message(
@@ -776,16 +787,17 @@ class Brooms(commands.Cog):
                     "The Marketplace isn't loaded.", ephemeral=True
                 )
                 return
-            if market.broom_token_count(interaction.user.id, stat_key) < 1:
+            if market.broom_token_count(payer.id, stat_key) < 1:
                 cost = token_point_cost(before)
+                whose = "your" if target.id == payer.id else f"{target.display_name}'s"
                 await interaction.response.send_message(
                     f"You don't have a **{label}** broom token. "
                     f"Buy one with `/market broomtoken` "
-                    f"(**{cost}** pts for your next bump).",
+                    f"(**{cost}** pts for {whose} next bump).",
                     ephemeral=True,
                 )
                 return
-            if not market.spend_broom_token(interaction.user.id, stat_key):
+            if not market.spend_broom_token(payer.id, stat_key):
                 await interaction.response.send_message(
                     "That token slipped away — try again.", ephemeral=True
                 )
@@ -798,25 +810,25 @@ class Brooms(commands.Cog):
             )
             return
 
-        updated = self.apply_upgrade(interaction.user.id, stat_key, 1)
+        updated = self.apply_upgrade(target.id, stat_key, 1)
         if not updated:
             # Refund best-effort if the upgrade somehow failed after payment.
             if method == "resin" and world:
                 async with world.lock:
                     world.world.give(
-                        world.student(interaction.user), PITCH_RESIN_ID, RESIN_PER_UPGRADE
+                        world.student(payer), PITCH_RESIN_ID, RESIN_PER_UPGRADE
                     )
                     world.save()
             elif method == "descent" and world and descent_mat:
                 async with world.lock:
                     world.world.give(
-                        world.student(interaction.user),
+                        world.student(payer),
                         descent_mat,
                         DESCENT_MATS_PER_UPGRADE,
                     )
                     world.save()
             elif method == "token" and market:
-                market.grant_broom_token(interaction.user.id, stat_key)
+                market.grant_broom_token(payer.id, stat_key)
             await interaction.response.send_message(
                 f"**{label}** couldn't be raised further — payment returned.",
                 ephemeral=True,
@@ -824,12 +836,19 @@ class Brooms(commands.Cog):
             return
 
         after = effective_stats(updated)[stat_key]
+        if target.id == payer.id:
+            who_line = (
+                f"{payer.display_name} tunes **{label}**: "
+                f"**{before}/10** → **{after}/10**."
+            )
+        else:
+            who_line = (
+                f"{payer.display_name} tunes **{target.display_name}**'s **{label}**: "
+                f"**{before}/10** → **{after}/10**."
+            )
         embed = discord.Embed(
             title=f"🧹 {updated['model']} upgraded",
-            description=(
-                f"{interaction.user.display_name} tunes **{label}**: "
-                f"**{before}/10** → **{after}/10**.\n\nPaid with {paid}."
-            ),
+            description=f"{who_line}\n\nPaid with {paid}.",
             color=BROOM_COLOR,
         )
         embed.set_footer(text="Base model sheet unchanged • upgrades stack toward 10")
