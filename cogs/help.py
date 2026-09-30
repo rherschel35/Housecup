@@ -35,6 +35,8 @@ HELP = {
             ("patronus", "Your patronus, cast from the same three words as your wand."),
             ("broom", "Your unique broom from the same three words — 100 portraits, flight + silly stats. One owner each."),
             ("broomupgrade", "Raise broom Speed or Altitude (Pitch Resin ×5, Descent mat ×100, or a market token)."),
+            ("broomrace", "Private 6-stage race on one of 100 courses (Quidditch channel). Higher stats → fewer choices."),
+            ("broomnotes", "Permanent study notes from courses you've finished."),
             ("rumor", "Explore secrets, student gossip, odd headmaster whispers, embarrassing ghosts."),
             ("cast", "Banish a wild threat in this channel. Needs a patronus already cast."),
             ("familiar", "Adopt a familiar (once, for good), name it, or see the one you have."),
