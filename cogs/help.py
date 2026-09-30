@@ -28,6 +28,7 @@ HELP = {
             ("trio scramble", "Open a casual 3v3 trio duel — any houses, join either side."),
             ("trio housematch", "Open a house-vs-house 3v3 trio duel (house role gated)."),
             ("grand", "Challenge someone to a Grand Duel (both need 50+ 1v1 wins)."),
+            ("duelend", "Clear a stuck duel lock so you can fight again (staff can clear others)."),
             ("houseduels", "Each house's overall duelling win/loss record."),
             ("bean", "Spend 1 point on a mystery bean. Might pay 5. Might be Mordy's socks."),
             ("wand", "Give any three words and a wand chooses you. Yours for good."),

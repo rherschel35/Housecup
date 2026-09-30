@@ -3,6 +3,7 @@ Wizard duels. Best of three, spells chosen in secret.
 
     /duel @member              - challenge someone (1v1)
     /duelrecord [member]       - rank, wins, streak, rivals, trio/grand, points
+    /duelend [member]          - clear a stuck duel lock (self, or staff for others)
     /houseduels                - each house's overall win/loss duelling record
     /duelnight start|end       - (staff) House Duel Night: duel wins count double
     /trio scramble             - open 3v3 signup (any houses)
@@ -49,6 +50,7 @@ ROUNDS_TO_WIN = 2          # best of three
 MAX_ROUNDS = 9             # ties replay; this stops an endless run of them
 ACCEPT_TIMEOUT = 120
 ROUND_TIMEOUT = 60
+GRAND_LOCK_TIMEOUT = 300     # seconds to lock both 10-spell sequences
 REWARD_POINTS = 1
 REWARDED_PER_DAY = 3
 WINDOW = 24 * 3600
@@ -356,12 +358,54 @@ class Duels(commands.Cog):
         self.bot = bot
         self.state = self._load()
         self.busy: set[int] = set()   # members currently in a duel / trio / grand
+        self.active: dict[int, object] = {}  # user_id -> Duel / GrandDuel / etc.
 
     async def cog_load(self):
         self.weekly.start()
 
     async def cog_unload(self):
         self.weekly.cancel()
+
+    def mark_busy(self, match, *members) -> None:
+        for m in members:
+            self.busy.add(m.id)
+            self.active[m.id] = match
+
+    def release_match(self, match) -> None:
+        """Mark a match done and free everyone locked to it."""
+        if getattr(match, "state", None) not in (None, "done"):
+            match.state = "done"
+        timer = getattr(match, "_timer", None)
+        if timer is not None:
+            try:
+                timer.cancel()
+            except Exception:
+                pass
+        for attr in ("a", "b"):
+            m = getattr(match, attr, None)
+            if m is None:
+                continue
+            self.busy.discard(m.id)
+            if self.active.get(m.id) is match:
+                self.active.pop(m.id, None)
+
+    def clear_user(self, user_id: int) -> str:
+        """End whatever has this user marked busy. Returns a short status."""
+        match = self.active.get(user_id)
+        if match is not None:
+            partner = None
+            for attr in ("a", "b"):
+                m = getattr(match, attr, None)
+                if m is not None and m.id != user_id:
+                    partner = m
+            self.release_match(match)
+            if partner is not None:
+                return f"ended (also freed {partner.display_name})"
+            return "ended"
+        if user_id in self.busy:
+            self.busy.discard(user_id)
+            return "cleared a stuck lock"
+        return "not_busy"
 
     # ------------------------------------------------------------- storage
 
@@ -869,7 +913,7 @@ class Duels(commands.Cog):
             return
 
         duel = Duel(self, interaction.channel, me, opponent)
-        self.busy.update({me.id, opponent.id})
+        self.mark_busy(duel, me, opponent)
         await interaction.response.send_message(
             content=opponent.mention,
             embed=duel.challenge_embed(),
@@ -877,6 +921,34 @@ class Duels(commands.Cog):
         )
         duel.message = await interaction.original_response()
         duel.start_accept_timer()
+
+    @app_commands.command(
+        name="duelend",
+        description="End a stuck duel lock so you (or someone) can fight again.",
+    )
+    @app_commands.describe(member="Whose lock to clear (staff only; leave blank for yourself)")
+    async def duelend(self, interaction: discord.Interaction, member: discord.Member = None):
+        target = member or interaction.user
+        if target.id != interaction.user.id:
+            store = self.bot.get_cog("Store")
+            if not (store and store.is_staff(interaction.user)):
+                await interaction.response.send_message(
+                    "Only staff can end someone else's duel. Use `/duelend` with no one tagged for yourself.",
+                    ephemeral=True,
+                )
+                return
+        status = self.clear_user(target.id)
+        if status == "not_busy":
+            who = "You aren't" if target.id == interaction.user.id else f"{target.display_name} isn't"
+            await interaction.response.send_message(
+                f"{who} marked as in a duel right now.", ephemeral=True
+            )
+            return
+        who = "Your" if target.id == interaction.user.id else f"{target.display_name}'s"
+        await interaction.response.send_message(
+            f"{who} duel lock is cleared ({status}). They can `/duel` or `/grand` again.",
+            ephemeral=True,
+        )
 
     @app_commands.command(name="duelrecord", description="Duel wins, rank, streak, trio/grand, and today's duel points.")
     @app_commands.describe(member="Whose record (leave blank for your own)")
@@ -1208,7 +1280,7 @@ class Duels(commands.Cog):
             return
 
         gd = GrandDuel(self, interaction.channel, me, member)
-        self.busy.update({me.id, member.id})
+        self.mark_busy(gd, me, member)
         await interaction.response.send_message(
             content=member.mention,
             embed=gd.challenge_embed(),
@@ -1289,8 +1361,7 @@ class Duel:
         async with self.lock:
             if self.state != "pending":
                 return
-            self.state = "done"
-            self.cog.busy.difference_update({self.a.id, self.b.id})
+            self.cog.release_match(self)
         try:
             await self.message.edit(
                 content=None,
@@ -1313,8 +1384,7 @@ class Duel:
                 self.history.append(f"*{loser.display_name} froze and never cast.*")
                 await self._finish(winner, loser, forfeit=True)
             else:
-                self.state = "done"
-                self.cog.busy.difference_update({self.a.id, self.b.id})
+                self.cog.release_match(self)
                 await self._update(view=None, footer="Neither duelist cast. The duel fizzles out.")
 
     # ------------------------------------------------------------ the rounds
@@ -1323,8 +1393,7 @@ class Duel:
         self.round += 1
         self.picks = {}
         if self.round > MAX_ROUNDS:
-            self.state = "done"
-            self.cog.busy.difference_update({self.a.id, self.b.id})
+            self.cog.release_match(self)
             await self._update(view=None, footer="Too evenly matched — declared a draw.")
             return
         await self._update(view=CastView(self))
@@ -1369,10 +1438,10 @@ class Duel:
             return f"You cast **{SPELLS[spell]['name']}**."
 
     async def _finish(self, winner, loser, forfeit: bool = False):
-        self.state = "done"
         if self._timer:
             self._timer.cancel()
-        self.cog.busy.difference_update({self.a.id, self.b.id})
+            self._timer = None
+        self.cog.release_match(self)
         outcome = self.cog.settle(winner, loser)
 
         from cogs.store import HOUSES
@@ -1432,10 +1501,7 @@ class AcceptView(discord.ui.View):
             if d.state != "pending":
                 await interaction.response.send_message("Too late for that.", ephemeral=True)
                 return
-            d.state = "done"
-            d.cog.busy.difference_update({d.a.id, d.b.id})
-            if d._timer:
-                d._timer.cancel()
+            d.cog.release_match(d)
         who = "withdraws" if interaction.user.id == d.a.id else "declines"
         await interaction.response.edit_message(
             content=None,
@@ -1929,8 +1995,7 @@ class GrandDuel:
         async with self.lock:
             if self.state != "pending":
                 return
-            self.state = "done"
-            self.cog.busy.difference_update({self.a.id, self.b.id})
+            self.cog.release_match(self)
         try:
             await self.message.edit(
                 content=None,
@@ -1940,6 +2005,17 @@ class GrandDuel:
             )
         except discord.DiscordException:
             pass
+
+    async def _locking_timeout(self):
+        await asyncio.sleep(GRAND_LOCK_TIMEOUT)
+        async with self.lock:
+            if self.state != "locking":
+                return
+            self.cog.release_match(self)
+        await self._update(
+            view=None,
+            footer="Sequences were never locked in time. The Grand Duel dissolves.",
+        )
 
     async def _update(self, view=None, footer=None):
         if self.message is None:
@@ -1951,8 +2027,14 @@ class GrandDuel:
 
     async def begin_locking(self):
         self.state = "locking"
-        await self._update(view=GrandLockPromptView(self),
-                           footer="Each duelist locks a 10-spell sequence privately.")
+        self._arm(self._locking_timeout())
+        await self._update(
+            view=GrandLockPromptView(self),
+            footer=(
+                f"Each duelist locks a 10-spell sequence privately "
+                f"({GRAND_LOCK_TIMEOUT // 60} min)."
+            ),
+        )
 
     def try_lock(self, user_id: int, sequence: list[str]) -> str:
         if self.state != "locking":
@@ -1972,6 +2054,9 @@ class GrandDuel:
             await self._update(view=GrandLockPromptView(self))
             return
         self.state = "playing"
+        if self._timer:
+            self._timer.cancel()
+            self._timer = None
         await self._update(view=None, footer="Sequences locked. The Circle begins…")
         asyncio.create_task(self._play_sequence())
 
@@ -2032,8 +2117,7 @@ class GrandDuel:
                 self.history.append(f"*{loser.display_name} froze in sudden death.*")
                 await self._finish(winner, loser)
             else:
-                self.state = "done"
-                self.cog.busy.difference_update({self.a.id, self.b.id})
+                self.cog.release_match(self)
                 await self._update(view=None, footer="Neither cast. The Grand Duel dissolves.")
 
     async def sudden_cast(self, member, spell: str) -> str:
@@ -2082,10 +2166,10 @@ class GrandDuel:
             return f"You cast **{SPELLS[spell]['name']}**."
 
     async def _finish(self, winner, loser):
-        self.state = "done"
         if self._timer:
             self._timer.cancel()
-        self.cog.busy.difference_update({self.a.id, self.b.id})
+            self._timer = None
+        self.cog.release_match(self)
         outcome = self.cog.settle_grand(winner, loser)
         from cogs.store import HOUSES
         if outcome["awarded"]:
@@ -2138,10 +2222,7 @@ class GrandAcceptView(discord.ui.View):
             if d.state != "pending":
                 await interaction.response.send_message("Too late for that.", ephemeral=True)
                 return
-            d.state = "done"
-            d.cog.busy.difference_update({d.a.id, d.b.id})
-            if d._timer:
-                d._timer.cancel()
+            d.cog.release_match(d)
         who = "withdraws" if interaction.user.id == d.a.id else "declines"
         await interaction.response.edit_message(
             content=None,
@@ -2153,7 +2234,7 @@ class GrandAcceptView(discord.ui.View):
 
 class GrandLockPromptView(discord.ui.View):
     def __init__(self, gd: GrandDuel):
-        super().__init__(timeout=ACCEPT_TIMEOUT)
+        super().__init__(timeout=GRAND_LOCK_TIMEOUT + 5)
         self.gd = gd
 
     @discord.ui.button(label="Lock your sequence", style=discord.ButtonStyle.primary, emoji="📜")
