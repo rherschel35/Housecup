@@ -243,6 +243,10 @@ class Wands(commands.Cog):
     @app_commands.command(name="wand", description="Receive your wand, or look at someone's.")
     @app_commands.describe(member="Whose wand to look at (leave blank for your own)")
     async def wand(self, interaction: discord.Interaction, member: discord.Member = None):
+        hexes = self.bot.get_cog("Hexes")
+        if hexes and await hexes.deny_if_limp_wand(interaction):
+            return
+
         target = member or interaction.user
 
         existing = self.wand_of(target.id)
@@ -297,6 +301,10 @@ class WandModal(discord.ui.Modal, title="The wand chooses the wizard"):
         self.cog = cog
 
     async def on_submit(self, interaction: discord.Interaction):
+        hexes = self.cog.bot.get_cog("Hexes")
+        if hexes and await hexes.deny_if_limp_wand(interaction):
+            return
+
         text = str(self.words).strip()
         if not _words_of(text):
             await interaction.response.send_message(

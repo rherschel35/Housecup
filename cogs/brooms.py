@@ -492,6 +492,10 @@ class Brooms(commands.Cog):
     )
     @app_commands.describe(member="Whose broom to see (leave blank for your own)")
     async def broom(self, interaction: discord.Interaction, member: discord.Member = None):
+        hexes = self.bot.get_cog("Hexes")
+        if hexes and await hexes.deny_if_limp_wand(interaction):
+            return
+
         target = member or interaction.user
 
         existing = self.broom_of(target.id)
