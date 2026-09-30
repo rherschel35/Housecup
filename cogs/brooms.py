@@ -40,6 +40,7 @@ BROOM_COLOR = 0x6B4F3A
 # everyone else's pool. Extra pairs via BROOM_RESERVED="id:Model,id2:Model2".
 RESERVED_BROOMS: dict[int, str] = {
     555141900802457630: "Moonflare",  # Headmaster Gon Vale
+    206828442065305600: "Mirthspire",
 }
 
 
