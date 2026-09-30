@@ -55,7 +55,7 @@ HELP = {
             ("market buy", "Buy a common (3 pts) or uncommon (6 pts) ingredient."),
             ("market sell", "Sell ingredients (3→3 pts) or Descent mats (25→3 pts); batches optional. 21/day cap."),
             ("market scroll", "Buy a Hex Scroll (30 pts)."),
-            ("market broomtoken", "Buy a Speed or Altitude broom upgrade token (cost max(1, current−6) pts)."),
+            ("market broomtoken", "Buy a Speed or Altitude broom upgrade token (50 pts)."),
             ("market title", "Buy an exclusive Marketplace title (50 pts)."),
             ("market room", "Buy the Room of Requirement (100 pts). Pings Headmasters."),
             ("hexscroll", "Cast a Hex Scroll on someone (30 min, random curse)."),
@@ -104,7 +104,7 @@ HELP = {
         "entries": [
             ("broom", "Claim your unique broom from the same three words — or view yours / @member's."),
             ("broomupgrade", "Raise Speed or Altitude on you or @member. Pay with Pitch Resin ×5, Descent mat ×100, or a market token."),
-            ("market broomtoken", "Buy a Speed or Altitude upgrade token (cost max(1, current−6) pts). Spend with /broomupgrade."),
+            ("market broomtoken", "Buy a Speed or Altitude upgrade token (50 pts). Spend with /broomupgrade."),
             ("broomrace", "Solo 6-stage race (Quidditch channel), or pass opponent: to challenge on the same track."),
             ("broomnotes", "Permanent study notes from courses you've finished (⚠ marks known traps when studied)."),
             ("checklist", "See solo learning races and challenge point-wins left today."),

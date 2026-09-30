@@ -5,7 +5,7 @@ The Velmora Marketplace — spend (and sell for) house points.
     /market buy ingredient qty  - common 3 pts, uncommon 6 pts (rare+ not sold)
     /market sell ingredient [batches] - sell ingredient sets (3) or Descent mats (25)
     /market scroll              - buy a Hex Scroll (30 pts)
-    /market broomtoken          - buy a Speed or Altitude broom upgrade token
+    /market broomtoken          - buy a Speed or Altitude broom upgrade token (50 pts)
     /market title               - buy an exclusive shop title (50 pts)
     /market room                - Room of Requirement (100 pts); pings @headmasters
     /hexscroll member           - cast one owned Hex Scroll (30 min, random effect)
@@ -15,8 +15,7 @@ Every spend deducts from the member's season contribution AND the house total
 (same honesty as /bean). Sell earnings go to both, capped at 21 pts/day.
 Rare, very_rare, and legendary place-ingredients cannot be bought or sold
 (Pitch Resin included — forage only). Descent materials (any zone drop /
-boss sigil) sell in batches of 25 → 3 pts. Broom tokens cost max(1, V−6)
-pts based on your broom's current Speed/Altitude.
+boss sigil) sell in batches of 25 → 3 pts. Broom tokens cost 50 pts each.
 """
 
 from __future__ import annotations
@@ -280,17 +279,7 @@ class Marketplace(commands.Cog):
         owned_titles = self.titles_of(interaction.user.id)
         speed_tok = self.broom_token_count(interaction.user.id, "speed")
         alt_tok = self.broom_token_count(interaction.user.id, "altitude")
-        broom_cost_hint = "max(1, current−6)"
-        brooms = self.bot.get_cog("Brooms")
-        if brooms:
-            from cogs.brooms import effective_stats, token_point_cost
-            broom = brooms.broom_of(interaction.user.id)
-            if broom:
-                eff = effective_stats(broom)
-                broom_cost_hint = (
-                    f"Speed next **{token_point_cost(eff['speed'])}** pts · "
-                    f"Altitude next **{token_point_cost(eff['altitude'])}** pts"
-                )
+        from cogs.brooms import BROOM_TOKEN_PRICE
 
         lines = [
             "Spend your personal points — every purchase comes out of your house total too.",
@@ -308,7 +297,7 @@ class Marketplace(commands.Cog):
             f"**{SCROLL_DURATION_MIN}** minutes. The scroll picks the curse.",
             "",
             "**🧹 Broom tokens**",
-            f"Buy with `/market broomtoken` — cost **{broom_cost_hint}**.",
+            f"Buy with `/market broomtoken` — **{BROOM_TOKEN_PRICE}** pts each (Speed or Altitude).",
             "Spend a token with `/broomupgrade` (or use Pitch Resin / Descent mats).",
             f"You hold · Speed ×{speed_tok} · Altitude ×{alt_tok}",
             "",
@@ -518,7 +507,7 @@ class Marketplace(commands.Cog):
 
     @group.command(
         name="broomtoken",
-        description="Buy a Speed or Altitude broom upgrade token (cost max(1, current−6) pts).",
+        description="Buy a Speed or Altitude broom upgrade token (50 pts).",
     )
     @app_commands.describe(stat="Which broom flight stat the token upgrades")
     @app_commands.choices(
@@ -532,7 +521,7 @@ class Marketplace(commands.Cog):
         interaction: discord.Interaction,
         stat: app_commands.Choice[str],
     ):
-        from cogs.brooms import MAX_STAT, effective_stats, token_point_cost
+        from cogs.brooms import BROOM_TOKEN_PRICE, MAX_STAT, effective_stats
 
         brooms = self.bot.get_cog("Brooms")
         if not brooms:
@@ -562,17 +551,15 @@ class Marketplace(commands.Cog):
                 ephemeral=True,
             )
             return
-        # Price accounts for tokens already held for this stat (they'd apply first).
         pending = self.broom_token_count(interaction.user.id, stat_key)
-        priced_at = min(MAX_STAT - 1, current + pending)
-        if priced_at >= MAX_STAT:
+        if current + pending >= MAX_STAT:
             await interaction.response.send_message(
                 f"You already hold enough **{label}** tokens to max that stat. "
                 "Spend them with `/broomupgrade` first.",
                 ephemeral=True,
             )
             return
-        price = token_point_cost(priced_at)
+        price = BROOM_TOKEN_PRICE
         charged = self._charge(
             interaction.user,
             price,
@@ -594,7 +581,7 @@ class Marketplace(commands.Cog):
                 f"Tokens held for {label}: **{held}**."
             ),
             color=h["color"],
-        ).set_footer(text=f"Priced from effective {label} {priced_at}/10 (incl. unspent tokens)"))
+        ).set_footer(text=f"{BROOM_TOKEN_PRICE} pts each · Speed or Altitude"))
 
     # ================================================================ scroll
 

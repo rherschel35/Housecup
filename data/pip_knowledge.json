@@ -55,7 +55,7 @@
         "broom control",
         "broom token"
       ],
-      "answer": "Tune flight with `/broomupgrade` \u2014 Speed or Altitude / control, toward 10. Pay with Pitch Resin \u00d75 (forage in the Garden or Forbidden Woods; never on market), any Descent material \u00d7100, or one Marketplace broom token (`/market broomtoken`, cost max(1, current\u22126) pts). Optional `member:` upgrades someone else's broom while ye pay. Staff free bumps: `/upgrade broom`.",
+      "answer": "Tune flight with `/broomupgrade` \u2014 Speed or Altitude / control, toward 10. Pay with Pitch Resin \u00d75 (forage in the Garden or Forbidden Woods; never on market), any Descent material \u00d7100, or one Marketplace broom token (`/market broomtoken`, 50 pts). Optional `member:` upgrades someone else's broom while ye pay. Staff free bumps: `/upgrade broom`.",
       "link": "https://everything-velmora.netlify.app/brooms"
     },
     {
@@ -295,7 +295,7 @@
         "broomtoken",
         "upgrade token"
       ],
-      "answer": "`/market browse` is the catalogue. Buy common/uncommon with `/market buy`. Sell place ingredients in sets of 3, or Descent materials in sets of 25, for 3 pts each batch \u2014 add `batches:` to sell several at once (21 pts/day cap). `/market broomtoken` buys a Speed or Altitude broom upgrade token (costs max(1, yer current\u22126) pts) \u2014 spend it with `/broomupgrade`. Also scrolls, titles, an' the Room. Pitch Resin is forage-only \u2014 never sold.",
+      "answer": "`/market browse` is the catalogue. Buy common/uncommon with `/market buy`. Sell place ingredients in sets of 3, or Descent materials in sets of 25, for 3 pts each batch \u2014 add `batches:` to sell several at once (21 pts/day cap). `/market broomtoken` buys a Speed or Altitude broom upgrade token (50 pts) \u2014 spend it with `/broomupgrade`. Also scrolls, titles, an' the Room. Pitch Resin is forage-only \u2014 never sold.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {

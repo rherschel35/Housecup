@@ -212,9 +212,12 @@ def bonus_field(stat: str) -> str:
     return f"{stat}_bonus"
 
 
-def token_point_cost(current: int) -> int:
-    """Marketplace token price for the next bump of this stat."""
-    return max(1, int(current) - 6)
+BROOM_TOKEN_PRICE = 50
+
+
+def token_point_cost(current: int | None = None) -> int:
+    """Marketplace token price (flat) for a Speed or Altitude bump."""
+    return BROOM_TOKEN_PRICE
 
 
 def effective_stats(broom: dict) -> dict:
@@ -788,12 +791,11 @@ class Brooms(commands.Cog):
                 )
                 return
             if market.broom_token_count(payer.id, stat_key) < 1:
-                cost = token_point_cost(before)
                 whose = "your" if target.id == payer.id else f"{target.display_name}'s"
                 await interaction.response.send_message(
                     f"You don't have a **{label}** broom token. "
                     f"Buy one with `/market broomtoken` "
-                    f"(**{cost}** pts for {whose} next bump).",
+                    f"(**{BROOM_TOKEN_PRICE}** pts) for {whose} next bump.",
                     ephemeral=True,
                 )
                 return
