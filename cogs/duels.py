@@ -23,7 +23,8 @@ privately, then both spells are revealed at once.
 The winner's house earns 1 point, up to 3 duel points per person per day.
 Duels past that still count toward the win/loss record. Duels between two
 members of the SAME house never award points - otherwise two housemates
-could simply trade wins and mint points for their house.
+could simply trade wins and mint points for their house. Same-house wins
+also never grow a win streak or pay a streak-bounty bonus.
 
 Wands are cosmetic: they're shown in the duel, but they don't affect it.
 """
@@ -654,6 +655,7 @@ class Duels(commands.Cog):
         store = self.bot.get_cog("Store")
         w_house = store.member_house(winner) if store else None
         l_house = store.member_house(loser) if store else None
+        same_house = bool(w_house and l_house and w_house == l_house)
         night = self.duel_night_on(now)
 
         # rivalry (counted before scoring so the 5th duel already pays)
@@ -677,7 +679,7 @@ class Duels(commands.Cog):
                    "night": night, "rival": rivals}
         if not store or not w_house:
             outcome["reason"] = "no-house"
-        elif w_house == l_house:
+        elif same_house:
             outcome["reason"] = "same-house"
         else:
             slots = REWARDED_PER_DAY - self.rewarded_today(winner.id, now)
@@ -699,31 +701,47 @@ class Duels(commands.Cog):
         # ------------------------------------------------ bounty on the loser
         bounty = self.state["bounties"].pop(lid, None)
         if bounty:
-            paid = ""
-            if store and w_house and w_house != l_house:
+            broken = self.state["streaks"].get(lid, 0) or bounty.get("streak", BOUNTY_AT)
+            if same_house:
+                notes.append(
+                    f"💰 **{winner.display_name}** broke **{loser.display_name}**'s "
+                    f"{broken}-win streak — housemates, so no bounty points."
+                )
+            elif store and w_house:
                 self._award(store, w_house, BOUNTY_POINTS, winner.id,
                             f"Broke {loser.display_name}'s {bounty.get('streak', BOUNTY_AT)}-win streak")
                 from cogs.store import HOUSES
                 h = HOUSES[w_house]
-                paid = f" +{BOUNTY_POINTS} to {h['emoji']} {h['name']}."
-            notes.append(f"💰 **{winner.display_name}** broke **{loser.display_name}**'s "
-                         f"{self.state['streaks'].get(lid, 0)}-win streak and claimed the bounty!{paid}")
+                notes.append(
+                    f"💰 **{winner.display_name}** broke **{loser.display_name}**'s "
+                    f"{broken}-win streak and claimed the bounty! "
+                    f"+{BOUNTY_POINTS} to {h['emoji']} {h['name']}."
+                )
+            else:
+                notes.append(
+                    f"💰 **{winner.display_name}** broke **{loser.display_name}**'s "
+                    f"{broken}-win streak (no house to credit for the bounty)."
+                )
 
         # ------------------------------------------------ streaks
+        # A loss always ends the loser's streak. Same-house wins do not grow
+        # the winner's streak or put a bounty on their head — only cross-house
+        # wins count toward killing-streak bonuses.
         self.state["streaks"][lid] = 0
-        streak = self.state["streaks"].get(wid, 0) + 1
-        self.state["streaks"][wid] = streak
-        if streak >= BOUNTY_AT and wid not in self.state["bounties"]:
-            self.state["bounties"][wid] = {"since": now, "streak": streak}
-            notes.append(f"🎯 **{winner.display_name}** has won {streak} in a row. "
-                         f"**A bounty is on their head** - beat them for +{BOUNTY_POINTS} points.")
-        elif wid in self.state["bounties"]:
-            self.state["bounties"][wid]["streak"] = streak
-            if streak % STREAK_EVERY == 0:
-                notes.append(f"🔥 **{winner.display_name}** is on a {streak}-win streak. "
-                             "The bounty still stands.")
-        elif streak == STREAK_ANNOUNCE:
-            notes.append(f"🔥 **{winner.display_name}** is on a {streak}-win streak.")
+        if not same_house:
+            streak = self.state["streaks"].get(wid, 0) + 1
+            self.state["streaks"][wid] = streak
+            if streak >= BOUNTY_AT and wid not in self.state["bounties"]:
+                self.state["bounties"][wid] = {"since": now, "streak": streak}
+                notes.append(f"🎯 **{winner.display_name}** has won {streak} in a row. "
+                             f"**A bounty is on their head** - beat them for +{BOUNTY_POINTS} points.")
+            elif wid in self.state["bounties"]:
+                self.state["bounties"][wid]["streak"] = streak
+                if streak % STREAK_EVERY == 0:
+                    notes.append(f"🔥 **{winner.display_name}** is on a {streak}-win streak. "
+                                 "The bounty still stands.")
+            elif streak == STREAK_ANNOUNCE:
+                notes.append(f"🔥 **{winner.display_name}** is on a {streak}-win streak.")
 
         # ------------------------------------------------ Circle reputation
         self.state["rep"][wid] = self.state["rep"].get(wid, 0) + REP_WIN
