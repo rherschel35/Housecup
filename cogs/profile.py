@@ -7,6 +7,7 @@
     Bestiary              - collector rank, beasts befriended, beast titles
     Wand                  - what chose them, and why
     Patronus              - the shape their protection takes
+    Broom                 - purely cosmetic, from the same three words
 
 House Cup honours come in two kinds:
 
@@ -192,6 +193,23 @@ class Profile(commands.Cog):
             )
         elif wand:
             embed.add_field(name="Patronus", value="Not cast yet \u2014 `/patronus`.",
+                            inline=True)
+
+        # ------------------------------------------------------------- broom
+        brooms_cog = self.bot.get_cog("Brooms")
+        broom = brooms_cog.broom_of(member.id) if brooms_cog else None
+        if broom:
+            from cogs.brooms import _ensure
+            broom = _ensure(dict(broom))
+            speed = broom.get("stats", {}).get("speed", "?")
+            alt = broom.get("stats", {}).get("altitude", "?")
+            embed.add_field(
+                name="Broom",
+                value=f"**The {broom['model']}**\nSpeed {speed}/10 · Altitude {alt}/10",
+                inline=True,
+            )
+        elif wand:
+            embed.add_field(name="Broom", value="Not claimed yet \u2014 `/broom`.",
                             inline=True)
 
         # --------------------------------------------------------- familiar
