@@ -1,12 +1,14 @@
 """
 Private broom racing on the Quidditch pitch.
 
-    /broomrace              - fly one of 100 courses (6 private stages)
-    /broomnotes [course]    - permanent study notes you've unlocked
+    /broomrace                     - solo fly one of 100 courses (6 private stages)
+    /broomrace opponent:@member    - challenge them on the same track
+    /broomnotes [course]           - permanent study notes you've unlocked
 
 Higher Speed/Altitude means fewer button choices per stage (the broom
 filters noise). Finish a course to unlock its study note forever; notes
-warn you off one trap when you race that course again.
+warn you off one trap when you race that course again. Challenges share
+one course; lower time-lost wins.
 """
 
 from __future__ import annotations
@@ -34,6 +36,7 @@ QUIDDITCH_CHANNEL_ID = 1553089438933065913
 
 RACE_COLOR = 0x2E6B4F
 STAGE_TIMEOUT = 90
+ACCEPT_TIMEOUT = 60
 STAGES = 6
 
 # kind -> base time penalty (seconds of "race time")
@@ -187,15 +190,115 @@ class StageView(discord.ui.View):
         await self.race.cog.on_stage_timeout(self.race)
 
 
+class ChallengeAcceptView(discord.ui.View):
+    def __init__(self, match: "ChallengeMatch"):
+        super().__init__(timeout=ACCEPT_TIMEOUT + 5)
+        self.match = match
+
+    @discord.ui.button(label="Accept", style=discord.ButtonStyle.success)
+    async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
+        m = self.match
+        if interaction.user.id != m.opponent.id:
+            await interaction.response.send_message(
+                "This challenge isn't yours to answer.", ephemeral=True
+            )
+            return
+        if m.state != "pending":
+            await interaction.response.send_message("Too late for that.", ephemeral=True)
+            return
+        await m.cog.start_challenge(interaction, m)
+
+    @discord.ui.button(label="Decline", style=discord.ButtonStyle.secondary)
+    async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
+        m = self.match
+        if interaction.user.id not in (m.challenger.id, m.opponent.id):
+            await interaction.response.send_message(
+                "This isn't your race challenge.", ephemeral=True
+            )
+            return
+        if m.state != "pending":
+            await interaction.response.send_message("Too late for that.", ephemeral=True)
+            return
+        m.state = "cancelled"
+        m.cog.clear_pending(m)
+        who = "withdraws" if interaction.user.id == m.challenger.id else "declines"
+        await interaction.response.edit_message(
+            content=None,
+            embed=discord.Embed(
+                description=(
+                    f"{interaction.user.display_name} {who}. No broom race today."
+                ),
+                color=0x7A7A7A,
+            ),
+            view=None,
+        )
+
+    async def on_timeout(self):
+        m = self.match
+        if m.state != "pending":
+            return
+        m.state = "cancelled"
+        m.cog.clear_pending(m)
+        if m.message is not None:
+            try:
+                await m.message.edit(
+                    content=None,
+                    embed=discord.Embed(
+                        title="🧹 Challenge expired",
+                        description=(
+                            f"**{m.opponent.display_name}** didn't answer in time. "
+                            "Challenge cancelled."
+                        ),
+                        color=0x95A5A6,
+                    ),
+                    view=None,
+                )
+            except discord.DiscordException:
+                log.exception("Could not expire broom race challenge")
+
+
+class OpenBoardButton(discord.ui.Button):
+    def __init__(self, match: "ChallengeMatch"):
+        super().__init__(
+            label="Open my race board",
+            style=discord.ButtonStyle.primary,
+            emoji="🧹",
+        )
+        self.match = match
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.match.cog.open_challenge_board(interaction, self.match)
+
+
+class OpenBoardView(discord.ui.View):
+    def __init__(self, match: "ChallengeMatch"):
+        super().__init__(timeout=STAGE_TIMEOUT * STAGES + 60)
+        self.match = match
+        self.add_item(OpenBoardButton(match))
+
+    async def on_timeout(self):
+        # If someone never opened, force-finish them so the match can resolve.
+        await self.match.cog.force_unopened_challengers(self.match)
+
+
 class RaceSession:
-    def __init__(self, cog: "BroomRace", user_id: int, course: dict, speed: int, altitude: int,
-                 studied: bool):
+    def __init__(
+        self,
+        cog: "BroomRace",
+        user_id: int,
+        course: dict,
+        speed: int,
+        altitude: int,
+        studied: bool,
+        match: "ChallengeMatch | None" = None,
+    ):
         self.cog = cog
         self.user_id = user_id
         self.course = course
         self.speed = speed
         self.altitude = altitude
         self.studied = studied
+        self.match = match
         self.stage_index = 0
         self.penalty = 0
         self.log_lines: list[str] = []
@@ -203,6 +306,39 @@ class RaceSession:
         self.message: discord.WebhookMessage | discord.Message | None = None
         self.view: StageView | None = None
         self.done = False
+        self.timed_out = False
+
+
+class ChallengeMatch:
+    def __init__(
+        self,
+        cog: "BroomRace",
+        channel: discord.abc.Messageable,
+        challenger: discord.Member,
+        opponent: discord.Member,
+        course: dict,
+    ):
+        self.cog = cog
+        self.channel = channel
+        self.challenger = challenger
+        self.opponent = opponent
+        self.course = course
+        self.state = "pending"  # pending | racing | done | cancelled
+        self.message: discord.Message | None = None
+        self.results: dict[int, int] = {}  # uid -> penalty
+        self.opened: set[int] = set()
+        self.announced = False
+
+    @property
+    def racer_ids(self) -> tuple[int, int]:
+        return (self.challenger.id, self.opponent.id)
+
+    def display_for(self, user_id: int) -> str:
+        if user_id == self.challenger.id:
+            return self.challenger.display_name
+        if user_id == self.opponent.id:
+            return self.opponent.display_name
+        return str(user_id)
 
 
 class BroomRace(commands.Cog):
@@ -214,6 +350,7 @@ class BroomRace(commands.Cog):
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         self.state = self._load_state()
         self.active: dict[int, RaceSession] = {}
+        self.pending: dict[int, ChallengeMatch] = {}  # uid -> match (both sides)
 
     def _load_state(self) -> dict:
         try:
@@ -226,6 +363,7 @@ class BroomRace(commands.Cog):
             data = {}
         data.setdefault("notes", {})   # uid -> [course_id, ...]
         data.setdefault("best", {})    # uid -> {course_id: {penalty, at}}
+        data.setdefault("versus", {})  # uid -> {wins, losses, ties}
         return data
 
     def save(self) -> None:
@@ -259,6 +397,31 @@ class BroomRace(commands.Cog):
         self.save()
         return True
 
+    def _versus_bump(self, winner_id: int | None, a_id: int, b_id: int) -> None:
+        bag = self.state.setdefault("versus", {})
+        for uid in (a_id, b_id):
+            bag.setdefault(str(uid), {"wins": 0, "losses": 0, "ties": 0})
+        if winner_id is None:
+            bag[str(a_id)]["ties"] += 1
+            bag[str(b_id)]["ties"] += 1
+        else:
+            loser = b_id if winner_id == a_id else a_id
+            bag[str(winner_id)]["wins"] += 1
+            bag[str(loser)]["losses"] += 1
+        self.save()
+
+    def clear_pending(self, match: ChallengeMatch) -> None:
+        for uid in match.racer_ids:
+            if self.pending.get(uid) is match:
+                self.pending.pop(uid, None)
+
+    def _busy(self, user_id: int) -> str | None:
+        if user_id in self.active:
+            return "already mid-race"
+        if user_id in self.pending:
+            return "already has a broom race challenge pending"
+        return None
+
     def _flight_stats(self, user_id: int) -> tuple[int, int] | None:
         brooms = self.bot.get_cog("Brooms")
         if not brooms:
@@ -270,22 +433,38 @@ class BroomRace(commands.Cog):
         eff = effective_stats(broom)
         return int(eff.get("speed", 0)), int(eff.get("altitude", 0))
 
-    def _pick_course(self, user_id: int) -> dict:
-        """Prefer unstudied courses; else any."""
-        notes = set(self.notes_of(user_id))
-        fresh = [c for c in self.courses if c["id"] not in notes]
-        pool = fresh or self.courses
-        return random.choice(pool)
+    def _pick_course(self, *user_ids: int) -> dict:
+        """Prefer courses none of the racers have studied yet."""
+        note_sets = [set(self.notes_of(uid)) for uid in user_ids]
+        fresh_all = [
+            c for c in self.courses
+            if all(c["id"] not in notes for notes in note_sets)
+        ]
+        if fresh_all:
+            return random.choice(fresh_all)
+        fresh_any = [
+            c for c in self.courses
+            if any(c["id"] not in notes for notes in note_sets)
+        ]
+        return random.choice(fresh_any or self.courses)
 
     def _stage_embed(self, race: RaceSession, options: list[dict]) -> discord.Embed:
         course = race.course
         n = race.stage_index + 1
         stage = course["stages"][race.stage_index]
         skill = (race.speed + race.altitude) / 2
+        versus = ""
+        if race.match:
+            rival_id = (
+                race.match.opponent.id
+                if race.user_id == race.match.challenger.id
+                else race.match.challenger.id
+            )
+            versus = f"\nHead-to-head vs **{race.match.display_for(rival_id)}**"
         embed = discord.Embed(
             title=f"🧹 {course['name']} — stage {n}/{STAGES}",
             description=(
-                f"*{course['blurb']}*\n\n"
+                f"*{course['blurb']}*{versus}\n\n"
                 f"**{stage['prompt']}**\n\n"
                 f"Your flight · Speed **{race.speed}/10** · Altitude **{race.altitude}/10**\n"
                 f"Choices shown · **{len(options)}** "
@@ -300,8 +479,14 @@ class BroomRace(commands.Cog):
             embed.set_footer(text="Private race · finish to unlock this course's study note")
         return embed
 
-    def _finish_embed(self, member: discord.Member, race: RaceSession, new_note: bool,
-                      new_best: bool) -> discord.Embed:
+    def _finish_embed(
+        self,
+        member: discord.Member,
+        race: RaceSession,
+        new_note: bool,
+        new_best: bool,
+        waiting: bool = False,
+    ) -> discord.Embed:
         course = race.course
         lines = "\n".join(f"· {x}" for x in race.log_lines) or "· (no notes)"
         desc = (
@@ -315,13 +500,71 @@ class BroomRace(commands.Cog):
             desc += f"\n\n📓 Notes you already hold\n*{course['study_note']}*"
         if new_best:
             desc += "\n\n🏆 Personal best on this course."
+        if waiting:
+            desc += "\n\n⏳ Waiting for your opponent to finish…"
         return discord.Embed(title="🏁 Race complete", description=desc, color=RACE_COLOR)
+
+    def _begin_session(
+        self,
+        user_id: int,
+        course: dict,
+        match: ChallengeMatch | None = None,
+    ) -> RaceSession | None:
+        stats = self._flight_stats(user_id)
+        if not stats:
+            return None
+        speed, altitude = stats
+        studied = course["id"] in self.notes_of(user_id)
+        race = RaceSession(
+            self, user_id, course, speed, altitude, studied, match=match
+        )
+        self.active[user_id] = race
+        return race
+
+    async def _send_stage_board(
+        self,
+        interaction: discord.Interaction,
+        race: RaceSession,
+        *,
+        via_followup: bool = False,
+    ) -> None:
+        options = pick_stage_options(
+            race.course["stages"][0],
+            race.speed,
+            race.altitude,
+            studied=race.studied,
+            rng=race.rng,
+        )
+        view = StageView(race, options)
+        race.view = view
+        embed = self._stage_embed(race, options)
+        if via_followup:
+            race.message = await interaction.followup.send(
+                embed=embed, view=view, ephemeral=True, wait=True
+            )
+        else:
+            await interaction.response.send_message(
+                embed=embed, view=view, ephemeral=True
+            )
+            try:
+                race.message = await interaction.original_response()
+            except discord.HTTPException:
+                race.message = None
+
+    # ================================================================ solo / challenge
 
     @app_commands.command(
         name="broomrace",
-        description="Private 6-stage broom race on a course (Quidditch channel). Higher stats → fewer choices.",
+        description="Private 6-stage broom race (Quidditch channel). Optional: challenge someone on the same track.",
     )
-    async def broomrace(self, interaction: discord.Interaction):
+    @app_commands.describe(
+        opponent="Challenge this member to the same course (leave blank to race solo)",
+    )
+    async def broomrace(
+        self,
+        interaction: discord.Interaction,
+        opponent: discord.Member | None = None,
+    ):
         if interaction.channel_id != QUIDDITCH_CHANNEL_ID:
             await interaction.response.send_message(
                 f"Broom races run on the pitch — try <#{QUIDDITCH_CHANNEL_ID}>.",
@@ -333,36 +576,33 @@ class BroomRace(commands.Cog):
         if hexes and await hexes.deny_if_limp_wand(interaction):
             return
 
-        if interaction.user.id in self.active:
+        if opponent is None:
+            await self._start_solo(interaction)
+            return
+        await self._offer_challenge(interaction, opponent)
+
+    async def _start_solo(self, interaction: discord.Interaction):
+        why = self._busy(interaction.user.id)
+        if why:
             await interaction.response.send_message(
-                "You're already mid-race. Finish your stages (or wait for timeout).",
-                ephemeral=True,
+                f"You're {why}.", ephemeral=True
             )
             return
 
-        stats = self._flight_stats(interaction.user.id)
-        if not stats:
+        if not self._flight_stats(interaction.user.id):
             await interaction.response.send_message(
                 "You need a claimed broom first — `/broom`.", ephemeral=True
             )
             return
-        speed, altitude = stats
+
         course = self._pick_course(interaction.user.id)
-        studied = course["id"] in self.notes_of(interaction.user.id)
-        race = RaceSession(self, interaction.user.id, course, speed, altitude, studied)
-        self.active[interaction.user.id] = race
+        race = self._begin_session(interaction.user.id, course)
+        if not race:
+            await interaction.response.send_message(
+                "You need a claimed broom first — `/broom`.", ephemeral=True
+            )
+            return
 
-        options = pick_stage_options(
-            course["stages"][0],
-            speed,
-            altitude,
-            studied=studied,
-            rng=race.rng,
-        )
-        view = StageView(race, options)
-        race.view = view
-
-        # Public ping that someone is racing; picks stay private (ephemeral).
         await interaction.response.send_message(
             embed=discord.Embed(
                 title="🧹 Broom race",
@@ -374,9 +614,154 @@ class BroomRace(commands.Cog):
                 color=RACE_COLOR,
             )
         )
-        race.message = await interaction.followup.send(
-            embed=self._stage_embed(race, options), view=view, ephemeral=True, wait=True
+        await self._send_stage_board(interaction, race, via_followup=True)
+
+    async def _offer_challenge(
+        self, interaction: discord.Interaction, opponent: discord.Member
+    ):
+        me = interaction.user
+        if opponent.id == me.id:
+            await interaction.response.send_message(
+                "Challenge someone else — solo is just `/broomrace`.", ephemeral=True
+            )
+            return
+        if opponent.bot:
+            await interaction.response.send_message(
+                "Brooms don't answer to bots.", ephemeral=True
+            )
+            return
+
+        for who, label in ((me, "You're"), (opponent, f"{opponent.display_name} is")):
+            why = self._busy(who.id)
+            if why:
+                await interaction.response.send_message(
+                    f"{label} {why}.", ephemeral=True
+                )
+                return
+
+        if not self._flight_stats(me.id):
+            await interaction.response.send_message(
+                "You need a claimed broom first — `/broom`.", ephemeral=True
+            )
+            return
+        if not self._flight_stats(opponent.id):
+            await interaction.response.send_message(
+                f"{opponent.display_name} hasn't claimed a broom yet.",
+                ephemeral=True,
+            )
+            return
+
+        course = self._pick_course(me.id, opponent.id)
+        match = ChallengeMatch(self, interaction.channel, me, opponent, course)
+        self.pending[me.id] = match
+        self.pending[opponent.id] = match
+
+        view = ChallengeAcceptView(match)
+        await interaction.response.send_message(
+            content=opponent.mention,
+            embed=discord.Embed(
+                title="🧹 Broom race challenge",
+                description=(
+                    f"**{me.display_name}** challenges **{opponent.display_name}** "
+                    f"on the same track.\n\n"
+                    f"**Course · {course['name']}**\n*{course['blurb']}*\n\n"
+                    "Accept to race head-to-head — private stages, shared course, "
+                    "lowest time lost wins."
+                ),
+                color=RACE_COLOR,
+            ).set_footer(text=f"Expires in {ACCEPT_TIMEOUT}s"),
+            view=view,
         )
+        match.message = await interaction.original_response()
+
+    async def start_challenge(
+        self, interaction: discord.Interaction, match: ChallengeMatch
+    ):
+        if match.state != "pending":
+            await interaction.response.send_message("Too late for that.", ephemeral=True)
+            return
+        # Re-check busy (solo race could have started? pending should block)
+        for uid in match.racer_ids:
+            if uid in self.active:
+                await interaction.response.send_message(
+                    "Someone started another race — challenge cancelled.",
+                    ephemeral=True,
+                )
+                match.state = "cancelled"
+                self.clear_pending(match)
+                return
+
+        match.state = "racing"
+        self.clear_pending(match)
+
+        view = OpenBoardView(match)
+        await interaction.response.edit_message(
+            content=None,
+            embed=discord.Embed(
+                title="🧹 Race is on — same track",
+                description=(
+                    f"**{match.challenger.display_name}** vs "
+                    f"**{match.opponent.display_name}**\n\n"
+                    f"**Course · {match.course['name']}**\n"
+                    f"*{match.course['blurb']}*\n\n"
+                    "Both racers: press **Open my race board** for your private "
+                    "6 stages. Your own Speed/Altitude still shapes how many "
+                    "choices you see. Lowest time lost wins."
+                ),
+                color=RACE_COLOR,
+            ),
+            view=view,
+        )
+        match.message = await interaction.original_response()
+
+    async def open_challenge_board(
+        self, interaction: discord.Interaction, match: ChallengeMatch
+    ):
+        if match.state != "racing":
+            await interaction.response.send_message(
+                "This race isn't open.", ephemeral=True
+            )
+            return
+        if interaction.user.id not in match.racer_ids:
+            await interaction.response.send_message(
+                "You're not in this race.", ephemeral=True
+            )
+            return
+        if interaction.user.id in match.opened or interaction.user.id in self.active:
+            await interaction.response.send_message(
+                "Your board is already open (check your ephemeral messages).",
+                ephemeral=True,
+            )
+            return
+        if interaction.user.id in match.results:
+            await interaction.response.send_message(
+                "You've already finished this race.", ephemeral=True
+            )
+            return
+
+        race = self._begin_session(interaction.user.id, match.course, match=match)
+        if not race:
+            await interaction.response.send_message(
+                "You need a claimed broom first — `/broom`.", ephemeral=True
+            )
+            return
+        match.opened.add(interaction.user.id)
+        await self._send_stage_board(interaction, race, via_followup=False)
+
+    async def force_unopened_challengers(self, match: ChallengeMatch):
+        if match.state != "racing" or match.announced:
+            return
+        for uid in match.racer_ids:
+            if uid in match.results:
+                continue
+            if uid in self.active:
+                continue
+            # Never opened — count as a heavy DNF so the match can resolve.
+            match.results[uid] = 15 * STAGES
+            self.unlock_note(uid, match.course["id"])
+        await self._maybe_announce_challenge(match)
+
+    # ================================================================ stage loop
 
     async def on_stage_pick(self, interaction: discord.Interaction, race: RaceSession, opt: dict):
         if interaction.user.id != race.user_id:
@@ -416,7 +801,6 @@ class BroomRace(commands.Cog):
     async def on_stage_timeout(self, race: RaceSession):
         if race.done or self.active.get(race.user_id) is not race:
             return
-        # DNF remaining stages — still bank a study note so timeouts aren't a dead end.
         while race.stage_index < STAGES:
             race.penalty += 15
             race.log_lines.append(
@@ -424,9 +808,42 @@ class BroomRace(commands.Cog):
             )
             race.stage_index += 1
         race.done = True
+        race.timed_out = True
         self.active.pop(race.user_id, None)
         new_note = self.unlock_note(race.user_id, race.course["id"])
         new_best = self.record_best(race.user_id, race.course["id"], race.penalty)
+
+        if race.match:
+            race.match.results[race.user_id] = race.penalty
+            if race.message is not None:
+                try:
+                    wait = (
+                        "\n\n⏳ Waiting for your opponent…"
+                        if len(race.match.results) < 2
+                        else ""
+                    )
+                    note = (
+                        f"\n📓 Study note unlocked\n*{race.course['study_note']}*"
+                        if new_note
+                        else ""
+                    )
+                    await race.message.edit(
+                        embed=discord.Embed(
+                            title="🏁 Race timed out",
+                            description=(
+                                f"**{race.course['name']}** — stages left unflown.\n"
+                                f"Time lost · **+{race.penalty}s**\n"
+                                f"{note}{wait}"
+                            ),
+                            color=0x95A5A6,
+                        ),
+                        view=None,
+                    )
+                except discord.DiscordException:
+                    log.exception("Could not edit timed-out challenge race message")
+            await self._maybe_announce_challenge(race.match)
+            return
+
         if race.message is not None:
             try:
                 await race.message.edit(
@@ -456,9 +873,19 @@ class BroomRace(commands.Cog):
         self.active.pop(race.user_id, None)
         new_note = self.unlock_note(race.user_id, race.course["id"])
         new_best = self.record_best(race.user_id, race.course["id"], race.penalty)
+
+        if race.match:
+            race.match.results[race.user_id] = race.penalty
+            waiting = len(race.match.results) < 2
+            embed = self._finish_embed(
+                interaction.user, race, new_note, new_best, waiting=waiting
+            )
+            await interaction.response.edit_message(embed=embed, view=None)
+            await self._maybe_announce_challenge(race.match)
+            return
+
         embed = self._finish_embed(interaction.user, race, new_note, new_best)
         await interaction.response.edit_message(embed=embed, view=None)
-        # Public finish line.
         try:
             await interaction.channel.send(
                 embed=discord.Embed(
@@ -473,6 +900,57 @@ class BroomRace(commands.Cog):
             )
         except discord.DiscordException:
             log.exception("Could not announce broom race finish")
+
+    async def _maybe_announce_challenge(self, match: ChallengeMatch):
+        if match.announced or match.state == "cancelled":
+            return
+        if len(match.results) < 2:
+            return
+        match.announced = True
+        match.state = "done"
+
+        a, b = match.challenger, match.opponent
+        pa, pb = match.results[a.id], match.results[b.id]
+        if pa < pb:
+            winner, winner_id = a, a.id
+            line = (
+                f"**{a.display_name}** wins with **+{pa}s** "
+                f"(vs **{b.display_name}** at **+{pb}s**)."
+            )
+        elif pb < pa:
+            winner, winner_id = b, b.id
+            line = (
+                f"**{b.display_name}** wins with **+{pb}s** "
+                f"(vs **{a.display_name}** at **+{pa}s**)."
+            )
+        else:
+            winner_id = None
+            line = (
+                f"Dead heat — both **{a.display_name}** and **{b.display_name}** "
+                f"at **+{pa}s**."
+            )
+
+        self._versus_bump(winner_id, a.id, b.id)
+
+        embed = discord.Embed(
+            title="🏁 Head-to-head result",
+            description=(
+                f"**{match.course['name']}**\n*{match.course['blurb']}*\n\n{line}"
+            ),
+            color=RACE_COLOR,
+        )
+        try:
+            if match.message is not None:
+                await match.message.edit(embed=embed, view=None)
+            else:
+                await match.channel.send(embed=embed)
+        except discord.DiscordException:
+            try:
+                await match.channel.send(embed=embed)
+            except discord.DiscordException:
+                log.exception("Could not announce broom race challenge result")
+
+    # ================================================================ notes
 
     @app_commands.command(
         name="broomnotes",
@@ -526,6 +1004,12 @@ class BroomRace(commands.Cog):
         footer = f"{len(ids)} / 100 courses studied"
         if more > 0:
             footer += f" · showing 25 · pass course: for one"
+        versus = self.state.get("versus", {}).get(str(interaction.user.id))
+        if versus:
+            footer += (
+                f" · H2H {versus.get('wins', 0)}-{versus.get('losses', 0)}"
+                f"-{versus.get('ties', 0)}"
+            )
         await interaction.response.send_message(
             embed=discord.Embed(
                 title="📓 Broom study notes",
