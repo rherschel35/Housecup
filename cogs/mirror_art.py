@@ -20,7 +20,7 @@ import math
 import random
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 from cogs.wizard_assets_bootstrap import assets_root, crests_root, female_full_ready
 from cogs import mirror_male1 as male1
@@ -779,10 +779,15 @@ def render(*, look: dict, user_id: int, name: str, title: str | None = None,
     oy = int((wy0 + 4) * S)
 
     if aura:
-        glow = Image.new("RGBA", port.size, (255, 214, 110, 0))
+        # Legend's Tooth — soft gold halo behind the portrait silhouette.
+        # (Must use ImageFilter.GaussianBlur directly; a nested __import__
+        # path raises AttributeError and fogs the whole Mirror.)
+        glow = Image.new("RGBA", port.size, (255, 214, 110, 255))
         glow.putalpha(port.getchannel("A"))
-        g = glow.filter(__import__("PIL.ImageFilter", fromlist=["ImageFilter"]).ImageFilter.GaussianBlur(14))
-        card.alpha_composite(g, (ox - 4, oy - 4))
+        halo = glow.filter(ImageFilter.GaussianBlur(14))
+        aura_layer = Image.new("RGBA", card.size, (0, 0, 0, 0))
+        aura_layer.paste(halo, (max(0, ox - 4), max(0, oy - 4)), halo)
+        card.alpha_composite(aura_layer)
 
     layer = Image.new("RGBA", card.size, (0, 0, 0, 0))
     layer.alpha_composite(port, (ox, oy))
