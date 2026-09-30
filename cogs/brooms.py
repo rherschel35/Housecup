@@ -8,8 +8,9 @@ your wand (and cast your patronus).
 
 100 fixed painted portraits (like Descent monsters). Each broom can be
 claimed by only ONE player; if your words point at a taken broom, you get
-the next-closest available one. Stats are decorative (Speed, Altitude, and
-ridiculous 0–10 meters). /broomreset frees the claim without touching the wand.
+the next-closest available one. Stats are decorative and fixed per broom
+model (Speed, Altitude, and ridiculous 0–10 meters) so Discord matches the
+Compendium. /broomreset frees the claim without touching the wand.
 """
 
 from __future__ import annotations
@@ -222,6 +223,11 @@ def _stat_block(digest: bytes) -> dict:
     return {k: digest[4 + i] % 11 for i, k in enumerate(SERIOUS_STATS + SILLY_STATS)}
 
 
+def stats_for_model(model: str) -> dict:
+    """Cosmetic stats are fixed per broom model (Discord and Compendium match)."""
+    return _stat_block(_digest(model))
+
+
 def _bar(n: int, width: int = 10) -> str:
     n = max(0, min(10, int(n)))
     return "█" * n + "░" * (width - n) + f" {n}/10"
@@ -246,7 +252,6 @@ def preference_rank(words: str) -> list[str]:
 
 
 def fallback_broom(words: str, model: str) -> dict:
-    digest = _digest(words + "|" + model)
     return {
         "model": model,
         "finish": f"The {model} settles into your hand like it had been waiting.",
@@ -254,7 +259,7 @@ def fallback_broom(words: str, model: str) -> dict:
             f"The {model} is {BROOMS[model]}. "
             "It will not make you faster. It will make you look like yourself."
         ),
-        "stats": _stat_block(digest),
+        "stats": stats_for_model(model),
     }
 
 
@@ -272,7 +277,7 @@ def _clean(raw: dict, words: str, allowed: set[str]) -> dict | None:
         "model": match,
         "finish": finish[:300],
         "reading": reading[:600],
-        "stats": _stat_block(_digest(words + "|" + match)),
+        "stats": stats_for_model(match),
     }
 
 
@@ -285,9 +290,8 @@ def _ensure(broom: dict, words: str | None = None) -> dict:
         out["model"] = fb["model"]
         out.setdefault("finish", fb["finish"])
         out.setdefault("reading", out.get("reading") or fb["reading"])
-        out["stats"] = fb["stats"]
-    if "stats" not in out or not isinstance(out.get("stats"), dict):
-        out["stats"] = _stat_block(_digest((words or "") + "|" + out["model"]))
+    # Always re-derive so Discord stays in lockstep with the Compendium sheet.
+    out["stats"] = stats_for_model(out["model"])
     return out
 
 
@@ -345,7 +349,12 @@ class Brooms(commands.Cog):
         raw = self.owners.get(str(user_id))
         if not raw:
             return None
-        return _ensure(raw)
+        fixed = _ensure(raw)
+        # Migrate stored word-based stats → fixed model sheet.
+        if fixed.get("stats") != raw.get("stats"):
+            self.owners[str(user_id)] = fixed
+            self.save()
+        return fixed
 
     def release(self, user_id: int) -> bool:
         gone = self.owners.pop(str(user_id), None) is not None
