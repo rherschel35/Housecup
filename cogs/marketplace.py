@@ -594,6 +594,8 @@ class Marketplace(commands.Cog):
                 "The scroll fizzled. It wasn't consumed — try again.", ephemeral=True)
             return
 
+        # Limp Wand (and any fixed-duration curse) overrides the scroll's usual 30 min.
+        mins = int(spell.get("fixed_minutes") or SCROLL_DURATION_MIN)
         flourish = random.choice(CAST_FLOURISHES)
         replaced = " (replacing the curse already on them)" if was_hexed else ""
         await interaction.response.send_message(embed=discord.Embed(
@@ -602,7 +604,7 @@ class Marketplace(commands.Cog):
                         f"**{member.display_name}**.\n\n"
                         f"{member.mention} is hexed with **{spell['name']}** "
                         f"({spell['description']}){replaced} for "
-                        f"**{SCROLL_DURATION_MIN}** minutes.",
+                        f"**{mins}** minutes.",
             color=0x8B5CF6,
         ).set_footer(text=f"Scrolls left: {self.scroll_count(interaction.user.id)}"))
 

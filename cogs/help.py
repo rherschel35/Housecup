@@ -180,7 +180,7 @@ HELP = {
             ("descentreset", "Wipe someone's Descent progress back to floor 1."),
             ("raidreset", "Clear a player's 3Raid weekly lockout, or end the active raid."),
             ("marketsellreset", "Clear someone's daily Marketplace sell-points cap."),
-            ("hex", "Curse a student's messages with a prank spell."),
+            ("hex", "Curse a student — chat mangles, or Limp Wand (blocks /wand, /patronus, /broom, /cast for 1 hour)."),
             ("unhex", "Lift a hex early."),
             ("hexlist", "Show who's currently hexed."),
         ],

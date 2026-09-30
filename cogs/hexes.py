@@ -1,16 +1,15 @@
 """
 Headmaster hexes - a prank spell a Headmaster can cast on a student so that,
-without warning, whatever they type comes out cursed.
+without warning, whatever they type comes out cursed — or their wand goes limp.
 
     /hex member:<@user> effect:<pick one> duration:<minutes>   - cast it
     /unhex member:<@user>                                      - lift it early
     /hexlist                                                   - who's currently hexed
 
-Mechanically: a bot can't rewrite someone else's sent message, so this
-deletes the cursed member's message the instant it lands and reposts it
-through a per-channel webhook wearing their name and avatar, with the text
-mangled. To everyone watching, it looks like their own words just came out
-wrong - there's no "a bot did this" tell.
+Most curses mangle chat: the bot deletes the cursed member's message and
+reposts it through a per-channel webhook wearing their name and avatar.
+Limp Wand is different — it leaves chat alone and blocks /wand, /patronus,
+/broom, and /cast for one hour.
 
 Needs the bot to hold Manage Messages (to delete the original) and Manage
 Webhooks (to create/reuse the relay webhook) in this server.
@@ -237,7 +236,17 @@ EFFECTS = {
                "only.", "func": fx_caveman},
     "pirates_tongue": {"name": "Pirate Curse", "description": "Curses them to talk like a pirate.",
                       "func": fx_pirates_tongue},
+    "limp_wand": {
+        "name": "Limp Wand",
+        "description": "Their wand hangs limp — /wand, /patronus, and /broom won't answer for an hour.",
+        "func": None,  # not a chat mangle; blocks wand commands instead
+        "blocks_wand": True,
+        "fixed_minutes": 60,
+    },
 }
+
+# Player wand-kit slash commands blocked by Limp Wand (staff resets stay usable).
+WAND_KIT_COMMANDS = frozenset({"wand", "patronus", "broom"})
 
 CAST_FLOURISHES = [
     "draws their wand with a flourish and levels it at",
@@ -299,9 +308,13 @@ class Hexes(commands.Cog):
     def apply_hex(self, *, target_id: int, effect: str, duration_minutes: int | None,
                   cast_by: int) -> tuple[dict, bool]:
         """Apply a hex by effect key. duration_minutes None/0 = until lifted.
-        Returns (spell dict, was_replacing_existing). Raises KeyError if effect unknown."""
+        Limp Wand always lasts its fixed_minutes (60). Returns (spell dict,
+        was_replacing_existing). Raises KeyError if effect unknown."""
         spell = EFFECTS[effect]
         was_hexed = str(target_id) in self.state["hexed"]
+        fixed = spell.get("fixed_minutes")
+        if fixed:
+            duration_minutes = int(fixed)
         expires_at = None if not duration_minutes else time.time() + duration_minutes * 60
         self.state["hexed"][str(target_id)] = {
             "effect": effect, "expires_at": expires_at, "cast_by": cast_by,
@@ -309,9 +322,55 @@ class Hexes(commands.Cog):
         self.save()
         return spell, was_hexed
 
-    @app_commands.command(name="hex", description="(Headmaster) Curse a student's messages with a prank spell.")
+    def active_hex(self, user_id: int) -> dict | None:
+        """Return the live hex record for this user, or None if expired/absent."""
+        rec = self.state["hexed"].get(str(user_id))
+        if not rec:
+            return None
+        if rec["expires_at"] is not None and rec["expires_at"] <= time.time():
+            self.state["hexed"].pop(str(user_id), None)
+            self.save()
+            return None
+        return rec
+
+    def is_wand_limp(self, user_id: int) -> bool:
+        rec = self.active_hex(user_id)
+        if not rec:
+            return False
+        spell = EFFECTS.get(rec["effect"]) or {}
+        return bool(spell.get("blocks_wand"))
+
+    def limp_minutes_left(self, user_id: int) -> int | None:
+        """Whole minutes left on a Limp Wand hex, or None if not limp."""
+        rec = self.active_hex(user_id)
+        if not rec:
+            return None
+        spell = EFFECTS.get(rec["effect"]) or {}
+        if not spell.get("blocks_wand"):
+            return None
+        if rec["expires_at"] is None:
+            return None
+        return max(0, int((rec["expires_at"] - time.time() + 59) // 60))
+
+    async def deny_if_limp_wand(self, interaction: discord.Interaction) -> bool:
+        """If the invoker is under Limp Wand, reply ephemerally and return True."""
+        if not self.is_wand_limp(interaction.user.id):
+            return False
+        mins = self.limp_minutes_left(interaction.user.id)
+        when = "until a Headmaster lifts it" if mins is None else f"for about {mins} more minute(s)"
+        msg = (
+            "Your wand hangs limp and won't answer. "
+            f"`/wand`, `/patronus`, and `/broom` are out {when}."
+        )
+        if interaction.response.is_done():
+            await interaction.followup.send(msg, ephemeral=True)
+        else:
+            await interaction.response.send_message(msg, ephemeral=True)
+        return True
+
+    @app_commands.command(name="hex", description="(Headmaster) Curse a student with a prank hex.")
     @app_commands.describe(member="Who to hex", effect="Which curse to cast",
-                           duration="How many minutes it lasts (0 = until lifted)")
+                           duration="How many minutes it lasts (0 = until lifted; Limp Wand is always 60)")
     @app_commands.choices(effect=[app_commands.Choice(name=v["name"], value=k) for k, v in EFFECTS.items()])
     async def hex(self, interaction: discord.Interaction, member: discord.Member,
                   effect: app_commands.Choice[str], duration: app_commands.Range[int, 0, 10080]):
@@ -340,7 +399,13 @@ class Hexes(commands.Cog):
         ))
 
         replaced_note = " (replacing the curse already on them)" if was_hexed else ""
-        until = "until a Headmaster lifts it" if not duration else f"for {duration} minute(s)"
+        fixed = spell.get("fixed_minutes")
+        if fixed:
+            until = f"for {fixed} minute(s)"
+        elif not duration:
+            until = "until a Headmaster lifts it"
+        else:
+            until = f"for {duration} minute(s)"
         await interaction.followup.send(
             f"🪄 {member.mention} is hexed with **{spell['name']}** ({spell['description']}){replaced_note}, "
             f"{until}.", ephemeral=True)
@@ -431,16 +496,13 @@ class Hexes(commands.Cog):
         if not message.content or not message.content.strip():
             return
 
-        rec = self.state["hexed"].get(str(message.author.id))
+        rec = self.active_hex(message.author.id)
         if not rec:
-            return
-        if rec["expires_at"] is not None and rec["expires_at"] <= time.time():
-            self.state["hexed"].pop(str(message.author.id), None)
-            self.save()
             return
 
         effect = EFFECTS.get(rec["effect"])
-        if not effect:
+        if not effect or effect.get("func") is None:
+            # Limp Wand (and any future non-chat hexes) leave messages alone.
             return
         cursed = effect["func"](message.content)
         if not cursed.strip():

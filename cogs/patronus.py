@@ -208,6 +208,10 @@ class Patronus(commands.Cog):
                           description="Cast your patronus from the words that chose your wand.")
     @app_commands.describe(member="Whose patronus to see (leave blank for your own)")
     async def patronus(self, interaction: discord.Interaction, member: discord.Member = None):
+        hexes = self.bot.get_cog("Hexes")
+        if hexes and await hexes.deny_if_limp_wand(interaction):
+            return
+
         target = member or interaction.user
 
         existing = self.patronus_of(target.id)
