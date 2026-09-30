@@ -33,10 +33,7 @@ HELP = {
             ("bean", "Spend 1 point on a mystery bean. Might pay 5. Might be Mordy's socks."),
             ("wand", "Give any three words and a wand chooses you. Yours for good."),
             ("patronus", "Your patronus, cast from the same three words as your wand."),
-            ("broom", "Your unique broom from the same three words — 100 portraits, flight + silly stats. One owner each."),
-            ("broomupgrade", "Raise broom Speed or Altitude on you or @member (you pay: resin ×5, Descent ×100, or token)."),
-            ("broomrace", "Private 6-stage race on a course (Quidditch channel). Pass opponent: to challenge them on the same track."),
-            ("broomnotes", "Permanent study notes from courses you've finished."),
+            ("broom", "Claim your unique broom (see Brooms section for upgrades, races, and notes)."),
             ("rumor", "Explore secrets, student gossip, odd headmaster whispers, embarrassing ghosts."),
             ("cast", "Banish a wild threat in this channel. Needs a patronus already cast."),
             ("familiar", "Adopt a familiar (once, for good), name it, or see the one you have."),
@@ -87,10 +84,32 @@ HELP = {
     "quidditch": {
         "title": "Quidditch",
         "staff": False,
+        "note": "Team pickup matches live here. Solo and challenge broom races (`/broomrace`) also run in the Quidditch channel — see Brooms.",
         "entries": [
             ("quidditch scramble", "Start a casual pickup match — any houses, either side."),
             ("quidditch housematch", "Start a house-vs-house Quidditch match."),
             ("quidditchstats", "Your Quidditch record and title."),
+            ("broomrace", "Private broom races / challenges on this pitch (see Brooms for daily caps)."),
+        ],
+    },
+    "brooms": {
+        "title": "Brooms",
+        "staff": False,
+        "note": (
+            "Claim one unique broom from your wand words (100 portraits). "
+            "Upgrade Speed/Altitude toward 10, then race on the Quidditch pitch. "
+            "Solo: 5 learning races/day (UTC). Challenges: always open; wins pay 3 pts "
+            "(5 paid wins/day), then free play."
+        ),
+        "entries": [
+            ("broom", "Claim your unique broom from the same three words — or view yours / @member's."),
+            ("broomupgrade", "Raise Speed or Altitude on you or @member. Pay with Pitch Resin ×5, Descent mat ×100, or a market token."),
+            ("market broomtoken", "Buy a Speed or Altitude upgrade token (cost max(1, current−6) pts). Spend with /broomupgrade."),
+            ("broomrace", "Solo 6-stage race (Quidditch channel), or pass opponent: to challenge on the same track."),
+            ("broomnotes", "Permanent study notes from courses you've finished (⚠ marks known traps when studied)."),
+            ("checklist", "See solo learning races and challenge point-wins left today."),
+            ("upgrade broom", "(staff) Freely raise anyone's broom Speed or Altitude / control."),
+            ("broomreset", "(staff) Free someone's broom claim (wand and patronus stay)."),
         ],
     },
     "explore": {
@@ -100,7 +119,7 @@ HELP = {
         "entries": [
             ("places", "Where you can go, and what's happening there."),
             ("explore", "Go somewhere and see what you find."),
-            ("forage", "Search for ingredients and strange things."),
+            ("forage", "Search for ingredients and strange things (Pitch Resin for broom upgrades is forage-only)."),
             ("satchel", "What you're carrying. Only you can see it."),
             ("use", "Try something from your satchel where you are."),
             ("offer", "Leave an offering where you are."),
@@ -152,7 +171,7 @@ HELP = {
         "staff": False,
         "entries": [
             ("profile", "Your Mirror, wand, patronus, broom, points, duel rank, beasts and honours - or anyone's."),
-            ("checklist", "Your daily points board (public) — only your own; with reset timers."),
+            ("checklist", "Your daily points board (public) — duels, Quidditch, broom solo/challenge caps, beasts, market, and more."),
             ("points", "Your points (or anyone's), this season and all time."),
             ("standings", "The House Cup table."),
             ("leaderboard", "The top earners."),
