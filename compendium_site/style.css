@@ -194,3 +194,11 @@ footer.site{border-top:1px solid var(--line);margin-top:60px;padding-top:18px;co
   .nav{order:3;flex-basis:100%;flex-wrap:wrap;overflow:visible;padding-block:4px 10px;margin-left:-9px;gap:2px}
   .nav a{padding:5px 9px;font-size:14.5px}
 }
+
+/* Broom gallery */
+.broom-grid{grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px}
+.broom-card{padding:0;overflow:hidden;display:flex;flex-direction:column}
+.broom-card img{display:block;width:100%;height:auto;aspect-ratio:1;object-fit:cover;background:#0a0a0c}
+.broom-card h3{margin:12px 14px 0;font-size:17px}
+.broom-card p{margin:4px 14px 14px;font-size:15px;color:var(--muted)}
+.broom-card:target{box-shadow:0 0 0 2px var(--gold-soft);border-color:var(--gold-soft)}
