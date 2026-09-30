@@ -178,6 +178,26 @@ class Checklist(commands.Cog):
                 f"**{left}/{DAILY_HOUSE_WIN_CAP}** point wins left ({HOUSE_POINTS_PER_WIN} pts each)",
                 utc_reset, "day resets"))
 
+        # ---- Broom races (UTC calendar) ----
+        broom_race = self.bot.get_cog("BroomRace")
+        if broom_race:
+            from cogs.broom_race import (
+                CHALLENGE_POINT_CAP,
+                CHALLENGE_POINTS,
+                SOLO_DAILY_CAP,
+            )
+            solo_left = broom_race.solo_left(member.id)
+            chall_left = broom_race.challenge_pts_left(member.id)
+            lines.append(_line(
+                solo_left == 0, "Broom race (solo)",
+                f"**{solo_left}/{SOLO_DAILY_CAP}** learning races left",
+                utc_reset, "day resets"))
+            lines.append(_line(
+                chall_left == 0, "Broom race (challenge wins)",
+                f"**{chall_left}/{CHALLENGE_POINT_CAP}** point wins left "
+                f"({CHALLENGE_POINTS} pts each · challenges always open)",
+                utc_reset, "day resets"))
+
         # ---- Beasts (rolling points + study) ----
         beasts = self.bot.get_cog("Beasts")
         if beasts:

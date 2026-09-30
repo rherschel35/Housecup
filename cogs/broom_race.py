@@ -9,10 +9,15 @@ Higher Speed/Altitude means fewer button choices per stage (the broom
 filters noise). Finish a course to unlock its study note forever; notes
 warn you off one trap when you race that course again. Challenges share
 one course; lower time-lost wins.
+
+Daily caps (UTC):
+    - Solo: 5 learning races/day (hard stop — those unlock study notes)
+    - Challenge: always allowed; first 5 wins pay 3 house points each
 """
 
 from __future__ import annotations
 
+import datetime
 import json
 import logging
 import os
@@ -38,6 +43,14 @@ RACE_COLOR = 0x2E6B4F
 STAGE_TIMEOUT = 90
 ACCEPT_TIMEOUT = 60
 STAGES = 6
+
+SOLO_DAILY_CAP = 5
+CHALLENGE_POINT_CAP = 5
+CHALLENGE_POINTS = 3
+
+
+def today_str() -> str:
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
 
 # kind -> base time penalty (seconds of "race time")
 KIND_PENALTY = {
@@ -364,6 +377,7 @@ class BroomRace(commands.Cog):
         data.setdefault("notes", {})   # uid -> [course_id, ...]
         data.setdefault("best", {})    # uid -> {course_id: {penalty, at}}
         data.setdefault("versus", {})  # uid -> {wins, losses, ties}
+        data.setdefault("daily", {})   # uid -> {date, solo, challenge_pts}
         return data
 
     def save(self) -> None:
@@ -374,6 +388,63 @@ class BroomRace(commands.Cog):
             os.replace(tmp, STATE_PATH)
         except OSError:
             log.exception("Could not save broom race state")
+
+    def daily_rec(self, user_id: int) -> dict:
+        key = str(user_id)
+        bag = self.state.setdefault("daily", {})
+        rec = bag.get(key) or {}
+        if rec.get("date") != today_str():
+            rec = {"date": today_str(), "solo": 0, "challenge_pts": 0}
+            bag[key] = rec
+        rec.setdefault("solo", 0)
+        rec.setdefault("challenge_pts", 0)
+        return rec
+
+    def solo_used(self, user_id: int) -> int:
+        return int(self.daily_rec(user_id).get("solo", 0))
+
+    def solo_left(self, user_id: int) -> int:
+        return max(0, SOLO_DAILY_CAP - self.solo_used(user_id))
+
+    def challenge_pts_used(self, user_id: int) -> int:
+        return int(self.daily_rec(user_id).get("challenge_pts", 0))
+
+    def challenge_pts_left(self, user_id: int) -> int:
+        return max(0, CHALLENGE_POINT_CAP - self.challenge_pts_used(user_id))
+
+    def consume_solo_slot(self, user_id: int) -> bool:
+        """Spend one of today's solo learning races. False if already at cap."""
+        rec = self.daily_rec(user_id)
+        if int(rec["solo"]) >= SOLO_DAILY_CAP:
+            return False
+        rec["solo"] = int(rec["solo"]) + 1
+        self.save()
+        return True
+
+    def try_award_challenge_points(self, member: discord.Member) -> str:
+        """Award CHALLENGE_POINTS for a challenge win if under daily cap.
+
+        Returns: "awarded" | "capped" | "no_house" | "no_store"
+        """
+        rec = self.daily_rec(member.id)
+        if int(rec["challenge_pts"]) >= CHALLENGE_POINT_CAP:
+            return "capped"
+        store = self.bot.get_cog("Store")
+        if not store:
+            return "no_store"
+        house = store.member_house(member)
+        if not house:
+            return "no_house"
+        store.record(
+            house=house,
+            delta=CHALLENGE_POINTS,
+            actor_id=self.bot.user.id if self.bot.user else 0,
+            target_id=member.id,
+            reason="Broom race challenge win",
+        )
+        rec["challenge_pts"] = int(rec["challenge_pts"]) + 1
+        self.save()
+        return "awarded"
 
     def notes_of(self, user_id: int) -> list[str]:
         return list(self.state["notes"].get(str(user_id), []))
@@ -555,10 +626,10 @@ class BroomRace(commands.Cog):
 
     @app_commands.command(
         name="broomrace",
-        description="Private 6-stage broom race (Quidditch channel). Optional: challenge someone on the same track.",
+        description="Solo (5 learning races/day) or challenge someone on the same track (Quidditch channel).",
     )
     @app_commands.describe(
-        opponent="Challenge this member to the same course (leave blank to race solo)",
+        opponent="Challenge this member to the same course (always allowed; wins pay pts up to 5/day)",
     )
     async def broomrace(
         self,
@@ -595,21 +666,43 @@ class BroomRace(commands.Cog):
             )
             return
 
+        if self.solo_left(interaction.user.id) <= 0:
+            await interaction.response.send_message(
+                f"You've used all **{SOLO_DAILY_CAP}** solo learning races today. "
+                "Challenge someone with `/broomrace opponent:` anytime — "
+                "those don't use the solo cap.",
+                ephemeral=True,
+            )
+            return
+
         course = self._pick_course(interaction.user.id)
+        if not self.consume_solo_slot(interaction.user.id):
+            await interaction.response.send_message(
+                f"You've used all **{SOLO_DAILY_CAP}** solo learning races today.",
+                ephemeral=True,
+            )
+            return
+
         race = self._begin_session(interaction.user.id, course)
         if not race:
+            # Refund the solo slot if we somehow failed to start.
+            rec = self.daily_rec(interaction.user.id)
+            rec["solo"] = max(0, int(rec["solo"]) - 1)
+            self.save()
             await interaction.response.send_message(
                 "You need a claimed broom first — `/broom`.", ephemeral=True
             )
             return
 
+        left = self.solo_left(interaction.user.id)
         await interaction.response.send_message(
             embed=discord.Embed(
                 title="🧹 Broom race",
                 description=(
                     f"**{interaction.user.display_name}** takes **{course['name']}**.\n"
                     f"*{course['blurb']}*\n\n"
-                    "Stages are private — only they see the choices."
+                    "Stages are private — only they see the choices.\n"
+                    f"Solo learning races left today · **{left}/{SOLO_DAILY_CAP}**"
                 ),
                 color=RACE_COLOR,
             )
@@ -656,6 +749,8 @@ class BroomRace(commands.Cog):
         self.pending[me.id] = match
         self.pending[opponent.id] = match
 
+        my_pts_left = self.challenge_pts_left(me.id)
+        their_pts_left = self.challenge_pts_left(opponent.id)
         view = ChallengeAcceptView(match)
         await interaction.response.send_message(
             content=opponent.mention,
@@ -666,7 +761,12 @@ class BroomRace(commands.Cog):
                     f"on the same track.\n\n"
                     f"**Course · {course['name']}**\n*{course['blurb']}*\n\n"
                     "Accept to race head-to-head — private stages, shared course, "
-                    "lowest time lost wins."
+                    f"lowest time lost wins. Winner earns **{CHALLENGE_POINTS}** "
+                    f"house points (up to **{CHALLENGE_POINT_CAP}**/day; challenges "
+                    "always allowed past that).\n\n"
+                    f"Point wins left today · "
+                    f"**{me.display_name}** {my_pts_left}/{CHALLENGE_POINT_CAP} · "
+                    f"**{opponent.display_name}** {their_pts_left}/{CHALLENGE_POINT_CAP}"
                 ),
                 color=RACE_COLOR,
             ).set_footer(text=f"Expires in {ACCEPT_TIMEOUT}s"),
@@ -932,10 +1032,34 @@ class BroomRace(commands.Cog):
 
         self._versus_bump(winner_id, a.id, b.id)
 
+        pts_line = ""
+        if winner_id is not None:
+            winner = a if winner_id == a.id else b
+            outcome = self.try_award_challenge_points(winner)
+            if outcome == "awarded":
+                left = self.challenge_pts_left(winner.id)
+                pts_line = (
+                    f"\n\n+**{CHALLENGE_POINTS}** house points to "
+                    f"**{winner.display_name}** "
+                    f"(point wins left today · **{left}/{CHALLENGE_POINT_CAP}**)."
+                )
+            elif outcome == "capped":
+                pts_line = (
+                    f"\n\n**{winner.display_name}** is at today's challenge "
+                    f"point cap (**{CHALLENGE_POINT_CAP}** wins) — race counted, "
+                    "no points."
+                )
+            elif outcome == "no_house":
+                pts_line = (
+                    f"\n\n**{winner.display_name}** needs a house before "
+                    "challenge wins can pay points."
+                )
+
         embed = discord.Embed(
             title="🏁 Head-to-head result",
             description=(
-                f"**{match.course['name']}**\n*{match.course['blurb']}*\n\n{line}"
+                f"**{match.course['name']}**\n*{match.course['blurb']}*\n\n"
+                f"{line}{pts_line}"
             ),
             color=RACE_COLOR,
         )
