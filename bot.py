@@ -72,6 +72,7 @@ INITIAL_COGS = (
     "cogs.wands",
     "cogs.patronus",
     "cogs.brooms",
+    "cogs.broom_race",
     "cogs.duels",
     "cogs.beans",
     "cogs.triwizard",
