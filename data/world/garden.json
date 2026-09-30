@@ -46,7 +46,8 @@
     "tree_bark",
     "lost_button",
     "map_scrap",
-    "prophecy_leaf"
+    "prophecy_leaf",
+    "pitch_resin"
   ],
   "areas": [
     {
@@ -60,7 +61,8 @@
       "drops": [
         "tree_bark",
         "sleeping_acorn",
-        "tree_amber"
+        "tree_amber",
+        "pitch_resin"
       ]
     },
     {
@@ -73,7 +75,8 @@
       "time": "any",
       "drops": [
         "tree_bark",
-        "fairy_ring_cap"
+        "fairy_ring_cap",
+        "pitch_resin"
       ]
     },
     {
