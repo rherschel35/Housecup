@@ -34,13 +34,17 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.velmora_channels import channel_mentions, with_study_hall
+
 log = logging.getLogger("velmora.potions")
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "potions_state.json"
 
-# Potions only runs in this one channel.
+# Potions classroom + new-student study hall.
+POTIONS_CHANNEL_IDS = with_study_hall(1553253009398693958)
+# Kept for any older references / embeds that expect a single home channel.
 POTIONS_CHANNEL_ID = 1553253009398693958
 
 # ------------------------------------------------------------- Potion Rep
@@ -377,9 +381,10 @@ class Potions(commands.Cog):
         for key, r in RECIPES.items()
     ])
     async def brew(self, interaction: discord.Interaction, potion: app_commands.Choice[str]):
-        if interaction.channel_id != POTIONS_CHANNEL_ID:
+        if interaction.channel_id not in POTIONS_CHANNEL_IDS:
             await interaction.response.send_message(
-                f"Potions can only be brewed in <#{POTIONS_CHANNEL_ID}>.", ephemeral=True)
+                f"Potions can only be brewed in {channel_mentions(POTIONS_CHANNEL_IDS)}.",
+                ephemeral=True)
             return
         recipe_id = potion.value
         recipe = RECIPES[recipe_id]
@@ -478,9 +483,10 @@ class Potions(commands.Cog):
         for key, r in RECIPES.items()
     ])
     async def drink(self, interaction: discord.Interaction, potion: app_commands.Choice[str]):
-        if interaction.channel_id != POTIONS_CHANNEL_ID:
+        if interaction.channel_id not in POTIONS_CHANNEL_IDS:
             await interaction.response.send_message(
-                f"Potions can only be drunk in <#{POTIONS_CHANNEL_ID}>.", ephemeral=True)
+                f"Potions can only be drunk in {channel_mentions(POTIONS_CHANNEL_IDS)}.",
+                ephemeral=True)
             return
         recipe_id = potion.value
         recipe = RECIPES[recipe_id]
@@ -595,9 +601,10 @@ class Potions(commands.Cog):
 
     @app_commands.command(name="potions", description="Your Potion Rep, discovered recipes, and brewed potions.")
     async def potions_cmd(self, interaction: discord.Interaction):
-        if interaction.channel_id != POTIONS_CHANNEL_ID:
+        if interaction.channel_id not in POTIONS_CHANNEL_IDS:
             await interaction.response.send_message(
-                f"Potions only runs in <#{POTIONS_CHANNEL_ID}>.", ephemeral=True)
+                f"Potions only runs in {channel_mentions(POTIONS_CHANNEL_IDS)}.",
+                ephemeral=True)
             return
         rec = self.record(interaction.user.id)
         idx, name, mult = rank_info(rec["rep_xp"])

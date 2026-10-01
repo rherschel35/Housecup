@@ -30,6 +30,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.velmora_channels import channel_mentions, with_study_hall
+
 log = logging.getLogger("velmora.broom_race")
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -37,8 +39,9 @@ STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 COURSES_PATH = DATA_DIR / "broom_courses.json"
 STATE_PATH = STATE_DIR / "broom_races.json"
 
-# Same pitch as team Quidditch.
+# Same pitch as team Quidditch, plus new-student study hall.
 QUIDDITCH_CHANNEL_ID = 1553089438933065913
+QUIDDITCH_CHANNEL_IDS = with_study_hall(QUIDDITCH_CHANNEL_ID)
 
 RACE_COLOR = 0x2E6B4F
 STAGE_TIMEOUT = 90
@@ -691,9 +694,9 @@ class BroomRace(commands.Cog):
         interaction: discord.Interaction,
         opponent: discord.Member | None = None,
     ):
-        if interaction.channel_id != QUIDDITCH_CHANNEL_ID:
+        if interaction.channel_id not in QUIDDITCH_CHANNEL_IDS:
             await interaction.response.send_message(
-                f"Broom races run on the pitch — try <#{QUIDDITCH_CHANNEL_ID}>.",
+                f"Broom races run on the pitch — try {channel_mentions(QUIDDITCH_CHANNEL_IDS)}.",
                 ephemeral=True,
             )
             return

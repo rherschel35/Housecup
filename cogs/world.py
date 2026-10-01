@@ -25,6 +25,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
+from cogs.velmora_channels import STUDY_HALL_CHANNEL_ID
 from cogs.world_engine import (HOUSE_NAMES, RARITY_LABEL, RARITY_ORDER, Ctx, Place, World,
                                blank_student, tone_for)
 
@@ -202,11 +203,20 @@ class WorldCog(commands.Cog, name="World"):
             e.set_author(name=title)
         return e
 
+    def _place_channel_ok(self, channel_id: int, place: str) -> bool:
+        """Home place channel, or the new-student study hall."""
+        cid = self.state["channels"].get(place)
+        if not cid:
+            return True
+        return channel_id == cid or channel_id == STUDY_HALL_CHANNEL_ID
+
     async def in_place_channel(self, interaction, place) -> bool:
         cid = self.state["channels"].get(place)
-        if cid and interaction.channel_id != cid:
+        if cid and not self._place_channel_ok(interaction.channel_id, place):
             await interaction.response.send_message(
-                f"{self.world.places[place].name.capitalize()} is found in <#{cid}>.", ephemeral=True)
+                f"{self.world.places[place].name.capitalize()} is found in <#{cid}> "
+                f"(or the study hall <#{STUDY_HALL_CHANNEL_ID}>).",
+                ephemeral=True)
             return False
         return True
 
@@ -469,8 +479,7 @@ class WorldCog(commands.Cog, name="World"):
         place = self.where(s)
         if not place or place not in self.world.places:
             return
-        cid = self.state["channels"].get(place)
-        if cid and message.channel.id != cid:
+        if not self._place_channel_ok(message.channel.id, place):
             return
         P = self.world.places[place]
         async with self.lock:
