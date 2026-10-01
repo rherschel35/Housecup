@@ -8,18 +8,19 @@ Placeholders: {you} {missing} {mhe} {mhim} {mhis} (missing person's pronouns).
 from __future__ import annotations
 
 # Art filenames under story_art_assets/
+# Missing keys fall back to no image until a plate is locked.
 ART = {
     "title": "title_mack_yuna.jpg",
     "dream": "dream_childhood.jpg",
     "scare": "dream_scare.jpg",
-    "school": "window_school.jpg",
-    "sneak": "window_school.jpg",
-    "city_fight": "train_gus_ella.jpg",
+    # "school" — awaiting plate (old window art was Mack+Yuna; wrong for Gus/Ella/Sebastian beats)
+    "sneak": None,
+    "city_fight": None,
     "train": "train_gus_ella.jpg",
-    "caden": "train_gus_ella.jpg",
-    "alley": "train_gus_ella.jpg",
+    "caden": None,
+    "alley": None,
     "inn": "gus.jpg",
-    "edge": "title_mack_yuna.jpg",
+    "edge": None,
     "mack": "mack.jpg",
     "yuna": "yuna.jpg",
     "ella": "ella.jpg",
