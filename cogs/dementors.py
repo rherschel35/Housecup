@@ -2,9 +2,9 @@
 Wild Threats. Something slips into one of the social channels on its own,
 a few times a day - and a headmaster can always summon one on the spot.
 
-    /cast spell:<Patronus|Hex|Ward|Disarm|Bind|Mirror>  - anyone, tries the
-                                                           spell against
-                                                           whatever's here
+    /cast [spell:<Patronus|Hex|Ward|Disarm|Bind|Mirror>]
+        - anyone, tries the spell against whatever's here
+        - CAST_AUTO_USER_ID may omit spell: and auto-cast the right one
     /dementor channels          - staff, set the 4 channels they can appear in
     /dementor summon [channel] [creature] - staff, make one appear right now
     /dementor status            - staff, what's configured and what's active
@@ -216,7 +216,16 @@ _DUEL_SPELL_NAMES = {"hex": "Hex", "ward": "Ward", "disarm": "Disarm", "bind": "
 CAST_CHOICES = [app_commands.Choice(name="Patronus", value="patronus")] + [
     app_commands.Choice(name=name, value=value) for value, name in _DUEL_SPELL_NAMES.items()
 ]
+SPELL_LABEL = {"patronus": "Patronus", **_DUEL_SPELL_NAMES}
 CREATURE_CHOICES = [app_commands.Choice(name=c["name"], value=key) for key, c in CREATURES.items()]
+
+# Headmaster convenience: omit spell: on /cast and the right weakness is
+# chosen automatically. Spell choices still show for everyone else.
+# Override with CAST_AUTO_USER_ID in the environment; unset/0 disables.
+_raw_cast_auto = os.getenv("CAST_AUTO_USER_ID", "555141900802457630")
+CAST_AUTO_USER_ID = (
+    int(_raw_cast_auto) if _raw_cast_auto and str(_raw_cast_auto).isdigit() else None
+)
 
 
 def _article(word: str) -> str:
@@ -421,15 +430,57 @@ class Dementors(commands.Cog):
 
     # ------------------------------------------------------------ /cast
 
+    def _creature_in_channel(self, channel_id: int) -> dict | None:
+        """Active wild threat in this channel (event wave or solo spawn)."""
+        event = self.state.get("event")
+        key = str(channel_id)
+        if event and key in event.get("channels", {}):
+            cid = event["channels"][key].get("creature")
+            return CREATURES.get(cid) if cid else None
+        active = self.state.get("active")
+        if active and active.get("channel_id") == channel_id:
+            return CREATURES.get(active.get("creature"))
+        return None
+
+    def _auto_spell_for(self, channel_id: int) -> app_commands.Choice[str] | None:
+        creature = self._creature_in_channel(channel_id)
+        if not creature:
+            return None
+        weak = creature["weak"]
+        return app_commands.Choice(name=SPELL_LABEL.get(weak, weak.title()), value=weak)
+
+    def _can_auto_cast(self, user_id: int) -> bool:
+        return CAST_AUTO_USER_ID is not None and user_id == CAST_AUTO_USER_ID
+
     @app_commands.command(name="cast", description="Cast a spell at whatever's in this channel.")
-    @app_commands.describe(spell="Which spell to cast")
+    @app_commands.describe(spell="Which spell to cast (optional — some users auto-pick)")
     @app_commands.choices(spell=CAST_CHOICES)
-    async def cast(self, interaction: discord.Interaction, spell: app_commands.Choice[str]):
+    async def cast(
+        self,
+        interaction: discord.Interaction,
+        spell: app_commands.Choice[str] | None = None,
+    ):
         hexes = self.bot.get_cog("Hexes")
         if hexes and await hexes.deny_if_limp_wand(interaction):
             return
 
+        if spell is None and not self._can_auto_cast(interaction.user.id):
+            await interaction.response.send_message(
+                "Pick which spell to cast — the choices are on the command.",
+                ephemeral=True,
+            )
+            return
+
         async with self.lock:
+            if spell is None:
+                spell = self._auto_spell_for(interaction.channel_id)
+                if spell is None:
+                    await interaction.response.send_message(
+                        "The air here feels perfectly normal. Nothing to banish.",
+                        ephemeral=True,
+                    )
+                    return
+
             event = self.state.get("event")
             key = str(interaction.channel_id)
             if event and key in event.get("channels", {}):
