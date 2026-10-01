@@ -13,8 +13,10 @@ ART = {
     "title": "title_mack_yuna.jpg",
     "dream": "dream_childhood.jpg",
     "scare": "dream_scare.jpg",
-    # "school" — awaiting plate (old window art was Mack+Yuna; wrong for Gus/Ella/Sebastian beats)
-    "sneak": None,
+    "gus_talk": "gus_hallway.jpg",
+    "sebastian": "sebastian_talk.jpg",
+    "party": "party_table.jpg",
+    "sneak": "mordy_sneak.jpg",
     "city_fight": None,
     "train": "train_gus_ella.jpg",
     "caden": None,
@@ -51,24 +53,15 @@ CITY_ESSENTIALS_2 = [
 ]
 
 
-def pronouns(protagonist: str) -> dict[str, str]:
-    """you = player; missing = the other. m* = missing person's pronouns."""
-    if protagonist == "mack":
-        return {
-            "you": "Mack",
-            "missing": "Yuna",
-            "mhe": "she",
-            "mhim": "her",
-            "mhis": "her",
-            "mThey": "She",
-        }
+def pronouns(_protagonist: str | None = None) -> dict[str, str]:
+    """Always Mack looking for Yuna. m* = Yuna's pronouns."""
     return {
-        "you": "Yuna",
-        "missing": "Mack",
-        "mhe": "he",
-        "mhim": "him",
-        "mhis": "his",
-        "mThey": "He",
+        "you": "Mack",
+        "missing": "Yuna",
+        "mhe": "she",
+        "mhim": "her",
+        "mhis": "her",
+        "mThey": "She",
     }
 
 
@@ -89,12 +82,12 @@ CH1_NODES: dict[str, dict] = {
         "pages": [
             "**The Forrest of Caden**\n"
             "*an 8 part solo interactive immersive story about 2 friends who grew apart*\n\n"
+            "You are **Mack**. Yuna didn’t show for fifth year — and you’re going to find her.\n\n"
             "Staff test build — Chapters 1 & 2.\n"
             "No house points. Your choices are saved to your story."
         ],
         "choices": [
-            {"id": "mack", "label": "Play as Mack", "set": {"protagonist": "mack"}, "goto": "dream"},
-            {"id": "yuna", "label": "Play as Yuna", "set": {"protagonist": "yuna"}, "goto": "dream"},
+            {"id": "begin", "label": "Begin", "set": {"protagonist": "mack"}, "goto": "dream"},
         ],
     },
     "dream": {
@@ -139,7 +132,7 @@ CH1_NODES: dict[str, dict] = {
         "goto": "gus_morning",
     },
     "gus_morning": {
-        "art": "school",
+        "art": "gus_talk",
         "pages": [
             "Gus finds you before breakfast the way he always does — like he’s been orbiting your door waiting for a "
             "polite excuse.\n\n"
@@ -159,7 +152,7 @@ CH1_NODES: dict[str, dict] = {
         ],
     },
     "gus_advice_tell": {
-        "art": "school",
+        "art": "gus_talk",
         "pages": [
             "Gus exhales like he’s been holding that breath since second year.\n\n"
             "**Gus:** “Yeah. Okay. Okay. Not today. But… yeah.”"
@@ -170,7 +163,7 @@ CH1_NODES: dict[str, dict] = {
         "goto": "missing",
     },
     "gus_advice_dont": {
-        "art": "school",
+        "art": "gus_talk",
         "pages": [
             "Gus nods too fast, relieved and disappointed in the same blink.\n\n"
             "**Gus:** “Right. Smart. I’m smart when you say I’m smart.”"
@@ -181,7 +174,7 @@ CH1_NODES: dict[str, dict] = {
         "goto": "missing",
     },
     "gus_advice_careful": {
-        "art": "school",
+        "art": "gus_talk",
         "pages": [
             "**Gus:** snorts. “Helpful. Truly. Spiritual guidance from the emotionally constipated.” Softens. "
             "“Thanks for not laughing.”"
@@ -192,7 +185,7 @@ CH1_NODES: dict[str, dict] = {
         "goto": "missing",
     },
     "missing": {
-        "art": "school",
+        "art": "yuna",
         "pages": [
             "Morning fills the school the way it always does first day back — trunks scraping, owls, somebody already "
             "late for a class that hasn’t started, the green of Thornmere scarves flashing like it’s a competition.\n\n"
@@ -217,7 +210,7 @@ CH1_NODES: dict[str, dict] = {
         ],
     },
     "sebastian": {
-        "art": "school",
+        "art": "sebastian",
         "pages": [
             "Sebastian listens the whole way through without interrupting, which is how you know it’s bad. He cracks "
             "one joke early — something about truancy and tradition — and then lets it die when he sees your face.\n\n"
@@ -232,7 +225,7 @@ CH1_NODES: dict[str, dict] = {
         ],
     },
     "sebastian_advice": {
-        "art": "school",
+        "art": "sebastian",
         "pages": [
             "He doesn’t give you permission like a teacher. He gives it like someone who has carried a quieter version "
             "of your sentence for longer than you’ve been alive.\n\n"
@@ -246,7 +239,7 @@ CH1_NODES: dict[str, dict] = {
         "goto": "party",
     },
     "party": {
-        "art": "school",
+        "art": "party",
         "pages": [
             "You find Gus and Ella together, which feels like the universe having a sense of humor. Ella’s got ink on "
             "her thumb. Gus is talking with his hands. For half a second you almost don’t say it — almost let first-day "
@@ -260,7 +253,7 @@ CH1_NODES: dict[str, dict] = {
         ],
     },
     "party_yes": {
-        "art": "school",
+        "art": "party",
         "pages": [
             "Ella doesn’t hesitate long enough for you to brace. Of course she’s coming. There’s a look she gives you — "
             "soft, stubborn, a little too open — that says this isn’t only about adventure. You feel it land and carefully, "
@@ -275,7 +268,7 @@ CH1_NODES: dict[str, dict] = {
         "goto": "materials",
     },
     "materials": {
-        "art": "school",
+        "art": "party",
         "pages": [
             "Packing feels like pretending this is a weekend trip. It isn’t. Your hands know that even when your mouth "
             "makes light of it.\n\n"

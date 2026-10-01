@@ -63,7 +63,7 @@ def _default_save() -> dict:
         "page": 0,
         "chapter": 1,
         "flags": {},
-        "protagonist": None,
+        "protagonist": "mack",
         "gus_with_party": True,
         "school_materials": [],
         "city_essentials": [],
@@ -149,6 +149,7 @@ class ForrestCaden(commands.Cog):
             return
         save = _default_save()
         save["active"] = True
+        save["protagonist"] = "mack"
         self.state.setdefault("players", {})[str(interaction.user.id)] = save
         self.write()
         await interaction.response.defer()
@@ -411,7 +412,7 @@ class StorySession:
 
         embed = discord.Embed(title=title, description=text[:4096], color=EMBED_COLOR)
         if save.get("protagonist"):
-            embed.set_footer(text=f"Playing as {self.p()['you']} · looking for {self.p()['missing']}")
+            embed.set_footer(text="Mack · looking for Yuna")
 
         file = None
         path = _art_path(art_key)
