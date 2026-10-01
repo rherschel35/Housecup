@@ -303,12 +303,18 @@
       "keywords": [
         "potion",
         "potions",
+        "potions list",
+        "potion list",
+        "my potions",
         "brew",
         "cauldron",
-        "ingredients"
+        "draught",
+        "recipe",
+        "recipes",
+        "drink potion"
       ],
-      "answer": "Brewin' lives with yer ingredients from forage an' the market. Check `/help` for potion commands in yer server \u2014 gather bits in yer `/satchel` first.",
-      "link": "https://everything-velmora.netlify.app/explore"
+      "answer": "Yer personal book is `/potions` \u2014 Potion Rep, every recipe with 🟢/🔴 ingredients, what ye've got bottled, an' what's brewable. `/brew` spends two ingredients for a 3-round Stir / Heat / Simmer cauldron; `/drink` activates one. Beast draughts: Beastcaller's, Whisker's Luck, Hunter, Niffler's Bait. Descent draughts: Fury, Frost Ward, Storm Focus, Vigor, Steady Hand, Second Wind, Giant's, Owl's Eye, Ironhide, Fortune, an' legendary Phoenix Tears. Brew in the Potions channel (or study hall).",
+      "link": "https://everything-velmora.netlify.app/commands#potions"
     },
     {
       "id": "gear",
