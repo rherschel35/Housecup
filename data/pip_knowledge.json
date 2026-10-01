@@ -70,8 +70,21 @@
         "broom course",
         "quidditch broom race"
       ],
-      "answer": "`/broomrace` on the Quidditch pitch \u2014 private 6-stage picks on one o' 100 courses. Higher Speed/Altitude means fewer choices (the broom filters noise). Solo: 5 learning races a day (UTC) that unlock study notes. Challenge someone with `/broomrace opponent:@member` on the same track anytime \u2014 lowest time lost wins; winner gets 3 house points up to 5 wins/day, then free play with no points. Check leftovers on `/checklist`.",
+      "answer": "`/broomrace` on the Quidditch pitch \u2014 private 6-stage picks on one o' 100 courses. Higher Speed/Altitude means fewer choices (the broom filters noise). Solo: 5 learning races a day (UTC) that unlock study notes. Challenge someone with `/broomrace opponent:@member` on the same track anytime \u2014 lowest time lost wins; winner gets 3 house points up to 5 wins/day, then free play with no points. Yer H2H record, courses studied, an' best times show on `/broomracerecord`. Check leftovers on `/checklist`.",
       "link": "https://everything-velmora.netlify.app/quidditch"
+    },
+    {
+      "id": "broom_race_record",
+      "keywords": [
+        "broomracerecord",
+        "broom race record",
+        "broom race stats",
+        "broom h2h",
+        "broom wins",
+        "broom race wins"
+      ],
+      "answer": "`/broomracerecord` shows head-to-head wins/losses/ties, how many courses ye've studied, yer best times, an' today's solo / challenge point caps. Optional `member:` looks up someone else. Also peeks on `/profile` under Broom.",
+      "link": "https://everything-velmora.netlify.app/brooms"
     },
     {
       "id": "broom_notes",
