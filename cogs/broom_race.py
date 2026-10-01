@@ -229,9 +229,13 @@ def resolve_choice(
 class StageButton(discord.ui.Button):
     def __init__(self, race: "RaceSession", opt: dict):
         style = discord.ButtonStyle.secondary
+        skill = (race.speed + race.altitude) / 2
         if opt.get("warned"):
+            # Studied trap — still marked, but only via ⚠ label + red.
             style = discord.ButtonStyle.danger
-        elif opt.get("kind") in ("clean", "tech"):
+        elif skill < 9 and opt.get("kind") in ("clean", "tech"):
+            # Lower-skill races may hint the racing line; top brooms don't —
+            # their three picks are shuffled and styled the same.
             style = discord.ButtonStyle.primary
         super().__init__(label=opt.get("label", "…")[:80], style=style)
         self.race = race
@@ -588,7 +592,9 @@ class BroomRace(commands.Cog):
                 f"**{stage['prompt']}**\n\n"
                 f"Your flight · Speed **{race.speed}/10** · Altitude **{race.altitude}/10**\n"
                 f"Choices shown · **{len(options)}** "
-                f"(skill {skill:.0f} filters the noise)\n"
+                f"(skill {skill:.0f} filters the noise"
+                + ("; wrong pick adds time, trap doubles it" if skill >= 9 else "")
+                + ")\n"
                 f"Time lost so far · **+{race.penalty}s**"
             ),
             color=RACE_COLOR,
