@@ -6,9 +6,10 @@ Private broom racing on the Quidditch pitch.
     /broomnotes [course]           - permanent study notes you've unlocked
 
 Higher Speed/Altitude means fewer button choices per stage (the broom
-filters noise). Finish a course to unlock its study note forever; notes
-warn you off one trap when you race that course again. Challenges share
-one course; lower time-lost wins.
+filters noise). Top brooms (skill 9–10) still see three: the right line,
+a pick that adds time, and a trap that doubles time lost. Finish a course
+to unlock its study note forever; notes warn you off traps on that course
+again. Challenges share one course; lower time-lost wins.
 
 Daily caps (UTC):
     - Solo: 5 learning races/day (hard stop — those unlock study notes)
@@ -53,12 +54,13 @@ def today_str() -> str:
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
 
 # kind -> base time penalty (seconds of "race time")
+# Trap is "double time" vs a normal wrong pick (bold).
 KIND_PENALTY = {
     "clean": 0,
     "tech": 0,
     "bold": 4,
     "stall": 6,
-    "trap": 12,
+    "trap": 8,  # 2× bold — overwritten for cumulative double in resolve_choice
 }
 
 
@@ -72,9 +74,13 @@ def _load_courses() -> list[dict]:
 
 
 def max_options_for_skill(skill: float) -> int:
-    """Higher flight stats → fewer choices (broom filters the noise)."""
+    """Higher flight stats → fewer choices (broom filters the noise).
+
+    Top brooms (skill 9–10) still see three: the right line, a time-adder,
+    and a trap that doubles your time lost.
+    """
     if skill >= 9:
-        return 2
+        return 3
     if skill >= 7:
         return 3
     if skill >= 5:
@@ -101,6 +107,15 @@ def option_score(opt: dict, speed: int, altitude: int) -> int:
     return base + gap * 3
 
 
+def _meets_line(opt: dict, speed: int, altitude: int) -> bool:
+    if opt.get("kind") not in ("clean", "tech"):
+        return False
+    stat = opt.get("stat")
+    thr = int(opt.get("threshold", 0) or 0)
+    have = speed if stat == "speed" else altitude if stat == "altitude" else max(speed, altitude)
+    return have >= thr
+
+
 def pick_stage_options(
     stage: dict,
     speed: int,
@@ -116,31 +131,52 @@ def pick_stage_options(
     limit = min(max_options_for_skill(skill), len(opts))
 
     ranked = sorted(opts, key=lambda o: (option_score(o, speed, altitude), o.get("label", "")))
-    # Always keep the best clean/tech if present.
     chosen: list[dict] = []
-    for o in ranked:
-        if o.get("kind") in ("clean", "tech"):
-            chosen.append(o)
-            break
-    # Fill with a mix; prefer variety of kinds when skill is low.
-    for o in ranked:
-        if o in chosen:
-            continue
-        chosen.append(o)
-        if len(chosen) >= limit:
-            break
 
-    # Studied courses: ensure one trap is visible (and marked) when skill still shows noise.
-    if studied and limit >= 3:
-        if not any(o.get("kind") == "trap" for o in chosen):
-            trap = next((o for o in opts if o.get("kind") == "trap"), None)
-            if trap and chosen:
-                chosen[-1] = trap
+    # Top brooms (3 options): always offer right line + time-adder + trap.
+    if limit == 3 and skill >= 9:
+        right = next((o for o in ranked if _meets_line(o, speed, altitude)), None)
+        if right is None:
+            right = next((o for o in ranked if o.get("kind") in ("clean", "tech")), None)
+        adder = next((o for o in opts if o.get("kind") == "bold"), None)
+        if adder is None:
+            adder = next((o for o in opts if o.get("kind") == "stall"), None)
+        trap = next((o for o in opts if o.get("kind") == "trap"), None)
+        for o in (right, adder, trap):
+            if o is not None and all(o is not c for c in chosen):
+                chosen.append(o)
+        # Only if a role was missing from the course data, fill from ranked.
+        for o in ranked:
+            if len(chosen) >= limit:
+                break
+            if all(o is not c for c in chosen):
+                chosen.append(o)
+    else:
+        # Always keep the best clean/tech if present.
+        for o in ranked:
+            if o.get("kind") in ("clean", "tech"):
+                chosen.append(o)
+                break
+        # Fill with a mix; prefer variety of kinds when skill is low.
+        for o in ranked:
+            if o in chosen:
+                continue
+            chosen.append(o)
+            if len(chosen) >= limit:
+                break
+
+        # Studied courses: ensure one trap is visible (and marked) when skill still shows noise.
+        if studied and limit >= 3:
+            if not any(o.get("kind") == "trap" for o in chosen):
+                trap = next((o for o in opts if o.get("kind") == "trap"), None)
+                if trap and chosen:
+                    chosen[-1] = trap
 
     rng.shuffle(chosen)
     out = []
     for o in chosen:
         copy = dict(o)
+        # Top brooms always see traps unmarked unless studied; studied marks ⚠.
         if studied and copy.get("kind") == "trap":
             copy["label"] = f"⚠ {copy['label']}"[:80]
             copy["warned"] = True
@@ -148,11 +184,24 @@ def pick_stage_options(
     return out[:limit]
 
 
-def resolve_choice(opt: dict, speed: int, altitude: int, rng: random.Random) -> tuple[int, str]:
-    """Return (penalty_seconds, flavor line)."""
+def resolve_choice(
+    opt: dict,
+    speed: int,
+    altitude: int,
+    rng: random.Random,
+    *,
+    time_lost: int = 0,
+) -> tuple[int, str]:
+    """Return (penalty_seconds, flavor line).
+
+    Wrong picks add time. Traps double your time lost so far (with a floor),
+    so a late mistake hurts more than an early one.
+    """
     kind = opt.get("kind", "bold")
     if opt.get("warned"):
-        return 10, "You recognized the trap from your notes — still costly, but you clipped free."
+        # Knew the trap — still costs, but not a full double.
+        hit = max(KIND_PENALTY["bold"], time_lost // 2)
+        return hit, "You recognized the trap from your notes — still costly, but you clipped free."
 
     if kind in ("clean", "tech"):
         stat = opt.get("stat")
@@ -166,15 +215,15 @@ def resolve_choice(opt: dict, speed: int, altitude: int, rng: random.Random) -> 
         return 3 + gap, "Your broom complains; you lose the racing line."
 
     if kind == "bold":
-        if rng.random() < 0.45:
-            return 1, "Audacity pays off. Barely."
-        return KIND_PENALTY["bold"], "Style points, time lost."
+        return KIND_PENALTY["bold"], "Wrong line — time added."
 
     if kind == "stall":
-        return KIND_PENALTY["stall"], "Safe. Slow. The pitch notices."
+        return KIND_PENALTY["stall"], "Wrong line — more time added."
 
-    # trap
-    return KIND_PENALTY["trap"], "Wrong way — the course exacts a toll."
+    # trap — double time lost so far (minimum 2× a bold mistake)
+    floor = KIND_PENALTY["bold"] * 2
+    doubled = max(floor, time_lost)  # add at least as much as you've already lost
+    return doubled, "Trap — your time lost doubles."
 
 
 class StageButton(discord.ui.Button):
@@ -873,7 +922,9 @@ class BroomRace(commands.Cog):
         if race.view:
             race.view.stop()
 
-        penalty, flavor = resolve_choice(opt, race.speed, race.altitude, race.rng)
+        penalty, flavor = resolve_choice(
+            opt, race.speed, race.altitude, race.rng, time_lost=race.penalty
+        )
         race.penalty += penalty
         label = opt.get("label", "a choice")
         race.log_lines.append(
