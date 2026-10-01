@@ -10,9 +10,10 @@ you in the Descent.
     /drink potion:<name>   - drink a brewed potion to activate it
 
 Brewing is a short 3-round minigame: each round the cauldron does
-something and you pick Stir / Add Heat / Let it Simmer. Every recipe has
-a hidden correct action per round - guess blind the first time, but once
-you've gotten all three right, that recipe's sequence is yours for good.
+something (drawn from a large pool of prompts) and you pick Stir / Add
+Heat / Let it Simmer. Every recipe has a hidden correct action per round
+- guess blind the first time, but once you've gotten all three right,
+that recipe's sequence is yours for good.
 Ingredients are spent the moment you commit, whether the brew works or not.
 
 Potion Rep rises with every successful brew (more for rarer potions) and
@@ -68,11 +69,131 @@ BASE_WINDOW_SECONDS = 600  # 10 minutes, before Rep scaling - for beast-luck pot
 # ------------------------------------------------------------ the cauldron
 
 ACTIONS = {"stir": "🥄 Stir", "heat": "🔥 Add Heat", "simmer": "💧 Let it Simmer"}
+# Shown one-per-round during /brew. Picked at random (no repeats in a single brew)
+# so the cauldron never feels like the same three lines on a loop.
 ROUND_FLAVOR = [
     "The brew turns a cloudy amber and starts to hiss.",
     "It thickens fast and gives off a sharp, unfamiliar smell.",
     "The surface goes still, then shivers once.",
+    "A thin green film creeps across the top, then cracks like ice.",
+    "Bubbles rise in perfect rows, then collapse all at once.",
+    "The cauldron exhales a breath of cold mint.",
+    "Steam coils into a brief spiral, then forgets the shape.",
+    "Something in the mixture taps the iron from the inside.",
+    "The color flips from violet to ash-grey between blinks.",
+    "A single golden bead floats up and refuses to sink.",
+    "The brew sings a note so high the spoons rattle.",
+    "Oil separates into three rings that slowly braid together.",
+    "A spark races around the rim and dies with a pop.",
+    "It smells suddenly of rain on hot stone.",
+    "The surface mirrors the ceiling — then shows a different room.",
+    "Foam climbs the sides, pauses, and carefully climbs back down.",
+    "A ribbon of silver light threads through the centre.",
+    "The mixture goes velvet-thick, then thin as tea.",
+    "Tiny lights wink under the surface like buried stars.",
+    "It coughs up a puff of indigo smoke that smells of parchment.",
+    "The brew leans toward the east wall, as if listening.",
+    "A soft chime answers every drip from the ladle.",
+    "Heat blooms without flame — the iron warms under your palm.",
+    "Frost feathers race across the outer bowl, then melt.",
+    "The liquid divides into two layers that refuse to mix.",
+    "A swirl of copper threads knits a knot and undoes it.",
+    "It tastes the air — the steam turns sweet, then bitter.",
+    "A low thrum starts in the floorboards beneath the stand.",
+    "The brew blinks: dark, bright, dark again.",
+    "Ash-fine dust settles on the surface in a perfect circle.",
+    "A bubble the size of a fist holds, then bursts into moths of steam.",
+    "It smells of crushed rosemary and old lightning.",
+    "The meniscus tilts as if the room has leaned.",
+    "Pale sparks drift up and go out before they clear the rim.",
+    "Something sketches a rune in the foam, then erases it.",
+    "The brew hushes so completely you hear your own pulse.",
+    "A thread of red climbs the ladle and slips back in.",
+    "It thickens into a gel, then sighs and turns liquid again.",
+    "The colour of dusk settles over everything — including your sleeves.",
+    "Three slow bubbles rise in time with a distant clock.",
+    "A scent of beeswax and ink rolls out in a warm wave.",
+    "The surface pebbles like rain on a pond, though the air is still.",
+    "Iron filings of light sift down through the brew and vanish.",
+    "It mutters — not words, exactly, but almost.",
+    "A clear window opens in the middle, showing nothing but depth.",
+    "The brew flares emerald, then apologises back to brown.",
+    "Steam writes a cursive letter and smudges it.",
+    "A cold spot blooms at the centre while the edges simmer.",
+    "It pulls taut like a drumskin, waiting for a touch.",
+    "A scatter of salt-white flecks spins, then dissolves.",
+    "The mixture sighs and settles half an inch lower.",
+    "A violet halo rings the rim and fades in a heartbeat.",
+    "It smells briefly of orchard fruit left too long in the sun.",
+    "The ladle leaves a wake that keeps moving after it stops.",
+    "A soft gold shimmer gathers, then drains toward the bottom.",
+    "Bubbles form letters for a moment — none you can read.",
+    "The brew goes matte, then glass-bright, then matte again.",
+    "A droplet climbs the inner wall against every rule of gravity.",
+    "Heat and chill trade places with a quiet click.",
+    "It throws a single spark that smells of burnt sugar.",
+    "The surface folds once, like a page turning.",
+    "A plume of white steam hats the cauldron, then tips off.",
+    "Something oily and blue winks from the depths and is gone.",
+    "The brew hushes the nearby candles for a breath.",
+    "A ring of foam spins left, then stubbornly right.",
+    "It thickens around an invisible spoon-shape in the middle.",
+    "The smell of wet slate and thyme arrives together.",
+    "A faint heartbeat thuds once against the iron.",
+    "Pale green vapor crawls out and tastes the floor.",
+    "The brew mirrors your face — older, then younger, then gone.",
+    "A constellation of bubbles holds still, then scatters.",
+    "It goes suddenly silent, as if someone covered it with a cloth.",
+    "Copper steam braids itself and unravels into ordinary air.",
+    "A warm citrus note cuts through the usual cellar damp.",
+    "The surface dimples where nothing touched it.",
+    "Ash and pearl swirl in opposite directions.",
+    "It flares, briefly smelling of a forge at midnight.",
+    "A thin whistle rises from the spout of steam.",
+    "The brew leans away from the open window.",
+    "Night-black ink blooms, then is swallowed whole.",
+    "A soft rain of glimmer falls inward, not outward.",
+    "It settles into stripes that slowly blur to one colour.",
+    "The iron sings a tired hymn and goes quiet.",
+    "A bubble opens like an eye and closes politely.",
+    "Steam smells of first snow and library dust.",
+    "The brew climbs an inch, thinks better of it, and drops.",
+    "A ribbon of cold blue light stitches the surface shut.",
+    "It pops once, loudly, as if offended.",
+    "The colour of old brass spreads from the centre out.",
+    "Something sweet and medicinal wafts up, then vanishes.",
+    "Foam crowns the rim in a neat, unsettling circle.",
+    "A shadow moves under the surface with no source above.",
+    "The brew tastes the spoon — you feel it through the handle.",
+    "Heat gathers in one stubborn corner of the bowl.",
+    "A mist of silver motes hangs, then sifts back in.",
+    "It goes clear as water, then remembers to be a potion.",
+    "Three notes chime from nowhere and agree on a chord.",
+    "The surface wrinkles like cloth pulled too tight.",
+    "A smell of pepper and rain-wet wool fills the bay.",
+    "Ember-orange flickers deep down, then cools to slate.",
+    "The brew bows toward the door as someone passes in the hall.",
+    "A slow whirlpool forms with nothing stirring it.",
+    "It sheds a skin of film that dissolves before it lands.",
+    "The ladle comes up colder than the brew has any right to be.",
+    "A hush of lavender smoke makes the nearest book sneeze.",
+    "Pearls of light bead along the rim and wink out one by one.",
+    "The mixture thickens into syrup, then thins with a shrug.",
+    "A crackle like distant fireworks skates across the top.",
+    "It smells of candle-snuff and green apples.",
+    "The brew draws a square, then a circle, then gives up.",
+    "A draft from nowhere ripples only the left half.",
+    "Gold dust rises, hesitates, and chooses to sink.",
+    "The surface goes so still it looks painted on.",
+    "A soft growl of boiling starts with no bubbles to show for it.",
 ]
+
+
+def pick_brew_prompts(n: int = 3) -> list[str]:
+    """Distinct cauldron lines for one brew — never the same prompt twice."""
+    if n >= len(ROUND_FLAVOR):
+        return list(ROUND_FLAVOR)
+    return random.sample(ROUND_FLAVOR, n)
 
 # ---------------------------------------------------------------- recipes
 #
@@ -268,13 +389,15 @@ def blank_player() -> dict:
 
 
 class BrewView(discord.ui.View):
-    def __init__(self, cog: "Potions", owner_id: int, recipe_id: str, correct_so_far: int, round_index: int):
+    def __init__(self, cog: "Potions", owner_id: int, recipe_id: str, correct_so_far: int,
+                 round_index: int, prompts: list[str]):
         super().__init__(timeout=120)
         self.cog = cog
         self.owner_id = owner_id
         self.recipe_id = recipe_id
         self.correct_so_far = correct_so_far
         self.round_index = round_index
+        self.prompts = prompts
         for action, label in ACTIONS.items():
             self.add_item(BrewButton(action, label))
 
@@ -290,7 +413,9 @@ class BrewButton(discord.ui.Button):
             await interaction.response.send_message("That's not your cauldron - use `/brew` to start your own.",
                                                      ephemeral=True)
             return
-        await view.cog.brew_round(interaction, view.recipe_id, view.correct_so_far, view.round_index, self.action)
+        await view.cog.brew_round(
+            interaction, view.recipe_id, view.correct_so_far, view.round_index, self.action, view.prompts,
+        )
 
 
 class Potions(commands.Cog):
@@ -412,16 +537,18 @@ class Potions(commands.Cog):
             await interaction.response.send_message("Something moved in your satchel - try again.", ephemeral=True)
             return
 
+        prompts = pick_brew_prompts(3)
         embed = discord.Embed(
             title=f"{recipe['emoji']} Brewing {recipe['name']}",
-            description=f"{ROUND_FLAVOR[0]}\n\nWhat do you do?",
+            description=f"{prompts[0]}\n\nWhat do you do?",
             color=TIER_COLOR[recipe["tier"]],
         )
         embed.set_footer(text="Round 1 of 3")
-        await interaction.response.send_message(embed=embed, view=BrewView(self, interaction.user.id, recipe_id, 0, 0))
+        await interaction.response.send_message(
+            embed=embed, view=BrewView(self, interaction.user.id, recipe_id, 0, 0, prompts))
 
     async def brew_round(self, interaction: discord.Interaction, recipe_id: str, correct_so_far: int,
-                         round_index: int, action: str):
+                         round_index: int, action: str, prompts: list[str]):
         recipe = RECIPES[recipe_id]
         was_correct = recipe["sequence"][round_index] == action
         correct_so_far += 1 if was_correct else 0
@@ -431,12 +558,14 @@ class Potions(commands.Cog):
         if round_index + 1 < 3:
             embed = discord.Embed(
                 title=f"{recipe['emoji']} Brewing {recipe['name']}",
-                description=f"{feedback}\n\n{ROUND_FLAVOR[round_index + 1]}\n\nWhat do you do?",
+                description=f"{feedback}\n\n{prompts[round_index + 1]}\n\nWhat do you do?",
                 color=TIER_COLOR[recipe["tier"]],
             )
             embed.set_footer(text=f"Round {round_index + 2} of 3")
             await interaction.response.edit_message(
-                embed=embed, view=BrewView(self, interaction.user.id, recipe_id, correct_so_far, round_index + 1))
+                embed=embed,
+                view=BrewView(self, interaction.user.id, recipe_id, correct_so_far, round_index + 1, prompts),
+            )
             return
 
         await self._finish_brew(interaction, recipe_id, correct_so_far, feedback)
