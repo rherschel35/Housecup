@@ -8,11 +8,10 @@ Placeholders: {you} {missing} {mhe} {mhim} {mhis} (missing person's pronouns).
 from __future__ import annotations
 
 # Art filenames under story_art_assets/
-# Scene plates scratched — keep title / school window / train + cast portraits only.
 ART = {
     "title": "title_mack_yuna.jpg",
-    "dream": "title_mack_yuna.jpg",
-    "scare": "title_mack_yuna.jpg",
+    "dream": "dream_childhood.jpg",
+    "scare": "dream_scare.jpg",
     "school": "window_school.jpg",
     "sneak": "window_school.jpg",
     "city_fight": "train_gus_ella.jpg",
