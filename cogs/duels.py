@@ -27,6 +27,12 @@ could simply trade wins and mint points for their house. Same-house wins
 also never grow a win streak or pay a streak-bounty bonus.
 
 Wands are cosmetic: they're shown in the duel, but they don't affect it.
+
+Cast resolution mutates state under a lock, then publishes the board *after*
+releasing it. A board generation counter drops superseded edits so a slow
+"waiting on…" update can't overwrite a round that already resolved — the
+usual "I cast but it's still waiting on me / frozen" failure when both
+sides click fast.
 """
 
 import asyncio
@@ -1339,7 +1345,9 @@ class Duel:
         self.history: list[str] = []
         self.state = "pending"     # pending -> active -> done
         self.lock = asyncio.Lock()
+        self.publish_lock = asyncio.Lock()  # one board edit at a time
         self._timer = None
+        self.board_gen = 0        # bumps on every planned board publish
 
     # -------------------------------------------------------------- display
 
@@ -1371,13 +1379,34 @@ class Duel:
                                         f"{ROUND_TIMEOUT}s per round")
         return embed
 
-    async def _update(self, view=None, footer=None):
+    def _snapshot(self, view=None, footer=None):
+        """Bump board gen and capture embed+view. Call while holding the lock
+        (or when no concurrent publisher can race)."""
+        self.board_gen += 1
+        return self.board_embed(footer), view, self.board_gen
+
+    async def _publish(self, embed, view, gen):
+        """Edit the public duel message only if this snapshot is still current.
+
+        publish_lock serializes Discord edits so a slow stale write can't land
+        *after* a newer board without the newer one getting to write last.
+        """
         if self.message is None:
             return
-        try:
-            await self.message.edit(content=None, embed=self.board_embed(footer), view=view)
-        except discord.DiscordException:
-            log.exception("Could not update the duel message.")
+        async with self.publish_lock:
+            async with self.lock:
+                if gen != self.board_gen:
+                    return
+            try:
+                await self.message.edit(content=None, embed=embed, view=view)
+            except discord.DiscordException:
+                log.exception("Could not update the duel message.")
+
+    async def _update(self, view=None, footer=None):
+        """Convenience: snapshot under the lock, then publish unlocked."""
+        async with self.lock:
+            snap = self._snapshot(view=view, footer=footer)
+        await self._publish(*snap)
 
     # --------------------------------------------------------------- timing
 
@@ -1407,6 +1436,8 @@ class Duel:
 
     async def _round_timeout(self, round_no: int):
         await asyncio.sleep(ROUND_TIMEOUT)
+        finish = None
+        fizzle = None
         async with self.lock:
             if self.state != "active" or self.round != round_no:
                 return
@@ -1415,25 +1446,42 @@ class Duel:
                 winner = cast[0]
                 loser = self.b if winner is self.a else self.a
                 self.history.append(f"*{loser.display_name} froze and never cast.*")
-                await self._finish(winner, loser, forfeit=True)
+                finish = (winner, loser)
             else:
                 self.cog.release_match(self)
-                await self._update(view=None, footer="Neither duelist cast. The duel fizzles out.")
+                fizzle = self._snapshot(
+                    view=None, footer="Neither duelist cast. The duel fizzles out.")
+        if finish:
+            await self._finish(finish[0], finish[1], forfeit=True)
+        elif fizzle:
+            await self._publish(*fizzle)
 
     # ------------------------------------------------------------ the rounds
 
     async def _next_round(self):
-        self.round += 1
-        self.picks = {}
-        if self.round > MAX_ROUNDS:
-            self.cog.release_match(self)
-            await self._update(view=None, footer="Too evenly matched — declared a draw.")
-            return
-        await self._update(view=CastView(self))
-        self._arm(self._round_timeout(self.round))
+        arm_round = None
+        async with self.lock:
+            self.round += 1
+            self.picks = {}
+            if self.round > MAX_ROUNDS:
+                self.cog.release_match(self)
+                snap = self._snapshot(view=None, footer="Too evenly matched — declared a draw.")
+            else:
+                snap = self._snapshot(view=CastView(self))
+                arm_round = self.round
+        await self._publish(*snap)
+        if arm_round is not None:
+            self._arm(self._round_timeout(arm_round))
 
     async def cast(self, member, spell: str, round_no: int = None) -> str:
-        """Lock in a spell. Returns a message for the caster."""
+        """Lock in a spell. Returns a message for the caster.
+
+        State changes happen under the lock; Discord edits happen after release
+        so a slow board update can't freeze the opponent's cast.
+        """
+        publish = None
+        finish = None
+        arm_round = None
         async with self.lock:
             if self.state != "active":
                 return "This duel is over."
@@ -1446,29 +1494,45 @@ class Duel:
             self.picks[member.id] = spell
 
             if len(self.picks) < 2:
-                await self._update(view=CastView(self))
-                return f"You cast **{SPELLS[spell]['name']}**. Waiting on your opponent…"
-
-            a_spell, b_spell = self.picks[self.a.id], self.picks[self.b.id]
-            disp_a, disp_b = favor_display_spells(self.a.id, self.b.id, a_spell, b_spell)
-            result, line = resolve(disp_a, disp_b)
-            reveal = (f"R{self.round}: {SPELLS[disp_a]['emoji']} {SPELLS[disp_a]['name']} vs "
-                      f"{SPELLS[disp_b]['emoji']} {SPELLS[disp_b]['name']} — {line}")
-            if result == 1:
-                self.score[self.a.id] += 1
-                self.cog.note_round_win(self.a.id, disp_a)
-            elif result == 2:
-                self.score[self.b.id] += 1
-                self.cog.note_round_win(self.b.id, disp_b)
-            self.history.append(reveal)
-
-            if self.score[self.a.id] >= ROUNDS_TO_WIN:
-                await self._finish(self.a, self.b)
-            elif self.score[self.b.id] >= ROUNDS_TO_WIN:
-                await self._finish(self.b, self.a)
+                publish = self._snapshot(view=CastView(self))
+                reply = f"You cast **{SPELLS[spell]['name']}**. Waiting on your opponent…"
             else:
-                await self._next_round()
-            return f"You cast **{SPELLS[spell]['name']}**."
+                a_spell, b_spell = self.picks[self.a.id], self.picks[self.b.id]
+                disp_a, disp_b = favor_display_spells(self.a.id, self.b.id, a_spell, b_spell)
+                result, line = resolve(disp_a, disp_b)
+                reveal = (f"R{self.round}: {SPELLS[disp_a]['emoji']} {SPELLS[disp_a]['name']} vs "
+                          f"{SPELLS[disp_b]['emoji']} {SPELLS[disp_b]['name']} — {line}")
+                if result == 1:
+                    self.score[self.a.id] += 1
+                    self.cog.note_round_win(self.a.id, disp_a)
+                elif result == 2:
+                    self.score[self.b.id] += 1
+                    self.cog.note_round_win(self.b.id, disp_b)
+                self.history.append(reveal)
+
+                if self.score[self.a.id] >= ROUNDS_TO_WIN:
+                    finish = (self.a, self.b, False)
+                elif self.score[self.b.id] >= ROUNDS_TO_WIN:
+                    finish = (self.b, self.a, False)
+                else:
+                    self.round += 1
+                    self.picks = {}
+                    if self.round > MAX_ROUNDS:
+                        self.cog.release_match(self)
+                        publish = self._snapshot(
+                            view=None, footer="Too evenly matched — declared a draw.")
+                    else:
+                        publish = self._snapshot(view=CastView(self))
+                        arm_round = self.round
+                reply = f"You cast **{SPELLS[spell]['name']}**."
+
+        if finish:
+            await self._finish(finish[0], finish[1], forfeit=finish[2])
+        elif publish:
+            await self._publish(*publish)
+            if arm_round is not None:
+                self._arm(self._round_timeout(arm_round))
+        return reply
 
     async def _finish(self, winner, loser, forfeit: bool = False):
         if self._timer:
@@ -1492,7 +1556,9 @@ class Duel:
         else:
             tail = "No house to credit"
         verb = "wins by forfeit" if forfeit else "wins the duel"
-        await self._update(view=None, footer=f"{winner.display_name} {verb} • {tail}")
+        async with self.lock:
+            snap = self._snapshot(view=None, footer=f"{winner.display_name} {verb} • {tail}")
+        await self._publish(*snap)
         notes = outcome.get("notes") or []
         if notes and self.channel is not None:
             try:
@@ -1556,12 +1622,17 @@ class CastView(discord.ui.View):
             await interaction.response.send_message("You're watching, not duelling.",
                                                     ephemeral=True)
             return
-        if interaction.user.id in d.picks:
-            await interaction.response.send_message("You've already cast this round.",
-                                                    ephemeral=True)
-            return
+        async with d.lock:
+            if d.state != "active":
+                await interaction.response.send_message("This duel is over.", ephemeral=True)
+                return
+            if interaction.user.id in d.picks:
+                await interaction.response.send_message("You've already cast this round.",
+                                                        ephemeral=True)
+                return
+            round_no = d.round
         await interaction.response.send_message(
-            f"Round {d.round} — choose your spell. Only you can see this.",
+            f"Round {round_no} — choose your spell. Only you can see this.",
             view=SpellView(d),
             ephemeral=True,
         )
@@ -1743,8 +1814,10 @@ class TrioMatch:
         self.history: list[str] = []
         self.state = "active"
         self.lock = asyncio.Lock()
+        self.publish_lock = asyncio.Lock()
         self.message = None
         self._timer = None
+        self.board_gen = 0
         self.channel = signup.message.channel if signup.message else None
 
     def all_players(self):
@@ -1784,16 +1857,31 @@ class TrioMatch:
             self._timer.cancel()
         self._timer = asyncio.create_task(coro)
 
-    async def _update(self, view=None, footer=None):
+    def _snapshot(self, view=None, footer=None):
+        self.board_gen += 1
+        return self.board_embed(footer), view, self.board_gen
+
+    async def _publish(self, embed, view, gen):
         if self.message is None:
             return
-        try:
-            await self.message.edit(content=None, embed=self.board_embed(footer), view=view)
-        except discord.DiscordException:
-            log.exception("Could not update trio message.")
+        async with self.publish_lock:
+            async with self.lock:
+                if gen != self.board_gen:
+                    return
+            try:
+                await self.message.edit(content=None, embed=embed, view=view)
+            except discord.DiscordException:
+                log.exception("Could not update trio message.")
+
+    async def _update(self, view=None, footer=None):
+        async with self.lock:
+            snap = self._snapshot(view=view, footer=footer)
+        await self._publish(*snap)
 
     async def _round_timeout(self, round_no: int):
         await asyncio.sleep(ROUND_TIMEOUT)
+        resolve = False
+        fizzle = None
         async with self.lock:
             if self.state != "active" or self.round != round_no:
                 return
@@ -1807,11 +1895,19 @@ class TrioMatch:
                 self.state = "done"
                 for m in self.all_players():
                     self.cog.busy.discard(m.id)
-                await self._update(view=None, footer="Too few casts — the trio fizzles out.")
-                return
-            await self._resolve_round()
+                fizzle = self._snapshot(view=None, footer="Too few casts — the trio fizzles out.")
+            else:
+                resolve = True
+                follow = self._resolve_round_locked()
+        if fizzle:
+            await self._publish(*fizzle)
+            return
+        if resolve:
+            await self._apply_trio_followup(follow)
 
     async def cast(self, member, spell: str, round_no: int = None) -> str:
+        publish = None
+        follow = None
         async with self.lock:
             if self.state != "active":
                 return "This trio is over."
@@ -1827,12 +1923,21 @@ class TrioMatch:
                 return "You've already cast this round."
             self.picks[member.id] = spell
             if len(self.picks) < len(self.all_players()):
-                await self._update(view=TrioCastView(self))
-                return f"You cast **{SPELLS[spell]['name']}**. Waiting on your team…"
-            await self._resolve_round()
-            return f"You cast **{SPELLS[spell]['name']}**."
+                publish = self._snapshot(view=TrioCastView(self))
+            else:
+                follow = self._resolve_round_locked()
+            reply = (
+                f"You cast **{SPELLS[spell]['name']}**. Waiting on your team…"
+                if publish else f"You cast **{SPELLS[spell]['name']}**."
+            )
+        if publish:
+            await self._publish(*publish)
+        elif follow:
+            await self._apply_trio_followup(follow)
+        return reply
 
-    async def _resolve_round(self):
+    def _resolve_round_locked(self) -> dict:
+        """Score the round under the lock; return Discord work for outside."""
         if self._timer:
             self._timer.cancel()
         a_pair_wins = 0
@@ -1872,19 +1977,32 @@ class TrioMatch:
             self.history.append(f"→ Round tied ({a_pair_wins}-{b_pair_wins}). Replaying.")
 
         if self.score_a >= TRIO_ROUNDS_TO_WIN:
-            await self._finish(self.team_a, self.team_b)
-        elif self.score_b >= TRIO_ROUNDS_TO_WIN:
-            await self._finish(self.team_b, self.team_a)
-        elif self.round >= MAX_ROUNDS:
+            return {"finish": (self.team_a, self.team_b)}
+        if self.score_b >= TRIO_ROUNDS_TO_WIN:
+            return {"finish": (self.team_b, self.team_a)}
+        if self.round >= MAX_ROUNDS:
             self.state = "done"
             for m in self.all_players():
                 self.cog.busy.discard(m.id)
-            await self._update(view=None, footer="Too evenly matched — declared a draw.")
-        else:
-            self.round += 1
-            self.picks = {}
-            await self._update(view=TrioCastView(self))
-            self._arm(self._round_timeout(self.round))
+            return {
+                "publish": self._snapshot(view=None, footer="Too evenly matched — declared a draw."),
+            }
+        self.round += 1
+        self.picks = {}
+        arm = self.round
+        return {
+            "publish": self._snapshot(view=TrioCastView(self)),
+            "arm": arm,
+        }
+
+    async def _apply_trio_followup(self, follow: dict):
+        if follow.get("finish"):
+            await self._finish(follow["finish"][0], follow["finish"][1])
+            return
+        if follow.get("publish"):
+            await self._publish(*follow["publish"])
+        if follow.get("arm") is not None:
+            self._arm(self._round_timeout(follow["arm"]))
 
     async def _finish(self, winners, losers):
         self.state = "done"
@@ -1910,10 +2028,12 @@ class TrioMatch:
             tail = "Daily trio point cap reached"
         else:
             tail = "No house points this match"
-        await self._update(
-            view=None,
-            footer=f"{self.side_name(win_side)} wins the trio • {tail}",
-        )
+        async with self.lock:
+            snap = self._snapshot(
+                view=None,
+                footer=f"{self.side_name(win_side)} wins the trio • {tail}",
+            )
+        await self._publish(*snap)
         notes = outcome.get("notes") or []
         if notes and self.channel is not None:
             try:
@@ -1934,11 +2054,16 @@ class TrioCastView(discord.ui.View):
         if interaction.user.id not in ids:
             await interaction.response.send_message("You're watching, not duelling.", ephemeral=True)
             return
-        if interaction.user.id in m.picks:
-            await interaction.response.send_message("You've already cast this round.", ephemeral=True)
-            return
+        async with m.lock:
+            if m.state != "active":
+                await interaction.response.send_message("This trio is over.", ephemeral=True)
+                return
+            if interaction.user.id in m.picks:
+                await interaction.response.send_message("You've already cast this round.", ephemeral=True)
+                return
+            round_no = m.round
         await interaction.response.send_message(
-            f"Round {m.round} — choose your spell. Only you can see this.",
+            f"Round {round_no} — choose your spell. Only you can see this.",
             view=TrioSpellView(m),
             ephemeral=True,
         )
@@ -1985,7 +2110,9 @@ class GrandDuel:
         self.history: list[str] = []
         self.sudden_picks: dict[int, str] = {}
         self.lock = asyncio.Lock()
+        self.publish_lock = asyncio.Lock()
         self._timer = None
+        self.board_gen = 0
 
     def challenge_embed(self) -> discord.Embed:
         embed = discord.Embed(
@@ -2045,18 +2172,32 @@ class GrandDuel:
             if self.state != "locking":
                 return
             self.cog.release_match(self)
-        await self._update(
-            view=None,
-            footer="Sequences were never locked in time. The Grand Duel dissolves.",
-        )
+            snap = self._snapshot(
+                view=None,
+                footer="Sequences were never locked in time. The Grand Duel dissolves.",
+            )
+        await self._publish(*snap)
 
-    async def _update(self, view=None, footer=None):
+    def _snapshot(self, view=None, footer=None):
+        self.board_gen += 1
+        return self.board_embed(footer), view, self.board_gen
+
+    async def _publish(self, embed, view, gen):
         if self.message is None:
             return
-        try:
-            await self.message.edit(content=None, embed=self.board_embed(footer), view=view)
-        except discord.DiscordException:
-            log.exception("Could not update Grand Duel message.")
+        async with self.publish_lock:
+            async with self.lock:
+                if gen != self.board_gen:
+                    return
+            try:
+                await self.message.edit(content=None, embed=embed, view=view)
+            except discord.DiscordException:
+                log.exception("Could not update Grand Duel message.")
+
+    async def _update(self, view=None, footer=None):
+        async with self.lock:
+            snap = self._snapshot(view=view, footer=footer)
+        await self._publish(*snap)
 
     async def begin_locking(self):
         self.state = "locking"
@@ -2120,26 +2261,41 @@ class GrandDuel:
                     f"**Step {self.round}:** {SPELLS[disp_a]['emoji']} {SPELLS[disp_a]['name']} vs "
                     f"{SPELLS[disp_b]['emoji']} {SPELLS[disp_b]['name']} — {detail} {who}"
                 )
-                await self._update(view=None)
+                snap = self._snapshot(view=None)
+            await self._publish(*snap)
 
-        a_s, b_s = self.score[self.a.id], self.score[self.b.id]
-        if a_s > b_s and a_s >= GRAND_TO_WIN:
-            await self._finish(self.a, self.b)
-        elif b_s > a_s and b_s >= GRAND_TO_WIN:
-            await self._finish(self.b, self.a)
-        elif a_s == b_s:
-            self.state = "sudden"
-            self.sudden_picks = {}
-            self.history.append("**5–5.** Sudden death. One spell each, until someone lands a hit.")
-            await self._update(view=GrandSuddenView(self), footer="Sudden death — Cast now.")
-            self._arm(self._sudden_timeout(self.round))
-        elif a_s > b_s:
-            await self._finish(self.a, self.b)
-        else:
-            await self._finish(self.b, self.a)
+        finish = None
+        sudden = None
+        arm_sudden = None
+        async with self.lock:
+            if self.state != "playing":
+                return
+            a_s, b_s = self.score[self.a.id], self.score[self.b.id]
+            if a_s > b_s and a_s >= GRAND_TO_WIN:
+                finish = (self.a, self.b)
+            elif b_s > a_s and b_s >= GRAND_TO_WIN:
+                finish = (self.b, self.a)
+            elif a_s == b_s:
+                self.state = "sudden"
+                self.sudden_picks = {}
+                self.history.append("**5–5.** Sudden death. One spell each, until someone lands a hit.")
+                sudden = self._snapshot(
+                    view=GrandSuddenView(self), footer="Sudden death — Cast now.")
+                arm_sudden = self.round
+            elif a_s > b_s:
+                finish = (self.a, self.b)
+            else:
+                finish = (self.b, self.a)
+        if finish:
+            await self._finish(finish[0], finish[1])
+        elif sudden:
+            await self._publish(*sudden)
+            self._arm(self._sudden_timeout(arm_sudden))
 
     async def _sudden_timeout(self, marker: int):
         await asyncio.sleep(ROUND_TIMEOUT)
+        finish = None
+        dissolve = None
         async with self.lock:
             if self.state != "sudden" or self.round != marker:
                 return
@@ -2148,12 +2304,20 @@ class GrandDuel:
                 winner = cast[0]
                 loser = self.b if winner is self.a else self.a
                 self.history.append(f"*{loser.display_name} froze in sudden death.*")
-                await self._finish(winner, loser)
+                finish = (winner, loser)
             else:
                 self.cog.release_match(self)
-                await self._update(view=None, footer="Neither cast. The Grand Duel dissolves.")
+                dissolve = self._snapshot(
+                    view=None, footer="Neither cast. The Grand Duel dissolves.")
+        if finish:
+            await self._finish(finish[0], finish[1])
+        elif dissolve:
+            await self._publish(*dissolve)
 
     async def sudden_cast(self, member, spell: str) -> str:
+        publish = None
+        finish = None
+        arm_round = None
         async with self.lock:
             if self.state != "sudden":
                 return "Sudden death isn't running."
@@ -2163,40 +2327,48 @@ class GrandDuel:
                 return f"You've already cast {SPELLS[self.sudden_picks[member.id]]['name']}."
             self.sudden_picks[member.id] = spell
             if len(self.sudden_picks) < 2:
-                await self._update(view=GrandSuddenView(self))
-                return f"You cast **{SPELLS[spell]['name']}**. Waiting…"
-            sa, sb = self.sudden_picks[self.a.id], self.sudden_picks[self.b.id]
-            self.round += 1
-            line = random.choice(GRAND_THEATRE)
-            disp_a, disp_b = favor_display_spells(self.a.id, self.b.id, sa, sb)
-            result, detail = resolve(disp_a, disp_b)
-            self.sudden_picks = {}
-            if result == 0:
-                self.history.append(
-                    f"*{line}*\n"
-                    f"**Sudden {self.round}:** {SPELLS[disp_a]['emoji']} vs {SPELLS[disp_b]['emoji']} — "
-                    f"{detail} Again."
-                )
-                await self._update(view=GrandSuddenView(self))
-                self._arm(self._sudden_timeout(self.round))
-                return f"You cast **{SPELLS[spell]['name']}**."
-            if result == 1:
-                self.score[self.a.id] += 1
-                self.history.append(
-                    f"*{line}*\n"
-                    f"**Sudden {self.round}:** {SPELLS[disp_a]['emoji']} {SPELLS[disp_a]['name']} vs "
-                    f"{SPELLS[disp_b]['emoji']} {SPELLS[disp_b]['name']} — {detail}"
-                )
-                await self._finish(self.a, self.b)
+                publish = self._snapshot(view=GrandSuddenView(self))
+                reply = f"You cast **{SPELLS[spell]['name']}**. Waiting…"
             else:
-                self.score[self.b.id] += 1
-                self.history.append(
-                    f"*{line}*\n"
-                    f"**Sudden {self.round}:** {SPELLS[disp_a]['emoji']} {SPELLS[disp_a]['name']} vs "
-                    f"{SPELLS[disp_b]['emoji']} {SPELLS[disp_b]['name']} — {detail}"
-                )
-                await self._finish(self.b, self.a)
-            return f"You cast **{SPELLS[spell]['name']}**."
+                sa, sb = self.sudden_picks[self.a.id], self.sudden_picks[self.b.id]
+                self.round += 1
+                line = random.choice(GRAND_THEATRE)
+                disp_a, disp_b = favor_display_spells(self.a.id, self.b.id, sa, sb)
+                result, detail = resolve(disp_a, disp_b)
+                self.sudden_picks = {}
+                if result == 0:
+                    self.history.append(
+                        f"*{line}*\n"
+                        f"**Sudden {self.round}:** {SPELLS[disp_a]['emoji']} vs "
+                        f"{SPELLS[disp_b]['emoji']} — {detail} Again."
+                    )
+                    publish = self._snapshot(view=GrandSuddenView(self))
+                    arm_round = self.round
+                elif result == 1:
+                    self.score[self.a.id] += 1
+                    self.history.append(
+                        f"*{line}*\n"
+                        f"**Sudden {self.round}:** {SPELLS[disp_a]['emoji']} {SPELLS[disp_a]['name']} vs "
+                        f"{SPELLS[disp_b]['emoji']} {SPELLS[disp_b]['name']} — {detail}"
+                    )
+                    finish = (self.a, self.b)
+                else:
+                    self.score[self.b.id] += 1
+                    self.history.append(
+                        f"*{line}*\n"
+                        f"**Sudden {self.round}:** {SPELLS[disp_a]['emoji']} {SPELLS[disp_a]['name']} vs "
+                        f"{SPELLS[disp_b]['emoji']} {SPELLS[disp_b]['name']} — {detail}"
+                    )
+                    finish = (self.b, self.a)
+                reply = f"You cast **{SPELLS[spell]['name']}**."
+
+        if finish:
+            await self._finish(finish[0], finish[1])
+        elif publish:
+            await self._publish(*publish)
+            if arm_round is not None:
+                self._arm(self._sudden_timeout(arm_round))
+        return reply
 
     async def _finish(self, winner, loser):
         if self._timer:
@@ -2216,7 +2388,10 @@ class GrandDuel:
             tail = f"{winner.display_name} has taken today's Grand points already"
         else:
             tail = "No house to credit"
-        await self._update(view=None, footer=f"{winner.display_name} wins the Grand Duel • {tail}")
+        async with self.lock:
+            snap = self._snapshot(
+                view=None, footer=f"{winner.display_name} wins the Grand Duel • {tail}")
+        await self._publish(*snap)
         notes = outcome.get("notes") or []
         if notes and self.channel is not None:
             try:
