@@ -3,7 +3,7 @@ Private broom racing on the Quidditch pitch.
 
     /broomrace                     - solo fly one of 100 courses (6 private stages)
     /broomrace opponent:@member    - challenge them on the same track
-    /broomraceend [member]         - clear a stuck race lock (self, or staff for others)
+    /broomraceend [member]         - clear a stuck race lock (yours, or anyone's)
     /broomnotes [course]           - permanent study notes you've unlocked
 
 Higher Speed/Altitude means fewer button choices per stage (the broom
@@ -750,22 +750,13 @@ class BroomRace(commands.Cog):
         name="broomraceend",
         description="End a stuck broom race so you (or someone) can race again.",
     )
-    @app_commands.describe(member="Whose race to clear (staff only; leave blank for yourself)")
+    @app_commands.describe(member="Whose race to clear (leave blank for yourself)")
     async def broomraceend(
         self,
         interaction: discord.Interaction,
         member: discord.Member | None = None,
     ):
         target = member or interaction.user
-        if target.id != interaction.user.id:
-            store = self.bot.get_cog("Store")
-            if not (store and store.is_staff(interaction.user)):
-                await interaction.response.send_message(
-                    "Only staff can end someone else's broom race. "
-                    "Use `/broomraceend` with no one tagged for yourself.",
-                    ephemeral=True,
-                )
-                return
 
         # Capture match message before clear_user mutates state.
         race = self.active.get(target.id)
@@ -780,14 +771,19 @@ class BroomRace(commands.Cog):
             return
 
         if match is not None and match.message is not None and "challenge" in status:
+            clearer = (
+                "they cleared it themselves"
+                if target.id == interaction.user.id
+                else f"{interaction.user.display_name} cleared it"
+            )
             try:
                 await match.message.edit(
                     content=None,
                     embed=discord.Embed(
                         title="🧹 Race cleared",
                         description=(
-                            f"**{target.display_name}** ended a stuck broom race. "
-                            "Challenge cancelled — both can `/broomrace` again."
+                            f"**{target.display_name}**'s stuck broom race ended "
+                            f"({clearer}). Challenge cancelled — both can `/broomrace` again."
                         ),
                         color=0x95A5A6,
                     ),
