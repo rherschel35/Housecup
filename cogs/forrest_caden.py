@@ -78,6 +78,8 @@ def _art_path(key: str | None) -> Optional[Path]:
     if not key:
         return None
     name = ART.get(key, key)
+    if not name:
+        return None
     path = ASSETS_DIR / name
     return path if path.is_file() else None
 
