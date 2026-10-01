@@ -42,14 +42,17 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.velmora_channels import channel_mentions, with_study_hall
+
 log = logging.getLogger("velmora.quidditch")
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "quidditch_state.json"
 
-# Quidditch only runs in this one channel.
+# Quidditch pitch + new-student study hall.
 QUIDDITCH_CHANNEL_ID = 1553089438933065913
+QUIDDITCH_CHANNEL_IDS = with_study_hall(QUIDDITCH_CHANNEL_ID)
 
 HOUSES = ["Caldrin", "Thornmere", "Veyren", "Vashara", "Moonveil"]
 
@@ -240,7 +243,7 @@ class Quidditch(commands.Cog):
         return rec
 
     def _in_channel(self, interaction: discord.Interaction) -> bool:
-        return interaction.channel_id == QUIDDITCH_CHANNEL_ID
+        return interaction.channel_id in QUIDDITCH_CHANNEL_IDS
 
     # -------------------------------------------------------------- setup
 
@@ -271,7 +274,8 @@ class Quidditch(commands.Cog):
                            house_a: Optional[str] = None, house_b: Optional[str] = None):
         if not self._in_channel(interaction):
             await interaction.response.send_message(
-                f"Quidditch can only be played in <#{QUIDDITCH_CHANNEL_ID}>.", ephemeral=True)
+                f"Quidditch can only be played in {channel_mentions(QUIDDITCH_CHANNEL_IDS)}.",
+                ephemeral=True)
             return
         signup = Signup(is_house, size, house_a, house_b)
         await interaction.response.send_message(embed=signup.embed(), view=SignupView(self, signup))
@@ -522,7 +526,8 @@ class Quidditch(commands.Cog):
     async def quidditchstats(self, interaction: discord.Interaction):
         if not self._in_channel(interaction):
             await interaction.response.send_message(
-                f"Quidditch can only be played in <#{QUIDDITCH_CHANNEL_ID}>.", ephemeral=True)
+                f"Quidditch can only be played in {channel_mentions(QUIDDITCH_CHANNEL_IDS)}.",
+                ephemeral=True)
             return
         rec = self.record(interaction.user.id)
         title = title_for(rec["house_w"])

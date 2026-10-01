@@ -41,6 +41,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
+from cogs.velmora_channels import STUDY_HALL_CHANNEL_ID, channel_mentions
+
 log = logging.getLogger("velmora.duels")
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -505,11 +507,24 @@ class Duels(commands.Cog):
         self.state[bucket][str(user_id)] = stamps
         return len(stamps)
 
-    def _in_duel_channel(self, interaction: discord.Interaction):
+    def _duel_channel_ids(self) -> set[int] | None:
+        """Allowed duel channels, or None if unrestricted.
+
+        When DUEL_CHANNEL_ID is set, the new-student study hall is also
+        allowed so beginners can practice without leaving orientation.
+        """
         arena = os.getenv("DUEL_CHANNEL_ID", "")
-        if arena.isdigit() and interaction.channel_id != int(arena):
-            return False, arena
-        return True, arena
+        if not arena.isdigit():
+            return None
+        return {int(arena), STUDY_HALL_CHANNEL_ID}
+
+    def _in_duel_channel(self, interaction: discord.Interaction):
+        allowed = self._duel_channel_ids()
+        if allowed is None:
+            return True, ""
+        if interaction.channel_id in allowed:
+            return True, ""
+        return False, channel_mentions(allowed)
 
     # ------------------------------------------------------- public helpers
 
@@ -910,7 +925,7 @@ class Duels(commands.Cog):
         ok, arena = self._in_duel_channel(interaction)
         if not ok:
             await interaction.response.send_message(
-                f"⚔️ Duels are fought in <#{arena}>.", ephemeral=True
+                f"⚔️ Duels are fought in {arena}.", ephemeral=True
             )
             return
         if opponent.id == me.id:
@@ -1251,7 +1266,7 @@ class Duels(commands.Cog):
         ok, arena = self._in_duel_channel(interaction)
         if not ok:
             await interaction.response.send_message(
-                f"⚔️ Duels are fought in <#{arena}>.", ephemeral=True)
+                f"⚔️ Duels are fought in {arena}.", ephemeral=True)
             return
         if interaction.user.id in self.busy:
             await interaction.response.send_message("You're already in a duel.", ephemeral=True)
@@ -1270,7 +1285,7 @@ class Duels(commands.Cog):
         ok, arena = self._in_duel_channel(interaction)
         if not ok:
             await interaction.response.send_message(
-                f"⚔️ Duels are fought in <#{arena}>.", ephemeral=True)
+                f"⚔️ Duels are fought in {arena}.", ephemeral=True)
             return
         if member.id == me.id:
             await interaction.response.send_message("You can't Grand Duel yourself.", ephemeral=True)
