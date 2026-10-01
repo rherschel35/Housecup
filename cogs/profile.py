@@ -204,11 +204,17 @@ class Profile(commands.Cog):
             eff = effective_stats(broom)
             speed = eff.get("speed", "?")
             alt = eff.get("altitude", "?")
-            embed.add_field(
-                name="Broom",
-                value=f"**The {broom['model']}**\nSpeed {speed}/10 · Altitude {alt}/10",
-                inline=True,
-            )
+            broom_line = f"**The {broom['model']}**\nSpeed {speed}/10 · Altitude {alt}/10"
+            race_cog = self.bot.get_cog("BroomRace")
+            if race_cog:
+                versus = race_cog.versus_of(member.id)
+                studied = len(race_cog.notes_of(member.id))
+                w = int(versus.get("wins", 0))
+                l = int(versus.get("losses", 0))
+                t = int(versus.get("ties", 0))
+                if w or l or t or studied:
+                    broom_line += f"\nRace {w}W–{l}L–{t}T · {studied}/100 studied"
+            embed.add_field(name="Broom", value=broom_line, inline=True)
         elif wand:
             embed.add_field(name="Broom", value="Not claimed yet \u2014 `/broom`.",
                             inline=True)

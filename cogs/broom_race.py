@@ -3,6 +3,7 @@ Private broom racing on the Quidditch pitch.
 
     /broomrace                     - solo fly one of 100 courses (6 private stages)
     /broomrace opponent:@member    - challenge them on the same track
+    /broomracerecord [member]      - H2H record, courses studied, best times, daily caps
     /broomnotes [course]           - permanent study notes you've unlocked
 
 Higher Speed/Altitude means fewer button choices per stage (the broom
@@ -480,6 +481,25 @@ class BroomRace(commands.Cog):
             bag[str(winner_id)]["wins"] += 1
             bag[str(loser)]["losses"] += 1
         self.save()
+
+    def versus_of(self, user_id: int) -> dict:
+        return self.state.setdefault("versus", {}).setdefault(
+            str(user_id), {"wins": 0, "losses": 0, "ties": 0}
+        )
+
+    def best_of(self, user_id: int) -> dict:
+        return dict(self.state.get("best", {}).get(str(user_id), {}))
+
+    def top_bests(self, user_id: int, limit: int = 5) -> list[tuple[dict, int]]:
+        """Lowest time-lost personal bests first."""
+        rows: list[tuple[dict, int]] = []
+        for cid, entry in self.best_of(user_id).items():
+            course = self.by_id.get(cid)
+            if not course:
+                continue
+            rows.append((course, int(entry.get("penalty", 0))))
+        rows.sort(key=lambda row: (row[1], row[0]["name"]))
+        return rows[:limit]
 
     def clear_pending(self, match: ChallengeMatch) -> None:
         for uid in match.racer_ids:
@@ -1055,11 +1075,24 @@ class BroomRace(commands.Cog):
                     "challenge wins can pay points."
                 )
 
+        def _h2h_line(member: discord.Member) -> str:
+            v = self.versus_of(member.id)
+            return (
+                f"**{member.display_name}** · "
+                f"{int(v.get('wins', 0))}W–{int(v.get('losses', 0))}L"
+                f"–{int(v.get('ties', 0))}T"
+            )
+
+        record_line = (
+            f"\n\nRecords · {_h2h_line(a)} · {_h2h_line(b)}"
+            f"\n`/broomracerecord` for full stats."
+        )
+
         embed = discord.Embed(
             title="🏁 Head-to-head result",
             description=(
                 f"**{match.course['name']}**\n*{match.course['blurb']}*\n\n"
-                f"{line}{pts_line}"
+                f"{line}{pts_line}{record_line}"
             ),
             color=RACE_COLOR,
         )
@@ -1073,6 +1106,68 @@ class BroomRace(commands.Cog):
                 await match.channel.send(embed=embed)
             except discord.DiscordException:
                 log.exception("Could not announce broom race challenge result")
+
+    # ================================================================ record
+
+    @app_commands.command(
+        name="broomracerecord",
+        description="Broom race record: H2H wins, courses studied, best times, today's caps.",
+    )
+    @app_commands.describe(member="Whose record to show (leave blank for your own)")
+    async def broomracerecord(
+        self, interaction: discord.Interaction, member: discord.Member | None = None
+    ):
+        target = member or interaction.user
+        versus = self.versus_of(target.id)
+        notes = self.notes_of(target.id)
+        bests = self.best_of(target.id)
+        solo_left = self.solo_left(target.id)
+        chall_left = self.challenge_pts_left(target.id)
+
+        w = int(versus.get("wins", 0))
+        l = int(versus.get("losses", 0))
+        t = int(versus.get("ties", 0))
+        h2h_total = w + l + t
+
+        desc = [
+            f"**Head-to-head** · **{w}W – {l}L – {t}T**"
+            + ("" if h2h_total else " · no challenges finished yet"),
+            f"**Courses studied** · **{len(notes)} / 100**",
+            f"**Personal bests** · **{len(bests)}** course{'s' if len(bests) != 1 else ''}",
+            (
+                f"**Today (UTC)** · solo learning **{solo_left}/{SOLO_DAILY_CAP}** left · "
+                f"challenge point-wins **{chall_left}/{CHALLENGE_POINT_CAP}** left"
+            ),
+        ]
+
+        embed = discord.Embed(
+            title=f"🧹 {target.display_name}'s broom race record",
+            description="\n".join(desc),
+            color=RACE_COLOR,
+        )
+
+        top = self.top_bests(target.id, limit=5)
+        if top:
+            lines = [
+                f"· **{course['name']}** — +{penalty}s time lost"
+                for course, penalty in top
+            ]
+            embed.add_field(
+                name="Best times",
+                value="\n".join(lines),
+                inline=False,
+            )
+        else:
+            embed.add_field(
+                name="Best times",
+                value="None yet — finish a `/broomrace` to set one.",
+                inline=False,
+            )
+
+        embed.set_footer(
+            text="Challenges always open · solo unlocks study notes · /broomnotes · /checklist"
+        )
+        await interaction.response.send_message(embed=embed)
 
     # ================================================================ notes
 
