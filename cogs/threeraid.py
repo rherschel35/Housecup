@@ -64,8 +64,8 @@ def _channel_hint() -> str:
 
 SPELLS: dict[str, dict] = {
     # Attacker
-    "incedio": {
-        "role": "attacker", "label": "Incedio", "emoji": "🔥", "ap": 2,
+    "incendio": {
+        "role": "attacker", "label": "Incendio", "emoji": "🔥", "ap": 2,
         "kind": "damage", "element": "fire", "primary": True,
         "desc": "Solid fire damage. Strong vs ice shields.",
     },

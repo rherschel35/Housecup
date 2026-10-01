@@ -93,7 +93,7 @@ ELEMENT_NAME = {"fire": "Fire", "ice": "Ice", "lightning": "Lightning", "poison"
 # the attack spell each element is cast as - shown on the buttons and in
 # the round log, with the element emoji doing the job of telling players
 # which element it actually is
-SPELL_NAME = {"fire": "Incedio", "ice": "Glacius", "lightning": "Fulgur",
+SPELL_NAME = {"fire": "Incendio", "ice": "Glacius", "lightning": "Fulgur",
               "poison": "Draught", "light": "Lumos Solem"}
 # what a monster of this element is weak to (takes double damage from) -
 # never shown to the player; the point is to learn it by fighting
