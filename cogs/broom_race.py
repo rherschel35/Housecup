@@ -3,6 +3,7 @@ Private broom racing on the Quidditch pitch.
 
     /broomrace                     - solo fly one of 100 courses (6 private stages)
     /broomrace opponent:@member    - challenge them on the same track
+    /broomraceend [member]         - clear a stuck race lock (yours, or anyone's)
     /broomnotes [course]           - permanent study notes you've unlocked
 
 Higher Speed/Altitude means fewer button choices per stage (the broom
@@ -542,11 +543,46 @@ class BroomRace(commands.Cog):
             if self.pending.get(uid) is match:
                 self.pending.pop(uid, None)
 
+    def _stop_race(self, race: RaceSession) -> None:
+        """Mark a session done and drop it from active (no scoring)."""
+        race.done = True
+        if race.view:
+            try:
+                race.view.stop()
+            except Exception:
+                pass
+        if self.active.get(race.user_id) is race:
+            self.active.pop(race.user_id, None)
+
+    def clear_user(self, user_id: int) -> str:
+        """End a stuck solo race or challenge for this user. Returns a short status."""
+        race = self.active.get(user_id)
+        if race is not None:
+            match = race.match
+            self._stop_race(race)
+            if match is not None and match.state in ("pending", "racing") and not match.announced:
+                match.state = "cancelled"
+                self.clear_pending(match)
+                for uid in match.racer_ids:
+                    other = self.active.get(uid)
+                    if other is not None:
+                        self._stop_race(other)
+                return "ended mid-race (challenge cancelled)"
+            return "ended mid-race"
+
+        match = self.pending.get(user_id)
+        if match is not None:
+            match.state = "cancelled"
+            self.clear_pending(match)
+            return "cleared pending challenge"
+
+        return "not_busy"
+
     def _busy(self, user_id: int) -> str | None:
         if user_id in self.active:
-            return "already mid-race"
+            return "already mid-race — `/broomraceend` clears a stuck race"
         if user_id in self.pending:
-            return "already has a broom race challenge pending"
+            return "already has a broom race challenge pending — `/broomraceend` clears it"
         return None
 
     def _flight_stats(self, user_id: int) -> tuple[int, int] | None:
@@ -709,6 +745,59 @@ class BroomRace(commands.Cog):
             await self._start_solo(interaction)
             return
         await self._offer_challenge(interaction, opponent)
+
+    @app_commands.command(
+        name="broomraceend",
+        description="End a stuck broom race so you (or someone) can race again.",
+    )
+    @app_commands.describe(member="Whose race to clear (leave blank for yourself)")
+    async def broomraceend(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member | None = None,
+    ):
+        target = member or interaction.user
+
+        # Capture match message before clear_user mutates state.
+        race = self.active.get(target.id)
+        match = race.match if race else self.pending.get(target.id)
+        status = self.clear_user(target.id)
+        if status == "not_busy":
+            who = "You aren't" if target.id == interaction.user.id else f"{target.display_name} isn't"
+            await interaction.response.send_message(
+                f"{who} marked as in a broom race right now.",
+                ephemeral=True,
+            )
+            return
+
+        if match is not None and match.message is not None and "challenge" in status:
+            clearer = (
+                "they cleared it themselves"
+                if target.id == interaction.user.id
+                else f"{interaction.user.display_name} cleared it"
+            )
+            try:
+                await match.message.edit(
+                    content=None,
+                    embed=discord.Embed(
+                        title="🧹 Race cleared",
+                        description=(
+                            f"**{target.display_name}**'s stuck broom race ended "
+                            f"({clearer}). Challenge cancelled — both can `/broomrace` again."
+                        ),
+                        color=0x95A5A6,
+                    ),
+                    view=None,
+                )
+            except discord.DiscordException:
+                log.exception("Could not edit cleared broom race challenge message")
+
+        who = "Your" if target.id == interaction.user.id else f"{target.display_name}'s"
+        await interaction.response.send_message(
+            f"{who} broom race lock is cleared ({status}). "
+            f"{'You' if target.id == interaction.user.id else 'They'} can `/broomrace` again.",
+            ephemeral=True,
+        )
 
     async def _start_solo(self, interaction: discord.Interaction):
         why = self._busy(interaction.user.id)

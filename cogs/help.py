@@ -107,6 +107,7 @@ HELP = {
             ("broomupgrade", "Raise Speed or Altitude on you or @member. Pay with Pitch Resin ×5, Descent mat ×100, or a market token."),
             ("market broomtoken", "Buy a Speed or Altitude upgrade token (50 pts). Spend with /broomupgrade."),
             ("broomrace", "Solo 6-stage race (Quidditch channel), or pass opponent: to challenge on the same track."),
+            ("broomraceend", "Clear a stuck broom race — yours or anyone else's."),
             ("broomnotes", "Permanent study notes from courses you've finished (⚠ marks known traps when studied)."),
             ("checklist", "Daily points board — broom races, potions, and the rest of today's caps."),
             ("upgrade broom", "(staff) Freely raise anyone's broom Speed or Altitude / control."),
