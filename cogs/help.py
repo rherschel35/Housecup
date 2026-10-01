@@ -108,7 +108,7 @@ HELP = {
             ("market broomtoken", "Buy a Speed or Altitude upgrade token (50 pts). Spend with /broomupgrade."),
             ("broomrace", "Solo 6-stage race (Quidditch channel), or pass opponent: to challenge on the same track."),
             ("broomnotes", "Permanent study notes from courses you've finished (⚠ marks known traps when studied)."),
-            ("checklist", "See solo learning races and challenge point-wins left today."),
+            ("checklist", "Daily points board — broom races, potions, and the rest of today's caps."),
             ("upgrade broom", "(staff) Freely raise anyone's broom Speed or Altitude / control."),
             ("broomreset", "(staff) Free someone's broom claim (wand and patronus stay)."),
         ],
@@ -172,7 +172,7 @@ HELP = {
         "staff": False,
         "entries": [
             ("profile", "Your Mirror, wand, patronus, broom, points, duel rank, beasts and honours - or anyone's."),
-            ("checklist", "Your daily points board (public) — duels, Quidditch, broom solo/challenge caps, beasts, market, and more."),
+            ("checklist", "Your daily points board (public) — duels, Quidditch, broom, beasts, potions, market, and more."),
             ("points", "Your points (or anyone's), this season and all time."),
             ("standings", "The House Cup table."),
             ("leaderboard", "The top earners."),

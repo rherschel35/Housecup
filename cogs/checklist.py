@@ -232,6 +232,27 @@ class Checklist(commands.Cog):
                 f"**{left}/{SELL_DAILY_CAP}** pts left from selling",
                 utc_reset, "day resets"))
 
+        # ---- Potions (brewable / bottled / active) ----
+        potions = self.bot.get_cog("Potions")
+        if potions:
+            from cogs.potions import RECIPES, TIER_MIN_RANK, rank_info
+            prec = potions.record(member.id)
+            p_idx, _, _ = rank_info(prec.get("rep_xp", 0))
+            have = potions._satchel_items(member)
+            brewable = sum(
+                1 for r in RECIPES.values()
+                if p_idx >= TIER_MIN_RANK[r["tier"]]
+                and all(have.get(i, 0) >= 1 for i in r["ingredients"])
+            )
+            bottled = sum(int(n) for n in (prec.get("inventory") or {}).values() if int(n) > 0)
+            active_n = len(prec.get("active") or [])
+            bits = [f"**{brewable}** brewable", f"**{bottled}** ready to drink"]
+            if active_n:
+                bits.append(f"**{active_n}** active")
+            # No daily cap — ✅ when there's nothing waiting on you.
+            mark = "✅" if brewable == 0 and bottled == 0 else "⬜"
+            lines.append(f"{mark} **Potions** — {' · '.join(bits)} · `/brew` / `/drink`")
+
         # ---- Familiar care / scout ----
         familiars = self.bot.get_cog("Familiars")
         if familiars:
