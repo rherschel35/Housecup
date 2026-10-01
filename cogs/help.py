@@ -228,7 +228,7 @@ HELP = {
         "staff": True,
         "entries": [
             ("dementor channels", "Set the 4 channels a wild threat can appear in."),
-            ("dementor summon", "Make one appear right now (any creature, or a dementor)."),
+            ("dementor summon", "Make one appear right now (study hall OK for practice; Attack waves skip it)."),
             ("duelnight", "Start or end a House Duel Night - duel wins count double."),
             ("beastadmin spawn", "Make a beast appear right now."),
             ("beastadmin channel", "Set which channel beasts appear in."),
