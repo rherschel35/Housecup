@@ -500,18 +500,32 @@ class Potions(commands.Cog):
 
     # ------------------------------------------------------------- brewing
 
+    def _satchel_items(self, member) -> dict:
+        world = self.bot.get_cog("World")
+        if not world:
+            return {}
+        return world.student(member).get("items", {})
+
+    def _brew_choice_label(self, recipe_id: str, have: dict) -> str:
+        """🟢 when every ingredient is in the satchel; 🔴 otherwise."""
+        r = RECIPES[recipe_id]
+        ready = all(have.get(i, 0) >= 1 for i in r["ingredients"])
+        mark = "🟢" if ready else "🔴"
+        return f"{mark} {r['emoji']} {r['name']} ({TIER_LABEL[r['tier']]})"[:100]
+
     @app_commands.command(name="brew", description="Spend two ingredients and try to brew a potion.")
-    @app_commands.choices(potion=[
-        app_commands.Choice(name=f"{r['emoji']} {r['name']} ({TIER_LABEL[r['tier']]})", value=key)
-        for key, r in RECIPES.items()
-    ])
-    async def brew(self, interaction: discord.Interaction, potion: app_commands.Choice[str]):
+    @app_commands.describe(potion="Which potion (🟢 = you have the ingredients)")
+    async def brew(self, interaction: discord.Interaction, potion: str):
         if interaction.channel_id not in POTIONS_CHANNEL_IDS:
             await interaction.response.send_message(
                 f"Potions can only be brewed in {channel_mentions(POTIONS_CHANNEL_IDS)}.",
                 ephemeral=True)
             return
-        recipe_id = potion.value
+        if potion not in RECIPES:
+            await interaction.response.send_message(
+                "That's not a known recipe — pick one from the list.", ephemeral=True)
+            return
+        recipe_id = potion
         recipe = RECIPES[recipe_id]
         rec = self.record(interaction.user.id)
         idx, rank_name, _mult = rank_info(rec["rep_xp"])
@@ -546,6 +560,23 @@ class Potions(commands.Cog):
         embed.set_footer(text="Round 1 of 3")
         await interaction.response.send_message(
             embed=embed, view=BrewView(self, interaction.user.id, recipe_id, 0, 0, prompts))
+
+    @brew.autocomplete("potion")
+    async def brew_potion_autocomplete(self, interaction: discord.Interaction, current: str):
+        have = self._satchel_items(interaction.user)
+        q = current.lower().strip()
+        rows = []
+        for key, r in RECIPES.items():
+            label = self._brew_choice_label(key, have)
+            hay = f"{label} {key} {r['name']}".lower()
+            if q and q not in hay:
+                continue
+            ready = all(have.get(i, 0) >= 1 for i in r["ingredients"])
+            rows.append((0 if ready else 1, key, label))
+        # Brewable (green) first, then recipe book order.
+        order = {k: i for i, k in enumerate(RECIPES)}
+        rows.sort(key=lambda t: (t[0], order[t[1]]))
+        return [app_commands.Choice(name=label, value=key) for _, key, label in rows[:25]]
 
     async def brew_round(self, interaction: discord.Interaction, recipe_id: str, correct_so_far: int,
                          round_index: int, action: str, prompts: list[str]):
