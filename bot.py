@@ -96,6 +96,7 @@ INITIAL_COGS = (
     "cogs.pip_wick",
     "cogs.checklist",
     "cogs.avada",
+    "cogs.broke",
 )
 
 

@@ -44,6 +44,7 @@ HELP = {
             ("raid", "Open a 3Raid lobby — Attacker, Specialty, Tank, 10 encounters."),
             ("raidstatus", "Your 3Raid weekly clear status."),
             ("piphowdoi", "Ask Pip Wick how to do something (public hearthling answer from help + Compendium)."),
+            ("gonsomethingbroke", "Tell Gon something's broken — staff get a jump link to your ticket."),
         ],
     },
     "market": {
