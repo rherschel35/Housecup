@@ -407,9 +407,21 @@ class StorySession:
         """destination: interaction.followup or channel."""
         await self._render(destination, edit=False)
 
-    async def refresh(self) -> None:
-        if self.message:
-            await self._render(self.message, edit=True)
+    async def refresh(self, interaction: Optional[discord.Interaction] = None) -> None:
+        """Redraw current node. Prefer editing the interaction message; fall back to a new post."""
+        try:
+            if interaction is not None:
+                await self._render(interaction, edit=True)
+            elif self.message is not None:
+                await self._render(self.message, edit=True)
+            else:
+                await self._render(self.channel, edit=False)
+        except Exception:
+            log.exception("Forrest refresh failed; posting a new story message")
+            try:
+                await self._render(self.channel, edit=False)
+            except Exception:
+                log.exception("Forrest fallback send also failed")
 
     async def _render(self, destination, edit: bool) -> None:
         save = self.save
@@ -493,7 +505,14 @@ class StorySession:
         elif file and edit:
             kwargs["attachments"] = [file]
 
-        if edit and isinstance(destination, discord.Message):
+        if edit and isinstance(destination, discord.Interaction):
+            # Component/followup interactions: edit the original story message.
+            if destination.response.is_done():
+                self.message = await destination.edit_original_response(**kwargs)
+            else:
+                await destination.response.edit_message(**kwargs)
+                self.message = destination.message
+        elif edit and isinstance(destination, discord.Message):
             self.message = await destination.edit(**kwargs)
         elif edit and self.message:
             self.message = await self.message.edit(**kwargs)
@@ -526,14 +545,14 @@ class StorySession:
             self.save["page"] = page_i + 1
             self.cog.write()
             await interaction.response.defer()
-            await self.refresh()
+            await self.refresh(interaction)
             return
         # finished pages → goto or choices already shown; ContinueView with auto_goto
         nxt = auto_goto or node.get("goto")
         if nxt:
             await self._advance(nxt)
             await interaction.response.defer()
-            await self.refresh()
+            await self.refresh(interaction)
         else:
             await interaction.response.defer()
 
@@ -553,7 +572,7 @@ class StorySession:
                     self.save["flags"]["gus_advice"] = v
         await self._advance(choice.get("goto"))
         await interaction.response.defer()
-        await self.refresh()
+        await self.refresh(interaction)
 
 
 class ContinueView(discord.ui.View):
@@ -586,6 +605,8 @@ class ChoiceButton(discord.ui.Button):
 
 
 class MaterialPickView(discord.ui.View):
+    """Toggle items, then press Continue once you have exactly `need` picks."""
+
     def __init__(self, session: StorySession, options: list[tuple], need: int, flag_key: str, nxt: str):
         super().__init__(timeout=600)
         self.session = session
@@ -594,23 +615,14 @@ class MaterialPickView(discord.ui.View):
         self.flag_key = flag_key
         self.nxt = nxt
         self.picked: list[str] = []
+        self._busy = False
         for key, label, _desc in options:
             self.add_item(MaterialButton(self, key, label))
+        self.confirm_btn = MaterialConfirmButton(self)
+        self.add_item(self.confirm_btn)
+        self._sync()
 
-    async def toggle(self, interaction: discord.Interaction, key: str):
-        if interaction.user.id != self.session.user_id:
-            await interaction.response.send_message("This isn’t your story.", ephemeral=True)
-            return
-        if key in self.picked:
-            self.picked.remove(key)
-        else:
-            if len(self.picked) >= self.need:
-                await interaction.response.send_message(
-                    f"Pick {self.need} only — tap one to unselect.", ephemeral=True
-                )
-                return
-            self.picked.append(key)
-        # update button styles
+    def _sync(self) -> None:
         for child in self.children:
             if isinstance(child, MaterialButton):
                 child.style = (
@@ -618,17 +630,55 @@ class MaterialPickView(discord.ui.View):
                     if child.key in self.picked
                     else discord.ButtonStyle.secondary
                 )
-        if len(self.picked) == self.need:
-            self.session.save[self.flag_key] = list(self.picked)
-            self.cog_write()
-            await self.session._advance(self.nxt)
-            await interaction.response.defer()
-            await self.session.refresh()
-        else:
-            await interaction.response.edit_message(view=self)
+        n = len(self.picked)
+        ready = n == self.need
+        self.confirm_btn.disabled = not ready
+        self.confirm_btn.style = (
+            discord.ButtonStyle.primary if ready else discord.ButtonStyle.secondary
+        )
+        self.confirm_btn.label = (
+            f"Continue ({n}/{self.need})" if not ready else f"Continue with these ({n})"
+        )
 
-    def cog_write(self):
+    async def toggle(self, interaction: discord.Interaction, key: str):
+        if interaction.user.id != self.session.user_id:
+            await interaction.response.send_message("This isn’t your story.", ephemeral=True)
+            return
+        if self._busy:
+            await interaction.response.send_message("One moment…", ephemeral=True)
+            return
+        if key in self.picked:
+            self.picked.remove(key)
+        else:
+            if len(self.picked) >= self.need:
+                await interaction.response.send_message(
+                    f"Pick {self.need} only — tap a green one to unselect, then Continue.",
+                    ephemeral=True,
+                )
+                return
+            self.picked.append(key)
+        self._sync()
+        await interaction.response.edit_message(view=self)
+        self.session.message = interaction.message
+
+    async def confirm(self, interaction: discord.Interaction):
+        if interaction.user.id != self.session.user_id:
+            await interaction.response.send_message("This isn’t your story.", ephemeral=True)
+            return
+        if self._busy:
+            await interaction.response.send_message("One moment…", ephemeral=True)
+            return
+        if len(self.picked) != self.need:
+            await interaction.response.send_message(
+                f"Pick exactly {self.need}, then press Continue.", ephemeral=True
+            )
+            return
+        self._busy = True
+        self.session.save[self.flag_key] = list(self.picked)
         self.session.cog.write()
+        await self.session._advance(self.nxt)
+        await interaction.response.defer()
+        await self.session.refresh(interaction)
 
 
 class MaterialButton(discord.ui.Button):
@@ -639,6 +689,20 @@ class MaterialButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         await self.parent_view.toggle(interaction, self.key)
+
+
+class MaterialConfirmButton(discord.ui.Button):
+    def __init__(self, parent: MaterialPickView):
+        super().__init__(
+            label="Continue (0/0)",
+            style=discord.ButtonStyle.secondary,
+            disabled=True,
+            row=4,
+        )
+        self.parent_view = parent
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.parent_view.confirm(interaction)
 
 
 class SneakView(discord.ui.View):
@@ -696,7 +760,7 @@ class SneakView(discord.ui.View):
             save.setdefault("flags", {})["sneak_caught"] = caught
             await self.session._advance("sneak_done")
             await interaction.response.defer()
-            await self.session.refresh()
+            await self.session.refresh(interaction)
         else:
             await interaction.response.send_message(
                 f"Round {r + 1}: {tip} ({save['sneak_round']}/3)", ephemeral=True
