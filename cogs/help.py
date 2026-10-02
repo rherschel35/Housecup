@@ -35,7 +35,7 @@ HELP = {
             ("patronus", "Your patronus, cast from the same three words as your wand."),
             ("broom", "Claim your unique broom (see Brooms section for upgrades, races, and notes)."),
             ("rumor", "Explore secrets, student gossip, odd headmaster whispers, embarrassing ghosts."),
-            ("cast", "Banish a wild threat in this channel. Needs a patronus already cast."),
+            ("cast", "Banish a wild threat in this channel. If you stirred it up exploring, you get 25s alone first."),
             ("familiar", "Adopt a familiar (once, for good), name it, or see the one you have."),
             ("feed", "Feed your familiar. Once a day."),
             ("pet", "Pet your familiar. Once a day."),
@@ -117,7 +117,9 @@ HELP = {
     "explore": {
         "title": "Explore Velmora",
         "staff": False,
-        "note": "Places remember how you treat them. Not everything you can do is listed here.",
+        "note": ("Places remember how you treat them. Not everything you can do is listed here. "
+                 "Exploring or foraging in the Dungeons or Forbidden Woods can stir up a wild threat — "
+                 "you get 25 seconds alone to `/cast` before anyone else can try."),
         "entries": [
             ("places", "Where you can go, and what's happening there."),
             ("explore", "Go somewhere and see what you find."),
@@ -131,9 +133,10 @@ HELP = {
         "title": "Beasts",
         "staff": False,
         "note": ("A few times a day a beast wanders into the explore channel and says what it wants. "
-                 "First to bring it befriends it. 70 to find — including Nifflers — some only after dark."),
+                 "First to `/approach` gets 60 seconds alone; then anyone can try. "
+                 "70 to find — including Nifflers — some only after dark."),
         "entries": [
-            ("approach", "Befriend the beast that's here, if you have what it wants."),
+            ("approach", "Befriend the beast that's here (first approach gets 60s exclusive)."),
             ("bestiary", "Every beast you've befriended - and the ones still out there."),
             ("summon", "Call one of your beasts to show off. Just for fun."),
             ("study", "Study a befriended beast (once a day). Three pages = 5 house points once."),

@@ -12,8 +12,9 @@ Beasts of Velmora. 70 creatures, 14 in each place, to find and befriend.
 
 About 5-6 times a day (for the whole server, not per place) a beast wanders
 into the explore channel and says exactly what it wants. The first person
-to /approach with those items in their satchel befriends it - the items
-are used up. It slips away after 10 minutes if nobody does.
+to /approach claims 60 seconds alone to bring what it wants; after that
+window anyone can try. Items are used up on a successful befriend. It
+slips away after 10 minutes if nobody does.
 
 Rarer beasts turn up less often, and a few only appear after dark
 (8 PM - 6 AM, Velmora time). Befriending pays house points by rarity -
@@ -58,6 +59,7 @@ DEFAULT_CHANNEL_ID = int(os.getenv("BEAST_CHANNEL_ID", "1552403888890576916") or
 GAP_MIN_HOURS = 2.5
 GAP_MAX_HOURS = 6.0          # average gap ~4.25h -> ~5.6 sightings a day
 STAY_MINUTES = 10
+APPROACH_CLAIM_SECONDS = 60  # first /approach gets exclusive dibs this long
 
 RARITY_WEIGHTS = {"common": 50, "uncommon": 30, "rare": 15, "legendary": 5}
 RARITY_POINTS = {"common": 1, "uncommon": 2, "rare": 3, "legendary": 5}
@@ -270,18 +272,38 @@ class Beasts(commands.Cog):
         pool = sorted(k for k, b in eligible.items() if b["rarity"] == rarity)
         return self.rng.choice(pool)
 
-    def sighting_embed(self, key: str, expires: float) -> discord.Embed:
+    def sighting_embed(self, key: str, expires: float,
+                       claimer_id: int | None = None,
+                       claim_until: float | None = None) -> discord.Embed:
         b = self.beasts[key]
         n = len(b["wants"])
         desc = (f"{b['sighting']}\n\n"
                 f"**It wants:** {self.items_line(b['wants'])}\n\n"
-                f"First to `/approach` with {'it' if n == 1 else 'them'} in their satchel befriends it. "
+                f"`/approach` with {'it' if n == 1 else 'them'} in your satchel to befriend it. "
                 f"It'll slip away <t:{int(expires)}:R>.")
+        now = time.time()
+        if claimer_id and claim_until and now < claim_until:
+            desc += (f"\n\n⏳ <@{claimer_id}> is approaching first — exclusive until "
+                     f"<t:{int(claim_until)}:R>. Then anyone can try.")
+        else:
+            desc += (f"\n\nFirst to `/approach` gets **{APPROACH_CLAIM_SECONDS} seconds** alone; "
+                     f"after that, anyone can try.")
         embed = discord.Embed(title=f"{b['emoji']} A {b['name']} appears!", description=desc,
                               color=SIGHTING_COLOR)
         embed.set_footer(text=f"{RARITY_LABEL[b['rarity']]} • from {PLACES[b['place']]}"
                               + (" • only seen after dark" if b.get("night") else ""))
         return embed
+
+    def _claim_blocks(self, sighting: dict, user_id: int, now: float) -> str | None:
+        """Ephemeral refusal while someone else still has exclusive approach rights."""
+        claimer = sighting.get("claimer_id")
+        until = sighting.get("claim_until")
+        if not claimer or not until:
+            return None
+        if now >= until or user_id == claimer:
+            return None
+        return (f"<@{claimer}> called dibs — they have until <t:{int(until)}:R> "
+                f"to `/approach`. After that, anyone can try.")
 
     async def spawn(self, key: Optional[str] = None, channel=None, now: Optional[float] = None) -> Optional[str]:
         """Put a beast in the channel. Returns its key, or None if it couldn't."""
@@ -396,6 +418,8 @@ class Beasts(commands.Cog):
     @app_commands.command(name="approach", description="Try to befriend the beast that's here.")
     async def approach(self, interaction: discord.Interaction):
         now = time.time()
+        claim_embed = None  # edit sighting after lock if a new claim was set
+        missing_reply = None
         async with self.lock:
             s = self.state.get("sighting")
             adorn = self.bot.get_cog("Adornments")
@@ -409,6 +433,19 @@ class Beasts(commands.Cog):
                 await interaction.response.send_message(
                     f"The beast is in <#{s['channel_id']}>.", ephemeral=True)
                 return
+            blocked = self._claim_blocks(s, interaction.user.id, now)
+            if blocked:
+                await interaction.response.send_message(blocked, ephemeral=True)
+                return
+            # First /approach (or first after a claim expires) gets exclusive dibs.
+            until = s.get("claim_until") or 0
+            if not s.get("claimer_id") or now >= until:
+                s["claimer_id"] = interaction.user.id
+                s["claim_until"] = now + APPROACH_CLAIM_SECONDS
+                self.save()
+                claim_embed = self.sighting_embed(
+                    s["beast"], s["expires"],
+                    claimer_id=s["claimer_id"], claim_until=s["claim_until"])
             key = s["beast"]
             b = self.beasts[key]
             world = self.bot.get_cog("World")
@@ -421,16 +458,27 @@ class Beasts(commands.Cog):
                 have = student.get("items", {})
                 missing = [i for i in b["wants"] if have.get(i, 0) < 1]
                 if missing:
-                    await interaction.response.send_message(
+                    claim_until = s.get("claim_until")
+                    tip = ""
+                    if claim_until and now < claim_until:
+                        tip = (f" You have until <t:{int(claim_until)}:R> before anyone else can try.")
+                    missing_reply = (
                         f"The {b['name']} sniffs at you and waits. It wants {self.items_line(b['wants'])} - "
-                        f"you're missing {self.items_line(missing)}.", ephemeral=True)
-                    return
-                for i in b["wants"]:
-                    world.world.take(student, i)
-                world.save()
-            out = self.befriend(interaction.user, key, now)
-            self.state["sighting"] = None
-            self.save()
+                        f"you're missing {self.items_line(missing)}.{tip}")
+                else:
+                    for i in b["wants"]:
+                        world.world.take(student, i)
+                    world.save()
+                    out = self.befriend(interaction.user, key, now)
+                    self.state["sighting"] = None
+                    self.save()
+                    claim_embed = None  # befriended — final edit happens below
+
+        if missing_reply is not None:
+            await interaction.response.send_message(missing_reply, ephemeral=True)
+            if claim_embed is not None:
+                await self._edit_sighting(s, claim_embed)
+            return
 
         from cogs.store import HOUSES
         lines = [f"{b['emoji']} **{interaction.user.display_name}** offers {self.items_line(b['wants'])} "
@@ -864,6 +912,10 @@ class Beasts(commands.Cog):
         lines = [f"Beasts appear in <#{self.channel_id()}>."]
         if s and time.time() < s["expires"]:
             lines.append(f"Out now: **{self.beasts[s['beast']]['name']}** (leaves <t:{int(s['expires'])}:R>).")
+            claimer = s.get("claimer_id")
+            until = s.get("claim_until")
+            if claimer and until and time.time() < until:
+                lines.append(f"Exclusive approach: <@{claimer}> until <t:{int(until)}:R>.")
         else:
             lines.append(f"Next sighting: <t:{int(self.state.get('next_at', 0))}:R>.")
         befriended = sum(len(c) for c in self.state["collections"].values())
