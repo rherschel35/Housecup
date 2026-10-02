@@ -281,6 +281,7 @@ class StorySession:
                 )
             ]
             self.save.setdefault("flags", {})["ella_hand"] = False
+            art = "train_trio"
         else:
             pages = [
                 render(
@@ -303,8 +304,9 @@ class StorySession:
             self.save["gus_with_party"] = True
             self.save.setdefault("flags", {})["ella_hand"] = True
             self.save.setdefault("flags", {})["gus_saw_hand"] = True
+            art = "train_hand"
         self.cog.write()
-        return {"art": "train", "pages": pages, "goto": "ch1_end"}
+        return {"art": art, "pages": pages, "goto": "ch1_end"}
 
     def _gus_talk_node(self) -> dict:
         flags = self.save.setdefault("flags", {})
