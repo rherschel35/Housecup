@@ -273,9 +273,12 @@ class Quidditch(commands.Cog):
     def _register_commands(self):
         size_choices = [app_commands.Choice(name="2v2", value=2), app_commands.Choice(name="4v4", value=4)]
         # Choice value is the store house key ('veyren'); name is what players see.
+        # Every house in Store must appear — housematch is house-vs-house for all five.
         house_choices = [
             app_commands.Choice(name=STORE_HOUSES[k]["name"], value=k) for k in HOUSE_KEYS
         ]
+        if len(house_choices) != len(STORE_HOUSES):
+            raise RuntimeError("Quidditch housematch is missing a house choice")
 
         @self.group.command(name="scramble", description="Start a casual pickup match - any houses, either side.")
         @app_commands.describe(size="Players per side")
@@ -288,11 +291,16 @@ class Quidditch(commands.Cog):
         @app_commands.choices(house1=house_choices, house2=house_choices, size=size_choices)
         async def housematch(interaction: discord.Interaction, house1: app_commands.Choice[str],
                              house2: app_commands.Choice[str], size: Optional[app_commands.Choice[int]] = None):
-            if house1.value == house2.value:
+            a = normalize_house(house1.value)
+            b = normalize_house(house2.value)
+            if not a or not b:
+                await interaction.response.send_message("Pick two valid houses.", ephemeral=True)
+                return
+            if a == b:
                 await interaction.response.send_message("Pick two different houses.", ephemeral=True)
                 return
             await self.start_signup(interaction, is_house=True, size=size.value if size else 2,
-                                    house_a=house1.value, house_b=house2.value)
+                                    house_a=a, house_b=b)
 
     # ------------------------------------------------------------ signup
 
@@ -341,12 +349,15 @@ class Quidditch(commands.Cog):
             return
         if signup.is_house:
             store = self.bot.get_cog("Store")
-            required_house = signup.house_a if side == "a" else signup.house_b
+            required_house = normalize_house(
+                signup.house_a if side == "a" else signup.house_b
+            )
+            # Prefer the guild member object so house roles are always available.
             member = interaction.user
-            if interaction.guild and not isinstance(member, discord.Member):
+            if interaction.guild is not None:
                 member = interaction.guild.get_member(interaction.user.id) or member
             member_house = store.member_house(member) if store else None
-            if member_house != required_house:
+            if not required_house or member_house != required_house:
                 yours = f" You're in House {house_name(member_house)}." if member_house else (
                     " I can't see a house role on you.")
                 await interaction.response.send_message(
@@ -504,7 +515,9 @@ class Quidditch(commands.Cog):
                 rec["scramble_l"] += 1
         else:
             store = self.bot.get_cog("Store")
-            winning_house = match.house_a if match.winner == "a" else (match.house_b if match.winner == "b" else None)
+            winning_house = normalize_house(
+                match.house_a if match.winner == "a" else (match.house_b if match.winner == "b" else None)
+            )
             for uid in winning_team or []:
                 rec = self.record(uid)
                 rec["house_w"] += 1
