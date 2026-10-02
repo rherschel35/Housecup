@@ -606,11 +606,11 @@
   var state = { name: "", index: 0, scores: {}, current: null };
   Object.keys(HOUSES).forEach(function (k) { state.scores[k] = 0; });
 
-  // All five houses are open. Caldrin is gently favored: each answer for
-  // them counts a little extra, and they win any tie. Someone who clearly
-  // leans toward another house still lands there.
-  var HOUSE_WEIGHT = { caldrin: 1.2 };
-  var FAVORED = ["caldrin"];
+  // All five houses are open. Caldrin and AsterWilde are gently favored: each
+  // answer for them counts a little extra, and they win any tie. Someone who
+  // clearly leans toward another house still lands there.
+  var HOUSE_WEIGHT = { caldrin: 1.2, asterwilde: 1.2 };
+  var FAVORED = ["caldrin", "asterwilde"];
 
   var SHEET_URL = "https://script.google.com/macros/s/AKfycbyqBL0qvyx_wc-hYCN26JKZYcoX1OBx-O0KZkYdWKQQc_z_o-nzUj23rZsyRE6AdWo-pw/exec";
 
