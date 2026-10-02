@@ -262,17 +262,20 @@ class WorldCog(commands.Cog, name="World"):
             return f"\n\n✨ **+{delta}** for {h['emoji']} {h['name']}."
         return f"\n\n🥀 **{delta}** from {h['emoji']} {h['name']}. It was noticed."
 
-    async def maybe_spawn_monster(self, place: str, channel_id: int) -> bool:
+    async def maybe_spawn_monster(self, place: str, channel_id: int,
+                                  finder_id: int | None = None) -> bool:
         """Searching somewhere dangerous risks a Wild Threat turning up right
         there. Quietly does nothing if that place isn't dangerous, the roll
         misses, the Dementors cog isn't loaded, or something's already loose
-        (never steals an encounter out from under another channel)."""
+        (never steals an encounter out from under another channel).
+        finder_id is the student who stirred it — they get a short exclusive
+        cast window before anyone else can try."""
         if place not in DANGEROUS_PLACES or self.world.rng.random() >= MONSTER_CHANCE:
             return False
         dementors = self.bot.get_cog("Dementors")
         if not dementors:
             return False
-        return await dementors.try_ambient_spawn(channel_id)
+        return await dementors.try_ambient_spawn(channel_id, finder_id=finder_id)
 
     # ------------------------------------------------------------ player commands
 
@@ -305,9 +308,11 @@ class WorldCog(commands.Cog, name="World"):
                                   f"🌿 found something rare in {P.name}")
         if reveal:
             text += f"\n\n{reveal}"
-        monster = await self.maybe_spawn_monster(place, interaction.channel_id)
+        monster = await self.maybe_spawn_monster(place, interaction.channel_id,
+                                                 finder_id=interaction.user.id)
         if monster:
-            text += "\n\n⚠️ Something else was already here. Better have a spell ready."
+            text += ("\n\n⚠️ Something else was already here. "
+                     "You have **25 seconds** to `/cast` before anyone else can try.")
         embed = self.embed(text, f"{interaction.user.display_name} explores {P.name}"
                            + (" by moonlight" if enc["night"] else ""), enc["night"])
         embed.set_footer(text=f"Visits left today: {left}")
@@ -367,9 +372,11 @@ class WorldCog(commands.Cog, name="World"):
             text += f"\n💍 {why}: {self.world.item_line(item)}"
         text += await self.points(ctx.student, interaction.user, self.world.reward_points(res["item"]),
                                   f"🌱 foraged something rare in {P.name}")
-        monster = await self.maybe_spawn_monster(place, interaction.channel_id)
+        monster = await self.maybe_spawn_monster(place, interaction.channel_id,
+                                                 finder_id=interaction.user.id)
         if monster:
-            text += "\n\n⚠️ Something else was already here. Better have a spell ready."
+            text += ("\n\n⚠️ Something else was already here. "
+                     "You have **25 seconds** to `/cast` before anyone else can try.")
         embed = self.embed(text, f"{interaction.user.display_name} forages in {P.name}")
         embed.set_footer(text=f"Searches left today: {left}")
         await interaction.response.send_message(embed=embed)

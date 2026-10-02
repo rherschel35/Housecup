@@ -96,6 +96,7 @@ INITIAL_COGS = (
     "cogs.pip_wick",
     "cogs.checklist",
     "cogs.avada",
+    "cogs.broke",
     "cogs.forrest_caden",  # private test: The Forrest of Caden Ch 1–2 (Gon + break-room)
 )
 

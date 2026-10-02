@@ -42,6 +42,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.store import HOUSE_KEYS, HOUSES as STORE_HOUSES
 from cogs.velmora_channels import channel_mentions, with_study_hall
 
 log = logging.getLogger("velmora.quidditch")
@@ -54,7 +55,28 @@ STATE_PATH = STATE_DIR / "quidditch_state.json"
 QUIDDITCH_CHANNEL_ID = 1553089438933065913
 QUIDDITCH_CHANNEL_IDS = with_study_hall(QUIDDITCH_CHANNEL_ID)
 
-HOUSES = ["Caldrin", "Thornmere", "Veyren", "Vashara", "Moonveil"]
+
+def house_name(key: str | None) -> str:
+    """Store house key ('veyren') -> display name ('Veyren')."""
+    if not key:
+        return "—"
+    meta = STORE_HOUSES.get(key)
+    return meta["name"] if meta else key.title()
+
+
+def normalize_house(value: str | None) -> str | None:
+    """Accept store keys or display names; always return a store key."""
+    if not value:
+        return None
+    if value in STORE_HOUSES:
+        return value
+    lowered = value.lower()
+    if lowered in STORE_HOUSES:
+        return lowered
+    for key, meta in STORE_HOUSES.items():
+        if meta["name"].lower() == lowered:
+            return key
+    return None
 
 ROUNDS = 5
 ROUND_TIMEOUT = 60   # seconds before a stalled round auto-resolves (non-responders just do nothing)
@@ -110,16 +132,17 @@ class Signup:
         self.timer_task: Optional[asyncio.Task] = None
 
     def label_a(self) -> str:
-        return f"Join {self.house_a}" if self.is_house else "Join Team A"
+        return f"Join {house_name(self.house_a)}" if self.is_house else "Join Team A"
 
     def label_b(self) -> str:
-        return f"Join {self.house_b}" if self.is_house else "Join Team B"
+        return f"Join {house_name(self.house_b)}" if self.is_house else "Join Team B"
 
     def embed(self) -> discord.Embed:
-        title = f"🏟️ {self.house_a} vs {self.house_b}" if self.is_house else f"🏟️ Quidditch Scramble ({self.size}v{self.size})"
+        title = (f"🏟️ {house_name(self.house_a)} vs {house_name(self.house_b)}"
+                 if self.is_house else f"🏟️ Quidditch Scramble ({self.size}v{self.size})")
         e = discord.Embed(title=title, description="Waiting for players to join both sides.", color=0x6C5CE7)
-        side_a_name = self.house_a if self.is_house else "Team A"
-        side_b_name = self.house_b if self.is_house else "Team B"
+        side_a_name = house_name(self.house_a) if self.is_house else "Team A"
+        side_b_name = house_name(self.house_b) if self.is_house else "Team B"
         e.add_field(name=f"{side_a_name} ({len(self.team_a)}/{self.size})",
                     value="\n".join(f"<@{u}>" for u in self.team_a) or "—", inline=True)
         e.add_field(name=f"{side_b_name} ({len(self.team_b)}/{self.size})",
@@ -153,8 +176,8 @@ class Match:
 
     def side_name(self, side: str) -> str:
         if side == "a":
-            return self.house_a if self.is_house else "Team A"
-        return self.house_b if self.is_house else "Team B"
+            return house_name(self.house_a) if self.is_house else "Team A"
+        return house_name(self.house_b) if self.is_house else "Team B"
 
     def embed(self) -> discord.Embed:
         title = f"🏟️ {self.side_name('a')} vs {self.side_name('b')}"
@@ -249,7 +272,13 @@ class Quidditch(commands.Cog):
 
     def _register_commands(self):
         size_choices = [app_commands.Choice(name="2v2", value=2), app_commands.Choice(name="4v4", value=4)]
-        house_choices = [app_commands.Choice(name=h, value=h) for h in HOUSES]
+        # Choice value is the store house key ('veyren'); name is what players see.
+        # Every house in Store must appear — housematch is house-vs-house for all five.
+        house_choices = [
+            app_commands.Choice(name=STORE_HOUSES[k]["name"], value=k) for k in HOUSE_KEYS
+        ]
+        if len(house_choices) != len(STORE_HOUSES):
+            raise RuntimeError("Quidditch housematch is missing a house choice")
 
         @self.group.command(name="scramble", description="Start a casual pickup match - any houses, either side.")
         @app_commands.describe(size="Players per side")
@@ -262,11 +291,16 @@ class Quidditch(commands.Cog):
         @app_commands.choices(house1=house_choices, house2=house_choices, size=size_choices)
         async def housematch(interaction: discord.Interaction, house1: app_commands.Choice[str],
                              house2: app_commands.Choice[str], size: Optional[app_commands.Choice[int]] = None):
-            if house1.value == house2.value:
+            a = normalize_house(house1.value)
+            b = normalize_house(house2.value)
+            if not a or not b:
+                await interaction.response.send_message("Pick two valid houses.", ephemeral=True)
+                return
+            if a == b:
                 await interaction.response.send_message("Pick two different houses.", ephemeral=True)
                 return
             await self.start_signup(interaction, is_house=True, size=size.value if size else 2,
-                                    house_a=house1.value, house_b=house2.value)
+                                    house_a=a, house_b=b)
 
     # ------------------------------------------------------------ signup
 
@@ -315,11 +349,20 @@ class Quidditch(commands.Cog):
             return
         if signup.is_house:
             store = self.bot.get_cog("Store")
-            required_house = signup.house_a if side == "a" else signup.house_b
-            member_house = store.member_house(interaction.user) if store else None
-            if member_house != required_house:
+            required_house = normalize_house(
+                signup.house_a if side == "a" else signup.house_b
+            )
+            # Prefer the guild member object so house roles are always available.
+            member = interaction.user
+            if interaction.guild is not None:
+                member = interaction.guild.get_member(interaction.user.id) or member
+            member_house = store.member_house(member) if store else None
+            if not required_house or member_house != required_house:
+                yours = f" You're in House {house_name(member_house)}." if member_house else (
+                    " I can't see a house role on you.")
                 await interaction.response.send_message(
-                    f"Only members of House {required_house} can join this side.", ephemeral=True)
+                    f"Only members of House {house_name(required_house)} can join this side.{yours}",
+                    ephemeral=True)
                 return
         target.append(uid)
 
@@ -472,7 +515,9 @@ class Quidditch(commands.Cog):
                 rec["scramble_l"] += 1
         else:
             store = self.bot.get_cog("Store")
-            winning_house = match.house_a if match.winner == "a" else (match.house_b if match.winner == "b" else None)
+            winning_house = normalize_house(
+                match.house_a if match.winner == "a" else (match.house_b if match.winner == "b" else None)
+            )
             for uid in winning_team or []:
                 rec = self.record(uid)
                 rec["house_w"] += 1

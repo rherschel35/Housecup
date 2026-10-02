@@ -297,10 +297,13 @@ class Store(commands.Cog):
         rows.sort(key=lambda r: (-r[1], HOUSES[r[0]]["name"]))
         return rows
 
-    def member_totals(self, scope: str = "season", limit: int = 10) -> list[tuple[int, int]]:
+    def member_totals(self, scope: str = "season", limit: int | None = 10) -> list[tuple[int, int]]:
         totals = self.state["totals"].get(scope, {}).get("members", {})
-        rows = [(int(uid), int(pts)) for uid, pts in totals.items() if pts]
-        rows.sort(key=lambda r: -r[1])
+        # Positive points only — zeros don't belong on a ranked board.
+        rows = [(int(uid), int(pts)) for uid, pts in totals.items() if pts and int(pts) > 0]
+        rows.sort(key=lambda r: (-r[1], r[0]))
+        if limit is None:
+            return rows
         return rows[:limit]
 
     def member_points(self, user_id: int, scope: str = "season") -> int:
