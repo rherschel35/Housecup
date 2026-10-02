@@ -31,16 +31,35 @@ SCOPE_CHOICES = [
 ]
 
 
+def _person_label(guild, uid: int) -> tuple[discord.Member | None, str]:
+    """Prefer a real display name over <@id> mentions.
+
+    Discord clients (especially mobile) often fail to resolve mentions inside
+    embeds, so the raw user id shows up instead of a name. Writing the
+    display name ourselves always reads correctly when the member is cached.
+    """
+    member = guild.get_member(uid) if guild else None
+    if member is not None:
+        return member, member.display_name
+    # Not in the server (or not cached) — try the bot-wide user cache.
+    user = None
+    if guild is not None and getattr(guild, "_state", None) is not None:
+        user = guild._state.get_user(uid)
+    if user is not None:
+        return None, user.global_name or user.name
+    return None, f"User {uid}"
+
+
 def _rank_lines(store, guild, rows: list[tuple[int, int]], start: int = 0) -> list[str]:
     """Format a slice of (user_id, points) as ranked lines."""
     lines = []
     for i, (uid, points) in enumerate(rows):
         rank = start + i + 1
         lead = MEDALS[rank - 1] if rank <= 3 else f"`#{rank}`"
-        member = guild.get_member(uid) if guild else None
+        member, name = _person_label(guild, uid)
         house = store.member_house(member) if member else None
         tag = f" {HOUSES[house]['emoji']}" if house else ""
-        lines.append(f"{lead} <@{uid}>{tag} — `{points:,}`")
+        lines.append(f"{lead} **{name}**{tag} — `{points:,}`")
     return lines
 
 
@@ -199,10 +218,10 @@ class Board(commands.Cog):
         lines = []
         for i, (uid, points) in enumerate(rows):
             lead = MEDALS[i] if i < 3 else f"`#{i + 1}`"
-            member = interaction.guild.get_member(uid) if interaction.guild else None
+            member, name = _person_label(interaction.guild, uid)
             house = store.member_house(member) if member else None
             tag = f" {HOUSES[house]['emoji']}" if house else ""
-            lines.append(f"{lead} <@{uid}>{tag} — `{points:,}`")
+            lines.append(f"{lead} **{name}**{tag} — `{points:,}`")
 
         embed = discord.Embed(
             title="Top of the school" if which == "season" else "All-Time Greats",
