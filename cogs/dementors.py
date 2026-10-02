@@ -474,15 +474,25 @@ class Dementors(commands.Cog):
 
     # ------------------------------------------------------------ /cast
 
+    @staticmethod
+    def _as_channel_id(value) -> int | None:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
     def _creature_in_channel(self, channel_id: int) -> dict | None:
         """Active wild threat in this channel (event wave or solo spawn)."""
+        channel_id = self._as_channel_id(channel_id)
+        if channel_id is None:
+            return None
         event = self.state.get("event")
         key = str(channel_id)
         if event and key in event.get("channels", {}):
             cid = event["channels"][key].get("creature")
             return CREATURES.get(cid) if cid else None
         active = self.state.get("active")
-        if active and active.get("channel_id") == channel_id:
+        if active and self._as_channel_id(active.get("channel_id")) == channel_id:
             return CREATURES.get(active.get("creature"))
         return None
 
@@ -495,6 +505,18 @@ class Dementors(commands.Cog):
 
     def _can_auto_cast(self, user_id: int) -> bool:
         return CAST_AUTO_USER_ID is not None and user_id == CAST_AUTO_USER_ID
+
+    def _nothing_here_message(self, channel_id: int) -> str:
+        """Clearer refusal when a wave is mid-landing vs truly empty air."""
+        event = self.state.get("event")
+        if event:
+            key = str(self._as_channel_id(channel_id) or channel_id)
+            if key not in event.get("channels", {}):
+                return (
+                    f"**{event.get('name', 'The attack')}** is still landing in this room — "
+                    "try `/cast` again in a second."
+                )
+        return "The air here feels perfectly normal. Nothing to banish."
 
     @app_commands.command(name="cast", description="Cast a spell at whatever's in this channel.")
     @app_commands.describe(spell="Which spell to cast (optional — some users auto-pick)")
@@ -517,26 +539,28 @@ class Dementors(commands.Cog):
 
         event_reply = None
         async with self.lock:
+            channel_id = interaction.channel_id
             if spell is None:
-                spell = self._auto_spell_for(interaction.channel_id)
+                spell = self._auto_spell_for(channel_id)
                 if spell is None:
                     await interaction.response.send_message(
-                        "The air here feels perfectly normal. Nothing to banish.",
+                        self._nothing_here_message(channel_id),
                         ephemeral=True,
                     )
                     return
 
             event = self.state.get("event")
-            key = str(interaction.channel_id)
+            key = str(self._as_channel_id(channel_id) or channel_id)
             if event and key in event.get("channels", {}):
                 # Build the reply under the lock; Discord I/O happens after release
                 # so a slow image upload can't freeze every other /cast.
                 event_reply = self._cast_event(interaction, spell, event, key)
             else:
                 active = self.state.get("active")
-                if not active or active["channel_id"] != interaction.channel_id:
+                active_cid = self._as_channel_id(active.get("channel_id")) if active else None
+                if not active or active_cid != self._as_channel_id(channel_id):
                     await interaction.response.send_message(
-                        "The air here feels perfectly normal. Nothing to banish.", ephemeral=True
+                        self._nothing_here_message(channel_id), ephemeral=True
                     )
                     return
                 blocked = self._finder_blocks(active, interaction.user.id)
@@ -754,14 +778,21 @@ class Dementors(commands.Cog):
 
     def _event_channel_ids(self) -> list[int]:
         """Channels Attack waves may flood. Study hall is summon/practice only."""
-        return [
-            cid for cid in self.state.get("channel_ids", [])
-            if cid != STUDY_HALL_CHANNEL_ID
-        ]
+        out = []
+        for raw in self.state.get("channel_ids", []):
+            cid = self._as_channel_id(raw)
+            if cid is None or cid == STUDY_HALL_CHANNEL_ID:
+                continue
+            out.append(cid)
+        return out
 
     def _prepare_wave(self, event: dict) -> list[dict]:
-        """Roll the next wave under the lock. Clears standing creatures so
-        casts don't hit ghosts while Discord posts go out unlocked."""
+        """Roll the next wave under the lock.
+
+        Standing creatures stay castable until each room's new post is
+        registered in `_deliver_wave` (avoids `/cast` seeing empty air
+        while Discord is still posting the wave).
+        """
         payloads = []
         for cid in self._event_channel_ids():
             creature_id = self._roll_creature()
@@ -774,13 +805,23 @@ class Dementors(commands.Cog):
                 "embed": embed,
                 "file": file,
             })
-        event["channels"] = {}
-        self.save()
         return payloads
 
     async def _deliver_wave(self, started_at: float, payloads: list[dict]) -> None:
-        """Post wave messages outside the lock, then write channel state back."""
-        channels = {}
+        """Post wave messages; register each channel as soon as it lands.
+
+        Writing state only after every channel finished left a race where a
+        Dementor was visible in Discord but `/cast` (and auto-pick) said
+        nothing was there.
+        """
+        # Drop the previous wave once delivery starts, then fill rooms in.
+        async with self.lock:
+            event = self.state.get("event")
+            if not event or event.get("started_at") != started_at:
+                return
+            event["channels"] = {}
+            self.save()
+
         for p in payloads:
             channel = await self._get_channel(p["channel_id"])
             if channel is None:
@@ -790,18 +831,17 @@ class Dementors(commands.Cog):
                        else await channel.send(embed=p["embed"]))
             except discord.HTTPException:
                 continue
-            channels[str(p["channel_id"])] = {
-                "creature": p["creature_id"],
-                "message_id": msg.id,
-                "spawned_at": time.time(),
-                "hits": [],
-            }
-        async with self.lock:
-            event = self.state.get("event")
-            if not event or event.get("started_at") != started_at:
-                return
-            event["channels"] = channels
-            self.save()
+            async with self.lock:
+                event = self.state.get("event")
+                if not event or event.get("started_at") != started_at:
+                    return
+                event.setdefault("channels", {})[str(p["channel_id"])] = {
+                    "creature": p["creature_id"],
+                    "message_id": msg.id,
+                    "spawned_at": time.time(),
+                    "hits": [],
+                }
+                self.save()
 
     def _clear_event(self) -> dict | None:
         """Must be called while holding self.lock. Pops the running event
