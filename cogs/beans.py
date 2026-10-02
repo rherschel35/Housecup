@@ -41,7 +41,7 @@ OUTCOMES = [
     ]),
     (25, +1, "Not bad at all.", [
         "toasted marshmallow", "honey", "warm bread", "cinnamon", "butterscotch",
-        "fresh mint", "apple crumble", "Vashara's herbal tonic",
+        "fresh mint", "apple crumble", "Oakmont's herbal tonic",
     ]),
     (12, +2, "Delicious.", [
         "hot chocolate", "birthday cake", "strawberries and cream",

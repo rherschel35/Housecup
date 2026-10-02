@@ -50,7 +50,7 @@ LINES = (
     "Crucio? The only thing suffering is the group chat's secondhand embarrassment.",
     "Imperio fails because nobody here takes orders from you on a good day.",
     "Avada Kedavra? Bold of you to main-character this hard in a school hallway.",
-    "A peacock from Vashara appears, looks you up and down, and leaves unimpressed.",
+    "A peacock from Oakmont appears, looks you up and down, and leaves unimpressed.",
     "The curse asks for your student ID, checks the list, and declines service.",
     "You meant to sound terrifying. You sounded like a ringtone from 2009.",
     "A portrait of a founder mouths \"cringe\" and draws the curtain.",

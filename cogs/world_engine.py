@@ -49,7 +49,7 @@ RARITY_ORDER = ["legendary", "very_rare", "rare", "uncommon", "common"]
 OFFER_REP = {"common": 1, "uncommon": 1, "rare": 2, "very_rare": 3, "legendary": 4}
 
 HOUSE_NAMES = {"caldrin": "Caldrin", "thornmere": "Thornmere", "veyren": "Veyren",
-               "vashara": "Vashara", "moonveil": "AsterWilde"}
+               "vashara": "Oakmont", "moonveil": "AsterWilde"}
 
 # Reputation -> how a place feels about someone. Never shown as a number.
 TIERS = [(-999, "hostile"), (-7, "wary"), (-2, "neutral"), (5, "friendly"), (15, "beloved")]
