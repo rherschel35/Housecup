@@ -3,6 +3,7 @@ Standings and leaderboards.
 
     /standings [scope]     - the House Cup table
     /leaderboard [scope]   - top individual members
+    /ranks [scope]         - everyone with points, ranked (paginated)
     /housecup              - past seasons and their winners
 
 Plus an optional weekly standings post, off until an announce channel is set.
@@ -10,6 +11,7 @@ Plus an optional weekly standings post, off until an announce channel is set.
 
 import datetime
 import logging
+import math
 
 import discord
 from discord import app_commands
@@ -21,11 +23,90 @@ log = logging.getLogger("velmora.board")
 
 BAR_WIDTH = 12
 MEDALS = ("\U0001F947", "\U0001F948", "\U0001F949")  # 1st, 2nd, 3rd
+RANKS_PAGE_SIZE = 15
 
 SCOPE_CHOICES = [
     app_commands.Choice(name="This season", value="season"),
     app_commands.Choice(name="All time", value="alltime"),
 ]
+
+
+def _rank_lines(store, guild, rows: list[tuple[int, int]], start: int = 0) -> list[str]:
+    """Format a slice of (user_id, points) as ranked lines."""
+    lines = []
+    for i, (uid, points) in enumerate(rows):
+        rank = start + i + 1
+        lead = MEDALS[rank - 1] if rank <= 3 else f"`#{rank}`"
+        member = guild.get_member(uid) if guild else None
+        house = store.member_house(member) if member else None
+        tag = f" {HOUSES[house]['emoji']}" if house else ""
+        lines.append(f"{lead} <@{uid}>{tag} — `{points:,}`")
+    return lines
+
+
+def build_ranks_embed(store, guild, scope: str, page: int, viewer_id: int | None = None) -> discord.Embed:
+    rows = store.member_totals(scope, limit=None)
+    total = len(rows)
+    pages = max(1, math.ceil(total / RANKS_PAGE_SIZE)) if total else 1
+    page = max(0, min(page, pages - 1))
+    start = page * RANKS_PAGE_SIZE
+    chunk = rows[start:start + RANKS_PAGE_SIZE]
+
+    if not rows:
+        body = "No one has earned anything yet."
+    else:
+        body = "\n".join(_rank_lines(store, guild, chunk, start=start))
+        if viewer_id is not None:
+            my_rank = store.member_rank(viewer_id, scope)
+            my_pts = store.member_points(viewer_id, scope)
+            if my_rank and my_pts > 0:
+                body += f"\n\n*You are **#{my_rank}** with `{my_pts:,}`.*"
+            elif my_pts <= 0:
+                body += "\n\n*You don’t have points on this board yet.*"
+
+    embed = discord.Embed(
+        title="Point ranks" if scope == "season" else "Point ranks — all time",
+        description=body,
+        color=discord.Color.gold(),
+    )
+    footer = store.current_season()["name"] if scope == "season" else "All seasons combined"
+    if total:
+        footer += f" · {total} ranked · page {page + 1}/{pages}"
+    embed.set_footer(text=footer)
+    return embed
+
+
+class RanksView(discord.ui.View):
+    """Prev/next through the full ranked list."""
+
+    def __init__(self, store, scope: str, page: int, pages: int, viewer_id: int):
+        super().__init__(timeout=180)
+        self.store = store
+        self.scope = scope
+        self.page = page
+        self.pages = pages
+        self.viewer_id = viewer_id
+        self._sync_buttons()
+
+    def _sync_buttons(self):
+        self.prev_btn.disabled = self.page <= 0
+        self.next_btn.disabled = self.page >= self.pages - 1
+
+    async def _flip(self, interaction: discord.Interaction, delta: int):
+        self.page = max(0, min(self.page + delta, self.pages - 1))
+        self._sync_buttons()
+        embed = build_ranks_embed(
+            self.store, interaction.guild, self.scope, self.page, self.viewer_id
+        )
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="Prev", style=discord.ButtonStyle.secondary)
+    async def prev_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._flip(interaction, -1)
+
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary)
+    async def next_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._flip(interaction, 1)
 
 
 def _bar(points: int, top: int) -> str:
@@ -132,6 +213,32 @@ class Board(commands.Cog):
             text=store.current_season()["name"] if which == "season" else "All seasons combined"
         )
         await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(
+        name="ranks",
+        description="Everyone with points, ranked from first to last.",
+    )
+    @app_commands.describe(scope="This season (default) or all time")
+    @app_commands.choices(scope=SCOPE_CHOICES)
+    async def ranks(self, interaction: discord.Interaction,
+                    scope: app_commands.Choice[str] = None):
+        store = self._store()
+        if store is None:
+            await interaction.response.send_message("The ledger isn't loaded.", ephemeral=True)
+            return
+
+        which = scope.value if scope else "season"
+        rows = store.member_totals(which, limit=None)
+        pages = max(1, math.ceil(len(rows) / RANKS_PAGE_SIZE)) if rows else 1
+        embed = build_ranks_embed(
+            store, interaction.guild, which, page=0, viewer_id=interaction.user.id
+        )
+        view = RanksView(store, which, page=0, pages=pages, viewer_id=interaction.user.id)
+        # No pager chrome when everything fits on one page.
+        if pages <= 1:
+            await interaction.response.send_message(embed=embed)
+        else:
+            await interaction.response.send_message(embed=embed, view=view)
 
     @app_commands.command(name="housecup", description="Past seasons and their champions.")
     async def housecup(self, interaction: discord.Interaction):
