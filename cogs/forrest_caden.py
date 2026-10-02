@@ -148,10 +148,18 @@ class ForrestCaden(commands.Cog):
         if key not in players:
             players[key] = _default_save()
         save = players[key]
-        # Older saves from before ability scores.
+        # Older saves: migrate / fill the three-skill sheet.
         if "abilities" not in save or not isinstance(save.get("abilities"), dict):
             save["abilities"] = default_abilities()
         else:
+            ab = save["abilities"]
+            # Legacy six-ability sheet → three skills.
+            if "atk" not in ab and any(k in ab for k in ("str", "dex", "int", "cha")):
+                save["abilities"] = {
+                    "atk": int(ab.get("str", 0) or 0),
+                    "wis": max(int(ab.get("wis", 0) or 0), int(ab.get("int", 0) or 0), int(ab.get("cha", 0) or 0)),
+                    "ste": int(ab.get("dex", 0) or 0),
+                }
             for ab_key in (a[0] for a in ABILITIES):
                 save["abilities"].setdefault(ab_key, 0)
         return save
@@ -214,7 +222,7 @@ class ForrestCaden(commands.Cog):
             f"**Node:** `{save.get('node')}` (page {save.get('page', 0)})",
             f"**Chapter:** {save.get('chapter', 1)}",
             f"**Protagonist:** {save.get('protagonist') or '—'}",
-            f"**Abilities:** {format_abilities(save.get('abilities'))}",
+            f"**Skills:** {format_abilities(save.get('abilities'))}",
             f"**Gus with party:** {save.get('gus_with_party', True)}",
             f"**School kit:** {', '.join(save.get('school_materials') or []) or '—'}",
             f"**City kit:** {', '.join(save.get('city_essentials') or []) or '—'}",
@@ -627,6 +635,12 @@ class StorySession:
             save["page"] = page_i
 
         text = flat[page_i]
+        # One-shot roll line from a check that advanced into this node (no 2nd Discord message).
+        flags = save.setdefault("flags", {})
+        roll_blurb = flags.pop("roll_blurb", None)
+        if roll_blurb:
+            text = f"{roll_blurb}\n\n{text}"
+            self.cog.write()
         # show empath only on last page of node when no more continue
         more_pages = page_i < len(flat) - 1
         empath = node.get("empath") if not more_pages else None
@@ -647,7 +661,8 @@ class StorySession:
 
         embed = discord.Embed(title=title, description=text[:4096], color=EMBED_COLOR)
         if save.get("protagonist"):
-            embed.set_footer(text="Mack · looking for Yuna")
+            skills = format_abilities(save.get("abilities"))
+            embed.set_footer(text=f"Mack · looking for Yuna · {skills}")
 
         file = None
         path = _art_path(art_key)
@@ -794,15 +809,11 @@ class StorySession:
                 self.save.setdefault("flags", {})[k] = v
         if choice.get("check"):
             result = self._apply_check(choice["check"])
-            # Flavor-only checks that share a destination still whisper the roll.
-            if choice.get("goto") in ("sebastian", "ask_library"):
-                await interaction.response.send_message(
-                    self._format_check_result(result),
-                    ephemeral=True,
-                )
-                await self._advance(choice.get("goto"))
-                await self.refresh(interaction)
-                return
+            # Keep the roll on the main story message — never a 2nd ephemeral post.
+            goto = choice.get("goto")
+            if goto in ("sebastian", "ask_library"):
+                self.save.setdefault("flags", {})["roll_blurb"] = self._format_check_result(result)
+            # wake_* / dream_bridge nodes already render last_check in their text
         await self._advance(choice.get("goto"))
         await interaction.response.defer()
         await self.refresh(interaction)
@@ -820,7 +831,7 @@ class ContinueView(discord.ui.View):
 
 
 class SkillAssignView(discord.ui.View):
-    """Spend SKILL_POINTS_TOTAL among the six abilities, then Continue."""
+    """Spend SKILL_POINTS_TOTAL among Attack / Wisdom / Stealth, then Continue."""
 
     def __init__(self, session: StorySession, nxt: Optional[str]):
         super().__init__(timeout=600)
@@ -958,13 +969,11 @@ class CheckRollView(discord.ui.View):
         if interaction.user.id != self.session.user_id:
             await interaction.response.send_message("This isn’t your story.", ephemeral=True)
             return
-        result = self.session._apply_check(self.check)
-        await interaction.response.send_message(
-            self.session._format_check_result(result),
-            ephemeral=True,
-        )
+        # Stay on the main story message — next node shows the roll result.
+        self.session._apply_check(self.check)
         if self.nxt:
             await self.session._advance(self.nxt)
+        await interaction.response.defer()
         await self.session.refresh(interaction)
 
 
@@ -1146,16 +1155,34 @@ class SneakView(discord.ui.View):
         save["sneak_round"] = r + 1
         self.session.cog.write()
         if save["sneak_round"] >= 3:
-            caught = save.get("sneak_score", 0) < 2
+            # Stealth bonus counts as free progress toward escaping.
+            ste = ability_mod(save.get("abilities"), "Stealth")
+            effective = save.get("sneak_score", 0) + ste
+            caught = effective < 2
             save["gus_with_party"] = not caught
             save.setdefault("flags", {})["sneak_caught"] = caught
+            save.setdefault("flags", {})["sneak_stealth"] = ste
             await self.session._advance("sneak_done")
             await interaction.response.defer()
             await self.session.refresh(interaction)
         else:
-            await interaction.response.send_message(
-                f"Round {r + 1}: {tip} ({save['sneak_round']}/3)", ephemeral=True
+            # Edit the same story message so progress isn't wiped by a 2nd post.
+            await interaction.response.edit_message(
+                content=None,
+                embed=discord.Embed(
+                    title="The Forrest of Caden — Chapter 1",
+                    description=(
+                        f"**Sneak past Mordy** — round {save['sneak_round']}/3\n\n"
+                        f"{tip}\n\n"
+                        f"*Score {save.get('sneak_score', 0)} clear so far"
+                        f" · Stealth +{ability_mod(save.get('abilities'), 'Stealth')}*"
+                    ),
+                    color=EMBED_COLOR,
+                ),
+                view=self,
+                attachments=[],
             )
+            self.session.message = interaction.message
 
 
 class FightView(discord.ui.View):
@@ -1164,8 +1191,9 @@ class FightView(discord.ui.View):
         self.session = session
         hard = not session.save.get("gus_with_party", True)
         self.hard = hard
-        self.hp = 3 if hard else 4
-        self.enemy = 4 if hard else 3
+        self.attack = ability_mod(session.save.get("abilities"), "Attack")
+        self.hp = (3 if hard else 4) + self.attack
+        self.enemy = max(1, (4 if hard else 3) - (1 if self.attack >= 2 else 0))
 
     @discord.ui.button(label="Strike", style=discord.ButtonStyle.danger)
     async def strike(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1183,17 +1211,17 @@ class FightView(discord.ui.View):
         if interaction.user.id != self.session.user_id:
             await interaction.response.send_message("This isn’t your story.", ephemeral=True)
             return
-        # simple resolution
+        bonus = self.attack
         if action == "strike":
-            self.enemy -= 2 if self.session.save.get("gus_with_party", True) else 1
+            self.enemy -= (2 if self.session.save.get("gus_with_party", True) else 1) + bonus
             self.hp -= 1
             line = "You hit back with a jinx. They snarl and answer."
         elif action == "guard":
-            self.enemy -= 1
+            self.enemy -= 1 + (1 if bonus >= 2 else 0)
             self.hp -= 0 if random.random() < 0.5 else 1
             line = "You take the hit meant for Ella. The world narrows to wand-light and breath."
         else:
-            self.enemy -= 1
+            self.enemy -= 1 + (1 if bonus >= 1 else 0)
             self.hp -= 1 if self.hard else 0
             line = "You break away and run — bags swinging, teeth gritted."
 
@@ -1202,7 +1230,7 @@ class FightView(discord.ui.View):
             self.session.save.setdefault("flags", {})["fight_hard"] = self.hard
             await self.session._advance("city_essentials")
             await interaction.response.defer()
-            await self.session.refresh()
+            await self.session.refresh(interaction)
             return
         if self.hp <= 0:
             # lose items flavor but continue
@@ -1214,14 +1242,26 @@ class FightView(discord.ui.View):
             self.session.save.setdefault("flags", {})["city_fight"] = "barely"
             await self.session._advance("city_essentials")
             await interaction.response.defer()
-            await self.session.refresh()
+            await self.session.refresh(interaction)
             return
 
-        await interaction.response.send_message(
-            f"{line}\n*You {self.hp} · Them {self.enemy}*"
-            + (" · (harder without Gus)" if self.hard else " · (easier with three)"),
-            ephemeral=True,
+        atk_note = f" · Attack +{bonus}" if bonus else ""
+        await interaction.response.edit_message(
+            content=None,
+            embed=discord.Embed(
+                title="The Forrest of Caden — Chapter 1",
+                description=(
+                    f"{line}\n\n"
+                    f"*You {self.hp} · Them {self.enemy}*"
+                    + (" · (harder without Gus)" if self.hard else " · (easier with three)")
+                    + atk_note
+                ),
+                color=EMBED_COLOR,
+            ),
+            view=self,
+            attachments=[],
         )
+        self.session.message = interaction.message
 
 
 async def setup(bot: commands.Bot):
