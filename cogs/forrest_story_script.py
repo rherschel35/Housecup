@@ -89,7 +89,7 @@ CH1_NODES: dict[str, dict] = {
             "**The Forrest of Caden**\n"
             "*an 8 part solo interactive immersive story about 2 friends who grew apart*\n\n"
             "You are **Mack**. Yuna didn’t show for fifth year — and you’re going to find her.\n\n"
-            "Staff test build — Chapters 1 & 2.\n"
+            "Private test — Chapters 1 & 2.\n"
             "No house points. Your choices are saved to your story."
         ],
         "choices": [
@@ -335,7 +335,7 @@ CH1_NODES: dict[str, dict] = {
         "pages": [
             "**Chapter 1 complete.**\n\n"
             "The cart rattles. Caden waits. The Forrest waits harder.\n\n"
-            "You can start Chapter 2 when you’re ready — staff test: no weekly gate yet."
+            "You can start Chapter 2 when you’re ready — private test: no weekly gate yet."
         ],
         "choices": [
             {"id": "ch2", "label": "Begin Chapter 2", "goto": "ch2_arrive", "set": {"chapter": 2}},
@@ -345,7 +345,7 @@ CH1_NODES: dict[str, dict] = {
     "paused": {
         "art": "title",
         "pages": [
-            "Story paused. Use `/forrest resume` when you want to continue (staff test)."
+            "Story paused. Use `/forrest resume` when you want to continue (private test)."
         ],
         "end": True,
     },
@@ -462,7 +462,7 @@ CH2_NODES: dict[str, dict] = {
             "**Chapter 2 complete.**\n\n"
             "Morning at the tree line. Mist between the pines. No letter. No rumor that matters. No face you came for.\n\n"
             "The Forrest of Caden waits anyway.\n\n"
-            "*(Chapters 3–8 not built yet — staff test ends here.)*"
+            "*(Chapters 3–8 not built yet — private test ends here.)*"
         ],
         "end": True,
     },

@@ -40,6 +40,14 @@ STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "forrest_caden_state.json"
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "story_art_assets"
 
+# Private test lock — only Gon, only the break-room channel he named.
+# Override with FORREST_CHANNEL_ID / FORREST_TESTER_IDS if needed.
+FORREST_CHANNEL_ID = int(os.getenv("FORREST_CHANNEL_ID", "1555383179802579005") or 0)
+FORREST_TESTER_IDS = frozenset(
+    int(x) for x in (os.getenv("FORREST_TESTER_IDS", "555141900802457630") or "").split(",")
+    if x.strip().isdigit()
+) or frozenset({555141900802457630})  # Headmaster Gon Vale
+
 EMBED_COLOR = 0x2F4F3E
 MAX_DESC = 3800
 
@@ -111,18 +119,20 @@ def _chunk(text: str, limit: int = MAX_DESC) -> list[str]:
 
 
 class ForrestCaden(commands.Cog):
-    """Staff-only test of The Forrest of Caden, chapters 1–2."""
+    """Private test of The Forrest of Caden, chapters 1–2 — tester + channel only."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.state = _load()
         self._sessions: dict[int, "StorySession"] = {}
 
-    def _staff(self, user: discord.abc.User) -> bool:
-        store = self.bot.get_cog("Store")
-        if store and hasattr(user, "guild_permissions"):
-            return bool(store.is_staff(user))
-        return False
+    def _allowed(self, interaction: discord.Interaction) -> str | None:
+        """None if ok; otherwise an ephemeral refusal line."""
+        if interaction.user.id not in FORREST_TESTER_IDS:
+            return "This story is in private test — not open yet."
+        if FORREST_CHANNEL_ID and interaction.channel_id != FORREST_CHANNEL_ID:
+            return f"Run this in <#{FORREST_CHANNEL_ID}> while testing."
+        return None
 
     def get_save(self, user_id: int) -> dict:
         players = self.state.setdefault("players", {})
@@ -138,15 +148,14 @@ class ForrestCaden(commands.Cog):
 
     forrest = app_commands.Group(
         name="forrest",
-        description="(staff test) The Forrest of Caden — solo story, Ch 1–2.",
+        description="(private test) The Forrest of Caden — solo story, Ch 1–2.",
     )
 
-    @forrest.command(name="start", description="(staff) Start or restart The Forrest of Caden (Ch 1–2).")
+    @forrest.command(name="start", description="Start or restart The Forrest of Caden (Ch 1–2).")
     async def forrest_start(self, interaction: discord.Interaction):
-        if not self._staff(interaction.user):
-            await interaction.response.send_message(
-                "Staff-only while this story is in test.", ephemeral=True
-            )
+        refuse = self._allowed(interaction)
+        if refuse:
+            await interaction.response.send_message(refuse, ephemeral=True)
             return
         save = _default_save()
         save["active"] = True
@@ -158,12 +167,11 @@ class ForrestCaden(commands.Cog):
         self._sessions[interaction.user.id] = session
         await session.show(interaction.followup)
 
-    @forrest.command(name="resume", description="(staff) Resume your Forrest of Caden run.")
+    @forrest.command(name="resume", description="Resume your Forrest of Caden run.")
     async def forrest_resume(self, interaction: discord.Interaction):
-        if not self._staff(interaction.user):
-            await interaction.response.send_message(
-                "Staff-only while this story is in test.", ephemeral=True
-            )
+        refuse = self._allowed(interaction)
+        if refuse:
+            await interaction.response.send_message(refuse, ephemeral=True)
             return
         save = self.get_save(interaction.user.id)
         if not save.get("active") and not save.get("finished_ch2"):
@@ -179,12 +187,11 @@ class ForrestCaden(commands.Cog):
         self._sessions[interaction.user.id] = session
         await session.show(interaction.followup)
 
-    @forrest.command(name="status", description="(staff) Your Forrest flags and chapter.")
+    @forrest.command(name="status", description="Your Forrest flags and chapter.")
     async def forrest_status(self, interaction: discord.Interaction):
-        if not self._staff(interaction.user):
-            await interaction.response.send_message(
-                "Staff-only while this story is in test.", ephemeral=True
-            )
+        refuse = self._allowed(interaction)
+        if refuse:
+            await interaction.response.send_message(refuse, ephemeral=True)
             return
         save = self.get_save(interaction.user.id)
         flags = save.get("flags", {})
@@ -199,12 +206,11 @@ class ForrestCaden(commands.Cog):
         ]
         await interaction.response.send_message("\n".join(lines), ephemeral=True)
 
-    @forrest.command(name="reset", description="(staff) Clear your Forrest save.")
+    @forrest.command(name="reset", description="Clear your Forrest save.")
     async def forrest_reset(self, interaction: discord.Interaction):
-        if not self._staff(interaction.user):
-            await interaction.response.send_message(
-                "Staff-only while this story is in test.", ephemeral=True
-            )
+        refuse = self._allowed(interaction)
+        if refuse:
+            await interaction.response.send_message(refuse, ephemeral=True)
             return
         self.state.setdefault("players", {})[str(interaction.user.id)] = _default_save()
         self.write()
