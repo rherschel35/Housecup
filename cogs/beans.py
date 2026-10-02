@@ -53,7 +53,7 @@ OUTCOMES = [
     ]),
     (9, -3, "Dreadful.", [
         "troll sweat", "maze mud", "earwax", "dragon's breath", "Mordy's socks",
-        "Caldrin lab fumes", "a Moonveil prank - it exploded", "regret",
+        "Caldrin lab fumes", "an AsterWilde prank - it exploded", "regret",
     ]),
 ]
 

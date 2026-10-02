@@ -41,11 +41,15 @@ HOUSES = {
         "emoji": "\U0001F418",  # elephant
         "motto": "We forgive. We remember.",
     },
+    # Internal key stays "moonveil" so seasons, crests, and world data keep working.
+    # Public name evolved: Moonveil → AsterWilde (same house, new crest & motto).
     "moonveil": {
-        "name": "Moonveil",
-        "color": 0x6FB7E0,
-        "emoji": "\U0001F407",  # rabbit
-        "motto": "Fuck around. Find out.",
+        "name": "AsterWilde",
+        "former_name": "Moonveil",
+        "aliases": ("asterwilde", "aster wilde", "moonveil"),
+        "color": 0x2E4A6E,  # night blue / silver crest
+        "emoji": "\U0001F43F\uFE0F",  # squirrel
+        "motto": "Wild Minds. Fierce Hearts. Beautiful Chaos.",
     },
     "veyren": {
         "name": "Veyren",
@@ -71,7 +75,7 @@ HOUSE_KEYS = tuple(HOUSES.keys())
 
 
 def house_display(key: str) -> str:
-    """'moonveil' -> '🌕 House Moonveil' for embeds and lists."""
+    """'moonveil' -> '🐿️ House AsterWilde' for embeds and lists."""
     h = HOUSES.get(key)
     if not h:
         return key.title()
@@ -203,8 +207,9 @@ class Store(commands.Cog):
 
         A manual override wins. Otherwise the member's Discord roles are
         checked - first against explicitly bound role IDs, then by matching
-        the house name inside the role's name, so a server that names its
-        roles 'House Moonveil' or 'Moonveil Student' works with no setup.
+        the house name (or aliases) inside the role's name, so a server that
+        names roles 'House AsterWilde', 'AsterWilde Student', or still
+        'House Moonveil' during the rename all resolve correctly.
         """
         override = self.state["overrides"].get(str(member.id))
         if override in HOUSES:
@@ -219,7 +224,11 @@ class Store(commands.Cog):
         for role in getattr(member, "roles", []):
             name = (role.name or "").lower()
             for house_key, meta in HOUSES.items():
-                if meta["name"].lower() in name:
+                needles = {meta["name"].lower(), *(a.lower() for a in meta.get("aliases") or ())}
+                former = meta.get("former_name")
+                if former:
+                    needles.add(former.lower())
+                if any(n and n in name for n in needles):
                     return house_key
         return None
 
