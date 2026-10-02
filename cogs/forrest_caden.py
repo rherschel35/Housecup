@@ -27,6 +27,7 @@ from cogs.forrest_story_script import (
     ART,
     CITY_ESSENTIALS_2,
     CITY_ESSENTIALS_3,
+    MATERIAL_LABELS,
     NODES,
     SCHOOL_MATERIALS,
     pronouns,
@@ -238,40 +239,161 @@ class StorySession:
         node = NODES.get(nid)
         if not node:
             return {"pages": ["(missing node)"], "end": True}
-        # dynamic pages
+        if nid == "dream_bridge":
+            return self._dream_bridge_node()
+        if nid == "wake_letter":
+            return self._wake_letter_node()
+        if nid == "wake_breakfast":
+            return self._wake_breakfast_node()
+        if nid == "wake_write":
+            return self._wake_write_node()
         if nid == "sneak_done":
             return self._sneak_done_node()
         if nid == "city_arrive":
             return self._city_arrive_node()
         if nid == "train":
             return self._train_node()
+        if nid == "ch2_arrive":
+            return self._ch2_arrive_node()
         if nid == "gus_ella_talk":
             return self._gus_talk_node()
         if nid == "morning":
             return self._morning_node()
         return node
 
+    def _inventory_line(self) -> str:
+        school = [
+            MATERIAL_LABELS.get(k, k) for k in (self.save.get("school_materials") or [])
+        ]
+        city = [
+            MATERIAL_LABELS.get(k, k) for k in (self.save.get("city_essentials") or [])
+        ]
+        bits = []
+        if school:
+            bits.append("School pack: " + ", ".join(school))
+        if city:
+            bits.append("City stall: " + ", ".join(city))
+        if self.save.get("flags", {}).get("has_nox"):
+            bits.append("Companion: Nox")
+        if self.save.get("flags", {}).get("cave_tip"):
+            bits.append("Note: Don't sleep in the cave")
+        return "\n".join(f"• {b}" for b in bits) if bits else "• (empty pockets and stubborn hope)"
+
+    def _dream_bridge_node(self) -> dict:
+        flags = self.save.get("flags", {})
+        check = flags.get("last_check") or {}
+        p = self.p()
+        if flags.get("saw_the_hand"):
+            outcome = render(
+                "For half a heartbeat you see it clearly: a long, pale hand with too many joints, reaching from behind "
+                "a tree toward {missing}'s shoulder, not yours.",
+                p,
+            )
+        else:
+            outcome = "You see only shadow, and the dark closing like a door."
+        roll_line = ""
+        if check.get("roll") is not None:
+            ok = "success" if check.get("ok") else "failure"
+            roll_line = f"\n\n*{check.get('skill', 'Wisdom')} {check['roll']} vs DC {check.get('dc', 12)} — {ok}.*"
+        pages = [
+            outcome
+            + roll_line
+            + "\n\nShe reached a hand toward you —"
+        ]
+        return {"art": "scare", "pages": pages, "goto": "dream_wake"}
+
+    def _wake_letter_node(self) -> dict:
+        check = (self.save.get("flags") or {}).get("last_check") or {}
+        roll = check.get("roll")
+        ok = bool(check.get("ok"))
+        roll_bit = f"\n\n*Investigation {roll} vs DC 12 — {'success' if ok else 'failure'}.*" if roll else ""
+        if ok:
+            body = (
+                "You read it again, slower. The ink is Yuna's, but near the torn edge the paper is faintly warped, as if "
+                "it got wet and dried wrong. Under the last unfinished line, pressed hard enough to leave a ghost on the "
+                "next sheet, you catch three words she almost didn't write:\n\n"
+                "***Don't come alone.***\n\n"
+                "Your stomach drops. The owl never brought a second page."
+            )
+            self.save.setdefault("flags", {})["letter_clue"] = True
+        else:
+            body = (
+                "You read it again. July. The joke about the sapwood tree. The sentence that stops mid-thought as if she "
+                "meant to finish it tomorrow.\n\n"
+                "If there's more in it, your eyes won't give it to you. Not this morning. Not with your hands shaking."
+            )
+        self.cog.write()
+        return {"art": "scare", "pages": [body + roll_bit], "goto": "gus_morning"}
+
+    def _wake_breakfast_node(self) -> dict:
+        check = (self.save.get("flags") or {}).get("last_check") or {}
+        roll = check.get("roll")
+        ok = bool(check.get("ok"))
+        roll_bit = f"\n\n*Perception {roll} vs DC 12 — {'success' if ok else 'failure'}.*" if roll else ""
+        if ok:
+            body = (
+                "The house table is a storm of chatter and toast. You scan for Yuna out of habit — and notice something "
+                "else. Two other seats that should be filled aren't. A third-year from Thornmere. A quiet Raven-lane "
+                "transfer who always sat near the end.\n\n"
+                "Absence has a pattern this morning. You don't like patterns that look like teeth."
+            )
+            self.save.setdefault("flags", {})["noticed_other_missing"] = True
+        else:
+            body = (
+                "The house table is noise and elbows and someone stealing jam. You look for Yuna until your eyes hurt. "
+                "She's not there. Beyond that, the morning blurs into ordinary first-day chaos, and you can't tell if "
+                "anyone else is missing or if your fear is inventing company."
+            )
+        self.cog.write()
+        return {"art": "missing_seat", "pages": [body + roll_bit], "goto": "gus_morning"}
+
+    def _wake_write_node(self) -> dict:
+        check = (self.save.get("flags") or {}).get("last_check") or {}
+        roll = check.get("roll")
+        ok = bool(check.get("ok"))
+        roll_bit = f"\n\n*Charisma {roll} vs DC 12 — {'success' if ok else 'failure'}.*" if roll else ""
+        if ok:
+            body = (
+                "You write fast, too honest, ink blotting where your hand presses. *Where are you. I'm coming. Wait for "
+                "me.* You tie it to the owl with fingers that won't stay steady.\n\n"
+                "The bird lifts, circles once, and vanishes into the grey. You don't know if it will find her. But it "
+                "left. That has to count for something."
+            )
+            self.save.setdefault("flags", {})["owl_sent"] = True
+        else:
+            body = (
+                "You write. You rewrite. The owl on the perch watches you with the bored contempt of a creature that has "
+                "delivered worse panic than yours.\n\n"
+                "When you finally hold out the letter, the owl ruffles, turns its head, and refuses to take it. Outside, "
+                "the sky is already filling with other wings. Yours stays put, stubborn as a locked door."
+            )
+            self.save.setdefault("flags", {})["owl_refused"] = True
+        self.cog.write()
+        return {"art": "scare", "pages": [body + roll_bit], "goto": "gus_morning"}
+
     def _city_arrive_node(self) -> dict:
-        """Robbery beat: show Gus in frame when he escaped school with you."""
         with_gus = self.save.get("gus_with_party", True)
         if with_gus:
             pages = [
-                "The city doesn’t care that you’re fifth-years with a noble reason. It cares that you’re young, loaded with "
-                "bags, and looking the wrong way at the wrong corner.\n\n"
-                "A hooded figure steps out of the dark like they practiced it — phone up, voice flat, no face to read.\n\n"
-                "**Robber:** “Bags. Quiet. Nobody has to get clever.”\n\n"
-                "You put yourself in front of Ella. She’s already clutching her bag like it’s the only solid thing left. "
-                "Gus is right there with you — glasses crooked, hands half-raised, making a sound that is definitely not a joke."
+                "The city doesn't care that you're fifth-years with a noble reason. It cares that you're young, weighed "
+                "down with bags, and looking the wrong way on the wrong corner.\n\n"
+                "A hooded figure steps out of the dark as if they rehearsed it: wand already raised, voice flat, no face "
+                "to read under the hood.\n\n"
+                '**Thief:** "Bags. Quietly. Nobody needs to get clever."\n\n'
+                "You put yourself in front of Ella. She's clutching her bag as if it's the only solid thing left in the "
+                "world. Gus is right beside you, glasses crooked, hands half raised, making a noise that is definitely "
+                "not a joke."
             ]
             art = "city_fight_trio"
         else:
             pages = [
-                "The city doesn’t care that you’re fifth-years with a noble reason. It cares that you’re young, loaded with "
-                "bags, and looking the wrong way at the wrong corner.\n\n"
-                "A hooded figure steps out of the dark like they practiced it — phone up, voice flat, no face to read.\n\n"
-                "**Robber:** “Bags. Quiet. Nobody has to get clever.”\n\n"
-                "You put yourself in front of Ella. She’s already clutching her bag like it’s the only solid thing left. "
-                "Gus isn’t here — still back at the castle — and the empty space beside you feels like another threat."
+                "The city doesn't care that you're fifth-years with a noble reason. It cares that you're young, weighed "
+                "down with bags, and looking the wrong way on the wrong corner.\n\n"
+                "A hooded figure steps out of the dark as if they rehearsed it: wand already raised, voice flat, no face "
+                "to read under the hood.\n\n"
+                '**Thief:** "Bags. Quietly. Nobody needs to get clever."\n\n'
+                "You put yourself in front of Ella. She's clutching her bag as if it's the only solid thing left in the "
+                "world. Gus isn't here; he's still back at the castle. The empty space beside you feels like one more threat."
             ]
             art = "city_fight_duo"
         return {
@@ -284,23 +406,23 @@ class StorySession:
     def _sneak_done_node(self) -> dict:
         if self.save.get("gus_with_party", True):
             pages = [
-                "You taste cold air that isn’t castle air. For one stupid second you could cry with relief. "
-                "Gus elbows you, whispering something dumb so none of you have to admit how hard your hearts are going.\n\n"
-                "All three of you made it out."
+                "You taste cold air that isn't castle air. For one stupid second you could cry with relief. Gus elbows "
+                "you and whispers something daft so none of you has to admit how hard your hearts are going.\n\n"
+                "**All three of you made it out.**"
             ]
             empath = (
-                "Freedom feels illegal. You keep waiting for the castle to yank you back by the collar."
+                "Freedom feels illegal. You keep waiting for the castle to haul you back by the collar."
             )
         else:
             pages = [
-                "Mordy’s voice stops the night cold. Gus steps forward before you can — glasses crooked, chin up, "
-                "already volunteering to be the problem.\n\n"
-                "**Gus:** mouths *Go.*\n\n"
-                "Ella’s hand finds your sleeve and pulls. Leaving him feels like biting through your own tongue. "
-                "He says he’ll catch up. You want to believe him the way you used to believe summer was endless."
+                "Mordy's voice stops the night cold. Gus steps forward before you can, glasses crooked, chin up, already "
+                "volunteering to be the problem.\n\n"
+                '**Gus:** *(mouthing)* "Go."\n\n'
+                "Ella's hand finds your sleeve and pulls. Leaving him feels like biting through your own tongue. He'll "
+                "catch up, he said. You want to believe him the way you used to believe summer was endless."
             ]
             empath = (
-                "Loyalty has a sound when it breaks a little. It’s quiet. It follows you out into the dark."
+                "Loyalty has a sound when it cracks a little. It's quiet, and it follows you out into the dark."
             )
         return {"art": "sneak", "pages": pages, "empath": empath, "goto": "city_arrive"}
 
@@ -309,12 +431,13 @@ class StorySession:
         if self.save.get("gus_with_party", True):
             pages = [
                 render(
-                    "The train toward Caden is half-empty. Ella sits by the window. Gus invents a bit about the "
-                    "robbers having terrible taste in alleyways until even Ella snorts.\n\n"
-                    "**Ella:** quieter, when he goes looking for water — “We’re doing what’s right. If something’s "
-                    "wrong out there… I trust you.”\n\n"
-                    "Gus comes back mid-sentence with snacks and a joke that lands soft. The heaviness thins. "
-                    "Ella doesn’t reach for your hand. She doesn’t need to, not with him filling the air.\n\n"
+                    "The train toward Caden is half empty and smells of old upholstery and someone's forgotten pasty. "
+                    "Ella takes the window seat. Gus invents an elaborate theory about the thief having terrible taste "
+                    "in alleyways until even Ella snorts.\n\n"
+                    "When he goes off in search of the trolley, Ella speaks more quietly.\n\n"
+                    '**Ella:** "We\'re doing what\'s right. If something\'s wrong out there… I trust you."\n\n'
+                    "Gus comes back mid-sentence, arms full of sweets, with a joke that lands soft. The heaviness thins. "
+                    "Ella doesn't reach for your hand. She doesn't need to, not with him there filling the air.\n\n"
                     "Outside, the hills darken toward the Forrest.",
                     p,
                 )
@@ -324,17 +447,16 @@ class StorySession:
         else:
             pages = [
                 render(
-                    "The train toward Caden is half-empty. Ella sits by the window. Without Gus, the quiet has room "
+                    "The train toward Caden is half empty. Ella takes the window seat. Without Gus, the quiet has room "
                     "to mean things.\n\n"
-                    "**Ella:** “We’re doing what’s right. If something’s wrong out there… I trust you.”\n\n"
-                    "It isn’t a speech. It’s heavier than one. You feel the weight of it in your ribs — her faith, "
-                    "your fear, the empty seat where Gus should be making this easier.\n\n"
-                    "She takes your hand.\n"
-                    "Not asking. Not performing. Just *here*.\n\n"
-                    "The cart jolts at a crossing. Boots hit the step. Gus — breathless, glasses fogged, bag half-zipped — "
-                    "hauls himself in before the door shuts.\n\n"
+                    '**Ella:** "We\'re doing what\'s right. If something\'s wrong out there… I trust you."\n\n'
+                    "It isn't a speech. It's heavier than a speech. You feel its weight in your ribs: her faith, your "
+                    "fear, the empty seat where Gus should be making all this easier.\n\n"
+                    "She takes your hand. She isn't asking and she isn't performing. She's just here.\n\n"
+                    "The carriage jolts over a crossing. Boots hit the step. Gus, breathless, glasses fogged, bag half "
+                    "fastened, hauls himself aboard a heartbeat before the doors close.\n\n"
                     "He sees.\n\n"
-                    "For a second nobody speaks. Then he laughs wrong and sits across from you both like nothing "
+                    "For a moment nobody speaks. Then he laughs wrong and sits across from you both as if nothing "
                     "happened, which means everything did.\n\n"
                     "Outside, the hills darken toward the Forrest.",
                     p,
@@ -347,59 +469,90 @@ class StorySession:
         self.cog.write()
         return {"art": art, "pages": pages, "goto": "ch1_end"}
 
+    def _ch2_arrive_node(self) -> dict:
+        p = self.p()
+        gus_line = (
+            "Gus clears his throat, as though that might make this less awful.\n\n"
+            if self.save.get("gus_with_party", True)
+            else ""
+        )
+        pages = [
+            render(
+                "The train sighs to a stop in Caden, the last town before the Forrest. It smells of lake water, fresh "
+                "bread and woodsmoke. Beyond the crooked rooftops the trees begin, and they're dark even at noon.\n\n"
+                "You unfold the photograph of {missing}. In it she's grinning and waving at you, the way she did the "
+                "summer it was taken, as if nothing could ever change.\n\n"
+                + gus_line
+                + "Ella takes the photograph from you gently, as though it might break.\n\n"
+                "You start asking.",
+                p,
+            )
+        ]
+        return {"art": "caden", "chapter": 2, "pages": pages, "goto": "ask_shops"}
+
     def _gus_talk_node(self) -> dict:
         flags = self.save.setdefault("flags", {})
+        advice = flags.get("gus_advice")
+        if advice == "tell":
+            advice_line = "You told me to tell her."
+        elif advice == "dont":
+            advice_line = "You told me to leave it."
+        elif advice == "careful":
+            advice_line = "You told me not to half-do it."
+        else:
+            advice_line = "You told me something about her."
         if flags.get("gus_saw_hand"):
             pages = [
-                "**Gus:** doesn’t joke first. That’s how you know.\n\n"
-                "“I saw. On the train. Her hand.” He stares at the floorboards. “I’m not mad at you. I don’t think. "
-                "I’m mad at the timing. At me for not being there. At… yeah.”\n\n"
-                "He asks if you told her to — you didn’t. He asks if you like her that way — you don’t, and saying it "
-                "out loud feels like putting down something sharp carefully.\n\n"
-                "**Gus:** “Okay. Then I still… I still want to try. Or I don’t. You told me "
-                + ("to tell her." if flags.get("gus_advice") == "tell" else "something about her.")
-                + " I’m remembering that. Just— don’t let me be the last to know if the world tilts again.”"
+                "Gus doesn't make a joke first. That's how you know.\n\n"
+                '**Gus:** "I saw. On the train. Her hand." He stares hard at the floorboards. "I\'m not angry with you. '
+                "I don't think. I'm angry at the timing. At me, for not being there. At… yeah.\"\n\n"
+                "He asks if you asked her to. You didn't. He asks if you like her that way. You don't, and saying it out "
+                "loud feels like setting down something sharp very carefully.\n\n"
+                f'**Gus:** "Okay. Then I still… I still want to try. Or I don\'t. {advice_line} I\'m remembering that. '
+                'Just — don\'t let me be the last to know if the world tips over again."'
             ]
-            empath = "Serious tone. His jealousy isn’t ugly — it’s scared. You feel it and don’t flinch away."
+            empath = "His jealousy isn't ugly. It's frightened. You feel it, and you don't flinch away."
             flags["gus_talk"] = "serious"
         else:
             pages = [
-                "**Gus:** paces once, then sits.\n\n"
-                "“She’s been laughing more. With me. Or near me. I can’t tell which and it’s killing me in a "
-                "stupid way.” He grins, small. “You were right there the whole time and somehow I still need a referee.”\n\n"
-                "You talk. Not forever. Long enough that the lamp burns lower.\n\n"
-                "**Gus:** “Tomorrow we find them. Tonight I pretend I’m brave about Ella. Deal?”"
+                "Gus paces once, then sits on the end of the bed.\n\n"
+                '**Gus:** "She\'s been laughing more. With me. Or *near* me. I can\'t tell which, and it\'s killing me in '
+                'a really stupid way." His grin is small. "You were right there the whole time, and somehow I still need '
+                'a referee."\n\n'
+                "You talk, not forever, but long enough for the lamp to burn low.\n\n"
+                '**Gus:** "Tomorrow we find Yuna. Tonight I pretend I\'m brave about Ella. Deal?"'
             ]
-            empath = "Lighter. Hopeful. The crush is still loud — just not bleeding."
+            empath = "It's lighter now, and hopeful. The crush is still loud, but it's no longer bleeding."
             flags["gus_talk"] = "light"
-        # surface advice flag for later
-        if "gus_advice" not in flags and self.save.get("flags", {}).get("gus_advice"):
-            pass
-        # copy from top-level if stored via set on choices - we store in flags via set handler
         self.cog.write()
         return {"art": "inn", "pages": pages, "empath": empath, "goto": "morning"}
 
     def _morning_node(self) -> dict:
         p = self.p()
+        inv = self._inventory_line()
+        head = (
+            "At dawn you check your supplies: water, whatever you bought, whatever the thief didn't take.\n\n"
+            f"**Pack**\n{inv}\n\n"
+        )
         if self.save.get("flags", {}).get("has_nox"):
             body = (
-                "Supply check at dawn: water, what you bought, what you didn’t lose to robbers. "
-                "Nox waits by the door like the day already belongs to him.\n\n"
-                "You step toward the tree line. He follows without being asked."
+                "Nox waits by the door as though the day already belongs to him. When you step toward the tree line, he "
+                "follows without being asked."
             )
         elif self.save.get("flags", {}).get("cave_tip"):
             body = (
-                "Supply check at dawn: water, what you bought, what you didn’t lose to robbers.\n\n"
-                "You write it once in the margin of the trail map, small, so you won’t pretend you forgot:\n"
-                "**Don’t sleep in the cave.**"
+                "You write it once in the margin of the trail map, small, so you can't pretend you forgot:\n"
+                "***Don't sleep in the cave.***"
             )
         else:
             body = (
-                "Supply check at dawn: water, what you bought, what you didn’t lose to robbers.\n\n"
                 "No dog. No warning. Just the three of you and a map that ends where the green begins."
             )
         pages = [
-            render(body + "\n\nThe Forrest of Caden stands waiting. Still no word of {missing}.", p)
+            render(
+                head + body + "\n\nThe Forrest of Caden stands waiting. There's still no word of {missing}.",
+                p,
+            )
         ]
         return {"art": "edge", "pages": pages, "goto": "ch2_end"}
 
@@ -455,7 +608,13 @@ class StorySession:
         more_pages = page_i < len(flat) - 1
         empath = node.get("empath") if not more_pages else None
         if empath and save.get("protagonist"):
-            text = text + "\n\n*" + render(empath, self.p()) + "*"
+            text = (
+                text
+                + "\n\n✨ **Empath's Sense**\n"
+                + "*"
+                + render(empath, self.p())
+                + "*"
+            )
 
         title = "The Forrest of Caden"
         if save.get("chapter") == 2:
@@ -477,6 +636,8 @@ class StorySession:
         view: discord.ui.View
         if more_pages:
             view = ContinueView(self)
+        elif node.get("mini") == "check_roll":
+            view = CheckRollView(self, node.get("check") or {}, node.get("goto"))
         elif node.get("mini") == "pick_materials":
             view = MaterialPickView(self, SCHOOL_MATERIALS, need=2, flag_key="school_materials", nxt=node.get("goto"))
         elif node.get("mini") == "pick_essentials":
@@ -556,6 +717,22 @@ class StorySession:
         else:
             await interaction.response.defer()
 
+    def _apply_check(self, check: dict) -> dict:
+        """Roll a d20 vs DC; store on flags['last_check']. Returns the result dict."""
+        skill = check.get("skill") or "Check"
+        dc = int(check.get("dc") or 12)
+        roll = random.randint(1, 20)
+        ok = roll >= dc
+        result = {"skill": skill, "dc": dc, "roll": roll, "ok": ok}
+        flags = self.save.setdefault("flags", {})
+        flags["last_check"] = result
+        if check.get("success_flag") and ok:
+            flags[check["success_flag"]] = True
+        elif check.get("success_flag") and not ok:
+            flags.setdefault(check["success_flag"], False)
+        self.cog.write()
+        return result
+
     async def pick_choice(self, interaction: discord.Interaction, choice: dict) -> None:
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("This isn’t your story.", ephemeral=True)
@@ -567,9 +744,18 @@ class StorySession:
                 self.save["chapter"] = v
             else:
                 self.save.setdefault("flags", {})[k] = v
-                # also mirror gus_advice at top for status readability
-                if k == "gus_advice":
-                    self.save["flags"]["gus_advice"] = v
+        if choice.get("check"):
+            result = self._apply_check(choice["check"])
+            # Flavor-only checks that share a destination still whisper the roll.
+            if choice.get("goto") in ("sebastian", "ask_library"):
+                await interaction.response.send_message(
+                    f"*{result['skill']} {result['roll']} vs DC {result['dc']} — "
+                    f"{'success' if result['ok'] else 'failure'}.*",
+                    ephemeral=True,
+                )
+                await self._advance(choice.get("goto"))
+                await self.refresh(interaction)
+                return
         await self._advance(choice.get("goto"))
         await interaction.response.defer()
         await self.refresh(interaction)
@@ -584,6 +770,41 @@ class ContinueView(discord.ui.View):
     @discord.ui.button(label="Continue", style=discord.ButtonStyle.primary)
     async def cont(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.session.continue_page(interaction, auto_goto=self.auto_goto)
+
+
+class CheckRollView(discord.ui.View):
+    """Single d20 roll (e.g. dream Wisdom save)."""
+
+    def __init__(self, session: StorySession, check: dict, nxt: Optional[str]):
+        super().__init__(timeout=600)
+        self.session = session
+        self.check = check or {}
+        self.nxt = nxt
+        label = (check.get("button") or "Roll")[:80]
+        self.add_item(CheckRollButton(self, label))
+
+    async def do_roll(self, interaction: discord.Interaction):
+        if interaction.user.id != self.session.user_id:
+            await interaction.response.send_message("This isn’t your story.", ephemeral=True)
+            return
+        result = self.session._apply_check(self.check)
+        await interaction.response.send_message(
+            f"*{result['skill']} {result['roll']} vs DC {result['dc']} — "
+            f"{'success' if result['ok'] else 'failure'}.*",
+            ephemeral=True,
+        )
+        if self.nxt:
+            await self.session._advance(self.nxt)
+        await self.session.refresh(interaction)
+
+
+class CheckRollButton(discord.ui.Button):
+    def __init__(self, parent: CheckRollView, label: str):
+        super().__init__(label=label, style=discord.ButtonStyle.primary)
+        self.parent_view = parent
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.parent_view.do_roll(interaction)
 
 
 class ChoiceView(discord.ui.View):
@@ -796,15 +1017,15 @@ class FightView(discord.ui.View):
         if action == "strike":
             self.enemy -= 2 if self.session.save.get("gus_with_party", True) else 1
             self.hp -= 1
-            line = "You hit hard. They hit back."
+            line = "You hit back with a jinx. They snarl and answer."
         elif action == "guard":
             self.enemy -= 1
             self.hp -= 0 if random.random() < 0.5 else 1
-            line = "You cover Ella. The world narrows to fists and breath."
+            line = "You take the hit meant for Ella. The world narrows to wand-light and breath."
         else:
             self.enemy -= 1
             self.hp -= 1 if self.hard else 0
-            line = "You shove through — bags swinging, teeth gritted."
+            line = "You break away and run — bags swinging, teeth gritted."
 
         if self.enemy <= 0:
             self.session.save.setdefault("flags", {})["city_fight"] = "won"
