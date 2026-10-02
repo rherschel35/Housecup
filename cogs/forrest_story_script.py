@@ -85,61 +85,36 @@ CHECK_ABILITY = {
     "Persuasion": "wis",
 }
 
-# Timed Attack mini-game: enemy casts a hex; pick the correct counter before it lands.
+# Timed Attack mini-game (best of 3): fixed cast order using duel counters.
 # Window: 5s alone / 10s with Gus. Options: 4 at Attack +0, 3 at +1, 2 at +2.
+# Lose → thief takes school supplies. Win → keep everything.
 HEX_SECONDS_SOLO = 5
 HEX_SECONDS_WITH_GUS = 10
 HEX_OPTION_BASE = 4  # Attack +0
 HEX_ROUNDS_TO_WIN = 2
 HEX_ROUNDS_MAX = 3
-HEX_PAIRS = [
+# Duel spells + Light (Poison's counter). Corrects match cogs/duels.py BEATS where possible.
+ATTACK_FIGHT_ROUNDS = [
     {
-        "hex": "Stinging Hex",
-        "counter": "Protego",
-        "hit": "Needles of light stitch into your arm before you can finish the counter.",
-        "block": "Your shield catches the sting and sheds it as sparks.",
+        "incoming": "Hex",
+        "corrects": ["Ward", "Mirror"],
+        "hit": "The hex bites in — your wand-hand goes numb and the street tilts.",
+        "block": "Your counter eats the hex. Sparks die on the cobbles.",
     },
     {
-        "hex": "Leg-Locker",
-        "counter": "Finite",
-        "hit": "Your legs snap together; cobbles rush up to meet you.",
-        "block": "Finite cracks the lock — you stumble, free.",
+        "incoming": "Bind",
+        "corrects": ["Hex", "Mirror"],
+        "hit": "Binding cinches your wrists; bags slip; the thief steps in.",
+        "block": "You tear through the bind before it can finish closing.",
     },
     {
-        "hex": "Disarming Hex",
-        "counter": "Expelliarmus",
-        "hit": "Your wand wrenches free; you snatch it back a heartbeat too late.",
-        "block": "You throw their disarm back. Their wand jumps; they swear.",
-    },
-    {
-        "hex": "Bind Hex",
-        "counter": "Relashio",
-        "hit": "Invisible rope cinches your wrists and yanks you off balance.",
-        "block": "Relashio blows the binding apart in a hot snap.",
-    },
-    {
-        "hex": "Knockback Hex",
-        "counter": "Arresto",
-        "hit": "The blast throws you into a crate. Breath gone.",
-        "block": "Arresto kills the force a foot from your chest.",
-    },
-    {
-        "hex": "Blinding Sparks",
-        "counter": "Protego",
-        "hit": "White fire claws across your eyes. The street vanishes.",
-        "block": "Sparks sheet off your shield and die on the stones.",
+        "incoming": "Poison",
+        "corrects": ["Light"],
+        "hit": "Green mist kisses your sleeve. Your throat burns; your knees soften.",
+        "block": "Light burns the poison mist out of the air.",
     },
 ]
-HEX_SPELL_POOL = sorted(
-    {
-        *(p["counter"] for p in HEX_PAIRS),
-        "Stupefy",
-        "Lumos",
-        "Accio",
-        "Wingardium",
-        "Rictusempra",
-    }
-)
+ATTACK_SPELL_POOL = ["Hex", "Ward", "Disarm", "Bind", "Mirror", "Light"]
 
 
 def hex_option_count(attack_mod: int) -> int:
