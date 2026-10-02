@@ -30,6 +30,7 @@ ART = {
     "inn": "inn_gus_mack.jpg",
     "edge": "forrest_edge.jpg",
     "mack": "mack.jpg",
+    "mack_skills": "mack_skills.jpg",
     "ask_shops": "ask_shops.jpg",
     "ask_food": "ask_food.jpg",
     "yuna": "yuna.jpg",
@@ -188,7 +189,7 @@ CH1_NODES: dict[str, dict] = {
         ],
     },
     "skills": {
-        "art": "mack",
+        "art": "mack_skills",
         "pages": [
             "Before the dream takes you, you take stock of what kind of wizard you've become — not grades, not house "
             "points. Three things decide whether a moment goes your way.\n\n"
