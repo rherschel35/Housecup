@@ -24,6 +24,10 @@ right hit shares in the reward once it's down.
 A Storm Sprite is rarer and skittish - leave it too long and it bolts to
 another configured channel rather than wait to be caught.
 
+When /explore or /forage in a dangerous place stirs one up, that student
+gets 25 seconds alone to /cast at it. After that window, anyone can try.
+Scheduled sightings and staff summons stay open to everyone from the start.
+
     /dementor eventstart [minutes] [name]  - staff, start "Attack on Velmora"
     /dementor eventend                     - staff, end it early
     /dementor eventstatus                  - staff, how it's going
@@ -68,6 +72,7 @@ TICKS_PER_DAY = (24 * 60) // TICK_MINUTES
 SPAWN_CHANCE = SPAWNS_PER_DAY / TICKS_PER_DAY   # per tick, while under the daily cap
 
 WANDER_MINUTES = 10   # how long a creature that can wander waits before it bolts
+FINDER_EXCLUSIVE_SECONDS = 25  # explorer who stirred one up gets first crack
 
 REWARD_POINTS = 3   # kept for backward compatibility; see CREATURES["dementor"]["points"]
 DARK = 0x0B0B12
@@ -318,22 +323,42 @@ class Dementors(commands.Cog):
             embed.set_image(url="attachment://monster.png")
         return file
 
-    def embed_arrival(self, creature_id: str) -> discord.Embed:
+    def embed_arrival(self, creature_id: str, finder_id: int | None = None,
+                       exclusive_until: float | None = None) -> discord.Embed:
         c = CREATURES[creature_id]
         desc = self.rng.choice(c["arrivals"])
         if creature_id == "dementor":
             desc += "\n\nOnly a cast patronus can drive it out - `/cast spell:Patronus`."
+        if finder_id and exclusive_until and time.time() < exclusive_until:
+            desc += (f"\n\n⏳ <@{finder_id}> stirred it up — they have until "
+                     f"<t:{int(exclusive_until)}:R> to `/cast` first. "
+                     f"Then anyone can try.")
         return discord.Embed(
             title=f"{c['emoji']} A {c['name']} has appeared",
             description=desc,
             color=THREAT_ALERT_COLOR,
         )
 
-    async def spawn(self, channel_id: int = None, creature_id: str = None) -> discord.TextChannel | None:
+    def _finder_blocks(self, active: dict, user_id: int) -> str | None:
+        """Ephemeral refusal while the explorer who stirred it up still has
+        exclusive cast rights; None once the window is open or there was no finder."""
+        until = active.get("exclusive_until")
+        finder = active.get("finder_id")
+        if not until or not finder:
+            return None
+        if time.time() >= until or user_id == finder:
+            return None
+        return (f"<@{finder}> stirred this one up — they have until "
+                f"<t:{int(until)}:R> to cast at it. After that, anyone can try.")
+
+    async def spawn(self, channel_id: int = None, creature_id: str = None,
+                    finder_id: int | None = None) -> discord.TextChannel | None:
         """Make a creature appear. Picks a random configured channel if none
         is given, and a random creature (weighted) if none is given - except
         a manual, unspecified /dementor summon still defaults to a Dementor,
-        same as it always has. Returns the channel it landed in, or None."""
+        same as it always has. When finder_id is set (explore/forage stir),
+        that student gets FINDER_EXCLUSIVE_SECONDS alone to /cast. Returns
+        the channel it landed in, or None."""
         pool = self.state.get("channel_ids", [])
         if channel_id is None:
             if not pool:
@@ -344,35 +369,45 @@ class Dementors(commands.Cog):
             return None
         if creature_id is None:
             creature_id = "dementor"
-        embed = self.embed_arrival(creature_id)
+        now = time.time()
+        exclusive_until = (now + FINDER_EXCLUSIVE_SECONDS) if finder_id else None
+        embed = self.embed_arrival(creature_id, finder_id=finder_id,
+                                   exclusive_until=exclusive_until)
         file = self._attach_art(embed, creature_id)
         try:
             msg = await channel.send(embed=embed, file=file) if file else await channel.send(embed=embed)
         except discord.HTTPException:
             log.exception("Couldn't post the %s in %s", creature_id, channel_id)
             return None
-        self.state["active"] = {
+        active = {
             "creature": creature_id, "channel_id": channel_id, "message_id": msg.id,
-            "spawned_at": time.time(), "hits": [],
+            "spawned_at": now, "hits": [],
         }
+        if finder_id:
+            active["finder_id"] = finder_id
+            active["exclusive_until"] = exclusive_until
+        self.state["active"] = active
         self.state["spawns_today"] = self.state.get("spawns_today", 0) + 1
         self.save()
-        log.info("A %s appeared in channel %s", creature_id, channel_id)
+        log.info("A %s appeared in channel %s (finder=%s)", creature_id, channel_id, finder_id)
         return channel
 
-    async def try_ambient_spawn(self, channel_id: int, creature_id: str = None) -> bool:
+    async def try_ambient_spawn(self, channel_id: int, creature_id: str = None,
+                                finder_id: int | None = None) -> bool:
         """Let another cog (right now: searching the Dungeons or the
         Forbidden Woods) try to drop a Wild Threat into a specific channel
         on the spot. Refuses quietly - no error, just nothing happens - if
         something's already loose or an event is running, so it never
-        steals the encounter out from under another channel."""
+        steals the encounter out from under another channel. finder_id is
+        the explorer who stirred it — they get a short exclusive cast window."""
         async with self.lock:
             if self.state.get("active") or self.state.get("event"):
                 return False
             # Unlike a manual /dementor summon, an ambient trigger like this
             # should draw from the whole weighted roster, not default to a
             # plain Dementor.
-            landed = await self.spawn(channel_id, creature_id or self._roll_creature())
+            landed = await self.spawn(channel_id, creature_id or self._roll_creature(),
+                                      finder_id=finder_id)
         return bool(landed)
 
     def _roll_creature(self) -> str:
@@ -408,6 +443,9 @@ class Dementors(commands.Cog):
         active["message_id"] = msg.id
         active["spawned_at"] = time.time()
         active["hits"] = []
+        # New channel, open season — the explorer's exclusive window doesn't travel.
+        active.pop("finder_id", None)
+        active.pop("exclusive_until", None)
         self.save()
 
     @tasks.loop(minutes=TICK_MINUTES)
@@ -500,6 +538,10 @@ class Dementors(commands.Cog):
                     await interaction.response.send_message(
                         "The air here feels perfectly normal. Nothing to banish.", ephemeral=True
                     )
+                    return
+                blocked = self._finder_blocks(active, interaction.user.id)
+                if blocked:
+                    await interaction.response.send_message(blocked, ephemeral=True)
                     return
                 creature_id = active["creature"]
                 creature = CREATURES[creature_id]
@@ -953,6 +995,10 @@ class Dementors(commands.Cog):
             need = CREATURES.get(active["creature"], {}).get("pack", 1)
             progress = f", {hits}/{need} hit(s) landed" if need > 1 else ""
             lines.append(f"Active now: {c['name']} in <#{active['channel_id']}>, {age} minute(s) ago{progress}.")
+            until = active.get("exclusive_until")
+            finder = active.get("finder_id")
+            if finder and until and time.time() < until:
+                lines.append(f"Exclusive cast: <@{finder}> until <t:{int(until)}:R>.")
         else:
             lines.append("Nothing active right now.")
         if self.state.get("event"):
