@@ -35,7 +35,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from cogs.velmora_channels import channel_mentions, with_study_hall
+from cogs.velmora_channels import channel_mentions, with_study_hall_and_ddp
 
 log = logging.getLogger("velmora.potions")
 
@@ -44,7 +44,7 @@ STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "potions_state.json"
 
 # Potions classroom + new-student study hall.
-POTIONS_CHANNEL_IDS = with_study_hall(1553253009398693958)
+POTIONS_CHANNEL_IDS = with_study_hall_and_ddp(1553253009398693958)
 # Kept for any older references / embeds that expect a single home channel.
 POTIONS_CHANNEL_ID = 1553253009398693958
 
