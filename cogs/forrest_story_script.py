@@ -316,7 +316,7 @@ CH1_NODES: dict[str, dict] = {
         "goto": "city_essentials",
     },
     "city_essentials": {
-        "art": "caden",
+        "art": "materials",
         "pages": [
             "After, your hands shake in a way you pretend is cold. A late stall is still open. You buy what you can carry "
             "before the last train toward Caden’s edge.\n\n"
@@ -427,7 +427,7 @@ CH2_NODES: dict[str, dict] = {
         "goto": "inn",
     },
     "alley_dog": {
-        "art": "alley",
+        "art": "nox",
         "pages": [
             "You drop to your knees. The grate is stubborn; your hands get scraped; the dog doesn’t bite. When the paw "
             "comes free, the dog shakes once, hard, and then leans into your shin like you’ve known each other for years.\n\n"
