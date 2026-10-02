@@ -336,11 +336,13 @@
         "season",
         "thornmere",
         "moonveil",
+        "asterwilde",
+        "aster wilde",
         "veyren",
         "caldrin",
         "vashara"
       ],
-      "answer": "Five houses chase one Cup. Almost everythin' ye do earns points for yer house. `/standings` shows the table; `/points` shows yer own; `/profile` is the full picture.",
+      "answer": "Five houses chase one Cup — Thornmere, AsterWilde (once Moonveil), Veyren, Caldrin, Vashara. Almost everythin' ye do earns points for yer house. `/standings` shows the table; `/points` shows yer own; `/profile` is the full picture.",
       "link": "https://everything-velmora.netlify.app/houses"
     },
     {
