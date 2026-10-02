@@ -35,7 +35,7 @@ HELP = {
             ("patronus", "Your patronus, cast from the same three words as your wand."),
             ("broom", "Claim your unique broom (see Brooms section for upgrades, races, and notes)."),
             ("rumor", "Explore secrets, student gossip, odd headmaster whispers, embarrassing ghosts."),
-            ("cast", "Banish a wild threat in this channel. If you stirred it up exploring, you get 25s alone first."),
+            ("cast", "Banish a wild threat here — pick the spell (some users auto-pick the weakness). Explorer who stirred it: 25s alone first."),
             ("familiar", "Adopt a familiar (once, for good), name it, or see the one you have."),
             ("feed", "Feed your familiar. Once a day."),
             ("pet", "Pet your familiar. Once a day."),
