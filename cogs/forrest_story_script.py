@@ -17,7 +17,7 @@ ART = {
     "sebastian": "sebastian_talk.jpg",
     "party": "party_table.jpg",
     "sneak": "mordy_sneak.jpg",
-    "city_fight": None,
+    "city_fight": "city_fight.jpg",
     "train": "train_gus_ella.jpg",
     "caden": None,
     "alley": None,
