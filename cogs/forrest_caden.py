@@ -592,10 +592,20 @@ class StorySession:
         await self._render(destination, edit=False)
 
     async def refresh(self, interaction: Optional[discord.Interaction] = None) -> None:
-        """Redraw current node. Prefer editing the interaction message; fall back to a new post."""
+        """Redraw current node on the existing public story message.
+
+        Always edits the component host message (or ``self.message``). Never
+        uses ``edit_original_response``, which can retarget an ephemeral reply
+        and wipe the player's progress when that reply is dismissed.
+        """
         try:
             if interaction is not None:
-                await self._render(interaction, edit=True)
+                host = interaction.message or self.message
+                if host is None:
+                    await self._render(self.channel, edit=False)
+                    return
+                self.message = host
+                await self._render_on_host(interaction, host)
             elif self.message is not None:
                 await self._render(self.message, edit=True)
             else:
@@ -606,6 +616,17 @@ class StorySession:
                 await self._render(self.channel, edit=False)
             except Exception:
                 log.exception("Forrest fallback send also failed")
+
+    async def _render_on_host(
+        self, interaction: discord.Interaction, host: discord.Message
+    ) -> None:
+        """Acknowledge the button and redraw ``host`` — never a 2nd/ephemeral post."""
+        if not interaction.response.is_done():
+            # Prefer atomic edit of the button's message (public).
+            await self._render(interaction, edit=True)
+            return
+        # Already acknowledged (e.g. deferred update) — edit the host Message object.
+        await self._render(host, edit=True)
 
     async def _render(self, destination, edit: bool) -> None:
         save = self.save
@@ -707,12 +728,17 @@ class StorySession:
             kwargs["attachments"] = [file]
 
         if edit and isinstance(destination, discord.Interaction):
-            # Component/followup interactions: edit the original story message.
-            if destination.response.is_done():
-                self.message = await destination.edit_original_response(**kwargs)
-            else:
+            # Edit the component's public message only. Never edit_original_response
+            # (that can rewrite an ephemeral send_message and look like a 2nd post).
+            host = destination.message or self.message
+            if not destination.response.is_done():
                 await destination.response.edit_message(**kwargs)
-                self.message = destination.message
+                self.message = destination.message or host
+            elif host is not None:
+                self.message = await host.edit(**kwargs)
+            else:
+                # Slash-start / no host: public followup only (never ephemeral).
+                self.message = await destination.followup.send(**kwargs)
         elif edit and isinstance(destination, discord.Message):
             self.message = await destination.edit(**kwargs)
         elif edit and self.message:
@@ -745,17 +771,16 @@ class StorySession:
         if page_i < len(flat) - 1:
             self.save["page"] = page_i + 1
             self.cog.write()
-            await interaction.response.defer()
             await self.refresh(interaction)
             return
         # finished pages → goto or choices already shown; ContinueView with auto_goto
         nxt = auto_goto or node.get("goto")
         if nxt:
             await self._advance(nxt)
-            await interaction.response.defer()
             await self.refresh(interaction)
         else:
-            await interaction.response.defer()
+            if not interaction.response.is_done():
+                await interaction.response.defer()
 
     def _apply_check(self, check: dict) -> dict:
         """Roll d20 + ability mod vs DC; store on flags['last_check']."""
@@ -815,7 +840,6 @@ class StorySession:
                 self.save.setdefault("flags", {})["roll_blurb"] = self._format_check_result(result)
             # wake_* / dream_bridge nodes already render last_check in their text
         await self._advance(choice.get("goto"))
-        await interaction.response.defer()
         await self.refresh(interaction)
 
 
@@ -925,7 +949,6 @@ class SkillAssignView(discord.ui.View):
         self.session.save["abilities"] = dict(self.abilities)
         self.session.cog.write()
         await self.session._advance(self.nxt)
-        await interaction.response.defer()
         await self.session.refresh(interaction)
 
 
@@ -969,11 +992,10 @@ class CheckRollView(discord.ui.View):
         if interaction.user.id != self.session.user_id:
             await interaction.response.send_message("This isn’t your story.", ephemeral=True)
             return
-        # Stay on the main story message — next node shows the roll result.
+        # Edit the same public story message in place — never a 2nd/ephemeral post.
         self.session._apply_check(self.check)
         if self.nxt:
             await self.session._advance(self.nxt)
-        await interaction.response.defer()
         await self.session.refresh(interaction)
 
 
@@ -1077,7 +1099,6 @@ class MaterialPickView(discord.ui.View):
         self.session.save[self.flag_key] = list(self.picked)
         self.session.cog.write()
         await self.session._advance(self.nxt)
-        await interaction.response.defer()
         await self.session.refresh(interaction)
 
 
@@ -1163,7 +1184,6 @@ class SneakView(discord.ui.View):
             save.setdefault("flags", {})["sneak_caught"] = caught
             save.setdefault("flags", {})["sneak_stealth"] = ste
             await self.session._advance("sneak_done")
-            await interaction.response.defer()
             await self.session.refresh(interaction)
         else:
             # Edit the same story message so progress isn't wiped by a 2nd post.
@@ -1229,7 +1249,6 @@ class FightView(discord.ui.View):
             self.session.save.setdefault("flags", {})["city_fight"] = "won"
             self.session.save.setdefault("flags", {})["fight_hard"] = self.hard
             await self.session._advance("city_essentials")
-            await interaction.response.defer()
             await self.session.refresh(interaction)
             return
         if self.hp <= 0:
@@ -1241,7 +1260,6 @@ class FightView(discord.ui.View):
                 self.session.save.setdefault("flags", {})["lost_item"] = lost
             self.session.save.setdefault("flags", {})["city_fight"] = "barely"
             await self.session._advance("city_essentials")
-            await interaction.response.defer()
             await self.session.refresh(interaction)
             return
 
