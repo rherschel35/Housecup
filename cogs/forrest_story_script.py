@@ -60,6 +60,54 @@ CITY_ESSENTIALS_2 = [
 
 MATERIAL_LABELS = {k: label for k, label, _ in SCHOOL_MATERIALS + CITY_ESSENTIALS_3}
 
+# Three story skills. Points spent = modifier (base +0).
+ABILITIES = [
+    ("atk", "Attack", "Monster fights and the city robbery."),
+    ("wis", "Wisdom", "Notes, letters, dialog, noticing what matters."),
+    ("ste", "Stealth", "Sneaking, eavesdropping, not getting caught."),
+]
+ABILITY_KEYS = [a[0] for a in ABILITIES]
+ABILITY_LABELS = {k: label for k, label, _ in ABILITIES}
+SKILL_POINTS_TOTAL = 3
+SKILL_POINTS_MAX_PER = 2
+
+# Story check / mini-game name → skill key.
+CHECK_ABILITY = {
+    "Attack": "atk",
+    "Wisdom": "wis",
+    "Stealth": "ste",
+    # Legacy / alias names from older script wording → Wisdom
+    "Investigation": "wis",
+    "Perception": "wis",
+    "Charisma": "wis",
+    "Persuasion": "wis",
+}
+
+
+def default_abilities() -> dict[str, int]:
+    return {k: 0 for k in ABILITY_KEYS}
+
+
+def ability_mod(abilities: dict | None, skill: str) -> int:
+    """Modifier for a check or skill name (e.g. Wisdom, Attack)."""
+    key = CHECK_ABILITY.get(skill) or CHECK_ABILITY.get(skill.title())
+    if not key:
+        return 0
+    try:
+        return int((abilities or {}).get(key, 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def format_abilities(abilities: dict | None) -> str:
+    ab = abilities or {}
+    parts = []
+    for key, label, _ in ABILITIES:
+        mod = int(ab.get(key, 0) or 0)
+        sign = f"+{mod}" if mod >= 0 else str(mod)
+        parts.append(f"**{label}** {sign}")
+    return " · ".join(parts)
+
 
 def pronouns(_protagonist: str | None = None) -> dict[str, str]:
     """Always Mack looking for Yuna. m* = Yuna's pronouns."""
@@ -94,8 +142,23 @@ CH1_NODES: dict[str, dict] = {
             "*Private test: Chapters 1 & 2. No house points. Your choices are written into your story.*"
         ],
         "choices": [
-            {"id": "begin", "label": "Begin", "set": {"protagonist": "mack"}, "goto": "dream"},
+            {"id": "begin", "label": "Begin", "set": {"protagonist": "mack"}, "goto": "skills"},
         ],
+    },
+    "skills": {
+        "art": "mack",
+        "pages": [
+            "Before the dream takes you, you take stock of what kind of wizard you've become — not grades, not house "
+            "points. Three things decide whether a moment goes your way.\n\n"
+            f"**Assign {SKILL_POINTS_TOTAL} skill points.** Each point is a **+1** "
+            f"(max **+{SKILL_POINTS_MAX_PER}** in any one skill).\n\n"
+            "• **Attack** — monster fights and the city robbery\n"
+            "• **Wisdom** — notes, letters, dialog, noticing what matters\n"
+            "• **Stealth** — sneaking, eavesdropping, not getting caught\n\n"
+            "Checks are **d20 + your bonus** vs a DC. Spend all your points, then Continue."
+        ],
+        "mini": "assign_skills",
+        "goto": "dream",
     },
     "dream": {
         "art": "dream",
@@ -128,7 +191,7 @@ CH1_NODES: dict[str, dict] = {
             "her wait.\n\n"
             "You tried to catch up. Your legs wouldn't move.\n\n"
             "Something shifted in the dark between the trunks. It was the wrong shape to be the wind.\n\n"
-            "🎲 **Wisdom saving throw. DC 12.**\n"
+            "🎲 **Wisdom saving throw. DC 12.** *(d20 + your Wisdom)*\n"
             "*Do you see what it is before the dream lets go of you?*"
         ],
         "mini": "check_roll",
@@ -170,21 +233,21 @@ CH1_NODES: dict[str, dict] = {
             {
                 "id": "letter",
                 "label": "Reread Yuna's letter",
-                "check": {"skill": "Investigation", "dc": 12},
+                "check": {"skill": "Wisdom", "dc": 12},
                 "set": {"wake_choice": "letter"},
                 "goto": "wake_letter",
             },
             {
                 "id": "breakfast",
                 "label": "Go down to breakfast",
-                "check": {"skill": "Perception", "dc": 12},
+                "check": {"skill": "Wisdom", "dc": 12},
                 "set": {"wake_choice": "breakfast"},
                 "goto": "wake_breakfast",
             },
             {
                 "id": "write",
                 "label": "Write to her right now",
-                "check": {"skill": "Charisma", "dc": 12},
+                "check": {"skill": "Wisdom", "dc": 12},
                 "set": {"wake_choice": "write"},
                 "goto": "wake_write",
             },
@@ -317,7 +380,7 @@ CH1_NODES: dict[str, dict] = {
             {
                 "id": "ask",
                 "label": "Ask around properly",
-                "check": {"skill": "Persuasion", "dc": 12},
+                "check": {"skill": "Wisdom", "dc": 12},
                 "goto": "sebastian",
             },
             {"id": "go", "label": "Go straight to Sebastian", "goto": "sebastian"},
@@ -489,7 +552,7 @@ CH2_NODES: dict[str, dict] = {
             {
                 "id": "push",
                 "label": "Please, look again.",
-                "check": {"skill": "Persuasion", "dc": 12},
+                "check": {"skill": "Wisdom", "dc": 12},
                 "goto": "ask_library",
             },
             {"id": "thanks", "label": "Thank you anyway.", "goto": "ask_library"},

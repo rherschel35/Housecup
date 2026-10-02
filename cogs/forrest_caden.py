@@ -24,12 +24,18 @@ from discord import app_commands
 from discord.ext import commands
 
 from cogs.forrest_story_script import (
+    ABILITIES,
     ART,
     CITY_ESSENTIALS_2,
     CITY_ESSENTIALS_3,
     MATERIAL_LABELS,
     NODES,
     SCHOOL_MATERIALS,
+    SKILL_POINTS_MAX_PER,
+    SKILL_POINTS_TOTAL,
+    ability_mod,
+    default_abilities,
+    format_abilities,
     pronouns,
     render,
 )
@@ -74,6 +80,7 @@ def _default_save() -> dict:
         "chapter": 1,
         "flags": {},
         "protagonist": "mack",
+        "abilities": default_abilities(),
         "gus_with_party": True,
         "school_materials": [],
         "city_essentials": [],
@@ -140,7 +147,22 @@ class ForrestCaden(commands.Cog):
         key = str(user_id)
         if key not in players:
             players[key] = _default_save()
-        return players[key]
+        save = players[key]
+        # Older saves: migrate / fill the three-skill sheet.
+        if "abilities" not in save or not isinstance(save.get("abilities"), dict):
+            save["abilities"] = default_abilities()
+        else:
+            ab = save["abilities"]
+            # Legacy six-ability sheet → three skills.
+            if "atk" not in ab and any(k in ab for k in ("str", "dex", "int", "cha")):
+                save["abilities"] = {
+                    "atk": int(ab.get("str", 0) or 0),
+                    "wis": max(int(ab.get("wis", 0) or 0), int(ab.get("int", 0) or 0), int(ab.get("cha", 0) or 0)),
+                    "ste": int(ab.get("dex", 0) or 0),
+                }
+            for ab_key in (a[0] for a in ABILITIES):
+                save["abilities"].setdefault(ab_key, 0)
+        return save
 
     def write(self) -> None:
         _save(self.state)
@@ -200,6 +222,7 @@ class ForrestCaden(commands.Cog):
             f"**Node:** `{save.get('node')}` (page {save.get('page', 0)})",
             f"**Chapter:** {save.get('chapter', 1)}",
             f"**Protagonist:** {save.get('protagonist') or '—'}",
+            f"**Skills:** {format_abilities(save.get('abilities'))}",
             f"**Gus with party:** {save.get('gus_with_party', True)}",
             f"**School kit:** {', '.join(save.get('school_materials') or []) or '—'}",
             f"**City kit:** {', '.join(save.get('city_essentials') or []) or '—'}",
@@ -293,8 +316,7 @@ class StorySession:
             outcome = "You see only shadow, and the dark closing like a door."
         roll_line = ""
         if check.get("roll") is not None:
-            ok = "success" if check.get("ok") else "failure"
-            roll_line = f"\n\n*{check.get('skill', 'Wisdom')} {check['roll']} vs DC {check.get('dc', 12)} — {ok}.*"
+            roll_line = "\n\n" + self._format_check_result(check)
         pages = [
             outcome
             + roll_line
@@ -304,9 +326,12 @@ class StorySession:
 
     def _wake_letter_node(self) -> dict:
         check = (self.save.get("flags") or {}).get("last_check") or {}
-        roll = check.get("roll")
+        roll_bit = (
+            "\n\n" + self._format_check_result(check)
+            if check.get("roll") is not None
+            else ""
+        )
         ok = bool(check.get("ok"))
-        roll_bit = f"\n\n*Investigation {roll} vs DC 12 — {'success' if ok else 'failure'}.*" if roll else ""
         if ok:
             body = (
                 "You read it again, slower. The ink is Yuna's, but near the torn edge the paper is faintly warped, as if "
@@ -327,9 +352,12 @@ class StorySession:
 
     def _wake_breakfast_node(self) -> dict:
         check = (self.save.get("flags") or {}).get("last_check") or {}
-        roll = check.get("roll")
+        roll_bit = (
+            "\n\n" + self._format_check_result(check)
+            if check.get("roll") is not None
+            else ""
+        )
         ok = bool(check.get("ok"))
-        roll_bit = f"\n\n*Perception {roll} vs DC 12 — {'success' if ok else 'failure'}.*" if roll else ""
         if ok:
             body = (
                 "The house table is a storm of chatter and toast. You scan for Yuna out of habit — and notice something "
@@ -349,9 +377,12 @@ class StorySession:
 
     def _wake_write_node(self) -> dict:
         check = (self.save.get("flags") or {}).get("last_check") or {}
-        roll = check.get("roll")
+        roll_bit = (
+            "\n\n" + self._format_check_result(check)
+            if check.get("roll") is not None
+            else ""
+        )
         ok = bool(check.get("ok"))
-        roll_bit = f"\n\n*Charisma {roll} vs DC 12 — {'success' if ok else 'failure'}.*" if roll else ""
         if ok:
             body = (
                 "You write fast, too honest, ink blotting where your hand presses. *Where are you. I'm coming. Wait for "
@@ -561,10 +592,20 @@ class StorySession:
         await self._render(destination, edit=False)
 
     async def refresh(self, interaction: Optional[discord.Interaction] = None) -> None:
-        """Redraw current node. Prefer editing the interaction message; fall back to a new post."""
+        """Redraw current node on the existing public story message.
+
+        Always edits the component host message (or ``self.message``). Never
+        uses ``edit_original_response``, which can retarget an ephemeral reply
+        and wipe the player's progress when that reply is dismissed.
+        """
         try:
             if interaction is not None:
-                await self._render(interaction, edit=True)
+                host = interaction.message or self.message
+                if host is None:
+                    await self._render(self.channel, edit=False)
+                    return
+                self.message = host
+                await self._render_on_host(interaction, host)
             elif self.message is not None:
                 await self._render(self.message, edit=True)
             else:
@@ -575,6 +616,17 @@ class StorySession:
                 await self._render(self.channel, edit=False)
             except Exception:
                 log.exception("Forrest fallback send also failed")
+
+    async def _render_on_host(
+        self, interaction: discord.Interaction, host: discord.Message
+    ) -> None:
+        """Acknowledge the button and redraw ``host`` — never a 2nd/ephemeral post."""
+        if not interaction.response.is_done():
+            # Prefer atomic edit of the button's message (public).
+            await self._render(interaction, edit=True)
+            return
+        # Already acknowledged (e.g. deferred update) — edit the host Message object.
+        await self._render(host, edit=True)
 
     async def _render(self, destination, edit: bool) -> None:
         save = self.save
@@ -604,6 +656,12 @@ class StorySession:
             save["page"] = page_i
 
         text = flat[page_i]
+        # One-shot roll line from a check that advanced into this node (no 2nd Discord message).
+        flags = save.setdefault("flags", {})
+        roll_blurb = flags.pop("roll_blurb", None)
+        if roll_blurb:
+            text = f"{roll_blurb}\n\n{text}"
+            self.cog.write()
         # show empath only on last page of node when no more continue
         more_pages = page_i < len(flat) - 1
         empath = node.get("empath") if not more_pages else None
@@ -624,7 +682,8 @@ class StorySession:
 
         embed = discord.Embed(title=title, description=text[:4096], color=EMBED_COLOR)
         if save.get("protagonist"):
-            embed.set_footer(text="Mack · looking for Yuna")
+            skills = format_abilities(save.get("abilities"))
+            embed.set_footer(text=f"Mack · looking for Yuna · {skills}")
 
         file = None
         path = _art_path(art_key)
@@ -636,6 +695,8 @@ class StorySession:
         view: discord.ui.View
         if more_pages:
             view = ContinueView(self)
+        elif node.get("mini") == "assign_skills":
+            view = SkillAssignView(self, nxt=node.get("goto"))
         elif node.get("mini") == "check_roll":
             view = CheckRollView(self, node.get("check") or {}, node.get("goto"))
         elif node.get("mini") == "pick_materials":
@@ -667,12 +728,17 @@ class StorySession:
             kwargs["attachments"] = [file]
 
         if edit and isinstance(destination, discord.Interaction):
-            # Component/followup interactions: edit the original story message.
-            if destination.response.is_done():
-                self.message = await destination.edit_original_response(**kwargs)
-            else:
+            # Edit the component's public message only. Never edit_original_response
+            # (that can rewrite an ephemeral send_message and look like a 2nd post).
+            host = destination.message or self.message
+            if not destination.response.is_done():
                 await destination.response.edit_message(**kwargs)
-                self.message = destination.message
+                self.message = destination.message or host
+            elif host is not None:
+                self.message = await host.edit(**kwargs)
+            else:
+                # Slash-start / no host: public followup only (never ephemeral).
+                self.message = await destination.followup.send(**kwargs)
         elif edit and isinstance(destination, discord.Message):
             self.message = await destination.edit(**kwargs)
         elif edit and self.message:
@@ -705,25 +771,33 @@ class StorySession:
         if page_i < len(flat) - 1:
             self.save["page"] = page_i + 1
             self.cog.write()
-            await interaction.response.defer()
             await self.refresh(interaction)
             return
         # finished pages → goto or choices already shown; ContinueView with auto_goto
         nxt = auto_goto or node.get("goto")
         if nxt:
             await self._advance(nxt)
-            await interaction.response.defer()
             await self.refresh(interaction)
         else:
-            await interaction.response.defer()
+            if not interaction.response.is_done():
+                await interaction.response.defer()
 
     def _apply_check(self, check: dict) -> dict:
-        """Roll a d20 vs DC; store on flags['last_check']. Returns the result dict."""
+        """Roll d20 + ability mod vs DC; store on flags['last_check']."""
         skill = check.get("skill") or "Check"
         dc = int(check.get("dc") or 12)
-        roll = random.randint(1, 20)
-        ok = roll >= dc
-        result = {"skill": skill, "dc": dc, "roll": roll, "ok": ok}
+        mod = ability_mod(self.save.get("abilities"), skill)
+        d20 = random.randint(1, 20)
+        total = d20 + mod
+        ok = total >= dc
+        result = {
+            "skill": skill,
+            "dc": dc,
+            "d20": d20,
+            "mod": mod,
+            "roll": total,  # kept as total for older display paths
+            "ok": ok,
+        }
         flags = self.save.setdefault("flags", {})
         flags["last_check"] = result
         if check.get("success_flag") and ok:
@@ -732,6 +806,20 @@ class StorySession:
             flags.setdefault(check["success_flag"], False)
         self.cog.write()
         return result
+
+    @staticmethod
+    def _format_check_result(result: dict) -> str:
+        mod = int(result.get("mod") or 0)
+        d20 = result.get("d20")
+        total = result.get("roll")
+        if d20 is None:
+            d20 = total
+        sign = f"+{mod}" if mod >= 0 else str(mod)
+        ok = "success" if result.get("ok") else "failure"
+        return (
+            f"*{result.get('skill', 'Check')} {d20} {sign} = **{total}** "
+            f"vs DC {result.get('dc', 12)} — {ok}.*"
+        )
 
     async def pick_choice(self, interaction: discord.Interaction, choice: dict) -> None:
         if interaction.user.id != self.user_id:
@@ -746,18 +834,12 @@ class StorySession:
                 self.save.setdefault("flags", {})[k] = v
         if choice.get("check"):
             result = self._apply_check(choice["check"])
-            # Flavor-only checks that share a destination still whisper the roll.
-            if choice.get("goto") in ("sebastian", "ask_library"):
-                await interaction.response.send_message(
-                    f"*{result['skill']} {result['roll']} vs DC {result['dc']} — "
-                    f"{'success' if result['ok'] else 'failure'}.*",
-                    ephemeral=True,
-                )
-                await self._advance(choice.get("goto"))
-                await self.refresh(interaction)
-                return
+            # Keep the roll on the main story message — never a 2nd ephemeral post.
+            goto = choice.get("goto")
+            if goto in ("sebastian", "ask_library"):
+                self.save.setdefault("flags", {})["roll_blurb"] = self._format_check_result(result)
+            # wake_* / dream_bridge nodes already render last_check in their text
         await self._advance(choice.get("goto"))
-        await interaction.response.defer()
         await self.refresh(interaction)
 
 
@@ -770,6 +852,129 @@ class ContinueView(discord.ui.View):
     @discord.ui.button(label="Continue", style=discord.ButtonStyle.primary)
     async def cont(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.session.continue_page(interaction, auto_goto=self.auto_goto)
+
+
+class SkillAssignView(discord.ui.View):
+    """Spend SKILL_POINTS_TOTAL among Attack / Wisdom / Stealth, then Continue."""
+
+    def __init__(self, session: StorySession, nxt: Optional[str]):
+        super().__init__(timeout=600)
+        self.session = session
+        self.nxt = nxt
+        self._busy = False
+        # Working copy — saved only on confirm.
+        base = session.save.get("abilities") or default_abilities()
+        self.abilities = {k: int(base.get(k, 0) or 0) for k, _, _ in ABILITIES}
+        # If save already spent points (resume mid-assign), keep them; else start clean.
+        if sum(self.abilities.values()) != SKILL_POINTS_TOTAL:
+            self.abilities = default_abilities()
+        for key, label, _desc in ABILITIES:
+            self.add_item(SkillAbilityButton(self, key, label))
+        self.confirm_btn = SkillConfirmButton(self)
+        self.add_item(self.confirm_btn)
+        self._sync()
+
+    def _spent(self) -> int:
+        return sum(self.abilities.values())
+
+    def _sync(self) -> None:
+        spent = self._spent()
+        left = SKILL_POINTS_TOTAL - spent
+        for child in self.children:
+            if isinstance(child, SkillAbilityButton):
+                mod = self.abilities[child.key]
+                child.label = f"{child.ability_label} +{mod}"
+                child.style = (
+                    discord.ButtonStyle.success if mod > 0 else discord.ButtonStyle.secondary
+                )
+        ready = left == 0
+        self.confirm_btn.disabled = not ready
+        self.confirm_btn.style = (
+            discord.ButtonStyle.primary if ready else discord.ButtonStyle.secondary
+        )
+        self.confirm_btn.label = (
+            f"Continue ({spent}/{SKILL_POINTS_TOTAL})"
+            if not ready
+            else f"Continue with these ({spent})"
+        )
+
+    async def bump(self, interaction: discord.Interaction, key: str):
+        if interaction.user.id != self.session.user_id:
+            await interaction.response.send_message("This isn’t your story.", ephemeral=True)
+            return
+        if self._busy:
+            await interaction.response.send_message("One moment…", ephemeral=True)
+            return
+        cur = self.abilities[key]
+        # Tap cycles: add a point until max, then clear that ability back to 0.
+        if cur >= SKILL_POINTS_MAX_PER:
+            self.abilities[key] = 0
+        elif self._spent() >= SKILL_POINTS_TOTAL:
+            # No points left — clear this ability so they can reallocate.
+            if cur > 0:
+                self.abilities[key] = 0
+            else:
+                await interaction.response.send_message(
+                    f"All {SKILL_POINTS_TOTAL} points are spent — tap a green ability to free points.",
+                    ephemeral=True,
+                )
+                return
+        else:
+            self.abilities[key] = cur + 1
+        self._sync()
+        await interaction.response.edit_message(view=self)
+        self.session.message = interaction.message
+
+    async def confirm(self, interaction: discord.Interaction):
+        if interaction.user.id != self.session.user_id:
+            await interaction.response.send_message("This isn’t your story.", ephemeral=True)
+            return
+        if self._busy:
+            await interaction.response.send_message("One moment…", ephemeral=True)
+            return
+        if self._spent() != SKILL_POINTS_TOTAL:
+            await interaction.response.send_message(
+                f"Spend all {SKILL_POINTS_TOTAL} points, then Continue.",
+                ephemeral=True,
+            )
+            return
+        for key, mod in self.abilities.items():
+            if mod < 0 or mod > SKILL_POINTS_MAX_PER:
+                await interaction.response.send_message(
+                    f"Max +{SKILL_POINTS_MAX_PER} in any ability.",
+                    ephemeral=True,
+                )
+                return
+        self._busy = True
+        self.session.save["abilities"] = dict(self.abilities)
+        self.session.cog.write()
+        await self.session._advance(self.nxt)
+        await self.session.refresh(interaction)
+
+
+class SkillAbilityButton(discord.ui.Button):
+    def __init__(self, parent: SkillAssignView, key: str, label: str):
+        super().__init__(label=f"{label} +0", style=discord.ButtonStyle.secondary)
+        self.parent_view = parent
+        self.key = key
+        self.ability_label = label
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.parent_view.bump(interaction, self.key)
+
+
+class SkillConfirmButton(discord.ui.Button):
+    def __init__(self, parent: SkillAssignView):
+        super().__init__(
+            label=f"Continue (0/{SKILL_POINTS_TOTAL})",
+            style=discord.ButtonStyle.secondary,
+            disabled=True,
+            row=4,
+        )
+        self.parent_view = parent
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.parent_view.confirm(interaction)
 
 
 class CheckRollView(discord.ui.View):
@@ -787,12 +992,8 @@ class CheckRollView(discord.ui.View):
         if interaction.user.id != self.session.user_id:
             await interaction.response.send_message("This isn’t your story.", ephemeral=True)
             return
-        result = self.session._apply_check(self.check)
-        await interaction.response.send_message(
-            f"*{result['skill']} {result['roll']} vs DC {result['dc']} — "
-            f"{'success' if result['ok'] else 'failure'}.*",
-            ephemeral=True,
-        )
+        # Edit the same public story message in place — never a 2nd/ephemeral post.
+        self.session._apply_check(self.check)
         if self.nxt:
             await self.session._advance(self.nxt)
         await self.session.refresh(interaction)
@@ -898,7 +1099,6 @@ class MaterialPickView(discord.ui.View):
         self.session.save[self.flag_key] = list(self.picked)
         self.session.cog.write()
         await self.session._advance(self.nxt)
-        await interaction.response.defer()
         await self.session.refresh(interaction)
 
 
@@ -976,16 +1176,33 @@ class SneakView(discord.ui.View):
         save["sneak_round"] = r + 1
         self.session.cog.write()
         if save["sneak_round"] >= 3:
-            caught = save.get("sneak_score", 0) < 2
+            # Stealth bonus counts as free progress toward escaping.
+            ste = ability_mod(save.get("abilities"), "Stealth")
+            effective = save.get("sneak_score", 0) + ste
+            caught = effective < 2
             save["gus_with_party"] = not caught
             save.setdefault("flags", {})["sneak_caught"] = caught
+            save.setdefault("flags", {})["sneak_stealth"] = ste
             await self.session._advance("sneak_done")
-            await interaction.response.defer()
             await self.session.refresh(interaction)
         else:
-            await interaction.response.send_message(
-                f"Round {r + 1}: {tip} ({save['sneak_round']}/3)", ephemeral=True
+            # Edit the same story message so progress isn't wiped by a 2nd post.
+            await interaction.response.edit_message(
+                content=None,
+                embed=discord.Embed(
+                    title="The Forrest of Caden — Chapter 1",
+                    description=(
+                        f"**Sneak past Mordy** — round {save['sneak_round']}/3\n\n"
+                        f"{tip}\n\n"
+                        f"*Score {save.get('sneak_score', 0)} clear so far"
+                        f" · Stealth +{ability_mod(save.get('abilities'), 'Stealth')}*"
+                    ),
+                    color=EMBED_COLOR,
+                ),
+                view=self,
+                attachments=[],
             )
+            self.session.message = interaction.message
 
 
 class FightView(discord.ui.View):
@@ -994,8 +1211,9 @@ class FightView(discord.ui.View):
         self.session = session
         hard = not session.save.get("gus_with_party", True)
         self.hard = hard
-        self.hp = 3 if hard else 4
-        self.enemy = 4 if hard else 3
+        self.attack = ability_mod(session.save.get("abilities"), "Attack")
+        self.hp = (3 if hard else 4) + self.attack
+        self.enemy = max(1, (4 if hard else 3) - (1 if self.attack >= 2 else 0))
 
     @discord.ui.button(label="Strike", style=discord.ButtonStyle.danger)
     async def strike(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1013,17 +1231,17 @@ class FightView(discord.ui.View):
         if interaction.user.id != self.session.user_id:
             await interaction.response.send_message("This isn’t your story.", ephemeral=True)
             return
-        # simple resolution
+        bonus = self.attack
         if action == "strike":
-            self.enemy -= 2 if self.session.save.get("gus_with_party", True) else 1
+            self.enemy -= (2 if self.session.save.get("gus_with_party", True) else 1) + bonus
             self.hp -= 1
             line = "You hit back with a jinx. They snarl and answer."
         elif action == "guard":
-            self.enemy -= 1
+            self.enemy -= 1 + (1 if bonus >= 2 else 0)
             self.hp -= 0 if random.random() < 0.5 else 1
             line = "You take the hit meant for Ella. The world narrows to wand-light and breath."
         else:
-            self.enemy -= 1
+            self.enemy -= 1 + (1 if bonus >= 1 else 0)
             self.hp -= 1 if self.hard else 0
             line = "You break away and run — bags swinging, teeth gritted."
 
@@ -1031,8 +1249,7 @@ class FightView(discord.ui.View):
             self.session.save.setdefault("flags", {})["city_fight"] = "won"
             self.session.save.setdefault("flags", {})["fight_hard"] = self.hard
             await self.session._advance("city_essentials")
-            await interaction.response.defer()
-            await self.session.refresh()
+            await self.session.refresh(interaction)
             return
         if self.hp <= 0:
             # lose items flavor but continue
@@ -1043,15 +1260,26 @@ class FightView(discord.ui.View):
                 self.session.save.setdefault("flags", {})["lost_item"] = lost
             self.session.save.setdefault("flags", {})["city_fight"] = "barely"
             await self.session._advance("city_essentials")
-            await interaction.response.defer()
-            await self.session.refresh()
+            await self.session.refresh(interaction)
             return
 
-        await interaction.response.send_message(
-            f"{line}\n*You {self.hp} · Them {self.enemy}*"
-            + (" · (harder without Gus)" if self.hard else " · (easier with three)"),
-            ephemeral=True,
+        atk_note = f" · Attack +{bonus}" if bonus else ""
+        await interaction.response.edit_message(
+            content=None,
+            embed=discord.Embed(
+                title="The Forrest of Caden — Chapter 1",
+                description=(
+                    f"{line}\n\n"
+                    f"*You {self.hp} · Them {self.enemy}*"
+                    + (" · (harder without Gus)" if self.hard else " · (easier with three)")
+                    + atk_note
+                ),
+                color=EMBED_COLOR,
+            ),
+            view=self,
+            attachments=[],
         )
+        self.session.message = interaction.message
 
 
 async def setup(bot: commands.Bot):
