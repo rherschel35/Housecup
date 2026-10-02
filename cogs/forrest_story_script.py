@@ -16,6 +16,8 @@ ART = {
     "gus_talk": "gus_hallway.jpg",
     "sebastian": "sebastian_talk.jpg",
     "party": "party_table.jpg",
+    "materials": "materials_pack.jpg",
+    "missing_seat": "empty_seat.jpg",
     "sneak": "mordy_sneak.jpg",
     "city_fight": "city_fight.jpg",
     "train": "train_trio.jpg",
@@ -23,6 +25,7 @@ ART = {
     "train_hand": "train_mack_ella.jpg",
     "caden": None,
     "alley": None,
+    "cave_tip": "cave_tip_kid.jpg",
     "inn": "gus.jpg",
     "edge": None,
     "mack": "mack.jpg",
@@ -187,7 +190,7 @@ CH1_NODES: dict[str, dict] = {
         "goto": "missing",
     },
     "missing": {
-        "art": "yuna",
+        "art": "missing_seat",
         "pages": [
             "Morning fills the school the way it always does first day back — trunks scraping, owls, somebody already "
             "late for a class that hasn’t started, the green of Thornmere scarves flashing like it’s a competition.\n\n"
@@ -270,7 +273,7 @@ CH1_NODES: dict[str, dict] = {
         "goto": "materials",
     },
     "materials": {
-        "art": "party",
+        "art": "materials",
         "pages": [
             "Packing feels like pretending this is a weekend trip. It isn’t. Your hands know that even when your mouth "
             "makes light of it.\n\n"
@@ -412,7 +415,7 @@ CH2_NODES: dict[str, dict] = {
         ],
     },
     "alley_chase": {
-        "art": "alley",
+        "art": "cave_tip",
         "pages": [
             "You run. Ella swears behind you. The kid is fast and then cornered and then talking too quick, hands up.\n\n"
             "**Kid:** “I didn’t take nothing — listen — if you’re going in the green, don’t sleep in the cave. People "
