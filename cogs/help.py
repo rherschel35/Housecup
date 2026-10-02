@@ -133,9 +133,10 @@ HELP = {
         "title": "Beasts",
         "staff": False,
         "note": ("A few times a day a beast wanders into the explore channel and says what it wants. "
-                 "First to bring it befriends it. 70 to find — including Nifflers — some only after dark."),
+                 "First to `/approach` gets 60 seconds alone; then anyone can try. "
+                 "70 to find — including Nifflers — some only after dark."),
         "entries": [
-            ("approach", "Befriend the beast that's here, if you have what it wants."),
+            ("approach", "Befriend the beast that's here (first approach gets 60s exclusive)."),
             ("bestiary", "Every beast you've befriended - and the ones still out there."),
             ("summon", "Call one of your beasts to show off. Just for fun."),
             ("study", "Study a befriended beast (once a day). Three pages = 5 house points once."),
