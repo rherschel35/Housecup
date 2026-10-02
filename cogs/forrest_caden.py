@@ -241,6 +241,8 @@ class StorySession:
         # dynamic pages
         if nid == "sneak_done":
             return self._sneak_done_node()
+        if nid == "city_arrive":
+            return self._city_arrive_node()
         if nid == "train":
             return self._train_node()
         if nid == "gus_ella_talk":
@@ -248,6 +250,36 @@ class StorySession:
         if nid == "morning":
             return self._morning_node()
         return node
+
+    def _city_arrive_node(self) -> dict:
+        """Robbery beat: show Gus in frame when he escaped school with you."""
+        with_gus = self.save.get("gus_with_party", True)
+        if with_gus:
+            pages = [
+                "The city doesn’t care that you’re fifth-years with a noble reason. It cares that you’re young, loaded with "
+                "bags, and looking the wrong way at the wrong corner.\n\n"
+                "A hooded figure steps out of the dark like they practiced it — phone up, voice flat, no face to read.\n\n"
+                "**Robber:** “Bags. Quiet. Nobody has to get clever.”\n\n"
+                "You put yourself in front of Ella. She’s already clutching her bag like it’s the only solid thing left. "
+                "Gus is right there with you — glasses crooked, hands half-raised, making a sound that is definitely not a joke."
+            ]
+            art = "city_fight_trio"
+        else:
+            pages = [
+                "The city doesn’t care that you’re fifth-years with a noble reason. It cares that you’re young, loaded with "
+                "bags, and looking the wrong way at the wrong corner.\n\n"
+                "A hooded figure steps out of the dark like they practiced it — phone up, voice flat, no face to read.\n\n"
+                "**Robber:** “Bags. Quiet. Nobody has to get clever.”\n\n"
+                "You put yourself in front of Ella. She’s already clutching her bag like it’s the only solid thing left. "
+                "Gus isn’t here — still back at the castle — and the empty space beside you feels like another threat."
+            ]
+            art = "city_fight_duo"
+        return {
+            "art": art,
+            "pages": pages,
+            "mini": "city_fight",
+            "goto": "city_essentials",
+        }
 
     def _sneak_done_node(self) -> dict:
         if self.save.get("gus_with_party", True):

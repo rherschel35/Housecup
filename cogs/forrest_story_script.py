@@ -20,6 +20,8 @@ ART = {
     "missing_seat": "empty_seat.jpg",
     "sneak": "mordy_sneak.jpg",
     "city_fight": "city_fight.jpg",
+    "city_fight_trio": "city_fight_trio.jpg",
+    "city_fight_duo": "city_fight.jpg",
     "train": "train_trio.jpg",
     "train_trio": "train_trio.jpg",
     "train_hand": "train_mack_ella.jpg",
@@ -304,14 +306,7 @@ CH1_NODES: dict[str, dict] = {
     },
     "city_arrive": {
         "art": "city_fight",
-        "pages": [
-            "The city doesn’t care that you’re fifth-years with a noble reason. It cares that you’re young, loaded with "
-            "bags, and looking the wrong way at the wrong corner.\n\n"
-            "A hooded figure steps out of the dark like they practiced it — phone up, voice flat, no face to read.\n\n"
-            "**Robber:** “Bags. Quiet. Nobody has to get clever.”\n\n"
-            "You put yourself in front of Ella. She’s already clutching her bag like it’s the only solid thing left. "
-            "Gus — if he’s still with you — is somewhere just out of the light, making a sound that is definitely not a joke."
-        ],
+        "pages": [],  # dynamic: trio art if Gus made it out, duo if not
         "mini": "city_fight",
         "goto": "city_essentials",
     },
