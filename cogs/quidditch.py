@@ -63,6 +63,21 @@ def house_name(key: str | None) -> str:
     meta = STORE_HOUSES.get(key)
     return meta["name"] if meta else key.title()
 
+
+def normalize_house(value: str | None) -> str | None:
+    """Accept store keys or display names; always return a store key."""
+    if not value:
+        return None
+    if value in STORE_HOUSES:
+        return value
+    lowered = value.lower()
+    if lowered in STORE_HOUSES:
+        return lowered
+    for key, meta in STORE_HOUSES.items():
+        if meta["name"].lower() == lowered:
+            return key
+    return None
+
 ROUNDS = 5
 ROUND_TIMEOUT = 60   # seconds before a stalled round auto-resolves (non-responders just do nothing)
 SIGNUP_TIMEOUT = 60  # seconds a match request waits for players before it expires
