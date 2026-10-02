@@ -30,6 +30,8 @@ ART = {
     "inn": "inn_gus_mack.jpg",
     "edge": "forrest_edge.jpg",
     "mack": "mack.jpg",
+    "ask_shops": "ask_shops.jpg",
+    "ask_food": "ask_food.jpg",
     "yuna": "yuna.jpg",
     "ella": "ella.jpg",
     "gus": "gus.jpg",
@@ -82,6 +84,71 @@ CHECK_ABILITY = {
     "Charisma": "wis",
     "Persuasion": "wis",
 }
+
+# Timed Attack mini-game: enemy casts a hex; pick the correct counter before it lands.
+# Window: 5s alone / 10s with Gus. Options: 4 at Attack +0, 3 at +1, 2 at +2.
+HEX_SECONDS_SOLO = 5
+HEX_SECONDS_WITH_GUS = 10
+HEX_OPTION_BASE = 4  # Attack +0
+HEX_ROUNDS_TO_WIN = 2
+HEX_ROUNDS_MAX = 3
+HEX_PAIRS = [
+    {
+        "hex": "Stinging Hex",
+        "counter": "Protego",
+        "hit": "Needles of light stitch into your arm before you can finish the counter.",
+        "block": "Your shield catches the sting and sheds it as sparks.",
+    },
+    {
+        "hex": "Leg-Locker",
+        "counter": "Finite",
+        "hit": "Your legs snap together; cobbles rush up to meet you.",
+        "block": "Finite cracks the lock — you stumble, free.",
+    },
+    {
+        "hex": "Disarming Hex",
+        "counter": "Expelliarmus",
+        "hit": "Your wand wrenches free; you snatch it back a heartbeat too late.",
+        "block": "You throw their disarm back. Their wand jumps; they swear.",
+    },
+    {
+        "hex": "Bind Hex",
+        "counter": "Relashio",
+        "hit": "Invisible rope cinches your wrists and yanks you off balance.",
+        "block": "Relashio blows the binding apart in a hot snap.",
+    },
+    {
+        "hex": "Knockback Hex",
+        "counter": "Arresto",
+        "hit": "The blast throws you into a crate. Breath gone.",
+        "block": "Arresto kills the force a foot from your chest.",
+    },
+    {
+        "hex": "Blinding Sparks",
+        "counter": "Protego",
+        "hit": "White fire claws across your eyes. The street vanishes.",
+        "block": "Sparks sheet off your shield and die on the stones.",
+    },
+]
+HEX_SPELL_POOL = sorted(
+    {
+        *(p["counter"] for p in HEX_PAIRS),
+        "Stupefy",
+        "Lumos",
+        "Accio",
+        "Wingardium",
+        "Rictusempra",
+    }
+)
+
+
+def hex_option_count(attack_mod: int) -> int:
+    """Fewer wrong answers as Attack rises: +0→4, +1→3, +2→2."""
+    return max(2, HEX_OPTION_BASE - max(0, int(attack_mod or 0)))
+
+
+def hex_seconds(gus_with_party: bool) -> int:
+    return HEX_SECONDS_WITH_GUS if gus_with_party else HEX_SECONDS_SOLO
 
 
 def default_abilities() -> dict[str, int]:
@@ -495,11 +562,7 @@ CH1_NODES: dict[str, dict] = {
     },
     "city_essentials": {
         "art": "materials",
-        "pages": [
-            "Afterwards your hands are shaking, and you pretend it's the cold. One late market stall still has its "
-            "lantern lit. You buy what you can carry before the last train toward Caden.\n\n"
-            "**Choose essentials** for the road. More options if Gus made it out with you."
-        ],
+        "pages": [],  # dynamic recap after the hex fight
         "mini": "pick_essentials",
         "goto": "train",
     },
@@ -541,7 +604,7 @@ CH2_NODES: dict[str, dict] = {
         "goto": "ask_shops",
     },
     "ask_shops": {
-        "art": "caden",
+        "art": "ask_shops",
         "pages": [
             "The baker shakes her head before you've finished the question. The cobbler remembers a girl last week, but "
             "it wasn't {missing}. A shopkeeper with kind, crinkled eyes says students go into the Forrest every year, "
@@ -572,7 +635,7 @@ CH2_NODES: dict[str, dict] = {
         ],
     },
     "ask_food": {
-        "art": "caden",
+        "art": "ask_food",
         "pages": [
             "A tavern by the water feeds you something fried and asks no questions until the plates are empty. Then the "
             "landlady wipes her hands on her apron and says, softly, that if someone wanted to disappear before term, "

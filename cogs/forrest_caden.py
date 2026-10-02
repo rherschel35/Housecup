@@ -12,6 +12,7 @@ No house points. Owner-locked buttons. Art from story_art_assets/.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -28,6 +29,10 @@ from cogs.forrest_story_script import (
     ART,
     CITY_ESSENTIALS_2,
     CITY_ESSENTIALS_3,
+    HEX_PAIRS,
+    HEX_ROUNDS_MAX,
+    HEX_ROUNDS_TO_WIN,
+    HEX_SPELL_POOL,
     MATERIAL_LABELS,
     NODES,
     SCHOOL_MATERIALS,
@@ -36,6 +41,8 @@ from cogs.forrest_story_script import (
     ability_mod,
     default_abilities,
     format_abilities,
+    hex_option_count,
+    hex_seconds,
     pronouns,
     render,
 )
@@ -274,6 +281,8 @@ class StorySession:
             return self._sneak_done_node()
         if nid == "city_arrive":
             return self._city_arrive_node()
+        if nid == "city_essentials":
+            return self._city_essentials_node()
         if nid == "train":
             return self._train_node()
         if nid == "ch2_arrive":
@@ -404,8 +413,18 @@ class StorySession:
 
     def _city_arrive_node(self) -> dict:
         with_gus = self.save.get("gus_with_party", True)
+        atk = ability_mod(self.save.get("abilities"), "Attack")
+        opts = hex_option_count(atk)
+        secs = hex_seconds(with_gus)
+        tip = (
+            f"🎲 **Attack — counter the hex.** They cast; you have **{secs} seconds** to pick the right spell "
+            f"({'Gus buys you time' if with_gus else 'alone — move fast'}). "
+            f"**{opts}** choices"
+            + (f" (Attack +{atk} thins the wrong answers)" if atk else " (raise Attack to see fewer fakes)")
+            + f". First to **{HEX_ROUNDS_TO_WIN}** clean counters wins."
+        )
         if with_gus:
-            pages = [
+            setup = (
                 "The city doesn't care that you're fifth-years with a noble reason. It cares that you're young, weighed "
                 "down with bags, and looking the wrong way on the wrong corner.\n\n"
                 "A hooded figure steps out of the dark as if they rehearsed it: wand already raised, voice flat, no face "
@@ -414,10 +433,10 @@ class StorySession:
                 "You put yourself in front of Ella. She's clutching her bag as if it's the only solid thing left in the "
                 "world. Gus is right beside you, glasses crooked, hands half raised, making a noise that is definitely "
                 "not a joke."
-            ]
+            )
             art = "city_fight_trio"
         else:
-            pages = [
+            setup = (
                 "The city doesn't care that you're fifth-years with a noble reason. It cares that you're young, weighed "
                 "down with bags, and looking the wrong way on the wrong corner.\n\n"
                 "A hooded figure steps out of the dark as if they rehearsed it: wand already raised, voice flat, no face "
@@ -425,13 +444,81 @@ class StorySession:
                 '**Thief:** "Bags. Quietly. Nobody needs to get clever."\n\n'
                 "You put yourself in front of Ella. She's clutching her bag as if it's the only solid thing left in the "
                 "world. Gus isn't here; he's still back at the castle. The empty space beside you feels like one more threat."
-            ]
+            )
             art = "city_fight_duo"
+        # Page 0 = read the ambush; page 1 (last) attaches HexCounterView and starts the timer.
+        pages = [setup, tip + "\n\nTheir wand tip brightens — counters incoming."]
         return {
             "art": art,
             "pages": pages,
             "mini": "city_fight",
             "goto": "city_essentials",
+        }
+
+    def _city_essentials_node(self) -> dict:
+        """Recap the robbery before the stall — not just 'fought, now shop'."""
+        flags = self.save.setdefault("flags", {})
+        outcome = flags.get("city_fight") or "won"
+        with_gus = self.save.get("gus_with_party", True)
+        hits = int(flags.get("hex_hits") or 0)
+        blocks = int(flags.get("hex_blocks") or 0)
+        lost = flags.get("lost_item")
+        lost_label = MATERIAL_LABELS.get(lost, lost) if lost else None
+
+        if outcome == "won":
+            if with_gus:
+                fight = (
+                    f"The last hex dies on your shield. The thief bolts — boots skidding, hood flapping — and the "
+                    f"alley swallows them. Gus whoops once, then winces like he didn't mean to be loud. Ella is still "
+                    f"holding her bag in both hands, knuckles white, breathing like she forgot how until just now.\n\n"
+                    f"You counted it without meaning to: **{blocks}** hexes turned, **{hits}** that kissed you on the way past. "
+                    f"Nobody's bleeding badly. Your hands disagree — they're shaking, and you pretend it's the cold."
+                )
+            else:
+                fight = (
+                    f"The last hex dies on your shield. The thief bolts into the dark. Without Gus, the quiet afterward "
+                    f"is too big — just you, Ella, and the echo of someone else's wand-work.\n\n"
+                    f"**{blocks}** counters. **{hits}** hits you didn't want. Ella's bag is still yours to protect. "
+                    f"Your hands are shaking; you pretend it's the cold."
+                )
+        else:
+            if with_gus:
+                fight = (
+                    f"You don't win clean. A hex lands hard enough that the world tips; Gus hauls you sideways while "
+                    f"Ella swears in a language that isn't for classrooms. The thief takes what they can grab and runs — "
+                    f"not everything, but enough to feel like a lesson.\n\n"
+                    f"**{blocks}** spells you caught. **{hits}** that caught you."
+                    + (
+                        f" Something from the school pack is gone — **{lost_label}** — vanished with the hood."
+                        if lost_label
+                        else " Your pride is lighter than your bag."
+                    )
+                    + " Afterwards your hands shake, and you stop pretending it's only the cold."
+                )
+            else:
+                fight = (
+                    f"You don't win clean. Without Gus, there's no one to yank you out of the worst of it. Ella pulls "
+                    f"you into the lantern light of a late stall while the thief's footsteps fade.\n\n"
+                    f"**{blocks}** counters. **{hits}** hits."
+                    + (
+                        f" You're missing **{lost_label}** from the school pack."
+                        if lost_label
+                        else ""
+                    )
+                    + " Your hands won't stay still."
+                )
+
+        stall = (
+            "\n\nOne market stall still has its lantern lit — oil, wool, a knife that looks like it has opinions. "
+            "The last train toward Caden won't wait on your nerves.\n\n"
+            "**Choose essentials** for the road."
+            + (" More options with Gus here." if with_gus else " Travel light — Gus isn't with you yet.")
+        )
+        return {
+            "art": "materials",
+            "pages": [fight + stall],
+            "mini": "pick_essentials",
+            "goto": "train",
         }
 
     def _sneak_done_node(self) -> dict:
@@ -708,7 +795,7 @@ class StorySession:
         elif node.get("mini") == "sneak":
             view = SneakView(self)
         elif node.get("mini") == "city_fight":
-            view = FightView(self)
+            view = HexCounterView(self)
         elif node.get("choices"):
             view = ChoiceView(self, node["choices"])
         elif node.get("end"):
@@ -747,6 +834,10 @@ class StorySession:
             # followup or channel
             send = destination.send if hasattr(destination, "send") else destination
             self.message = await send(**kwargs)
+
+        # Timed Attack mini-game: start the first hex window on the live message.
+        if isinstance(view, HexCounterView) and self.message is not None:
+            await view.begin(self.message)
 
     async def _advance(self, goto: Optional[str]) -> None:
         if not goto:
@@ -1205,81 +1296,189 @@ class SneakView(discord.ui.View):
             self.session.message = interaction.message
 
 
-class FightView(discord.ui.View):
+class HexCounterView(discord.ui.View):
+    """Attack mini-game: counter a hex before the timer. Reused for all Attack fights."""
+
     def __init__(self, session: StorySession):
-        super().__init__(timeout=600)
+        super().__init__(timeout=120)
         self.session = session
-        hard = not session.save.get("gus_with_party", True)
-        self.hard = hard
+        self.with_gus = bool(session.save.get("gus_with_party", True))
         self.attack = ability_mod(session.save.get("abilities"), "Attack")
-        self.hp = (3 if hard else 4) + self.attack
-        self.enemy = max(1, (4 if hard else 3) - (1 if self.attack >= 2 else 0))
+        self.seconds = hex_seconds(self.with_gus)
+        self.n_options = hex_option_count(self.attack)
+        self.blocks = 0
+        self.hits = 0
+        self.round_i = 0
+        self.current: Optional[dict] = None
+        self.correct: Optional[str] = None
+        self._task: Optional[asyncio.Task] = None
+        self._lock = asyncio.Lock()
+        self._round_open = False
+        self._started = False
+        self._finished = False
+        self.message: Optional[discord.Message] = None
+        # Placeholder until begin() builds the first hex row.
+        self.add_item(
+            discord.ui.Button(
+                label="Brace…",
+                style=discord.ButtonStyle.secondary,
+                disabled=True,
+            )
+        )
 
-    @discord.ui.button(label="Strike", style=discord.ButtonStyle.danger)
-    async def strike(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self._round(interaction, "strike")
+    async def begin(self, message: discord.Message) -> None:
+        if self._started or self._finished:
+            return
+        self._started = True
+        self.message = message
+        self.session.message = message
+        await self._start_round()
 
-    @discord.ui.button(label="Guard Ella", style=discord.ButtonStyle.primary)
-    async def guard(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self._round(interaction, "guard")
+    def _cancel_timer(self) -> None:
+        task = self._task
+        self._task = None
+        if task and not task.done():
+            task.cancel()
 
-    @discord.ui.button(label="Shove past", style=discord.ButtonStyle.secondary)
-    async def shove(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self._round(interaction, "shove")
+    async def _start_round(self) -> None:
+        if self._finished:
+            return
+        self.round_i += 1
+        pair = random.choice(HEX_PAIRS)
+        self.current = pair
+        self.correct = pair["counter"]
+        wrongs = [s for s in HEX_SPELL_POOL if s != self.correct]
+        opts = [self.correct] + random.sample(wrongs, max(0, self.n_options - 1))
+        random.shuffle(opts)
 
-    async def _round(self, interaction: discord.Interaction, action: str):
+        self.clear_items()
+        for spell in opts:
+            self.add_item(HexSpellButton(self, spell))
+
+        self._round_open = True
+        await self._paint(
+            (
+                f"**Hex incoming — round {self.round_i}/{HEX_ROUNDS_MAX}**\n\n"
+                f"The thief snaps **{pair['hex']}** at you.\n\n"
+                f"Counter it. **{self.seconds} seconds.**\n"
+                f"*{self.n_options} spells"
+                + (f" · Attack +{self.attack}" if self.attack else "")
+                + (" · Gus steadies your aim" if self.with_gus else " · no Gus — faster")
+                + f" · score {self.blocks}–{self.hits}*"
+            )
+        )
+        self._cancel_timer()
+        self._task = asyncio.create_task(self._watchdog())
+
+    async def _watchdog(self) -> None:
+        try:
+            await asyncio.sleep(self.seconds)
+        except asyncio.CancelledError:
+            return
+        async with self._lock:
+            if not self._round_open or self._finished:
+                return
+            self._round_open = False
+            await self._resolve(None)
+
+    async def pick(self, interaction: discord.Interaction, spell: str) -> None:
         if interaction.user.id != self.session.user_id:
             await interaction.response.send_message("This isn’t your story.", ephemeral=True)
             return
-        bonus = self.attack
-        if action == "strike":
-            self.enemy -= (2 if self.session.save.get("gus_with_party", True) else 1) + bonus
-            self.hp -= 1
-            line = "You hit back with a jinx. They snarl and answer."
-        elif action == "guard":
-            self.enemy -= 1 + (1 if bonus >= 2 else 0)
-            self.hp -= 0 if random.random() < 0.5 else 1
-            line = "You take the hit meant for Ella. The world narrows to wand-light and breath."
-        else:
-            self.enemy -= 1 + (1 if bonus >= 1 else 0)
-            self.hp -= 1 if self.hard else 0
-            line = "You break away and run — bags swinging, teeth gritted."
+        async with self._lock:
+            if not self._round_open or self._finished:
+                if not interaction.response.is_done():
+                    await interaction.response.defer()
+                return
+            self._round_open = False
+            self._cancel_timer()
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+            await self._resolve(spell)
 
-        if self.enemy <= 0:
-            self.session.save.setdefault("flags", {})["city_fight"] = "won"
-            self.session.save.setdefault("flags", {})["fight_hard"] = self.hard
-            await self.session._advance("city_essentials")
-            await self.session.refresh(interaction)
+    async def _resolve(self, spell: Optional[str]) -> None:
+        pair = self.current or {}
+        ok = spell is not None and spell == self.correct
+        if ok:
+            self.blocks += 1
+            line = pair.get("block") or "You turn it."
+            result = f"✅ **{self.correct}** — {line}"
+        else:
+            self.hits += 1
+            if spell is None:
+                result = f"⏱ Too slow. **{pair.get('hex', 'The hex')}** lands. {pair.get('hit', '')}"
+            else:
+                result = (
+                    f"❌ **{spell}** misses the counter. "
+                    f"**{pair.get('hex', 'The hex')}** hits. {pair.get('hit', '')}"
+                )
+
+        won = self.blocks >= HEX_ROUNDS_TO_WIN
+        lost = self.hits >= HEX_ROUNDS_TO_WIN
+        done_rounds = self.round_i >= HEX_ROUNDS_MAX
+        if won or lost or done_rounds:
+            await self._finish(won=(self.blocks > self.hits) or won, bridge=result)
             return
-        if self.hp <= 0:
-            # lose items flavor but continue
+
+        await self._paint(
+            f"{result}\n\n*Breath. Next hex… ({self.blocks}–{self.hits})*"
+        )
+        await asyncio.sleep(1.1)
+        await self._start_round()
+
+    async def _finish(self, *, won: bool, bridge: str) -> None:
+        self._finished = True
+        self._round_open = False
+        self._cancel_timer()
+        self.clear_items()
+        flags = self.session.save.setdefault("flags", {})
+        flags["hex_blocks"] = self.blocks
+        flags["hex_hits"] = self.hits
+        flags["fight_hard"] = not self.with_gus
+        if won:
+            flags["city_fight"] = "won"
+        else:
+            flags["city_fight"] = "barely"
             mats = self.session.save.get("school_materials") or []
             if mats:
-                lost = mats.pop(0)
+                lost_item = mats.pop(0)
                 self.session.save["school_materials"] = mats
-                self.session.save.setdefault("flags", {})["lost_item"] = lost
-            self.session.save.setdefault("flags", {})["city_fight"] = "barely"
-            await self.session._advance("city_essentials")
-            await self.session.refresh(interaction)
-            return
+                flags["lost_item"] = lost_item
+        self.session.cog.write()
+        await self.session._advance("city_essentials")
+        # Redraw essentials on the same public message (no interaction token here).
+        try:
+            await self.session.refresh(None)
+        except Exception:
+            log.exception("Hex fight finish refresh failed")
 
-        atk_note = f" · Attack +{bonus}" if bonus else ""
-        await interaction.response.edit_message(
-            content=None,
-            embed=discord.Embed(
-                title="The Forrest of Caden — Chapter 1",
-                description=(
-                    f"{line}\n\n"
-                    f"*You {self.hp} · Them {self.enemy}*"
-                    + (" · (harder without Gus)" if self.hard else " · (easier with three)")
-                    + atk_note
-                ),
-                color=EMBED_COLOR,
-            ),
-            view=self,
-            attachments=[],
+    async def _paint(self, description: str) -> None:
+        if self.message is None:
+            return
+        embed = discord.Embed(
+            title="The Forrest of Caden — Chapter 1",
+            description=description[:4096],
+            color=EMBED_COLOR,
         )
-        self.session.message = interaction.message
+        skills = format_abilities(self.session.save.get("abilities"))
+        embed.set_footer(text=f"Mack · looking for Yuna · {skills}")
+        try:
+            self.message = await self.message.edit(
+                content=None, embed=embed, view=self, attachments=[]
+            )
+            self.session.message = self.message
+        except Exception:
+            log.exception("HexCounterView paint failed")
+
+
+class HexSpellButton(discord.ui.Button):
+    def __init__(self, parent: HexCounterView, spell: str):
+        super().__init__(label=spell[:80], style=discord.ButtonStyle.primary)
+        self.parent_view = parent
+        self.spell = spell
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.parent_view.pick(interaction, self.spell)
 
 
 async def setup(bot: commands.Bot):
