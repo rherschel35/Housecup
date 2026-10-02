@@ -60,6 +60,59 @@ CITY_ESSENTIALS_2 = [
 
 MATERIAL_LABELS = {k: label for k, label, _ in SCHOOL_MATERIALS + CITY_ESSENTIALS_3}
 
+# Ability scores for d20 checks. Points spent = modifier (base +0).
+ABILITIES = [
+    ("str", "Strength", "Shoves, climbs, hard hits."),
+    ("dex", "Dexterity", "Stealth, reflexes, quick hands."),
+    ("con", "Constitution", "Endurance when things go wrong."),
+    ("int", "Intelligence", "Investigation, maps, noticing details."),
+    ("wis", "Wisdom", "Perception, gut feeling, dream-sense."),
+    ("cha", "Charisma", "Persuasion, owls, talking your way through."),
+]
+ABILITY_KEYS = [a[0] for a in ABILITIES]
+ABILITY_LABELS = {k: label for k, label, _ in ABILITIES}
+SKILL_POINTS_TOTAL = 4
+SKILL_POINTS_MAX_PER = 2
+
+# Story check skill name → ability key used for the modifier.
+CHECK_ABILITY = {
+    "Strength": "str",
+    "Dexterity": "dex",
+    "Constitution": "con",
+    "Intelligence": "int",
+    "Wisdom": "wis",
+    "Charisma": "cha",
+    "Investigation": "int",
+    "Perception": "wis",
+    "Persuasion": "cha",
+    "Stealth": "dex",
+}
+
+
+def default_abilities() -> dict[str, int]:
+    return {k: 0 for k in ABILITY_KEYS}
+
+
+def ability_mod(abilities: dict | None, skill: str) -> int:
+    """Modifier for a check skill name (e.g. Wisdom, Persuasion)."""
+    key = CHECK_ABILITY.get(skill) or CHECK_ABILITY.get(skill.title())
+    if not key:
+        return 0
+    try:
+        return int((abilities or {}).get(key, 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def format_abilities(abilities: dict | None) -> str:
+    ab = abilities or {}
+    parts = []
+    for key, label, _ in ABILITIES:
+        mod = int(ab.get(key, 0) or 0)
+        sign = f"+{mod}" if mod >= 0 else str(mod)
+        parts.append(f"**{label[:3]}** {sign}")
+    return " · ".join(parts)
+
 
 def pronouns(_protagonist: str | None = None) -> dict[str, str]:
     """Always Mack looking for Yuna. m* = Yuna's pronouns."""
@@ -94,8 +147,26 @@ CH1_NODES: dict[str, dict] = {
             "*Private test: Chapters 1 & 2. No house points. Your choices are written into your story.*"
         ],
         "choices": [
-            {"id": "begin", "label": "Begin", "set": {"protagonist": "mack"}, "goto": "dream"},
+            {"id": "begin", "label": "Begin", "set": {"protagonist": "mack"}, "goto": "skills"},
         ],
+    },
+    "skills": {
+        "art": "mack",
+        "pages": [
+            "Before the dream takes you, you take stock of what kind of wizard you've become — not grades, not house "
+            "points. The things that decide whether a roll goes your way.\n\n"
+            f"**Assign {SKILL_POINTS_TOTAL} ability points.** Each point is a **+1** on that ability's checks "
+            f"(max **+{SKILL_POINTS_MAX_PER}** in any one).\n\n"
+            "• **Strength** — shoves, climbs, hard hits\n"
+            "• **Dexterity** — stealth, reflexes\n"
+            "• **Constitution** — lasting through a bad night\n"
+            "• **Intelligence** — Investigation, maps, details\n"
+            "• **Wisdom** — Perception, gut feeling, dream-sense\n"
+            "• **Charisma** — Persuasion, owls, talking your way through\n\n"
+            "Checks are **d20 + your bonus** vs a DC. Spend all your points, then Continue."
+        ],
+        "mini": "assign_skills",
+        "goto": "dream",
     },
     "dream": {
         "art": "dream",
@@ -128,7 +199,7 @@ CH1_NODES: dict[str, dict] = {
             "her wait.\n\n"
             "You tried to catch up. Your legs wouldn't move.\n\n"
             "Something shifted in the dark between the trunks. It was the wrong shape to be the wind.\n\n"
-            "🎲 **Wisdom saving throw. DC 12.**\n"
+            "🎲 **Wisdom saving throw. DC 12.** *(d20 + your Wisdom)*\n"
             "*Do you see what it is before the dream lets go of you?*"
         ],
         "mini": "check_roll",
