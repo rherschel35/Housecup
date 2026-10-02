@@ -1,5 +1,5 @@
 """
-The Forrest of Caden — solo Telltale-style story (private test: Ch 1–2).
+The Forrest of Caden — solo Telltale-style story (Ch 1–2).
 
     /forrest start   — begin or restart Chapters 1–2
     /forrest resume  — continue your run
@@ -54,13 +54,25 @@ STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "forrest_caden_state.json"
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "story_art_assets"
 
-# Private test lock — only Gon, only the break-room channel he named.
-# Override with FORREST_CHANNEL_ID / FORREST_TESTER_IDS if needed.
+# Open play: anyone in these channels. Private test: Gon-only break room.
+# Override with FORREST_OPEN_CHANNEL_IDS / FORREST_CHANNEL_ID / FORREST_TESTER_IDS.
+def _parse_id_set(raw: str, defaults: frozenset[int]) -> frozenset[int]:
+    ids = frozenset(
+        int(x) for x in (raw or "").split(",") if x.strip().isdigit()
+    )
+    return ids or defaults
+
+
+FORREST_OPEN_CHANNEL_IDS = _parse_id_set(
+    os.getenv("FORREST_OPEN_CHANNEL_IDS", "1555609052782919760"),
+    frozenset({1555609052782919760}),
+)
+# Legacy private test channel (Gon only).
 FORREST_CHANNEL_ID = int(os.getenv("FORREST_CHANNEL_ID", "1555383179802579005") or 0)
-FORREST_TESTER_IDS = frozenset(
-    int(x) for x in (os.getenv("FORREST_TESTER_IDS", "555141900802457630") or "").split(",")
-    if x.strip().isdigit()
-) or frozenset({555141900802457630})  # Headmaster Gon Vale
+FORREST_TESTER_IDS = _parse_id_set(
+    os.getenv("FORREST_TESTER_IDS", "555141900802457630"),
+    frozenset({555141900802457630}),  # Headmaster Gon Vale
+)
 
 EMBED_COLOR = 0x2F4F3E
 MAX_DESC = 3800
@@ -134,7 +146,7 @@ def _chunk(text: str, limit: int = MAX_DESC) -> list[str]:
 
 
 class ForrestCaden(commands.Cog):
-    """Private test of The Forrest of Caden, chapters 1–2 — tester + channel only."""
+    """The Forrest of Caden, chapters 1–2 — open in designated channels."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -143,11 +155,19 @@ class ForrestCaden(commands.Cog):
 
     def _allowed(self, interaction: discord.Interaction) -> str | None:
         """None if ok; otherwise an ephemeral refusal line."""
-        if interaction.user.id not in FORREST_TESTER_IDS:
-            return "This story is in private test — not open yet."
-        if FORREST_CHANNEL_ID and interaction.channel_id != FORREST_CHANNEL_ID:
-            return f"Run this in <#{FORREST_CHANNEL_ID}> while testing."
-        return None
+        cid = interaction.channel_id
+        # Public play channel(s): anyone who can see the channel may play.
+        if cid in FORREST_OPEN_CHANNEL_IDS:
+            return None
+        # Private test channel: named testers only.
+        if FORREST_CHANNEL_ID and cid == FORREST_CHANNEL_ID:
+            if interaction.user.id in FORREST_TESTER_IDS:
+                return None
+            return "This test channel is locked to the story testers."
+        open_mentions = ", ".join(f"<#{c}>" for c in sorted(FORREST_OPEN_CHANNEL_IDS))
+        if FORREST_CHANNEL_ID:
+            return f"Run `/forrest` in {open_mentions} (or the private test channel)."
+        return f"Run `/forrest` in {open_mentions}."
 
     def get_save(self, user_id: int) -> dict:
         players = self.state.setdefault("players", {})
