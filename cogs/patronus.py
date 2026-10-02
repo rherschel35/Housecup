@@ -79,7 +79,7 @@ ANIMALS = {
 }
 
 # Patronuses that share a shape with a house emblem.
-EMBLEM_MATCH = {"Elephant": "vashara", "Stag": "veyren", "Doe": "veyren", "Wolf": "thornmere"}
+EMBLEM_MATCH = {"Elephant": "vashara", "Bear": "vashara", "Grizzly": "vashara", "Stag": "veyren", "Doe": "veyren", "Wolf": "thornmere"}
 
 READING_PROMPT = """You are reading a student's patronus at Velmora, a school of magic. A patronus is a guardian made of silver light, and it takes the shape of what a person would protect - the thing that keeps them steady when everything else goes dark.
 

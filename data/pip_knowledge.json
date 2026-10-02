@@ -10,7 +10,7 @@
         "three words",
         "get wand"
       ],
-      "answer": "Aye \u2014 dig out three words ye fancy an' cast `/wand`. A wand chooses ye for good. Same three words unlock `/patronus` an' `/broom` after.",
+      "answer": "Aye — dig out three words ye fancy an' cast `/wand`. A wand chooses ye for good. Same three words unlock `/patronus` an' `/broom` after.",
       "link": "https://everything-velmora.netlify.app/magic"
     },
     {
@@ -33,7 +33,7 @@
         "claim broom",
         "broom portrait"
       ],
-      "answer": "Yer `/broom` comes from the same three words as yer wand \u2014 100 fixed portraits, one owner each. If that broom's taken, ye get the next-closest. Base Speed an' Altitude are fixed per model (same on the Compendium); ye can upgrade 'em toward 10 with `/broomupgrade`. Need a wand first. Staff `/broomreset` frees a claim without touchin' the wand. Full gallery's on the Compendium Brooms page.",
+      "answer": "Yer `/broom` comes from the same three words as yer wand — 100 fixed portraits, one owner each. If that broom's taken, ye get the next-closest. Base Speed an' Altitude are fixed per model (same on the Compendium); ye can upgrade 'em toward 10 with `/broomupgrade`. Need a wand first. Staff `/broomreset` frees a claim without touchin' the wand. Full gallery's on the Compendium Brooms page.",
       "link": "https://everything-velmora.netlify.app/brooms"
     },
     {
@@ -55,7 +55,7 @@
         "broom control",
         "broom token"
       ],
-      "answer": "Tune flight with `/broomupgrade` \u2014 Speed or Altitude / control, toward 10. Pay with Pitch Resin \u00d75 (forage in the Garden or Forbidden Woods; never on market), any Descent material \u00d7100, or one Marketplace broom token (`/market broomtoken`, 50 pts). Optional `member:` upgrades someone else's broom while ye pay. Staff free bumps: `/upgrade broom`.",
+      "answer": "Tune flight with `/broomupgrade` — Speed or Altitude / control, toward 10. Pay with Pitch Resin ×5 (forage in the Garden or Forbidden Woods; never on market), any Descent material ×100, or one Marketplace broom token (`/market broomtoken`, 50 pts). Optional `member:` upgrades someone else's broom while ye pay. Staff free bumps: `/upgrade broom`.",
       "link": "https://everything-velmora.netlify.app/brooms"
     },
     {
@@ -70,7 +70,7 @@
         "broom course",
         "quidditch broom race"
       ],
-      "answer": "`/broomrace` on the Quidditch pitch \u2014 private 6-stage picks on one o' 100 courses. Higher Speed/Altitude means fewer choices (the broom filters noise). Top brooms still see three: the right line, a pick that adds time, an' a trap that doubles yer time lost. Solo: 5 learning races a day (UTC) that unlock study notes. Challenge someone with `/broomrace opponent:@member` on the same track anytime \u2014 lowest time lost wins; winner gets 3 house points up to 5 wins/day, then free play with no points. Stuck mid-race or \"already mid-race\"? `/broomraceend` clears the lock — yours or anyone else's. Check leftovers on `/checklist`.",
+      "answer": "`/broomrace` on the Quidditch pitch — private 6-stage picks on one o' 100 courses. Higher Speed/Altitude means fewer choices (the broom filters noise). Top brooms still see three: the right line, a pick that adds time, an' a trap that doubles yer time lost. Solo: 5 learning races a day (UTC) that unlock study notes. Challenge someone with `/broomrace opponent:@member` on the same track anytime — lowest time lost wins; winner gets 3 house points up to 5 wins/day, then free play with no points. Stuck mid-race or \"already mid-race\"? `/broomraceend` clears the lock — yours or anyone else's. Check leftovers on `/checklist`.",
       "link": "https://everything-velmora.netlify.app/quidditch"
     },
     {
@@ -82,7 +82,7 @@
         "course notes",
         "broom study"
       ],
-      "answer": "Finish a course with `/broomrace` an' ye unlock a permanent study note \u2014 read 'em with `/broomnotes`. Studied courses mark traps ye know with \u26a0 when ye race that track again.",
+      "answer": "Finish a course with `/broomrace` an' ye unlock a permanent study note — read 'em with `/broomnotes`. Studied courses mark traps ye know with ⚠ when ye race that track again.",
       "link": "https://everything-velmora.netlify.app/brooms"
     },
     {
@@ -102,7 +102,7 @@
         "what can I still do",
         "what can i still do"
       ],
-      "answer": "`/checklist` is yer daily points board \u2014 what's left for house points an' habits, with reset timers. Includes duels, Quidditch house-match wins, broom solo learning races (5/day), broom challenge point-wins (5/day at 3 pts), beasts, potions (brewable / ready to drink), market sells, an' more.",
+      "answer": "`/checklist` is yer daily points board — what's left for house points an' habits, with reset timers. Includes duels, Quidditch house-match wins, broom solo learning races (5/day), broom challenge point-wins (5/day at 3 pts), beasts, potions (brewable / ready to drink), market sells, an' more.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {
@@ -117,7 +117,7 @@
         "feminine",
         "full body"
       ],
-      "answer": "Design yer look with `/wizard` \u2014 there's Masculine, Feminine, an' Feminine (full body). Show it off anytime with `/mirror`.",
+      "answer": "Design yer look with `/wizard` — there's Masculine, Feminine, an' Feminine (full body). Show it off anytime with `/mirror`.",
       "link": "https://everything-velmora.netlify.app/cards"
     },
     {
@@ -131,7 +131,7 @@
         "raven",
         "fox"
       ],
-      "answer": "`/familiar` adopts one for good \u2014 salamander, raven, or fox. Feed, pet, an' play once a day, an' send it `/scout` for a lil' find.",
+      "answer": "`/familiar` adopts one for good — salamander, raven, or fox. Feed, pet, an' play once a day, an' send it `/scout` for a lil' find.",
       "link": "https://everything-velmora.netlify.app/magic"
     },
     {
@@ -149,7 +149,7 @@
         "offering",
         "offer"
       ],
-      "answer": "Each place has its own channel. Use `/explore` (up to 10/day per place) an' `/forage` (up to 5/day). Check `/satchel`, try `/use`, leave an `/offer`. `/places` shows where ye can go \u2014 places remember how ye treat 'em.",
+      "answer": "Each place has its own channel. Use `/explore` (up to 10/day per place) an' `/forage` (up to 5/day). Check `/satchel`, try `/use`, leave an `/offer`. `/places` shows where ye can go — places remember how ye treat 'em.",
       "link": "https://everything-velmora.netlify.app/explore"
     },
     {
@@ -188,7 +188,7 @@
         "study a beast",
         "notes on a beast"
       ],
-      "answer": "Got a befriended beast? `/study` it once a day \u2014 three pages fills yer notes. Read 'em with `/journal`. Finish all three an' yer house gets **5** points once for that beast.",
+      "answer": "Got a befriended beast? `/study` it once a day — three pages fills yer notes. Read 'em with `/journal`. Finish all three an' yer house gets **5** points once for that beast.",
       "link": "https://everything-velmora.netlify.app/beasts"
     },
     {
@@ -200,7 +200,7 @@
         "niffler's bait",
         "niffler bait"
       ],
-      "answer": "Nifflers are the shiny-thievin' beasts \u2014 one uncommon per place. Spot 'em in `/bestiary`, or brew **Niffler's Bait** if ye want a private encounter with one.",
+      "answer": "Nifflers are the shiny-thievin' beasts — one uncommon per place. Spot 'em in `/bestiary`, or brew **Niffler's Bait** if ye want a private encounter with one.",
       "link": "https://everything-velmora.netlify.app/beasts"
     },
     {
@@ -215,7 +215,7 @@
         "grand duel",
         "trio"
       ],
-      "answer": "`/duel` is best of three \u2014 both pick a spell in secret. Hex, Ward, Disarm, Bind, Mirror; each beats two an' loses to two. There's also `/trio scramble`, `/trio housematch`, an' `/grand` for the big leagues. Stuck on \"already in a duel\"? Cast `/duelend` to clear the lock.",
+      "answer": "`/duel` is best of three — both pick a spell in secret. Hex, Ward, Disarm, Bind, Mirror; each beats two an' loses to two. There's also `/trio scramble`, `/trio housematch`, an' `/grand` for the big leagues. Stuck on \"already in a duel\"? Cast `/duelend` to clear the lock.",
       "link": "https://everything-velmora.netlify.app/duels"
     },
     {
@@ -229,7 +229,7 @@
         "nightweaver",
         "stone golem"
       ],
-      "answer": "When a wild threat crawls into a channel, ye need a patronus ready \u2014 then `/cast` to banish it. Check `/help` under Play for the cast command.",
+      "answer": "When a wild threat crawls into a channel, ye need a patronus ready — then `/cast` to banish it. Check `/help` under Play for the cast command.",
       "link": "https://everything-velmora.netlify.app/duels"
     },
     {
@@ -257,7 +257,7 @@
         "practice +1",
         "replay floor"
       ],
-      "answer": "Replay a cleared floor with `/descend floor:n` (not bosses). Practice can sharpen ye with a free stat pick \u2014 closer floors more often. Spend any pending stat pick first, or the grind won't award another.",
+      "answer": "Replay a cleared floor with `/descend floor:n` (not bosses). Practice can sharpen ye with a free stat pick — closer floors more often. Spend any pending stat pick first, or the grind won't award another.",
       "link": "https://everything-velmora.netlify.app/descent"
     },
     {
@@ -268,7 +268,7 @@
         "scramble quidditch",
         "house match"
       ],
-      "answer": "Quidditch runs house matches an' scrambles \u2014 five rounds, an' a Snitch that can end it all. Peek `/help` or the Compendium Quidditch page for the commands.",
+      "answer": "Quidditch runs house matches an' scrambles — five rounds, an' a Snitch that can end it all. Peek `/help` or the Compendium Quidditch page for the commands.",
       "link": "https://everything-velmora.netlify.app/quidditch"
     },
     {
@@ -279,7 +279,7 @@
         "three raid",
         "raidstatus"
       ],
-      "answer": "`/raid` opens a 3Raid lobby \u2014 Attacker, Specialty, Tank, ten encounters. `/raidstatus` shows yer weekly clear.",
+      "answer": "`/raid` opens a 3Raid lobby — Attacker, Specialty, Tank, ten encounters. `/raidstatus` shows yer weekly clear.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {
@@ -295,7 +295,7 @@
         "broomtoken",
         "upgrade token"
       ],
-      "answer": "`/market browse` is the catalogue. Buy common/uncommon with `/market buy`. Sell place ingredients in sets of 3, or Descent materials in sets of 25, for 3 pts each batch \u2014 add `batches:` to sell several at once (21 pts/day cap). `/market broomtoken` buys a Speed or Altitude broom upgrade token (50 pts) \u2014 spend it with `/broomupgrade`. Also scrolls, titles, an' the Room. Pitch Resin is forage-only \u2014 never sold.",
+      "answer": "`/market browse` is the catalogue. Buy common/uncommon with `/market buy`. Sell place ingredients in sets of 3, or Descent materials in sets of 25, for 3 pts each batch — add `batches:` to sell several at once (21 pts/day cap). `/market broomtoken` buys a Speed or Altitude broom upgrade token (50 pts) — spend it with `/broomupgrade`. Also scrolls, titles, an' the Room. Pitch Resin is forage-only — never sold.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {
@@ -307,7 +307,7 @@
         "cauldron",
         "ingredients"
       ],
-      "answer": "Brewin' lives with yer ingredients from forage an' the market. Check `/help` for potion commands in yer server \u2014 gather bits in yer `/satchel` first.",
+      "answer": "Brewin' lives with yer ingredients from forage an' the market. Check `/help` for potion commands in yer server — gather bits in yer `/satchel` first.",
       "link": "https://everything-velmora.netlify.app/explore"
     },
     {
@@ -340,9 +340,10 @@
         "aster wilde",
         "veyren",
         "caldrin",
-        "vashara"
+        "vashara",
+        "oakmont"
       ],
-      "answer": "Five houses chase one Cup — Thornmere, AsterWilde (once Moonveil), Veyren, Caldrin, Vashara. Almost everythin' ye do earns points for yer house. `/standings` shows the table; `/points` shows yer own; `/profile` is the full picture.",
+      "answer": "Five houses chase one Cup — Thornmere, AsterWilde (once Moonveil), Veyren, Caldrin, Oakmont (once Vashara). Almost everythin' ye do earns points for yer house. `/standings` shows the table; `/points` shows yer own; `/profile` is the full picture.",
       "link": "https://everything-velmora.netlify.app/houses"
     },
     {
@@ -354,7 +355,7 @@
         "rite",
         "challengestatus"
       ],
-      "answer": "Challenges post for everyone \u2014 first three correct answers win points. Daily is every 24 hours (pings @everyone); Trial an' Rite on their schedule. `/challengestatus` shows what's open.",
+      "answer": "Challenges post for everyone — first three correct answers win points. Daily is every 24 hours (pings @everyone); Trial an' Rite on their schedule. `/challengestatus` shows what's open.",
       "link": "https://everything-velmora.netlify.app/houses"
     },
     {
@@ -364,7 +365,7 @@
         "checkers",
         "board game"
       ],
-      "answer": "Chess an' checkers aren't ready yet \u2014 the boards are still bein' polished. Pip'll tell ye when ye can challenge a classmate.",
+      "answer": "Chess an' checkers aren't ready yet — the boards are still bein' polished. Pip'll tell ye when ye can challenge a classmate.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {
@@ -384,7 +385,7 @@
         "rumour",
         "gossip"
       ],
-      "answer": "`/rumor` conjures a whisper from the mill \u2014 explore secrets, student gossip, odd headmaster talk, embarrass\u00edn' ghosts. Believe nothin'.",
+      "answer": "`/rumor` conjures a whisper from the mill — explore secrets, student gossip, odd headmaster talk, embarrassín' ghosts. Believe nothin'.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {
@@ -399,7 +400,7 @@
         "cassy",
         "founders"
       ],
-      "answer": "The founders never quite left. Their stories live on the Compendium Ghosts page \u2014 an' sometimes in a `/rumor` if the mill's feelin' cheeky.",
+      "answer": "The founders never quite left. Their stories live on the Compendium Ghosts page — an' sometimes in a `/rumor` if the mill's feelin' cheeky.",
       "link": "https://everything-velmora.netlify.app/ghosts"
     },
     {
@@ -423,7 +424,7 @@
         "leaderboard",
         "duelrecord"
       ],
-      "answer": "`/profile` is yer whole sheet \u2014 Mirror, wand, points, ranks, beasts. `/standings` is the Cup table; `/leaderboard` the top earners; `/duelrecord` yer duel sheet.",
+      "answer": "`/profile` is yer whole sheet — Mirror, wand, points, ranks, beasts. `/standings` is the Cup table; `/leaderboard` the top earners; `/duelrecord` yer duel sheet.",
       "link": "https://everything-velmora.netlify.app/commands"
     }
   ]

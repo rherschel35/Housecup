@@ -35,11 +35,15 @@ LEDGER_LIMIT = 500
 
 # The five houses of Velmora. Key -> display name, colour, emblem.
 HOUSES = {
+    # Internal key stays "vashara" so seasons, crests, and world data keep working.
+    # Public name evolved: Vashara → Oakmont (same house, new crest & motto; colors kept).
     "vashara": {
-        "name": "Vashara",
-        "color": 0x8B5FBF,
-        "emoji": "\U0001F418",  # elephant
-        "motto": "We forgive. We remember.",
+        "name": "Oakmont",
+        "former_name": "Vashara",
+        "aliases": ("oakmont", "oak mont", "vashara"),
+        "color": 0x8B5FBF,  # same purple
+        "emoji": "\U0001F43B",  # bear
+        "motto": "Rooted in Patient. Relentless in Purpose.",
     },
     # Internal key stays "moonveil" so seasons, crests, and world data keep working.
     # Public name evolved: Moonveil → AsterWilde (same house, new crest & motto).

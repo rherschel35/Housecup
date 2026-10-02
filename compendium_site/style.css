@@ -2,7 +2,7 @@
 :root{
   --bg:#F2EBDD; --surface:#FBF7EE; --surface-2:#EAE0CC; --ink:#241C17; --muted:#6A5D4E;
   --line:#D9CBAF; --gold:#8E6A26; --gold-soft:#B98F3E; --accent:#6C3A5C;
-  --thornmere:#3E8E5A; --moonveil:#2E4A6E; --asterwilde:#2E4A6E; --veyren:#B8434F; --caldrin:#C99A22; --vashara:#8B5FBF;
+  --thornmere:#3E8E5A; --moonveil:#2E4A6E; --asterwilde:#2E4A6E; --veyren:#B8434F; --caldrin:#C99A22; --vashara:#8B5FBF; --oakmont:#8B5FBF;
   --common:#6E7C6A; --uncommon:#2F7A93; --rare:#7C4FA8; --very_rare:#B0552E; --legendary:#A8741A;
   --display:'Cinzel',Georgia,'Times New Roman',serif;
   --body:'Alegreya',Georgia,'Times New Roman',serif;
@@ -13,7 +13,7 @@
   :root:not([data-theme="light"]){
     --bg:#141019; --surface:#1D1822; --surface-2:#262030; --ink:#EDE4D3; --muted:#A99E8E;
     --line:#352D3D; --gold:#D8B461; --gold-soft:#B39352; --accent:#C99BC0;
-    --thornmere:#6CC08A; --moonveil:#7FA8D4; --asterwilde:#7FA8D4; --veyren:#E07884; --caldrin:#E8C25A; --vashara:#B893E8;
+    --thornmere:#6CC08A; --moonveil:#7FA8D4; --asterwilde:#7FA8D4; --veyren:#E07884; --caldrin:#E8C25A; --vashara:#B893E8; --oakmont:#B893E8;
     --common:#A7B4A2; --uncommon:#6FBBD2; --rare:#B793E0; --very_rare:#E58F66; --legendary:#E8BD5B;
     color-scheme:dark;
   }
@@ -21,7 +21,7 @@
 :root[data-theme="dark"]{
   --bg:#141019; --surface:#1D1822; --surface-2:#262030; --ink:#EDE4D3; --muted:#A99E8E;
   --line:#352D3D; --gold:#D8B461; --gold-soft:#B39352; --accent:#C99BC0;
-  --thornmere:#6CC08A; --moonveil:#7FA8D4; --asterwilde:#7FA8D4; --veyren:#E07884; --caldrin:#E8C25A; --vashara:#B893E8;
+  --thornmere:#6CC08A; --moonveil:#7FA8D4; --asterwilde:#7FA8D4; --veyren:#E07884; --caldrin:#E8C25A; --vashara:#B893E8; --oakmont:#B893E8;
   --common:#A7B4A2; --uncommon:#6FBBD2; --rare:#B793E0; --very_rare:#E58F66; --legendary:#E8BD5B;
   color-scheme:dark;
 }
@@ -82,7 +82,7 @@ a.card .go{font-family:var(--label);color:var(--gold);font-size:14px;letter-spac
 .motto{font-style:italic}
 .hc-thornmere{--hc:var(--thornmere)} .hc-moonveil{--hc:var(--moonveil)} .hc-asterwilde{--hc:var(--asterwilde)}
 .hc-veyren{--hc:var(--veyren)}
-.hc-caldrin{--hc:var(--caldrin)} .hc-vashara{--hc:var(--vashara)} .hc-velmora{--hc:var(--gold)}
+.hc-caldrin{--hc:var(--caldrin)} .hc-vashara{--hc:var(--vashara)} .hc-oakmont{--hc:var(--oakmont)} .hc-velmora{--hc:var(--gold)}
 
 .tag{display:inline-block;font-family:var(--label);font-size:12.5px;letter-spacing:.06em;border:1px solid currentColor;
   border-radius:3px;padding:0 6px;line-height:1.5;margin:2px 4px 0 0;white-space:nowrap}
