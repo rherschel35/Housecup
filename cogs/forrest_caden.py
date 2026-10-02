@@ -1,11 +1,12 @@
 """
-The Forrest of Caden — solo Telltale-style story (staff test: Ch 1–2).
+The Forrest of Caden — solo Telltale-style story (private test: Ch 1–2).
 
-    /forrest start   — (staff) begin or restart Chapters 1–2
-    /forrest resume  — (staff) continue your run
-    /forrest status  — (staff) flags / chapter
-    /forrest reset   — (staff) clear your save
+    /forrest start   — begin or restart Chapters 1–2
+    /forrest resume  — continue your run
+    /forrest status  — flags / chapter
+    /forrest reset   — clear your save
 
+Locked to Headmaster Gon Vale and one test channel while Ch 1–2 are in trial.
 No house points. Owner-locked buttons. Art from story_art_assets/.
 """
 
