@@ -301,9 +301,10 @@ CH1_NODES: dict[str, dict] = {
         "pages": [
             "The city doesn’t care that you’re fifth-years with a noble reason. It cares that you’re young, loaded with "
             "bags, and looking the wrong way at the wrong corner.\n\n"
-            "Two men step out of an alley like they practiced it. One smiles with too many teeth. The other doesn’t bother.\n\n"
+            "A hooded figure steps out of the dark like they practiced it — phone up, voice flat, no face to read.\n\n"
             "**Robber:** “Bags. Quiet. Nobody has to get clever.”\n\n"
-            "Ella’s already shifting her weight. Gus — if he’s here — makes a sound that is definitely not a joke."
+            "You put yourself in front of Ella. She’s already clutching her bag like it’s the only solid thing left. "
+            "Gus — if he’s still with you — is somewhere just out of the light, making a sound that is definitely not a joke."
         ],
         "mini": "city_fight",
         "goto": "city_essentials",
