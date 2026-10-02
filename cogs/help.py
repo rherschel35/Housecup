@@ -177,6 +177,7 @@ HELP = {
             ("points", "Your points (or anyone's), this season and all time."),
             ("standings", "The House Cup table."),
             ("leaderboard", "The top earners."),
+            ("ranks", "Everyone with points, ranked from first to last."),
             ("duelrecord", "Your duel rank, wins, streak, rivals, trio/grand records, and today's duel points left."),
             ("history", "Recent points activity."),
             ("housecup", "Past seasons and their champions."),
