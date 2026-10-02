@@ -59,7 +59,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from cogs.velmora_channels import channel_mentions, with_study_hall_and_ddp
+from cogs.velmora_channels import channel_mentions, with_study_hall
 
 log = logging.getLogger("velmora.descent")
 
@@ -71,7 +71,7 @@ ASSETS_DIR = Path(__file__).resolve().parent.parent / "monster_art_assets"
 # The Descent only runs in these channels - keeps the fight embeds and
 # spam out of every other channel in the server. Study hall included for
 # new-student practice.
-DESCENT_CHANNEL_IDS = with_study_hall_and_ddp(
+DESCENT_CHANNEL_IDS = with_study_hall(
     1553089612849877053,  # original Descent channel
     1553861330988044308,
     1553861650732421202,

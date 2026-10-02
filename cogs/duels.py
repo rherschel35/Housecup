@@ -48,7 +48,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from cogs.velmora_channels import (
-    DUEL_DESCENT_POTIONS_CHANNEL_ID,
+    DUELS_POTIONS_CHANNEL_ID,
     STUDY_HALL_CHANNEL_ID,
     channel_mentions,
 )
@@ -529,7 +529,7 @@ class Duels(commands.Cog):
         return {
             int(arena),
             STUDY_HALL_CHANNEL_ID,
-            DUEL_DESCENT_POTIONS_CHANNEL_ID,
+            DUELS_POTIONS_CHANNEL_ID,
         }
 
     def _in_duel_channel(self, interaction: discord.Interaction):
