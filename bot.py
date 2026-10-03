@@ -307,9 +307,22 @@ async def main():
         raise SystemExit("DISCORD_TOKEN is not set. Copy .env.example to .env and fill it in.")
 
     async with bot:
+        # Discord caps global slash commands at 100 top-level names. A single
+        # failed cog must not take the whole House Cup bot down.
         for cog in INITIAL_COGS:
-            await bot.load_extension(cog)
-            log.info("Loaded %s", cog)
+            try:
+                await bot.load_extension(cog)
+                log.info("Loaded %s", cog)
+            except Exception:
+                log.exception("Failed to load %s — continuing without it", cog)
+        top_level = len(bot.tree.get_commands())
+        log.info("Slash command tree: %s top-level (Discord global cap is 100)", top_level)
+        if top_level > 100:
+            log.error(
+                "Top-level slash command count %s exceeds Discord's 100 cap — "
+                "some commands will not register until groups are nested further.",
+                top_level,
+            )
         await bot.start(DISCORD_TOKEN)
 
 

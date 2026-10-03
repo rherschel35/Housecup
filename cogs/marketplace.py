@@ -9,7 +9,7 @@ The Velmora Marketplace — spend (and sell for) house points.
     /market title               - buy an exclusive shop title (50 pts)
     /market room                - Room of Requirement (100 pts); pings @headmasters
     /hexscroll member           - cast one owned Hex Scroll (30 min, random effect)
-    /marketsellreset member     - (staff) clear someone's daily sell-points cap
+    /market sellreset member    - (staff) clear someone's daily sell-points cap
 
 Every spend deducts from the member's season contribution AND the house total
 (same honesty as /bean). Sell earnings go to both, capped at 21 pts/day.
@@ -741,12 +741,12 @@ class Marketplace(commands.Cog):
             color=0x8B5CF6,
         ).set_footer(text=f"Scrolls left: {self.scroll_count(interaction.user.id)}"))
 
-    @app_commands.command(
-        name="marketsellreset",
+    @group.command(
+        name="sellreset",
         description="(staff) Clear someone's daily Marketplace sell-points cap.",
     )
     @app_commands.describe(member="Whose sell attempts to reset")
-    async def marketsellreset(self, interaction: discord.Interaction, member: discord.Member):
+    async def sellreset(self, interaction: discord.Interaction, member: discord.Member):
         store = self._store()
         if not store or not store.is_staff(interaction.user):
             await interaction.response.send_message("Staff only.", ephemeral=True)
@@ -761,7 +761,7 @@ class Marketplace(commands.Cog):
             msg = (f"**{member.display_name}** had nothing on today's sell cap — "
                    f"still clear. They can sell up to **{SELL_DAILY_CAP}** pts.")
         await interaction.response.send_message(msg, ephemeral=True)
-        log.info("marketsellreset by %s for %s (had %s)", interaction.user.id, member.id, had)
+        log.info("market sellreset by %s for %s (had %s)", interaction.user.id, member.id, had)
 
 
 async def setup(bot: commands.Bot):
