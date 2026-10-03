@@ -120,7 +120,8 @@ HELP = {
         "note": (
             "Claim one unique broom from your wand words (100 portraits). "
             "Upgrade Speed/Altitude toward 10, then race on the Quidditch pitch. "
-            "Top brooms still see 3 picks per stage (right line / add time / trap doubles time). "
+            "From skill 7 up you still see 3 picks per stage (right line / add time / "
+            "trap doubles time) — mid upgrades aren't a free clear. "
             "Solo: 5 learning races/day (UTC). Challenges: always open; wins pay 3 pts "
             "(5 paid wins/day), then free play."
         ),

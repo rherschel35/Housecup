@@ -7,10 +7,11 @@ Private broom racing on the Quidditch pitch.
     /broomnotes [course]           - permanent study notes you've unlocked
 
 Higher Speed/Altitude means fewer button choices per stage (the broom
-filters noise). Top brooms (skill 9–10) still see three: the right line,
-a pick that adds time, and a trap that doubles time lost. Finish a course
-to unlock its study note forever; notes warn you off traps on that course
-again. Challenges share one course; lower time-lost wins.
+filters noise). From skill 7 up you still see three: the right line, a
+pick that adds time, and a trap that doubles time lost — mid upgrades
+aren't a free clear. Finish a course to unlock its study note forever;
+notes warn you off traps on that course again. Challenges share one
+course; lower time-lost wins.
 
 Daily caps (UTC):
     - Solo: 5 learning races/day (hard stop — those unlock study notes)
@@ -62,9 +63,9 @@ def today_str() -> str:
 KIND_PENALTY = {
     "clean": 0,
     "tech": 0,
-    "bold": 4,
-    "stall": 6,
-    "trap": 8,  # 2× bold — overwritten for cumulative double in resolve_choice
+    "bold": 5,
+    "stall": 8,
+    "trap": 10,  # 2× bold — overwritten for cumulative double in resolve_choice
 }
 
 
@@ -80,11 +81,9 @@ def _load_courses() -> list[dict]:
 def max_options_for_skill(skill: float) -> int:
     """Higher flight stats → fewer choices (broom filters the noise).
 
-    Top brooms (skill 9–10) still see three: the right line, a time-adder,
-    and a trap that doubles your time lost.
+    Skill 7+ still sees three: the right line, a time-adder, and a trap
+    that doubles your time lost (so mid upgrades aren't safer than top).
     """
-    if skill >= 9:
-        return 3
     if skill >= 7:
         return 3
     if skill >= 5:
@@ -137,8 +136,8 @@ def pick_stage_options(
     ranked = sorted(opts, key=lambda o: (option_score(o, speed, altitude), o.get("label", "")))
     chosen: list[dict] = []
 
-    # Top brooms (3 options): always offer right line + time-adder + trap.
-    if limit == 3 and skill >= 9:
+    # Skill 7+ (3 options): always offer right line + time-adder + trap.
+    if limit == 3:
         right = next((o for o in ranked if _meets_line(o, speed, altitude)), None)
         if right is None:
             right = next((o for o in ranked if o.get("kind") in ("clean", "tech")), None)
@@ -169,6 +168,18 @@ def pick_stage_options(
             if len(chosen) >= limit:
                 break
 
+        # Mid boards (4–5 picks): keep real risk — reserve a trap, else a stall.
+        if limit >= 4 and not any(o.get("kind") in ("trap", "stall") for o in chosen):
+            danger = next((o for o in opts if o.get("kind") == "trap"), None)
+            if danger is None:
+                danger = next((o for o in opts if o.get("kind") == "stall"), None)
+            if danger is not None and chosen:
+                # Replace the lowest-ranked (last filled) safe filler.
+                for i in range(len(chosen) - 1, -1, -1):
+                    if chosen[i].get("kind") in ("clean", "tech", "bold") and chosen[i] is not chosen[0]:
+                        chosen[i] = danger
+                        break
+
         # Studied courses: ensure one trap is visible (and marked) when skill still shows noise.
         if studied and limit >= 3:
             if not any(o.get("kind") == "trap" for o in chosen):
@@ -180,7 +191,7 @@ def pick_stage_options(
     out = []
     for o in chosen:
         copy = dict(o)
-        # Top brooms always see traps unmarked unless studied; studied marks ⚠.
+        # Traps stay unmarked unless studied; studied marks ⚠.
         if studied and copy.get("kind") == "trap":
             copy["label"] = f"⚠ {copy['label']}"[:80]
             copy["warned"] = True
@@ -214,7 +225,8 @@ def resolve_choice(
         if have >= thr:
             return 0, "Clean line. The markers blur past."
         gap = thr - have
-        if gap <= 2 and rng.random() < 0.55:
+        # Near-miss scrape is possible but not the usual outcome.
+        if gap <= 2 and rng.random() < 0.30:
             return 2, "A little shaky — you make it with scraped knuckles."
         return 3 + gap, "Your broom complains; you lose the racing line."
 
@@ -237,9 +249,9 @@ class StageButton(discord.ui.Button):
         if opt.get("warned"):
             # Studied trap — still marked, but only via ⚠ label + red.
             style = discord.ButtonStyle.danger
-        elif skill < 9 and opt.get("kind") in ("clean", "tech"):
-            # Lower-skill races may hint the racing line; top brooms don't —
-            # their three picks are shuffled and styled the same.
+        elif skill < 5 and opt.get("kind") in ("clean", "tech"):
+            # Only early learning races hint the racing line in blue.
+            # From skill 5 up, picks are shuffled and styled the same.
             style = discord.ButtonStyle.primary
         super().__init__(label=opt.get("label", "…")[:80], style=style)
         self.race = race
@@ -632,7 +644,7 @@ class BroomRace(commands.Cog):
                 f"Your flight · Speed **{race.speed}/10** · Altitude **{race.altitude}/10**\n"
                 f"Choices shown · **{len(options)}** "
                 f"(skill {skill:.0f} filters the noise"
-                + ("; wrong pick adds time, trap doubles it" if skill >= 9 else "")
+                + ("; wrong pick adds time, trap doubles it" if skill >= 7 else "")
                 + ")\n"
                 f"Time lost so far · **+{race.penalty}s**"
             ),
