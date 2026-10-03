@@ -6,10 +6,10 @@ Private broom racing on the Quidditch pitch.
     /broomraceend [member]         - clear a stuck race lock (yours, or anyone's)
     /broomnotes [course]           - permanent study notes you've unlocked
 
-Higher Speed/Altitude means fewer button choices per stage (the broom
-filters noise). From skill 7 up you still see three: the right line, a
-pick that adds time, and a trap that doubles time lost — mid upgrades
-aren't a free clear. Finish a course to unlock its study note forever;
+Every stage shows the full set of racing lines — no spoon-fed shortlist.
+Higher Speed/Altitude still decides whether you can hold a clean/tech
+line (miss it and you scrape or lose time). Wrong picks add time; traps
+double time lost. Finish a course to unlock its study note forever;
 notes warn you off traps on that course again. Challenges share one
 course; lower time-lost wins.
 
@@ -78,47 +78,6 @@ def _load_courses() -> list[dict]:
     return courses
 
 
-def max_options_for_skill(skill: float) -> int:
-    """Higher flight stats → fewer choices (broom filters the noise).
-
-    Skill 7+ still sees three: the right line, a time-adder, and a trap
-    that doubles your time lost (so mid upgrades aren't safer than top).
-    """
-    if skill >= 7:
-        return 3
-    if skill >= 5:
-        return 4
-    if skill >= 3:
-        return 5
-    return 6
-
-
-def option_score(opt: dict, speed: int, altitude: int) -> int:
-    """Lower is better when ranking which options to keep visible."""
-    kind = opt.get("kind", "bold")
-    if kind == "trap":
-        return 50
-    if kind == "stall":
-        return 40
-    if kind == "bold":
-        return 30
-    stat = opt.get("stat")
-    thr = int(opt.get("threshold", 0) or 0)
-    have = speed if stat == "speed" else altitude if stat == "altitude" else max(speed, altitude)
-    gap = max(0, thr - have)
-    base = 0 if kind == "clean" else 2
-    return base + gap * 3
-
-
-def _meets_line(opt: dict, speed: int, altitude: int) -> bool:
-    if opt.get("kind") not in ("clean", "tech"):
-        return False
-    stat = opt.get("stat")
-    thr = int(opt.get("threshold", 0) or 0)
-    have = speed if stat == "speed" else altitude if stat == "altitude" else max(speed, altitude)
-    return have >= thr
-
-
 def pick_stage_options(
     stage: dict,
     speed: int,
@@ -127,76 +86,25 @@ def pick_stage_options(
     studied: bool = False,
     rng: random.Random,
 ) -> list[dict]:
+    """Show every racing line for the stage (shuffled).
+
+    Speed/Altitude no longer hide options — they only decide whether a
+    clean/tech line is holdable. Studied traps stay marked ⚠.
+    """
+    _ = (speed, altitude)  # stats apply in resolve_choice, not option filtering
     opts = list(stage.get("options") or [])
     if not opts:
         return []
-    skill = (speed + altitude) / 2
-    limit = min(max_options_for_skill(skill), len(opts))
-
-    ranked = sorted(opts, key=lambda o: (option_score(o, speed, altitude), o.get("label", "")))
-    chosen: list[dict] = []
-
-    # Skill 7+ (3 options): always offer right line + time-adder + trap.
-    if limit == 3:
-        right = next((o for o in ranked if _meets_line(o, speed, altitude)), None)
-        if right is None:
-            right = next((o for o in ranked if o.get("kind") in ("clean", "tech")), None)
-        adder = next((o for o in opts if o.get("kind") == "bold"), None)
-        if adder is None:
-            adder = next((o for o in opts if o.get("kind") == "stall"), None)
-        trap = next((o for o in opts if o.get("kind") == "trap"), None)
-        for o in (right, adder, trap):
-            if o is not None and all(o is not c for c in chosen):
-                chosen.append(o)
-        # Only if a role was missing from the course data, fill from ranked.
-        for o in ranked:
-            if len(chosen) >= limit:
-                break
-            if all(o is not c for c in chosen):
-                chosen.append(o)
-    else:
-        # Always keep the best clean/tech if present.
-        for o in ranked:
-            if o.get("kind") in ("clean", "tech"):
-                chosen.append(o)
-                break
-        # Fill with a mix; prefer variety of kinds when skill is low.
-        for o in ranked:
-            if o in chosen:
-                continue
-            chosen.append(o)
-            if len(chosen) >= limit:
-                break
-
-        # Mid boards (4–5 picks): keep real risk — reserve a trap, else a stall.
-        if limit >= 4 and not any(o.get("kind") in ("trap", "stall") for o in chosen):
-            danger = next((o for o in opts if o.get("kind") == "trap"), None)
-            if danger is None:
-                danger = next((o for o in opts if o.get("kind") == "stall"), None)
-            if danger is not None and chosen:
-                # Replace the lowest-ranked (last filled) safe filler.
-                for i in range(len(chosen) - 1, -1, -1):
-                    if chosen[i].get("kind") in ("clean", "tech", "bold") and chosen[i] is not chosen[0]:
-                        chosen[i] = danger
-                        break
-
-        # Studied courses: ensure one trap is visible (and marked) when skill still shows noise.
-        if studied and limit >= 3:
-            if not any(o.get("kind") == "trap" for o in chosen):
-                trap = next((o for o in opts if o.get("kind") == "trap"), None)
-                if trap and chosen:
-                    chosen[-1] = trap
-
+    chosen = list(opts)
     rng.shuffle(chosen)
     out = []
     for o in chosen:
         copy = dict(o)
-        # Traps stay unmarked unless studied; studied marks ⚠.
         if studied and copy.get("kind") == "trap":
             copy["label"] = f"⚠ {copy['label']}"[:80]
             copy["warned"] = True
         out.append(copy)
-    return out[:limit]
+    return out
 
 
 def resolve_choice(
@@ -640,9 +548,8 @@ class BroomRace(commands.Cog):
                 f"**{stage['prompt']}**\n\n"
                 f"Your flight · Speed **{race.speed}/10** · Altitude **{race.altitude}/10**\n"
                 f"Choices shown · **{len(options)}** "
-                f"(skill {skill:.0f} filters the noise"
-                + ("; wrong pick adds time, trap doubles it" if skill >= 7 else "")
-                + ")\n"
+                f"(read the stage — skill {skill:.0f} only helps you hold a line; "
+                f"wrong pick adds time, trap doubles it)\n"
                 f"Time lost so far · **+{race.penalty}s**"
             ),
             color=RACE_COLOR,
