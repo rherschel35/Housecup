@@ -245,14 +245,11 @@ def resolve_choice(
 class StageButton(discord.ui.Button):
     def __init__(self, race: "RaceSession", opt: dict):
         style = discord.ButtonStyle.secondary
-        skill = (race.speed + race.altitude) / 2
         if opt.get("warned"):
             # Studied trap — still marked, but only via ⚠ label + red.
             style = discord.ButtonStyle.danger
-        elif skill < 5 and opt.get("kind") in ("clean", "tech"):
-            # Only early learning races hint the racing line in blue.
-            # From skill 5 up, picks are shuffled and styled the same.
-            style = discord.ButtonStyle.primary
+        # No blue "correct line" hint — every pick should read like a real
+        # racing line; winning comes from reading the stage, not a keyword.
         super().__init__(label=opt.get("label", "…")[:80], style=style)
         self.race = race
         self.opt = opt
