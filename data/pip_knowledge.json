@@ -215,7 +215,7 @@
         "grand duel",
         "trio"
       ],
-      "answer": "`/duel` is best of three \u2014 both pick a spell in secret. Hex, Ward, Disarm, Bind, Mirror; each beats two an' loses to two. There's also `/trio scramble`, `/trio housematch`, an' `/grand` for the big leagues. Stuck on \"already in a duel\"? Cast `/duelend` to clear the lock.",
+      "answer": "`/duel` is best of three \u2014 both pick a spell in secret. Hex, Ward, Disarm, Bind, Mirror; each beats two an' loses to two. There's also `/trio scramble`, `/trio housematch`, an' `/grand` for the big leagues. Stuck on \"already in a duel\"? Cast `/duelend` to clear the lock — yours or anyone else's.",
       "link": "https://everything-velmora.netlify.app/duels"
     },
     {

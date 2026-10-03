@@ -3,7 +3,7 @@ Wizard duels. Best of three, spells chosen in secret.
 
     /duel @member              - challenge someone (1v1)
     /duelrecord [member]       - rank, wins, streak, rivals, trio/grand, points
-    /duelend [member]          - clear a stuck duel lock (self, or staff for others)
+    /duelend [member]          - clear a stuck duel lock (yours, or anyone's)
     /houseduels                - each house's overall win/loss duelling record
     /staff duels night start|end  - House Duel Night: duel wins count double
     /trio scramble             - open 3v3 signup (any houses)
@@ -973,17 +973,9 @@ class Duels(commands.Cog):
         name="duelend",
         description="End a stuck duel lock so you (or someone) can fight again.",
     )
-    @app_commands.describe(member="Whose lock to clear (staff only; leave blank for yourself)")
+    @app_commands.describe(member="Whose lock to clear (leave blank for yourself)")
     async def duelend(self, interaction: discord.Interaction, member: discord.Member = None):
         target = member or interaction.user
-        if target.id != interaction.user.id:
-            store = self.bot.get_cog("Store")
-            if not (store and store.is_staff(interaction.user)):
-                await interaction.response.send_message(
-                    "Only staff can end someone else's duel. Use `/duelend` with no one tagged for yourself.",
-                    ephemeral=True,
-                )
-                return
         status = self.clear_user(target.id)
         if status == "not_busy":
             who = "You aren't" if target.id == interaction.user.id else f"{target.display_name} isn't"
@@ -993,7 +985,8 @@ class Duels(commands.Cog):
             return
         who = "Your" if target.id == interaction.user.id else f"{target.display_name}'s"
         await interaction.response.send_message(
-            f"{who} duel lock is cleared ({status}). They can `/duel` or `/grand` again.",
+            f"{who} duel lock is cleared ({status}). "
+            f"{'You' if target.id == interaction.user.id else 'They'} can `/duel` or `/grand` again.",
             ephemeral=True,
         )
 
