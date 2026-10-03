@@ -6,7 +6,8 @@ The Forrest of Caden — solo Telltale-style story (Ch 1–2).
     /forrest status  — flags / chapter
     /forrest reset   — clear your save
 
-Locked to Headmaster Gon Vale and one test channel while Ch 1–2 are in trial.
+Open to the Headmasters role in the designated story channel(s) while Ch 1–2
+are in trial. Legacy private test channel still allows named testers.
 No house points. Owner-locked buttons. Art from story_art_assets/.
 """
 
@@ -54,8 +55,9 @@ STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "forrest_caden_state.json"
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "story_art_assets"
 
-# Open play: anyone in these channels. Private test: Gon-only break room.
+# Open play: Headmasters role in these channels. Private test: named testers.
 # Override with FORREST_OPEN_CHANNEL_IDS / FORREST_CHANNEL_ID / FORREST_TESTER_IDS.
+# Role name matches marketplace/hexes (case-insensitive).
 def _parse_id_set(raw: str, defaults: frozenset[int]) -> frozenset[int]:
     ids = frozenset(
         int(x) for x in (raw or "").split(",") if x.strip().isdigit()
@@ -67,15 +69,23 @@ FORREST_OPEN_CHANNEL_IDS = _parse_id_set(
     os.getenv("FORREST_OPEN_CHANNEL_IDS", "1555609052782919760"),
     frozenset({1555609052782919760}),
 )
-# Legacy private test channel (Gon only).
+# Legacy private test channel (named testers).
 FORREST_CHANNEL_ID = int(os.getenv("FORREST_CHANNEL_ID", "1555383179802579005") or 0)
 FORREST_TESTER_IDS = _parse_id_set(
     os.getenv("FORREST_TESTER_IDS", "555141900802457630"),
     frozenset({555141900802457630}),  # Headmaster Gon Vale
 )
+HEADMASTER_ROLE_NAME = os.getenv("FORREST_HEADMASTER_ROLE", "headmasters").strip().lower() or "headmasters"
 
 EMBED_COLOR = 0x2F4F3E
 MAX_DESC = 3800
+
+
+def _is_headmaster(member) -> bool:
+    return any(
+        (r.name or "").lower() == HEADMASTER_ROLE_NAME
+        for r in getattr(member, "roles", [])
+    )
 
 
 def _load() -> dict:
@@ -146,7 +156,7 @@ def _chunk(text: str, limit: int = MAX_DESC) -> list[str]:
 
 
 class ForrestCaden(commands.Cog):
-    """The Forrest of Caden, chapters 1–2 — open in designated channels."""
+    """The Forrest of Caden, chapters 1–2 — Headmasters in designated channels."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -156,18 +166,20 @@ class ForrestCaden(commands.Cog):
     def _allowed(self, interaction: discord.Interaction) -> str | None:
         """None if ok; otherwise an ephemeral refusal line."""
         cid = interaction.channel_id
-        # Public play channel(s): anyone who can see the channel may play.
+        # Story channel(s): Headmasters role may play.
         if cid in FORREST_OPEN_CHANNEL_IDS:
-            return None
-        # Private test channel: named testers only.
+            if _is_headmaster(interaction.user):
+                return None
+            return "The Forrest of Caden is open to the Headmasters role for now."
+        # Private test channel: named testers, or Headmasters.
         if FORREST_CHANNEL_ID and cid == FORREST_CHANNEL_ID:
-            if interaction.user.id in FORREST_TESTER_IDS:
+            if interaction.user.id in FORREST_TESTER_IDS or _is_headmaster(interaction.user):
                 return None
             return "This test channel is locked to the story testers."
         open_mentions = ", ".join(f"<#{c}>" for c in sorted(FORREST_OPEN_CHANNEL_IDS))
         if FORREST_CHANNEL_ID:
-            return f"Run `/forrest` in {open_mentions} (or the private test channel)."
-        return f"Run `/forrest` in {open_mentions}."
+            return f"Run `/forrest` in {open_mentions} (Headmasters) or the private test channel."
+        return f"Run `/forrest` in {open_mentions} (Headmasters)."
 
     def get_save(self, user_id: int) -> dict:
         players = self.state.setdefault("players", {})
@@ -198,7 +210,7 @@ class ForrestCaden(commands.Cog):
 
     forrest = app_commands.Group(
         name="forrest",
-        description="(private test) The Forrest of Caden — solo story, Ch 1–2.",
+        description="(Headmasters) The Forrest of Caden — solo story, Ch 1–2.",
     )
 
     @forrest.command(name="start", description="Start or restart The Forrest of Caden (Ch 1–2).")
