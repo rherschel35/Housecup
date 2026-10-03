@@ -5,6 +5,7 @@ Reaction roles. Post one message; reacting to it hands out a role.
     /reactionroles addhouse <emoji> <house>           - uses the role already
                                                          bound with /sethouserole
     /reactionroles remove <emoji>                     - drop a mapping
+    /reactionroles setmessage [title] [intro] [reset] - custom copy for the post
     /reactionroles post <channel>                     - publish the sign-up
                                                          message and react to it
     /reactionroles config                             - what's configured
@@ -20,6 +21,9 @@ another emoji in that same category is undone (the reaction is removed) so
 it's clear it didn't take. Un-reacting never takes a role away; the only way
 to change someone's pick afterwards is a staff member using /reactionroles
 setmember (or just editing their roles directly in Discord).
+
+Custom title/intro from /reactionroles setmessage are used the next time you
+/reactionroles post — an already-posted message is not edited in place.
 """
 
 import json
@@ -48,9 +52,18 @@ CATEGORY_CHOICES = [
     app_commands.Choice(name="House", value="house"),
 ]
 
+DEFAULT_TITLE = "Sort yourself into Velmora"
+DEFAULT_INTRO = (
+    "React below to pick yours. One pick per row - reacting to a second option in the "
+    "same row won't do anything (ask a staff member if you need it changed)."
+)
+# Leave room under the intro for the emoji lists inside Discord's embed description cap.
+MAX_TITLE_LEN = 256
+MAX_INTRO_LEN = 1500
+
 
 def _blank_state() -> dict:
-    return {"message": None, "status": {}, "houses": {}}
+    return {"message": None, "status": {}, "houses": {}, "title": None, "intro": None}
 
 
 class ReactionRoles(commands.Cog):
@@ -111,6 +124,14 @@ class ReactionRoles(commands.Cog):
         bucket = self.state["status"] if category == "status" else self.state["houses"]
         return {entry["role_id"] for entry in bucket.values()}
 
+    def _title(self) -> str:
+        custom = self.state.get("title")
+        return custom if custom else DEFAULT_TITLE
+
+    def _intro(self) -> str:
+        custom = self.state.get("intro")
+        return custom if custom else DEFAULT_INTRO
+
     # -------------------------------------------------------------- group
 
     reactionroles = app_commands.Group(name="reactionroles", description="Set up reaction-role sign-ups.")
@@ -164,6 +185,75 @@ class ReactionRoles(commands.Cog):
         self.save()
         await interaction.response.send_message(f"{emoji} removed from the sign-up.", ephemeral=True)
 
+    @reactionroles.command(name="setmessage", description="Set the title and intro for the sign-up post.")
+    @app_commands.describe(
+        title="Embed title (omit to keep the current one)",
+        intro="Opening text under the title, before the emoji list (omit to keep current)",
+        reset="Clear custom title/intro back to the defaults",
+    )
+    async def setmessage(self, interaction: discord.Interaction,
+                         title: str | None = None, intro: str | None = None,
+                         reset: bool = False):
+        store = await self._guard(interaction)
+        if store is None:
+            return
+
+        if reset:
+            self.state["title"] = None
+            self.state["intro"] = None
+            self.save()
+            await interaction.response.send_message(
+                "Sign-up copy reset to defaults. Run `/reactionroles post` to publish a new message "
+                "(the old posted one isn't edited).",
+                ephemeral=True,
+            )
+            return
+
+        if title is None and intro is None:
+            await interaction.response.send_message(
+                f"**Title:** {self._title()}\n**Intro:** {self._intro()}\n\n"
+                "Pass `title` and/or `intro` to change them, or `reset:True` for defaults. "
+                "Then `/reactionroles post` to publish.",
+                ephemeral=True,
+            )
+            return
+
+        if title is not None:
+            cleaned = title.strip()
+            if not cleaned:
+                await interaction.response.send_message(
+                    "Title can't be empty — omit it to keep the current one, or use `reset:True`.",
+                    ephemeral=True,
+                )
+                return
+            if len(cleaned) > MAX_TITLE_LEN:
+                await interaction.response.send_message(
+                    f"Title is too long ({len(cleaned)}/{MAX_TITLE_LEN}).", ephemeral=True)
+                return
+            self.state["title"] = cleaned
+
+        if intro is not None:
+            cleaned = intro.strip()
+            if not cleaned:
+                await interaction.response.send_message(
+                    "Intro can't be empty — omit it to keep the current one, or use `reset:True`.",
+                    ephemeral=True,
+                )
+                return
+            if len(cleaned) > MAX_INTRO_LEN:
+                await interaction.response.send_message(
+                    f"Intro is too long ({len(cleaned)}/{MAX_INTRO_LEN}).", ephemeral=True)
+                return
+            self.state["intro"] = cleaned
+
+        self.save()
+        await interaction.response.send_message(
+            f"Saved.\n**Title:** {self._title()}\n**Intro:** {self._intro()}\n\n"
+            "Run `/reactionroles post` when you want that copy live "
+            "(an already-posted message isn't edited).",
+            ephemeral=True,
+        )
+
     @reactionroles.command(name="config", description="What the reaction-role sign-up currently looks like.")
     async def config(self, interaction: discord.Interaction):
         store = await self._guard(interaction)
@@ -179,6 +269,8 @@ class ReactionRoles(commands.Cog):
             description="\n".join(lines) if lines else "Nothing configured yet.",
             color=discord.Color.blurple(),
         )
+        embed.add_field(name="Post title", value=self._title(), inline=False)
+        embed.add_field(name="Post intro", value=self._intro(), inline=False)
         embed.add_field(name="Posted", value=posted, inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -194,8 +286,7 @@ class ReactionRoles(commands.Cog):
                 ephemeral=True)
             return
 
-        lines = ["React below to pick yours. One pick per row - reacting to a second option in the "
-                "same row won't do anything (ask a staff member if you need it changed)."]
+        lines = [self._intro()]
         if self.state["status"]:
             lines.append("")
             lines.append("**Status**")
@@ -206,7 +297,7 @@ class ReactionRoles(commands.Cog):
             lines += [f"{emoji} — House {HOUSES[e['house']]['name']}"
                      for emoji, e in self.state["houses"].items() if e["house"] in HOUSES]
 
-        embed = discord.Embed(title="Sort yourself into Velmora", description="\n".join(lines),
+        embed = discord.Embed(title=self._title(), description="\n".join(lines),
                               color=discord.Color.gold())
         message = await channel.send(embed=embed)
         for emoji in list(self.state["status"].keys()) + list(self.state["houses"].keys()):
