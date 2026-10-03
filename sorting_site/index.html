@@ -157,19 +157,32 @@
     font-weight: 600;
     margin-bottom: 26px;
   }
-  .options { display: flex; flex-direction: column; gap: 10px; }
-  .option {
-    text-align: left;
-    background: var(--bg-elev);
-    border: 1px solid var(--border);
-    color: var(--ink);
-    padding: 15px 18px;
-    border-radius: 12px;
-    font-size: 1rem;
-    transition: border-color 150ms ease, background 150ms ease;
+  .blank-form { display: flex; flex-direction: column; gap: 14px; }
+  .blank-hint {
+    color: var(--ink-dim);
+    font-size: 0.9rem;
+    margin: -10px 0 0;
   }
-  .option:hover { border-color: var(--accent); }
-  .option.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--bg-elev)); }
+  .blank-form textarea {
+    width: 100%;
+    min-height: 110px;
+    resize: vertical;
+    font-family: inherit;
+    font-size: 1.05rem;
+    line-height: 1.45;
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-elev);
+    color: var(--ink);
+  }
+  .blank-form textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .blank-form .btn-primary { align-self: flex-start; margin-top: 4px; }
+  .blank-miss {
+    color: var(--ink-dim);
+    font-size: 0.88rem;
+    min-height: 1.2em;
+  }
 
   /* ---------- Results ---------- */
   .results { text-align: center; padding-top: clamp(16px, 6vh, 48px); }
@@ -237,6 +250,7 @@
   .row-delete:hover { color: #B23B3B; }
   .storage-note { color: var(--ink-dim); font-size: 0.82rem; margin-bottom: 20px; }
   .table-wrap { overflow-x: auto; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 </style>
 </head>
 <body>
@@ -246,7 +260,7 @@
     <div class="intro">
       <div class="kicker">Tri-Wizard Tournament</div>
       <h1>The Sorting</h1>
-      <p class="lede">Answer honestly, not strategically. Twenty-five questions, no right answers — just the one house that already fits how you actually move through the world.</p>
+      <p class="lede">Answer honestly, not strategically. Twenty-five fill-in-the-blanks, no right answers — write what you would actually do, and the house that already fits you will find you.</p>
       <div class="name-field">
         <label for="nameInput">Your name</label>
         <input type="text" id="nameInput" placeholder="Enter your name" autocomplete="off">
@@ -263,7 +277,13 @@
     <div class="progress-label" id="progressLabel">Question 1 of 10</div>
     <div class="question">
       <h2 id="questionText"></h2>
-      <div class="options" id="optionsWrap"></div>
+      <p class="blank-hint" id="blankHint">Finish the thought in your own words.</p>
+      <form class="blank-form" id="blankForm">
+        <label class="visually-hidden" for="answerInput">Your answer</label>
+        <textarea id="answerInput" rows="3" maxlength="280" placeholder="Type your answer…" autocomplete="off"></textarea>
+        <div class="blank-miss" id="blankMiss" aria-live="polite"></div>
+        <button class="btn-primary" type="submit" id="nextBtn">Continue</button>
+      </form>
     </div>
   </section>
 
@@ -352,254 +372,254 @@
 
   var QUESTIONS = [
     {
-      text: "A challenge grabs you. What happens next?",
-      options: [
-        { house: "caldrin", label: "I watch how it unfolds before I commit to anything." },
-        { house: "asterwilde", label: "I obsess over it until I've tested every angle, sensible or not." },
-        { house: "oakmont", label: "I dig in patiently — I don't quit once I've said I'm in." },
-        { house: "thornmere", label: "I look for the angle that actually gets me the result." },
-        { house: "veyren", label: "I check in with the people I trust before I move." }
-      ]
+      text: "A challenge grabs you. What happens next? I ____.",
+      keywords: {
+        caldrin: ["watch", "observe", "wait", "assess", "look first", "think first", "before i commit", "before committing", "study it", "see how"],
+        asterwilde: ["obsess", "test every", "every angle", "experiment", "try everything", "sensible or not", "tinker", "play with"],
+        oakmont: ["dig in", "don't quit", "patient", "stay in", "see it through", "commit", "won't quit", "stick with"],
+        thornmere: ["angle", "result", "advantage", "win", "best move", "get what i want", "leverage", "strategy"],
+        veyren: ["check in", "people i trust", "ask someone", "talk to", "with my people", "trusted", "who i trust"]
+      }
     },
     {
-      text: "Someone close to you lies to your face. What sticks with you longest?",
-      options: [
-        { house: "veyren", label: "It stings more than it should — trust matters that much to me." },
-        { house: "caldrin", label: "I stay calm about it. Once. Twice is a different conversation." },
-        { house: "thornmere", label: "I note it quietly and adjust how I deal with them from here." },
-        { house: "oakmont", label: "I may forgive it, but I don't forget — access has to be earned back." },
-        { house: "asterwilde", label: "Honestly, whether the lie was actually interesting." }
-      ]
+      text: "Someone close to you lies to your face. What sticks with you longest is ____.",
+      keywords: {
+        veyren: ["trust", "stings", "hurt", "betrayal", "matters that much", "broken trust"],
+        caldrin: ["stay calm", "once", "twice", "boundaries", "different conversation", "patient once"],
+        thornmere: ["note it", "adjust", "quietly", "how i deal", "file it", "remember and adapt"],
+        oakmont: ["forgive", "don't forget", "earn back", "access", "memory", "won't forget"],
+        asterwilde: ["interesting", "clever lie", "creative", "whether it was", "the story"]
+      }
     },
     {
-      text: "You've got a free afternoon with nowhere to be. You spend it —",
-      options: [
-        { house: "thornmere", label: "getting ahead on something before anyone else even starts." },
-        { house: "veyren", label: "with the one or two people who matter most, no agenda." },
-        { house: "asterwilde", label: "chasing a strange idea nobody else would bother trying." },
-        { house: "caldrin", label: "somewhere quiet, mostly in my own head." },
-        { house: "oakmont", label: "checking in on the people I care about." }
-      ]
+      text: "You've got a free afternoon with nowhere to be. You spend it ____.",
+      keywords: {
+        thornmere: ["getting ahead", "before anyone", "work ahead", "advantage", "plan ahead", "start early"],
+        veyren: ["people who matter", "no agenda", "one or two", "close friends", "with someone i love", "quality time"],
+        asterwilde: ["strange idea", "nobody else", "experiment", "weird project", "try something", "chase an idea"],
+        caldrin: ["quiet", "own head", "alone", "think", "solitude", "by myself"],
+        oakmont: ["checking in", "care about", "look after", "people i care", "make sure they're"]
+      }
     },
     {
-      text: "Which line, said about you, would land best?",
-      options: [
-        { house: "oakmont", label: "\"I know I can always count on you.\"" },
-        { house: "thornmere", label: "\"You always land on your feet.\"" },
-        { house: "veyren", label: "\"You just get me, without me having to explain.\"" },
-        { house: "asterwilde", label: "\"You're genuinely impossible to predict.\"" },
-        { house: "caldrin", label: "\"You always know when to hold back, and when not to.\"" }
-      ]
+      text: "The compliment that would land best is: \"____.\"",
+      keywords: {
+        oakmont: ["count on you", "dependable", "always there", "reliable", "loyal"],
+        thornmere: ["land on your feet", "resourceful", "find a way", "always figure it out"],
+        veyren: ["get me", "without explaining", "understand me", "just know", "read me"],
+        asterwilde: ["impossible to predict", "unpredictable", "never boring", "wild", "chaos"],
+        caldrin: ["hold back", "when not to", "know when", "composed", "measured", "timing"]
+      }
     },
     {
-      text: "In a group project, you end up as —",
-      options: [
-        { house: "asterwilde", label: "the one throwing out the ideas everyone else calls too risky." },
-        { house: "caldrin", label: "the one who steps in only when it's actually needed." },
-        { house: "thornmere", label: "the one steering it toward the best outcome — for the group, and for me." },
-        { house: "oakmont", label: "the one holding the whole thing together." },
-        { house: "veyren", label: "the one making sure nobody feels like they're carrying it alone." }
-      ]
+      text: "In a group project, you end up as the one who ____.",
+      keywords: {
+        asterwilde: ["risky", "ideas", "too far", "wild suggestion", "throwing out", "creative"],
+        caldrin: ["steps in", "when needed", "only when", "if necessary", "quiet lead"],
+        thornmere: ["steering", "best outcome", "for me", "direct", "control the", "shape it"],
+        oakmont: ["holding", "together", "glue", "keep us", "carry the", "organize"],
+        veyren: ["nobody feels", "alone", "support", "check on everyone", "make sure no one"]
+      }
     },
     {
-      text: "What would genuinely rattle you, socially?",
-      options: [
-        { house: "thornmere", label: "Getting outmaneuvered by someone I underestimated." },
-        { house: "oakmont", label: "Being betrayed by someone I actually trusted." },
-        { house: "asterwilde", label: "Being bored. Genuinely, deeply bored." },
-        { house: "veyren", label: "Losing someone close without warning." },
-        { house: "caldrin", label: "Being written off as weak." }
-      ]
+      text: "What would genuinely rattle you, socially? ____.",
+      keywords: {
+        thornmere: ["outmaneuvered", "underestimated", "outplayed", "someone smarter", "got played"],
+        oakmont: ["betrayed", "trusted", "lied to me", "backstab"],
+        asterwilde: ["bored", "boredom", "nothing happening", "routine", "dull"],
+        veyren: ["losing someone", "without warning", "sudden loss", "left behind", "abandoned"],
+        caldrin: ["written off", "weak", "dismissed", "underestimated as soft", "seen as soft"]
+      }
     },
     {
-      text: "How do you actually feel about rules?",
-      options: [
-        { house: "veyren", label: "They matter less to me than the people they affect." },
-        { house: "thornmere", label: "They're mostly a map of where the loopholes are." },
-        { house: "caldrin", label: "I follow them right up until they stop making sense." },
-        { house: "asterwilde", label: "They're interesting mainly as things to test." },
-        { house: "oakmont", label: "They matter — but people still matter more." }
-      ]
+      text: "How do you actually feel about rules? ____.",
+      keywords: {
+        veyren: ["people they affect", "people first", "impact", "harm", "who gets hurt"],
+        thornmere: ["loopholes", "map", "work around", "bend", "find the gap"],
+        caldrin: ["until they stop", "stop making sense", "follow until", "when they don't work"],
+        asterwilde: ["test", "break", "interesting", "push", "see what happens"],
+        oakmont: ["people still matter", "matter more", "fair", "protect people", "care about people"]
+      }
     },
     {
-      text: "Mid-conflict, your instinct is to —",
-      options: [
-        { house: "caldrin", label: "stay quiet, until I really can't anymore." },
-        { house: "asterwilde", label: "escalate it into something far more interesting." },
-        { house: "veyren", label: "figure out what's actually going on underneath it." },
-        { house: "thornmere", label: "work out how I come out of this ahead." },
-        { house: "oakmont", label: "say exactly what's true, loudly if I have to." }
-      ]
+      text: "Mid-conflict, your instinct is to ____.",
+      keywords: {
+        caldrin: ["stay quiet", "until i can't", "hold back", "silent", "wait"],
+        asterwilde: ["escalate", "more interesting", "turn it into", "stir", "make it bigger"],
+        veyren: ["underneath", "what's going on", "understand", "feelings", "read the room"],
+        thornmere: ["come out ahead", "advantage", "win", "position myself", "end up better"],
+        oakmont: ["what's true", "loudly", "say it", "honest", "speak up"]
+      }
     },
     {
-      text: "What do people get wrong about you most often?",
-      options: [
-        { house: "thornmere", label: "That I only care about winning." },
-        { house: "veyren", label: "That I'm quiet because I have nothing to say — I just already know what matters." },
-        { house: "oakmont", label: "That I'm soft. I forgive easily. I don't forget easily." },
-        { house: "caldrin", label: "That I'm passive. I'm just patient." },
-        { house: "asterwilde", label: "That my chaos is careless. It's never careless." }
-      ]
+      text: "What do people get wrong about you most often? ____.",
+      keywords: {
+        thornmere: ["only care about winning", "just competitive", "selfish", "only in it for"],
+        veyren: ["quiet", "nothing to say", "already know", "what matters", "shy"],
+        oakmont: ["soft", "forgive", "don't forget", "pushover"],
+        caldrin: ["passive", "patient", "do nothing", "checked out"],
+        asterwilde: ["careless", "chaos", "never careless", "mess", "random"]
+      }
     },
     {
-      text: "Years from now, what do you want people to remember about you?",
-      options: [
-        { house: "oakmont", label: "That I never once gave up on them." },
-        { house: "thornmere", label: "That I got it done, my way, every time." },
-        { house: "asterwilde", label: "That I made everything more interesting." },
-        { house: "caldrin", label: "That I knew exactly when to step up." },
-        { house: "veyren", label: "That they never had to explain themselves to me." }
-      ]
+      text: "Years from now, what do you want people to remember about you? ____.",
+      keywords: {
+        oakmont: ["never gave up", "didn't give up", "showed up", "stayed", "for them"],
+        thornmere: ["got it done", "my way", "every time", "results", "won"],
+        asterwilde: ["more interesting", "never boring", "spark", "alive", "fun"],
+        caldrin: ["when to step up", "stepped up", "right moment", "knew when"],
+        veyren: ["never had to explain", "understood", "safe with me", "got them"]
+      }
     },
     {
-      text: "You just won something. First instinct?",
-      options: [
-        { house: "asterwilde", label: "Already plotting how to make the next one messier and more fun." },
-        { house: "oakmont", label: "Thank the people who actually helped me get there." },
-        { house: "caldrin", label: "Stay quiet. Let the win speak for itself." },
-        { house: "veyren", label: "Text the one or two people who'll actually care, before anyone else." },
-        { house: "thornmere", label: "Think about how to leverage it into the next win." }
-      ]
+      text: "You just won something. First instinct? ____.",
+      keywords: {
+        asterwilde: ["next one", "messier", "more fun", "already plotting", "what's next"],
+        oakmont: ["thank", "helped", "people who", "credit", "grateful"],
+        caldrin: ["stay quiet", "win speak", "no fuss", "understated", "let it speak"],
+        veyren: ["text", "one or two", "who'll care", "close people", "before anyone else"],
+        thornmere: ["leverage", "next win", "use it", "capitalize", "stack wins"]
+      }
     },
     {
-      text: "Someone trusts you with a real secret. You —",
-      options: [
-        { house: "oakmont", label: "guard it like it's mine to protect now." },
-        { house: "caldrin", label: "keep it, and quietly note whether I should've been trusted with it." },
-        { house: "veyren", label: "hold it, simply because they trusted me with it." },
-        { house: "thornmere", label: "file it away — it might matter later." },
-        { house: "asterwilde", label: "immediately start imagining every way it could go sideways." }
-      ]
+      text: "Someone trusts you with a real secret. You ____.",
+      keywords: {
+        oakmont: ["guard", "protect", "keep safe", "mine to protect"],
+        caldrin: ["keep it", "note whether", "should've been trusted", "quietly note"],
+        veyren: ["hold it", "because they trusted", "honor", "safe with me"],
+        thornmere: ["file it", "might matter", "later", "useful", "information"],
+        asterwilde: ["go sideways", "imagine", "every way", "what if", "scenarios"]
+      }
     },
     {
-      text: "People's first impression of you is usually —",
-      options: [
-        { house: "thornmere", label: "sharp, hard to read." },
-        { house: "asterwilde", label: "a lot, in a good way." },
-        { house: "oakmont", label: "warm — but don't test me." },
-        { house: "caldrin", label: "quiet, watching everything." },
-        { house: "veyren", label: "easy to talk to." }
-      ]
+      text: "People's first impression of you is usually ____.",
+      keywords: {
+        thornmere: ["sharp", "hard to read", "guarded", "calculating"],
+        asterwilde: ["a lot", "intense", "chaotic", "extra", "big energy"],
+        oakmont: ["warm", "don't test", "friendly but", "kind until"],
+        caldrin: ["quiet", "watching", "observing", "reserved", "still"],
+        veyren: ["easy to talk", "approachable", "warm", "open", "comfortable"]
+      }
     },
     {
-      text: "When you're wrong, you —",
-      options: [
-        { house: "caldrin", label: "admit it plainly. No drama needed." },
-        { house: "oakmont", label: "own it fully, and remember not to repeat it." },
-        { house: "asterwilde", label: "own it, then get genuinely curious about why it went wrong." },
-        { house: "thornmere", label: "adjust the plan and move on fast." },
-        { house: "veyren", label: "worry more about how it affected the people around me." }
-      ]
+      text: "When you're wrong, you ____.",
+      keywords: {
+        caldrin: ["admit", "plainly", "no drama", "say so", "own it simply"],
+        oakmont: ["own it", "don't repeat", "fully", "remember", "make it right"],
+        asterwilde: ["curious", "why it went wrong", "figure out", "learn", "obsess over why"],
+        thornmere: ["adjust", "move on", "fast", "new plan", "pivot"],
+        veyren: ["affected", "people around", "hurt", "how it landed", "apologize"]
+      }
     },
     {
-      text: "Under real pressure, what do you actually rely on?",
-      options: [
-        { house: "veyren", label: "The people I trust most." },
-        { house: "thornmere", label: "My ability to think three steps ahead." },
-        { house: "caldrin", label: "Staying steady when everyone else isn't." },
-        { house: "asterwilde", label: "Instinct. I'll figure out the plan mid-air." },
-        { house: "oakmont", label: "Whatever I already promised I'd do, no matter what." }
-      ]
+      text: "Under real pressure, what do you actually rely on? ____.",
+      keywords: {
+        veyren: ["people i trust", "closest", "my people", "support", "friends"],
+        thornmere: ["three steps", "ahead", "thinking", "plan", "strategy"],
+        caldrin: ["steady", "stay calm", "composed", "everyone else isn't", "level"],
+        asterwilde: ["instinct", "mid-air", "figure it out", "improvise", "wing it"],
+        oakmont: ["promised", "no matter what", "word", "commitment", "follow through"]
+      }
     },
     {
-      text: "What actually earns your respect?",
-      options: [
-        { house: "oakmont", label: "Keeping your word, especially when it's inconvenient." },
-        { house: "asterwilde", label: "Doing something nobody else was brave enough to try." },
-        { house: "caldrin", label: "Knowing when to speak, and when not to." },
-        { house: "thornmere", label: "Being good enough that you don't need to brag about it." },
-        { house: "veyren", label: "Showing up for people without being asked." }
-      ]
+      text: "What actually earns your respect? ____.",
+      keywords: {
+        oakmont: ["keeping your word", "inconvenient", "promise", "integrity", "follow through"],
+        asterwilde: ["brave enough", "nobody else", "try", "risk", "dare"],
+        caldrin: ["when to speak", "when not", "timing", "restraint", "know when"],
+        thornmere: ["don't need to brag", "good enough", "quiet competence", "results without"],
+        veyren: ["showing up", "without being asked", "unprompted", "for people"]
+      }
     },
     {
-      text: "Your idea of a good celebration is —",
-      options: [
-        { house: "thornmere", label: "quiet — just the people who actually mattered to the win." },
-        { house: "asterwilde", label: "loud, chaotic, and slightly out of hand." },
-        { house: "oakmont", label: "a proper toast, where everyone who helped gets named." },
-        { house: "veyren", label: "small and close. Nobody performing for anyone." },
-        { house: "caldrin", label: "understated. I don't need a spectacle." }
-      ]
+      text: "Your idea of a good celebration is ____.",
+      keywords: {
+        thornmere: ["quiet", "who mattered", "small win circle", "selective"],
+        asterwilde: ["loud", "chaotic", "out of hand", "party", "wild"],
+        oakmont: ["toast", "everyone who helped", "named", "proper", "credit"],
+        veyren: ["small and close", "nobody performing", "intimate", "just us"],
+        caldrin: ["understated", "no spectacle", "low key", "simple", "quiet"]
+      }
     },
     {
-      text: "A plan falls apart at the worst moment. You —",
-      options: [
-        { house: "caldrin", label: "assess calmly before doing anything at all." },
-        { house: "asterwilde", label: "get more interested, honestly." },
-        { house: "thornmere", label: "already have three backup plans ready." },
-        { house: "oakmont", label: "hold the group together and figure it out with them." },
-        { house: "veyren", label: "check that everyone's okay before worrying about the plan." }
-      ]
+      text: "A plan falls apart at the worst moment. You ____.",
+      keywords: {
+        caldrin: ["assess", "calmly", "before doing", "pause", "think first"],
+        asterwilde: ["more interested", "excited", "now it's fun", "lean in"],
+        thornmere: ["backup", "already have", "plan b", "ready", "alternatives"],
+        oakmont: ["hold the group", "together", "figure it out with", "rally"],
+        veyren: ["everyone's okay", "check that", "people first", "are you alright"]
+      }
     },
     {
-      text: "What does loyalty actually mean to you?",
-      options: [
-        { house: "veyren", label: "Understanding someone so well that words become optional." },
-        { house: "oakmont", label: "Showing up, every time, no matter what." },
-        { house: "thornmere", label: "Something earned — and something that can be re-negotiated." },
-        { house: "caldrin", label: "Quiet consistency, not grand gestures." },
-        { house: "asterwilde", label: "Loving someone through every version of myself, chaotic ones included." }
-      ]
+      text: "What does loyalty actually mean to you? ____.",
+      keywords: {
+        veyren: ["words become optional", "understand", "without words", "deep knowing"],
+        oakmont: ["showing up", "every time", "no matter what", "always there"],
+        thornmere: ["earned", "re-negotiated", "conditional", "can change"],
+        caldrin: ["quiet consistency", "not grand", "steady", "reliable without show"],
+        asterwilde: ["every version", "chaotic", "through the mess", "love anyway"]
+      }
     },
     {
-      text: "You're most likely to be described as —",
-      options: [
-        { house: "asterwilde", label: "unpredictable." },
-        { house: "caldrin", label: "composed." },
-        { house: "thornmere", label: "strategic." },
-        { house: "oakmont", label: "dependable." },
-        { house: "veyren", label: "intuitive." }
-      ]
+      text: "You're most likely to be described as ____.",
+      keywords: {
+        asterwilde: ["unpredictable", "chaotic", "wild", "erratic", "surprising"],
+        caldrin: ["composed", "calm", "measured", "steady", "level-headed"],
+        thornmere: ["strategic", "calculating", "clever", "ambitious", "sharp"],
+        oakmont: ["dependable", "loyal", "reliable", "solid", "steadfast"],
+        veyren: ["intuitive", "empathetic", "perceptive", "feeling", "tuned in"]
+      }
     },
     {
-      text: "Someone challenges your authority. You —",
-      options: [
-        { house: "thornmere", label: "quietly recalibrate, then outmaneuver them." },
-        { house: "oakmont", label: "stand my ground, loudly if I have to." },
-        { house: "caldrin", label: "let it go — until it becomes a pattern." },
-        { house: "asterwilde", label: "get intrigued. Maybe test them right back." },
-        { house: "veyren", label: "try to understand where it's actually coming from." }
-      ]
+      text: "Someone challenges your authority. You ____.",
+      keywords: {
+        thornmere: ["recalibrate", "outmaneuver", "quietly", "outplay", "adjust then"],
+        oakmont: ["stand my ground", "loudly", "don't back down", "push back"],
+        caldrin: ["let it go", "until it becomes", "pattern", "once", "not yet"],
+        asterwilde: ["intrigued", "test them", "right back", "curious", "game on"],
+        veyren: ["understand where", "coming from", "why", "listen", "what's under"]
+      }
     },
     {
-      text: "What kind of mistake is hardest for you to forgive?",
-      options: [
-        { house: "oakmont", label: "A lie. Especially a deliberate one." },
-        { house: "veyren", label: "Someone breaking a trust I didn't think could break." },
-        { house: "caldrin", label: "Disrespect dressed up as a joke." },
-        { house: "thornmere", label: "Carelessness that ends up costing me something." },
-        { house: "asterwilde", label: "Honestly? Boredom is worse than most mistakes." }
-      ]
+      text: "What kind of mistake is hardest for you to forgive? ____.",
+      keywords: {
+        oakmont: ["lie", "deliberate", "lying", "dishonesty"],
+        veyren: ["breaking a trust", "didn't think could break", "betrayed trust", "broken trust"],
+        caldrin: ["disrespect", "joke", "dressed up", "mocking", "belittling"],
+        thornmere: ["carelessness", "costing me", "sloppy", "waste", "cost me"],
+        asterwilde: ["boredom", "boring", "dull", "wasting time", "nothing happening"]
+      }
     },
     {
-      text: "The night before something big, you're —",
-      options: [
-        { house: "caldrin", label: "alone, quiet, mentally rehearsing." },
-        { house: "asterwilde", label: "up too late, chasing one more idea." },
-        { house: "thornmere", label: "reviewing every angle I can still control." },
-        { house: "oakmont", label: "with the people who'll be there with me tomorrow." },
-        { house: "veyren", label: "talking it through with someone who really knows me." }
-      ]
+      text: "The night before something big, you're ____.",
+      keywords: {
+        caldrin: ["alone", "quiet", "rehearsing", "mentally", "prepare silently"],
+        asterwilde: ["up too late", "one more idea", "can't sleep", "still tinkering"],
+        thornmere: ["reviewing", "every angle", "control", "checklist", "covering bases"],
+        oakmont: ["with the people", "who'll be there", "together", "my people"],
+        veyren: ["talking it through", "someone who knows me", "vent", "process with"]
+      }
     },
     {
-      text: "You disagree with the group. What happens?",
-      options: [
-        { house: "veyren", label: "I say it gently — but I do say it." },
-        { house: "thornmere", label: "I wait for the moment it'll actually land." },
-        { house: "oakmont", label: "I say it plainly. I'd rather be honest than liked." },
-        { house: "caldrin", label: "I hold it until it's actually worth the friction." },
-        { house: "asterwilde", label: "I say it immediately, probably too bluntly." }
-      ]
+      text: "You disagree with the group. What happens? ____.",
+      keywords: {
+        veyren: ["gently", "but i do say", "kindly", "softly"],
+        thornmere: ["wait for the moment", "it'll land", "timing", "right moment"],
+        oakmont: ["plainly", "honest than liked", "say it straight", "rather be honest"],
+        caldrin: ["hold it", "worth the friction", "until it's worth", "pick my battles"],
+        asterwilde: ["immediately", "too bluntly", "say it now", "blunt"]
+      }
     },
     {
-      text: "What do people eventually come to learn about you?",
-      options: [
-        { house: "thornmere", label: "I was playing a longer game than they realized." },
-        { house: "caldrin", label: "The calm was never passivity." },
-        { house: "asterwilde", label: "The chaos was never careless." },
-        { house: "oakmont", label: "I don't forget who showed up." },
-        { house: "veyren", label: "I noticed far more than I ever said." }
-      ]
+      text: "What do people eventually come to learn about you? ____.",
+      keywords: {
+        thornmere: ["longer game", "than they realized", "playing", "ahead"],
+        caldrin: ["calm was never", "passivity", "not passive", "quiet strength"],
+        asterwilde: ["chaos was never", "careless", "method to", "intentional chaos"],
+        oakmont: ["don't forget", "who showed up", "remember", "loyalty remembered"],
+        veyren: ["noticed far more", "than i ever said", "paying attention", "saw everything"]
+      }
     }
   ];
 
@@ -640,16 +660,49 @@
   });
 
   var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var answerInput = document.getElementById("answerInput");
+  var blankForm = document.getElementById("blankForm");
+  var blankMiss = document.getElementById("blankMiss");
+  var nextBtn = document.getElementById("nextBtn");
 
-  function shuffled(arr) {
-    var copy = arr.slice();
-    for (var i = copy.length - 1; i > 0; i--) {
-      var j = Math.floor(Math.random() * (i + 1));
-      var tmp = copy[i];
-      copy[i] = copy[j];
-      copy[j] = tmp;
-    }
-    return copy;
+  function normalizeAnswer(s) {
+    return String(s || "")
+      .toLowerCase()
+      .replace(/[’']/g, "'")
+      .replace(/[^a-z0-9'\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function scoreAnswer(q, raw) {
+    var text = normalizeAnswer(raw);
+    var hits = {};
+    Object.keys(HOUSES).forEach(function (k) { hits[k] = 0; });
+    if (!text) return hits;
+    Object.keys(q.keywords || {}).forEach(function (house) {
+      (q.keywords[house] || []).forEach(function (kw) {
+        var needle = normalizeAnswer(kw);
+        if (!needle) return;
+        // Phrase / word match against the free-text answer.
+        if (text.indexOf(needle) !== -1) hits[house] += needle.split(" ").length;
+      });
+    });
+    return hits;
+  }
+
+  function applyAnswerHits(hits) {
+    var best = 0;
+    var winners = [];
+    Object.keys(hits).forEach(function (k) {
+      if (hits[k] > best) { best = hits[k]; winners = [k]; }
+      else if (hits[k] === best && best > 0) winners.push(k);
+    });
+    if (best === 0) return false;
+    var favoredWinners = winners.filter(function (k) { return FAVORED.indexOf(k) !== -1; });
+    var pool = favoredWinners.length ? favoredWinners : winners;
+    var house = pool[Math.floor(Math.random() * pool.length)];
+    state.scores[house] += HOUSE_WEIGHT[house] || 1;
+    return true;
   }
 
   function renderQuestion() {
@@ -657,37 +710,44 @@
     document.getElementById("progressFill").style.width = (state.index / QUESTIONS.length * 100) + "%";
     document.getElementById("progressLabel").textContent = "Question " + (state.index + 1) + " of " + QUESTIONS.length;
     document.getElementById("questionText").textContent = q.text;
-    var wrap = document.getElementById("optionsWrap");
-    wrap.innerHTML = "";
-    // Shuffle option order each time so no house is consistently first or
-    // last in the list — fixed ordering biases quick/mobile answers toward
-    // whichever house always appears last.
-    shuffled(q.options).forEach(function (opt) {
-      var btn = document.createElement("button");
-      btn.className = "option";
-      btn.type = "button";
-      btn.textContent = opt.label;
-      btn.addEventListener("click", function () { selectOption(btn, opt.house); });
-      wrap.appendChild(btn);
-    });
+    blankMiss.textContent = "";
+    answerInput.value = "";
+    nextBtn.disabled = false;
+    answerInput.focus();
   }
 
-  function selectOption(btn, house) {
-    Array.prototype.forEach.call(btn.parentNode.children, function (c) { c.classList.remove("selected"); });
-    btn.classList.add("selected");
-    Array.prototype.forEach.call(btn.parentNode.children, function (c) { c.disabled = true; });
-    state.scores[house] += HOUSE_WEIGHT[house] || 1;
+  function submitAnswer(ev) {
+    if (ev) ev.preventDefault();
+    var raw = answerInput.value.trim();
+    if (!raw) {
+      blankMiss.textContent = "Write something — a short phrase is enough.";
+      answerInput.focus();
+      return;
+    }
+    var hits = scoreAnswer(QUESTIONS[state.index], raw);
+    var matched = applyAnswerHits(hits);
+    if (!matched) {
+      // Soft fallback so odd wording still nudges the sort instead of stalling.
+      var keys = Object.keys(HOUSES);
+      var house = keys[Math.floor(Math.random() * keys.length)];
+      state.scores[house] += (HOUSE_WEIGHT[house] || 1) * 0.35;
+    }
+    nextBtn.disabled = true;
     var advance = function () {
       state.index += 1;
-      if (state.index < QUESTIONS.length) {
-        renderQuestion();
-        Array.prototype.forEach.call(document.getElementById("optionsWrap").children, function (c) { c.disabled = false; });
-      } else {
-        finishQuiz();
-      }
+      if (state.index < QUESTIONS.length) renderQuestion();
+      else finishQuiz();
     };
-    if (reducedMotion) advance(); else setTimeout(advance, 320);
+    if (reducedMotion) advance(); else setTimeout(advance, 220);
   }
+
+  blankForm.addEventListener("submit", submitAnswer);
+  answerInput.addEventListener("keydown", function (ev) {
+    if (ev.key === "Enter" && !ev.shiftKey) {
+      ev.preventDefault();
+      submitAnswer(ev);
+    }
+  });
 
   function finishQuiz() {
     document.getElementById("progressFill").style.width = "100%";
@@ -875,7 +935,7 @@
 
   // Testing shortcut: open the link with ?house=oakmont (or asterwilde / caldrin /
   // veyren / thornmere), optionally with &name=Someone, to skip straight to that
-  // house's result screen without answering all 25 questions.
+  // house's result screen without filling all 25 blanks.
   (function testingShortcut() {
     var params = new URLSearchParams(window.location.search);
     var forced = (params.get("house") || "").toLowerCase();
