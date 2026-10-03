@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The Sorting — Tri-Wizard Tournament</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #EFE7D8;
+    --bg-elev: #FBF7EE;
+    --ink: #241F30;
+    --ink-dim: #6E6478;
+    --accent: #9C6B1E;
+    --border: rgba(36,31,48,0.14);
+    --shadow: 0 1px 2px rgba(36,31,48,0.06), 0 8px 24px rgba(36,31,48,0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15121F;
+      --bg-elev: #201B30;
+      --ink: #EFE7D8;
+      --ink-dim: #B7AFC4;
+      --accent: #D6A94A;
+      --border: rgba(239,231,216,0.14);
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 32px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15121F;
+    --bg-elev: #201B30;
+    --ink: #EFE7D8;
+    --ink-dim: #B7AFC4;
+    --accent: #D6A94A;
+    --border: rgba(239,231,216,0.14);
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 32px rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: clamp(20px, 6vw, 56px) 18px;
+    line-height: 1.5;
+  }
+  .app {
+    width: 100%;
+    max-width: 640px;
+  }
+  h1, h2, h3, .display {
+    font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+    font-weight: 600;
+    line-height: 1.1;
+    margin: 0;
+  }
+  .screen { display: none; }
+  .screen.active { display: block; animation: rise 420ms ease both; }
+  @media (prefers-reduced-motion: reduce) {
+    .screen.active { animation: none; }
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---------- Intro ---------- */
+  .intro { text-align: center; padding-top: clamp(24px, 8vh, 72px); }
+  .kicker {
+    font-style: italic;
+    color: var(--ink-dim);
+    font-size: 0.95rem;
+    margin-bottom: 10px;
+  }
+  .intro h1 { font-size: clamp(2.4rem, 7vw, 3.4rem); }
+  .intro p.lede {
+    color: var(--ink-dim);
+    max-width: 46ch;
+    margin: 18px auto 0;
+    font-size: 1.05rem;
+  }
+  .name-field {
+    margin: 36px auto 0;
+    max-width: 360px;
+    text-align: left;
+  }
+  label { font-size: 0.9rem; color: var(--ink-dim); display: block; margin-bottom: 6px; }
+  input[type="text"] {
+    width: 100%;
+    font-family: inherit;
+    font-size: 1.05rem;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-elev);
+    color: var(--ink);
+  }
+  input[type="text"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  button {
+    font-family: 'Work Sans', sans-serif;
+    cursor: pointer;
+    border: none;
+  }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn-primary {
+    margin-top: 22px;
+    background: var(--accent);
+    color: var(--bg-elev);
+    font-size: 1.05rem;
+    font-weight: 600;
+    padding: 13px 30px;
+    border-radius: 999px;
+    transition: transform 150ms ease;
+  }
+  .btn-primary:hover { transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+  .link-row { margin-top: 40px; }
+  .link-btn {
+    background: none;
+    color: var(--ink-dim);
+    font-size: 0.9rem;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    padding: 6px;
+  }
+  .link-btn:hover { color: var(--ink); }
+
+  /* ---------- Quiz ---------- */
+  .progress-track {
+    height: 3px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 300ms ease;
+  }
+  @media (prefers-reduced-motion: reduce) { .progress-fill { transition: none; } }
+  .progress-label {
+    color: var(--ink-dim);
+    font-size: 0.85rem;
+    margin-bottom: 28px;
+  }
+  .question h2 {
+    font-size: clamp(1.6rem, 5vw, 2rem);
+    font-weight: 600;
+    margin-bottom: 26px;
+  }
+  .options { display: flex; flex-direction: column; gap: 10px; }
+  .option {
+    text-align: left;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    padding: 15px 18px;
+    border-radius: 12px;
+    font-size: 1rem;
+    transition: border-color 150ms ease, background 150ms ease;
+  }
+  .option:hover { border-color: var(--accent); }
+  .option.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--bg-elev)); }
+
+  /* ---------- Results ---------- */
+  .results { text-align: center; padding-top: clamp(16px, 6vh, 48px); }
+  .crest {
+    width: 132px; height: 132px;
+    border-radius: 50%;
+    margin: 0 auto 22px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2.6rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(155deg, var(--house-a, var(--accent)), var(--house-b, var(--accent)));
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .crest img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .results .for-name { color: var(--ink-dim); font-size: 1rem; margin-bottom: 4px; }
+  .results h1 { font-size: clamp(2.2rem, 7vw, 3rem); color: var(--house-a, var(--ink)); }
+  .results .animal { color: var(--ink-dim); margin-top: 6px; font-size: 1rem; }
+  .results .motto { font-style: italic; margin-top: 18px; font-size: 1.15rem; }
+  .results .blurb { max-width: 50ch; margin: 20px auto 0; color: var(--ink-dim); }
+  .results .traits { margin-top: 18px; font-size: 0.92rem; color: var(--ink-dim); max-width: 48ch; margin-left: auto; margin-right: auto; }
+  .results .actions { margin-top: 34px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn-ghost {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--ink);
+    padding: 11px 22px;
+    border-radius: 999px;
+    font-size: 0.95rem;
+  }
+  .btn-ghost:hover { border-color: var(--accent); }
+
+  /* ---------- Dashboard ---------- */
+  .dash-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+  .dash-head h1 { font-size: clamp(1.8rem, 5vw, 2.3rem); }
+  .dash-sub { color: var(--ink-dim); font-size: 0.9rem; margin-bottom: 30px; }
+  .bars { display: flex; flex-direction: column; gap: 14px; margin-bottom: 38px; }
+  .bar-row { display: grid; grid-template-columns: 110px 1fr 34px; align-items: center; gap: 12px; }
+  .bar-name { font-size: 0.92rem; }
+  .bar-track { height: 10px; border-radius: 6px; background: var(--border); overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 6px; transition: width 400ms ease; }
+  @media (prefers-reduced-motion: reduce) { .bar-fill { transition: none; } }
+  .bar-count { font-size: 0.85rem; color: var(--ink-dim); text-align: right; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--ink-dim); font-weight: 500; font-size: 0.82rem; }
+  .house-tag { display: inline-flex; align-items: center; gap: 7px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .empty-note { color: var(--ink-dim); font-size: 0.9rem; padding: 18px 0; }
+  .row-delete {
+    background: none;
+    color: var(--ink-dim);
+    font-size: 0.82rem;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    padding: 4px 6px;
+  }
+  .row-delete:hover { color: #B23B3B; }
+  .storage-note { color: var(--ink-dim); font-size: 0.82rem; margin-bottom: 20px; }
+  .table-wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <section class="screen active" id="screen-intro">
+    <div class="intro">
+      <div class="kicker">Tri-Wizard Tournament</div>
+      <h1>The Sorting</h1>
+      <p class="lede">Answer honestly, not strategically. Twenty-five questions, no right answers — just the one house that already fits how you actually move through the world.</p>
+      <div class="name-field">
+        <label for="nameInput">Your name</label>
+        <input type="text" id="nameInput" placeholder="Enter your name" autocomplete="off">
+      </div>
+      <button class="btn-primary" id="beginBtn" disabled>Begin the Sorting</button>
+      <div class="link-row">
+        <button class="link-btn" id="dashLink">View the tournament dashboard</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-quiz">
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">Question 1 of 10</div>
+    <div class="question">
+      <h2 id="questionText"></h2>
+      <div class="options" id="optionsWrap"></div>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-results">
+    <div class="results">
+      <div class="crest" id="crest"></div>
+      <div class="for-name" id="forName"></div>
+      <h1 id="houseName"></h1>
+      <div class="animal" id="houseAnimal"></div>
+      <div class="motto" id="houseMotto"></div>
+      <p class="blurb" id="houseBlurb"></p>
+      <p class="traits" id="houseTraits"></p>
+      <div class="actions">
+        <button class="btn-primary" id="anotherBtn">Sort Another Player</button>
+        <button class="btn-ghost" id="toDashBtn">View Dashboard</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-dashboard">
+    <div class="dash-head">
+      <h1>Tournament Results</h1>
+      <button class="link-btn" id="backFromDash">← Back</button>
+    </div>
+    <div class="dash-sub" id="dashCount"></div>
+    <div id="storageNote"></div>
+    <button class="link-btn" id="clearAllBtn" style="margin-bottom:24px;">Clear all results</button>
+    <div class="bars" id="bars"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Player</th><th>House</th><th>Sorted</th><th></th></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="empty-note" id="emptyNote" style="display:none;">No players have been sorted yet.</div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var HOUSES = {
+    asterwilde: {
+      name: "AsterWilde",
+      animal: "Squirrel",
+      colorA: "#2E4A6E", colorB: "#A8B4C4",
+      motto: "Wild Minds. Fierce Hearts. Beautiful Chaos.",
+      blurb: "Grown from Moonveil — same wild minds, new crest. AsterWilde attracts people far smarter than their behavior first suggests, who work hardest on the ideas everyone else would call ridiculous.",
+      traits: "Known for: chaos, intelligence, obsessive work ethic, experimentation, unpredictability, and turning terrible ideas into surprisingly effective plans."
+    },
+    oakmont: {
+      name: "Oakmont",
+      animal: "Bear",
+      colorA: "#8B5FBF", colorB: "#B8860B",
+      motto: "Rooted in Patient. Relentless in Purpose.",
+      blurb: "Grown from Vashara — same loyalty, new crest. Oakmont is fierce loyalty, truth, protection, and memory. An Oakmont gives people more chances than they should — but deliberate deception is never quite forgotten.",
+      traits: "Known for: fierce loyalty, honesty, protection, forgiveness, strong memory, passion, and commanding presence."
+    },
+    caldrin: {
+      name: "Caldrin",
+      animal: "Barbed Lemur",
+      colorA: "#5C6773", colorB: "#B08D57",
+      motto: "Measured, not meek.",
+      blurb: "The house of composure with teeth. Caldrin members observe first and act second — level-headed and patient, until patience stops working, and the barbs come out.",
+      traits: "Known for: level-headedness, patience, bluntness when it matters, boundaries, and stepping into leadership when the group actually needs it."
+    },
+    veyren: {
+      name: "Veyren",
+      animal: "Antelope",
+      colorA: "#9A2B34", colorB: "#1A1A1A",
+      motto: "Some bonds need no words.",
+      blurb: "The house of deep-rooted connection and chosen family. Veyren members read the people closest to them on a wavelength most others miss — trust must be earned, but once it is, it runs deep.",
+      traits: "Known for: loyalty, empathy, intuition, chosen family, emotional intelligence, and unspoken understanding."
+    },
+    thornmere: {
+      name: "Thornmere",
+      animal: "Wolf",
+      colorA: "#1F6F54", colorB: "#4A4A4A",
+      motto: "Loyalty is earned. Advantage is taken.",
+      blurb: "The house of resourcefulness and ambition. Thornmere members always seem to find another path — they read people well, and know exactly when to cooperate and when to play for themselves.",
+      traits: "Known for: resourcefulness, ambition, calculation, adaptability, and competitiveness."
+    }
+  };
+
+  var QUESTIONS = [
+    {
+      text: "A challenge grabs you. What happens next?",
+      options: [
+        { house: "caldrin", label: "I watch how it unfolds before I commit to anything." },
+        { house: "asterwilde", label: "I obsess over it until I've tested every angle, sensible or not." },
+        { house: "oakmont", label: "I dig in patiently — I don't quit once I've said I'm in." },
+        { house: "thornmere", label: "I look for the angle that actually gets me the result." },
+        { house: "veyren", label: "I check in with the people I trust before I move." }
+      ]
+    },
+    {
+      text: "Someone close to you lies to your face. What sticks with you longest?",
+      options: [
+        { house: "veyren", label: "It stings more than it should — trust matters that much to me." },
+        { house: "caldrin", label: "I stay calm about it. Once. Twice is a different conversation." },
+        { house: "thornmere", label: "I note it quietly and adjust how I deal with them from here." },
+        { house: "oakmont", label: "I may forgive it, but I don't forget — access has to be earned back." },
+        { house: "asterwilde", label: "Honestly, whether the lie was actually interesting." }
+      ]
+    },
+    {
+      text: "You've got a free afternoon with nowhere to be. You spend it —",
+      options: [
+        { house: "thornmere", label: "getting ahead on something before anyone else even starts." },
+        { house: "veyren", label: "with the one or two people who matter most, no agenda." },
+        { house: "asterwilde", label: "chasing a strange idea nobody else would bother trying." },
+        { house: "caldrin", label: "somewhere quiet, mostly in my own head." },
+        { house: "oakmont", label: "checking in on the people I care about." }
+      ]
+    },
+    {
+      text: "Which line, said about you, would land best?",
+      options: [
+        { house: "oakmont", label: "\"I know I can always count on you.\"" },
+        { house: "thornmere", label: "\"You always land on your feet.\"" },
+        { house: "veyren", label: "\"You just get me, without me having to explain.\"" },
+        { house: "asterwilde", label: "\"You're genuinely impossible to predict.\"" },
+        { house: "caldrin", label: "\"You always know when to hold back, and when not to.\"" }
+      ]
+    },
+    {
+      text: "In a group project, you end up as —",
+      options: [
+        { house: "asterwilde", label: "the one throwing out the ideas everyone else calls too risky." },
+        { house: "caldrin", label: "the one who steps in only when it's actually needed." },
+        { house: "thornmere", label: "the one steering it toward the best outcome — for the group, and for me." },
+        { house: "oakmont", label: "the one holding the whole thing together." },
+        { house: "veyren", label: "the one making sure nobody feels like they're carrying it alone." }
+      ]
+    },
+    {
+      text: "What would genuinely rattle you, socially?",
+      options: [
+        { house: "thornmere", label: "Getting outmaneuvered by someone I underestimated." },
+        { house: "oakmont", label: "Being betrayed by someone I actually trusted." },
+        { house: "asterwilde", label: "Being bored. Genuinely, deeply bored." },
+        { house: "veyren", label: "Losing someone close without warning." },
+        { house: "caldrin", label: "Being written off as weak." }
+      ]
+    },
+    {
+      text: "How do you actually feel about rules?",
+      options: [
+        { house: "veyren", label: "They matter less to me than the people they affect." },
+        { house: "thornmere", label: "They're mostly a map of where the loopholes are." },
+        { house: "caldrin", label: "I follow them right up until they stop making sense." },
+        { house: "asterwilde", label: "They're interesting mainly as things to test." },
+        { house: "oakmont", label: "They matter — but people still matter more." }
+      ]
+    },
+    {
+      text: "Mid-conflict, your instinct is to —",
+      options: [
+        { house: "caldrin", label: "stay quiet, until I really can't anymore." },
+        { house: "asterwilde", label: "escalate it into something far more interesting." },
+        { house: "veyren", label: "figure out what's actually going on underneath it." },
+        { house: "thornmere", label: "work out how I come out of this ahead." },
+        { house: "oakmont", label: "say exactly what's true, loudly if I have to." }
+      ]
+    },
+    {
+      text: "What do people get wrong about you most often?",
+      options: [
+        { house: "thornmere", label: "That I only care about winning." },
+        { house: "veyren", label: "That I'm quiet because I have nothing to say — I just already know what matters." },
+        { house: "oakmont", label: "That I'm soft. I forgive easily. I don't forget easily." },
+        { house: "caldrin", label: "That I'm passive. I'm just patient." },
+        { house: "asterwilde", label: "That my chaos is careless. It's never careless." }
+      ]
+    },
+    {
+      text: "Years from now, what do you want people to remember about you?",
+      options: [
+        { house: "oakmont", label: "That I never once gave up on them." },
+        { house: "thornmere", label: "That I got it done, my way, every time." },
+        { house: "asterwilde", label: "That I made everything more interesting." },
+        { house: "caldrin", label: "That I knew exactly when to step up." },
+        { house: "veyren", label: "That they never had to explain themselves to me." }
+      ]
+    },
+    {
+      text: "You just won something. First instinct?",
+      options: [
+        { house: "asterwilde", label: "Already plotting how to make the next one messier and more fun." },
+        { house: "oakmont", label: "Thank the people who actually helped me get there." },
+        { house: "caldrin", label: "Stay quiet. Let the win speak for itself." },
+        { house: "veyren", label: "Text the one or two people who'll actually care, before anyone else." },
+        { house: "thornmere", label: "Think about how to leverage it into the next win." }
+      ]
+    },
+    {
+      text: "Someone trusts you with a real secret. You —",
+      options: [
+        { house: "oakmont", label: "guard it like it's mine to protect now." },
+        { house: "caldrin", label: "keep it, and quietly note whether I should've been trusted with it." },
+        { house: "veyren", label: "hold it, simply because they trusted me with it." },
+        { house: "thornmere", label: "file it away — it might matter later." },
+        { house: "asterwilde", label: "immediately start imagining every way it could go sideways." }
+      ]
+    },
+    {
+      text: "People's first impression of you is usually —",
+      options: [
+        { house: "thornmere", label: "sharp, hard to read." },
+        { house: "asterwilde", label: "a lot, in a good way." },
+        { house: "oakmont", label: "warm — but don't test me." },
+        { house: "caldrin", label: "quiet, watching everything." },
+        { house: "veyren", label: "easy to talk to." }
+      ]
+    },
+    {
+      text: "When you're wrong, you —",
+      options: [
+        { house: "caldrin", label: "admit it plainly. No drama needed." },
+        { house: "oakmont", label: "own it fully, and remember not to repeat it." },
+        { house: "asterwilde", label: "own it, then get genuinely curious about why it went wrong." },
+        { house: "thornmere", label: "adjust the plan and move on fast." },
+        { house: "veyren", label: "worry more about how it affected the people around me." }
+      ]
+    },
+    {
+      text: "Under real pressure, what do you actually rely on?",
+      options: [
+        { house: "veyren", label: "The people I trust most." },
+        { house: "thornmere", label: "My ability to think three steps ahead." },
+        { house: "caldrin", label: "Staying steady when everyone else isn't." },
+        { house: "asterwilde", label: "Instinct. I'll figure out the plan mid-air." },
+        { house: "oakmont", label: "Whatever I already promised I'd do, no matter what." }
+      ]
+    },
+    {
+      text: "What actually earns your respect?",
+      options: [
+        { house: "oakmont", label: "Keeping your word, especially when it's inconvenient." },
+        { house: "asterwilde", label: "Doing something nobody else was brave enough to try." },
+        { house: "caldrin", label: "Knowing when to speak, and when not to." },
+        { house: "thornmere", label: "Being good enough that you don't need to brag about it." },
+        { house: "veyren", label: "Showing up for people without being asked." }
+      ]
+    },
+    {
+      text: "Your idea of a good celebration is —",
+      options: [
+        { house: "thornmere", label: "quiet — just the people who actually mattered to the win." },
+        { house: "asterwilde", label: "loud, chaotic, and slightly out of hand." },
+        { house: "oakmont", label: "a proper toast, where everyone who helped gets named." },
+        { house: "veyren", label: "small and close. Nobody performing for anyone." },
+        { house: "caldrin", label: "understated. I don't need a spectacle." }
+      ]
+    },
+    {
+      text: "A plan falls apart at the worst moment. You —",
+      options: [
+        { house: "caldrin", label: "assess calmly before doing anything at all." },
+        { house: "asterwilde", label: "get more interested, honestly." },
+        { house: "thornmere", label: "already have three backup plans ready." },
+        { house: "oakmont", label: "hold the group together and figure it out with them." },
+        { house: "veyren", label: "check that everyone's okay before worrying about the plan." }
+      ]
+    },
+    {
+      text: "What does loyalty actually mean to you?",
+      options: [
+        { house: "veyren", label: "Understanding someone so well that words become optional." },
+        { house: "oakmont", label: "Showing up, every time, no matter what." },
+        { house: "thornmere", label: "Something earned — and something that can be re-negotiated." },
+        { house: "caldrin", label: "Quiet consistency, not grand gestures." },
+        { house: "asterwilde", label: "Loving someone through every version of myself, chaotic ones included." }
+      ]
+    },
+    {
+      text: "You're most likely to be described as —",
+      options: [
+        { house: "asterwilde", label: "unpredictable." },
+        { house: "caldrin", label: "composed." },
+        { house: "thornmere", label: "strategic." },
+        { house: "oakmont", label: "dependable." },
+        { house: "veyren", label: "intuitive." }
+      ]
+    },
+    {
+      text: "Someone challenges your authority. You —",
+      options: [
+        { house: "thornmere", label: "quietly recalibrate, then outmaneuver them." },
+        { house: "oakmont", label: "stand my ground, loudly if I have to." },
+        { house: "caldrin", label: "let it go — until it becomes a pattern." },
+        { house: "asterwilde", label: "get intrigued. Maybe test them right back." },
+        { house: "veyren", label: "try to understand where it's actually coming from." }
+      ]
+    },
+    {
+      text: "What kind of mistake is hardest for you to forgive?",
+      options: [
+        { house: "oakmont", label: "A lie. Especially a deliberate one." },
+        { house: "veyren", label: "Someone breaking a trust I didn't think could break." },
+        { house: "caldrin", label: "Disrespect dressed up as a joke." },
+        { house: "thornmere", label: "Carelessness that ends up costing me something." },
+        { house: "asterwilde", label: "Honestly? Boredom is worse than most mistakes." }
+      ]
+    },
+    {
+      text: "The night before something big, you're —",
+      options: [
+        { house: "caldrin", label: "alone, quiet, mentally rehearsing." },
+        { house: "asterwilde", label: "up too late, chasing one more idea." },
+        { house: "thornmere", label: "reviewing every angle I can still control." },
+        { house: "oakmont", label: "with the people who'll be there with me tomorrow." },
+        { house: "veyren", label: "talking it through with someone who really knows me." }
+      ]
+    },
+    {
+      text: "You disagree with the group. What happens?",
+      options: [
+        { house: "veyren", label: "I say it gently — but I do say it." },
+        { house: "thornmere", label: "I wait for the moment it'll actually land." },
+        { house: "oakmont", label: "I say it plainly. I'd rather be honest than liked." },
+        { house: "caldrin", label: "I hold it until it's actually worth the friction." },
+        { house: "asterwilde", label: "I say it immediately, probably too bluntly." }
+      ]
+    },
+    {
+      text: "What do people eventually come to learn about you?",
+      options: [
+        { house: "thornmere", label: "I was playing a longer game than they realized." },
+        { house: "caldrin", label: "The calm was never passivity." },
+        { house: "asterwilde", label: "The chaos was never careless." },
+        { house: "oakmont", label: "I don't forget who showed up." },
+        { house: "veyren", label: "I noticed far more than I ever said." }
+      ]
+    }
+  ];
+
+  var state = { name: "", index: 0, scores: {}, current: null };
+  Object.keys(HOUSES).forEach(function (k) { state.scores[k] = 0; });
+
+  // All five houses are open. Caldrin and AsterWilde are gently favored: each
+  // answer for them counts a little extra, and they win any tie. Someone who
+  // clearly leans toward another house still lands there.
+  var HOUSE_WEIGHT = { caldrin: 1.2, asterwilde: 1.2 };
+  var FAVORED = ["caldrin", "asterwilde"];
+
+  var SHEET_URL = "https://script.google.com/macros/s/AKfycbyqBL0qvyx_wc-hYCN26JKZYcoX1OBx-O0KZkYdWKQQc_z_o-nzUj23rZsyRE6AdWo-pw/exec";
+
+  var screens = {
+    intro: document.getElementById("screen-intro"),
+    quiz: document.getElementById("screen-quiz"),
+    results: document.getElementById("screen-results"),
+    dashboard: document.getElementById("screen-dashboard")
+  };
+  function show(name) {
+    Object.keys(screens).forEach(function (k) {
+      screens[k].classList.toggle("active", k === name);
+    });
+  }
+
+  var nameInput = document.getElementById("nameInput");
+  var beginBtn = document.getElementById("beginBtn");
+  nameInput.addEventListener("input", function () {
+    beginBtn.disabled = nameInput.value.trim().length === 0;
+  });
+  beginBtn.addEventListener("click", function () {
+    state.name = nameInput.value.trim();
+    state.index = 0;
+    Object.keys(HOUSES).forEach(function (k) { state.scores[k] = 0; });
+    renderQuestion();
+    show("quiz");
+  });
+
+  var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function shuffled(arr) {
+    var copy = arr.slice();
+    for (var i = copy.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = copy[i];
+      copy[i] = copy[j];
+      copy[j] = tmp;
+    }
+    return copy;
+  }
+
+  function renderQuestion() {
+    var q = QUESTIONS[state.index];
+    document.getElementById("progressFill").style.width = (state.index / QUESTIONS.length * 100) + "%";
+    document.getElementById("progressLabel").textContent = "Question " + (state.index + 1) + " of " + QUESTIONS.length;
+    document.getElementById("questionText").textContent = q.text;
+    var wrap = document.getElementById("optionsWrap");
+    wrap.innerHTML = "";
+    // Shuffle option order each time so no house is consistently first or
+    // last in the list — fixed ordering biases quick/mobile answers toward
+    // whichever house always appears last.
+    shuffled(q.options).forEach(function (opt) {
+      var btn = document.createElement("button");
+      btn.className = "option";
+      btn.type = "button";
+      btn.textContent = opt.label;
+      btn.addEventListener("click", function () { selectOption(btn, opt.house); });
+      wrap.appendChild(btn);
+    });
+  }
+
+  function selectOption(btn, house) {
+    Array.prototype.forEach.call(btn.parentNode.children, function (c) { c.classList.remove("selected"); });
+    btn.classList.add("selected");
+    Array.prototype.forEach.call(btn.parentNode.children, function (c) { c.disabled = true; });
+    state.scores[house] += HOUSE_WEIGHT[house] || 1;
+    var advance = function () {
+      state.index += 1;
+      if (state.index < QUESTIONS.length) {
+        renderQuestion();
+        Array.prototype.forEach.call(document.getElementById("optionsWrap").children, function (c) { c.disabled = false; });
+      } else {
+        finishQuiz();
+      }
+    };
+    if (reducedMotion) advance(); else setTimeout(advance, 320);
+  }
+
+  function finishQuiz() {
+    document.getElementById("progressFill").style.width = "100%";
+    var max = -1, winners = [];
+    Object.keys(state.scores).forEach(function (k) {
+      if (state.scores[k] > max) { max = state.scores[k]; winners = [k]; }
+      else if (state.scores[k] === max) { winners.push(k); }
+    });
+    var favoredWinners = winners.filter(function (k) { return FAVORED.indexOf(k) !== -1; });
+    var pool = favoredWinners.length ? favoredWinners : winners;
+    var house = pool[Math.floor(Math.random() * pool.length)];
+    state.current = house;
+    showResults(house);
+    saveResult(state.name, state.scores, house);
+  }
+
+  function showResults(houseKey) {
+    var h = HOUSES[houseKey];
+    var crest = document.getElementById("crest");
+    crest.style.setProperty("--house-a", h.colorA);
+    crest.style.setProperty("--house-b", h.colorB);
+    crest.innerHTML = "";
+    var img = document.createElement("img");
+    img.src = "crests/" + houseKey + ".jpg";
+    img.alt = "House " + h.name + " crest";
+    img.onerror = function () {
+      crest.innerHTML = "";
+      crest.textContent = h.name.charAt(0);
+    };
+    crest.appendChild(img);
+    document.getElementById("houseName").style.setProperty("--house-a", h.colorA);
+    document.getElementById("forName").textContent = state.name + " has been sorted into";
+    document.getElementById("houseName").textContent = h.name;
+    document.getElementById("houseAnimal").textContent = h.animal;
+    var motto = document.getElementById("houseMotto");
+    if (h.motto) { motto.textContent = "\u201C" + h.motto + "\u201D"; motto.style.display = "block"; }
+    else { motto.style.display = "none"; }
+    document.getElementById("houseBlurb").textContent = h.blurb;
+    document.getElementById("houseTraits").textContent = h.traits;
+    show("results");
+  }
+
+  document.getElementById("anotherBtn").addEventListener("click", function () {
+    nameInput.value = "";
+    beginBtn.disabled = true;
+    show("intro");
+  });
+  document.getElementById("toDashBtn").addEventListener("click", function () { openDashboard(); });
+  document.getElementById("dashLink").addEventListener("click", function () { openDashboard(); });
+  document.getElementById("backFromDash").addEventListener("click", function () { show("intro"); });
+
+  function saveResult(name, scores, house) {
+    var record = { id: makeLocalId(), name: name, house: house, ts: Date.now() };
+    saveLocal(record);
+    fetch(SHEET_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(record)
+    }).catch(function (e) { console.error("sheet save failed", e); });
+  }
+  function makeLocalId() {
+    return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : "local_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+  }
+  function saveLocal(record) {
+    try {
+      var key = "triwizard_sorting_responses";
+      var arr = JSON.parse(localStorage.getItem(key) || "[]");
+      arr.push(record);
+      localStorage.setItem(key, JSON.stringify(arr));
+    } catch (e) { /* storage unavailable; nothing more we can do */ }
+  }
+  function loadLocal() {
+    try { return JSON.parse(localStorage.getItem("triwizard_sorting_responses") || "[]"); }
+    catch (e) { return []; }
+  }
+  function deleteLocal(id) {
+    try {
+      var key = "triwizard_sorting_responses";
+      var arr = JSON.parse(localStorage.getItem(key) || "[]");
+      arr = arr.filter(function (r) { return r.id !== id; });
+      localStorage.setItem(key, JSON.stringify(arr));
+      return arr;
+    } catch (e) { return loadLocal(); }
+  }
+
+  var dashPoll = null;
+  function openDashboard() {
+    show("dashboard");
+    document.getElementById("storageNote").innerHTML = "";
+    loadDashboard();
+    if (dashPoll) clearInterval(dashPoll);
+    dashPoll = setInterval(function () {
+      if (screens.dashboard.classList.contains("active")) loadDashboard();
+      else { clearInterval(dashPoll); dashPoll = null; }
+    }, 6000);
+  }
+
+  function loadDashboard() {
+    fetch(SHEET_URL)
+      .then(function (res) { return res.json(); })
+      .then(function (rows) {
+        rows = (rows || []).slice().sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+        renderDashboard(rows);
+      })
+      .catch(function (e) {
+        console.error("sheet load failed", e);
+        var note = document.getElementById("storageNote");
+        note.innerHTML = '<div class="storage-note">Couldn\u2019t reach the shared results sheet \u2014 showing results saved on this device only.</div>';
+        renderDashboard(loadLocal());
+      });
+  }
+
+  function renderDashboard(rows) {
+    rows = rows || [];
+    document.getElementById("dashCount").textContent =
+      rows.length === 0 ? "No one sorted yet." : rows.length + " player" + (rows.length === 1 ? "" : "s") + " sorted so far.";
+
+    var counts = {};
+    Object.keys(HOUSES).forEach(function (k) { counts[k] = 0; });
+    rows.forEach(function (r) { if (counts[r.house] !== undefined) counts[r.house] += 1; });
+    var max = Math.max.apply(null, Object.keys(counts).map(function (k) { return counts[k]; }).concat([1]));
+
+    var barsEl = document.getElementById("bars");
+    barsEl.innerHTML = "";
+    Object.keys(HOUSES).forEach(function (k) {
+      var h = HOUSES[k];
+      var row = document.createElement("div");
+      row.className = "bar-row";
+      row.innerHTML =
+        '<div class="bar-name">' + h.name + '</div>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + (counts[k] / max * 100) + '%; background:' + h.colorA + ';"></div></div>' +
+        '<div class="bar-count">' + counts[k] + '</div>';
+      barsEl.appendChild(row);
+    });
+
+    var tbody = document.getElementById("tableBody");
+    var emptyNote = document.getElementById("emptyNote");
+    tbody.innerHTML = "";
+    if (rows.length === 0) {
+      emptyNote.style.display = "block";
+    } else {
+      emptyNote.style.display = "none";
+      rows.forEach(function (r) {
+        var h = HOUSES[r.house] || { name: r.house, colorA: "#999" };
+        var tr = document.createElement("tr");
+        var when = r.ts ? new Date(r.ts).toLocaleString() : "";
+        tr.innerHTML =
+          "<td>" + escapeHtml(r.name || "\u2014") + "</td>" +
+          '<td><span class="house-tag"><span class="dot" style="background:' + h.colorA + ';"></span>' + h.name + "</span></td>" +
+          "<td>" + when + "</td>" +
+          '<td><button class="row-delete" type="button">Delete</button></td>';
+        tr.querySelector(".row-delete").addEventListener("click", function () { deleteRow(r.id); });
+        tbody.appendChild(tr);
+      });
+    }
+  }
+
+  function deleteRow(id) {
+    if (!id) return;
+    deleteLocal(id);
+    fetch(SHEET_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "delete", id: id })
+    }).then(function () { loadDashboard(); })
+      .catch(function (e) { console.error("delete failed", e); });
+  }
+
+  document.getElementById("clearAllBtn").addEventListener("click", function () {
+    if (!window.confirm("Delete every saved result? This can't be undone.")) return;
+    try { localStorage.setItem("triwizard_sorting_responses", "[]"); } catch (e) {}
+    fetch(SHEET_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "clear" })
+    }).then(function () { loadDashboard(); })
+      .catch(function (e) { console.error("clear all failed", e); renderDashboard([]); });
+  });
+
+  function escapeHtml(s) {
+    var div = document.createElement("div");
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  // Testing shortcut: open the link with ?house=oakmont (or asterwilde / caldrin /
+  // veyren / thornmere), optionally with &name=Someone, to skip straight to that
+  // house's result screen without answering all 25 questions.
+  (function testingShortcut() {
+    var params = new URLSearchParams(window.location.search);
+    var forced = (params.get("house") || "").toLowerCase();
+    if (!HOUSES[forced]) return;
+    state.name = params.get("name") || "Test Player";
+    Object.keys(HOUSES).forEach(function (k) { state.scores[k] = (k === forced) ? QUESTIONS.length : 0; });
+    state.current = forced;
+    showResults(forced);
+    saveResult(state.name, state.scores, forced);
+  })();
+})();
+</script>
+</body>
+</html>
