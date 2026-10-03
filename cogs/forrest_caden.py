@@ -229,6 +229,19 @@ class ForrestCaden(commands.Cog):
         self._sessions[interaction.user.id] = session
         await session.show(interaction.followup)
 
+    @staticmethod
+    def _leave_pause(save: dict) -> None:
+        """If the save is parked on the paused end-node, restore the beat to resume."""
+        if save.get("node") != "paused":
+            return
+        nxt = save.get("resume_node")
+        if not nxt or nxt == "paused" or nxt not in NODES:
+            # Older saves (paused before we stored resume_node): Ch1 stop → ch1_end.
+            nxt = "ch2_arrive" if int(save.get("chapter") or 1) >= 2 else "ch1_end"
+        save["node"] = nxt
+        save["page"] = 0
+        save.pop("resume_node", None)
+
     @forrest.command(name="resume", description="Resume your Forrest of Caden run.")
     async def forrest_resume(self, interaction: discord.Interaction):
         refuse = self._allowed(interaction)
@@ -242,6 +255,7 @@ class ForrestCaden(commands.Cog):
                     "No run yet. Use `/forrest start`.", ephemeral=True
                 )
                 return
+        self._leave_pause(save)
         save["active"] = True
         self.write()
         await interaction.response.defer()
@@ -874,6 +888,11 @@ class StorySession:
     async def _advance(self, goto: Optional[str]) -> None:
         if not goto:
             return
+        # Remember where "Stop here for now" left off so /forrest resume can return.
+        if goto == "paused":
+            prev = self.save.get("node")
+            if prev and prev != "paused":
+                self.save["resume_node"] = prev
         self.save["node"] = goto
         self.save["page"] = 0
         if goto.startswith("ch2") or NODES.get(goto, {}).get("chapter") == 2:

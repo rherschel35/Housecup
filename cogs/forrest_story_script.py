@@ -562,7 +562,8 @@ CH1_NODES: dict[str, dict] = {
     "paused": {
         "art": "title",
         "pages": [
-            "Story paused. Use `/forrest resume` when you want to continue."
+            "Story paused. Use `/forrest resume` when you want to continue — "
+            "it'll pick up where you left off."
         ],
         "end": True,
     },
