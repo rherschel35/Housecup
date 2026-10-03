@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The Sorting — Tri-Wizard Tournament</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #EFE7D8;
+    --bg-elev: #FBF7EE;
+    --ink: #241F30;
+    --ink-dim: #6E6478;
+    --accent: #9C6B1E;
+    --border: rgba(36,31,48,0.14);
+    --shadow: 0 1px 2px rgba(36,31,48,0.06), 0 8px 24px rgba(36,31,48,0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15121F;
+      --bg-elev: #201B30;
+      --ink: #EFE7D8;
+      --ink-dim: #B7AFC4;
+      --accent: #D6A94A;
+      --border: rgba(239,231,216,0.14);
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 32px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15121F;
+    --bg-elev: #201B30;
+    --ink: #EFE7D8;
+    --ink-dim: #B7AFC4;
+    --accent: #D6A94A;
+    --border: rgba(239,231,216,0.14);
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 32px rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: clamp(20px, 6vw, 56px) 18px;
+    line-height: 1.5;
+  }
+  .app {
+    width: 100%;
+    max-width: 640px;
+  }
+  h1, h2, h3, .display {
+    font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+    font-weight: 600;
+    line-height: 1.1;
+    margin: 0;
+  }
+  .screen { display: none; }
+  .screen.active { display: block; animation: rise 420ms ease both; }
+  @media (prefers-reduced-motion: reduce) {
+    .screen.active { animation: none; }
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---------- Intro ---------- */
+  .intro { text-align: center; padding-top: clamp(24px, 8vh, 72px); }
+  .kicker {
+    font-style: italic;
+    color: var(--ink-dim);
+    font-size: 0.95rem;
+    margin-bottom: 10px;
+  }
+  .intro h1 { font-size: clamp(2.4rem, 7vw, 3.4rem); }
+  .intro p.lede {
+    color: var(--ink-dim);
+    max-width: 46ch;
+    margin: 18px auto 0;
+    font-size: 1.05rem;
+  }
+  .name-field {
+    margin: 36px auto 0;
+    max-width: 360px;
+    text-align: left;
+  }
+  label { font-size: 0.9rem; color: var(--ink-dim); display: block; margin-bottom: 6px; }
+  input[type="text"] {
+    width: 100%;
+    font-family: inherit;
+    font-size: 1.05rem;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-elev);
+    color: var(--ink);
+  }
+  input[type="text"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  button {
+    font-family: 'Work Sans', sans-serif;
+    cursor: pointer;
+    border: none;
+  }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn-primary {
+    margin-top: 22px;
+    background: var(--accent);
+    color: var(--bg-elev);
+    font-size: 1.05rem;
+    font-weight: 600;
+    padding: 13px 30px;
+    border-radius: 999px;
+    transition: transform 150ms ease;
+  }
+  .btn-primary:hover { transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+  .link-row { margin-top: 40px; }
+  .link-btn {
+    background: none;
+    color: var(--ink-dim);
+    font-size: 0.9rem;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    padding: 6px;
+  }
+  .link-btn:hover { color: var(--ink); }
+
+  /* ---------- Quiz ---------- */
+  .progress-track {
+    height: 3px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 300ms ease;
+  }
+  @media (prefers-reduced-motion: reduce) { .progress-fill { transition: none; } }
+  .progress-label {
+    color: var(--ink-dim);
+    font-size: 0.85rem;
+    margin-bottom: 28px;
+  }
+  .question h2 {
+    font-size: clamp(1.6rem, 5vw, 2rem);
+    font-weight: 600;
+    margin-bottom: 26px;
+  }
+  .blank-form { display: flex; flex-direction: column; gap: 14px; }
+  .blank-hint {
+    color: var(--ink-dim);
+    font-size: 0.9rem;
+    margin: -10px 0 0;
+  }
+  .blank-form textarea {
+    width: 100%;
+    min-height: 110px;
+    resize: vertical;
+    font-family: inherit;
+    font-size: 1.05rem;
+    line-height: 1.45;
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-elev);
+    color: var(--ink);
+  }
+  .blank-form textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .blank-form .btn-primary { align-self: flex-start; margin-top: 4px; }
+  .blank-miss {
+    color: var(--ink-dim);
+    font-size: 0.88rem;
+    min-height: 1.2em;
+  }
+
+  /* ---------- Results ---------- */
+  .results { text-align: center; padding-top: clamp(16px, 6vh, 48px); }
+  .crest {
+    width: 132px; height: 132px;
+    border-radius: 50%;
+    margin: 0 auto 22px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2.6rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(155deg, var(--house-a, var(--accent)), var(--house-b, var(--accent)));
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .crest img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .results .for-name { color: var(--ink-dim); font-size: 1rem; margin-bottom: 4px; }
+  .results h1 { font-size: clamp(2.2rem, 7vw, 3rem); color: var(--house-a, var(--ink)); }
+  .results .animal { color: var(--ink-dim); margin-top: 6px; font-size: 1rem; }
+  .results .motto { font-style: italic; margin-top: 18px; font-size: 1.15rem; }
+  .results .blurb { max-width: 50ch; margin: 20px auto 0; color: var(--ink-dim); }
+  .results .traits { margin-top: 18px; font-size: 0.92rem; color: var(--ink-dim); max-width: 48ch; margin-left: auto; margin-right: auto; }
+  .results .actions { margin-top: 34px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn-ghost {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--ink);
+    padding: 11px 22px;
+    border-radius: 999px;
+    font-size: 0.95rem;
+  }
+  .btn-ghost:hover { border-color: var(--accent); }
+
+  /* ---------- Dashboard ---------- */
+  .dash-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+  .dash-head h1 { font-size: clamp(1.8rem, 5vw, 2.3rem); }
+  .dash-sub { color: var(--ink-dim); font-size: 0.9rem; margin-bottom: 30px; }
+  .bars { display: flex; flex-direction: column; gap: 14px; margin-bottom: 38px; }
+  .bar-row { display: grid; grid-template-columns: 110px 1fr 34px; align-items: center; gap: 12px; }
+  .bar-name { font-size: 0.92rem; }
+  .bar-track { height: 10px; border-radius: 6px; background: var(--border); overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 6px; transition: width 400ms ease; }
+  @media (prefers-reduced-motion: reduce) { .bar-fill { transition: none; } }
+  .bar-count { font-size: 0.85rem; color: var(--ink-dim); text-align: right; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--ink-dim); font-weight: 500; font-size: 0.82rem; }
+  .house-tag { display: inline-flex; align-items: center; gap: 7px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .empty-note { color: var(--ink-dim); font-size: 0.9rem; padding: 18px 0; }
+  .row-delete {
+    background: none;
+    color: var(--ink-dim);
+    font-size: 0.82rem;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    padding: 4px 6px;
+  }
+  .row-delete:hover { color: #B23B3B; }
+  .storage-note { color: var(--ink-dim); font-size: 0.82rem; margin-bottom: 20px; }
+  .table-wrap { overflow-x: auto; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <section class="screen active" id="screen-intro">
+    <div class="intro">
+      <div class="kicker">Tri-Wizard Tournament</div>
+      <h1>The Sorting</h1>
+      <p class="lede">Answer honestly, not strategically. Twenty-five fill-in-the-blanks, no right answers — write what you would actually do, and the house that already fits you will find you.</p>
+      <div class="name-field">
+        <label for="nameInput">Your name</label>
+        <input type="text" id="nameInput" placeholder="Enter your name" autocomplete="off">
+      </div>
+      <button class="btn-primary" id="beginBtn" disabled>Begin the Sorting</button>
+      <div class="link-row">
+        <button class="link-btn" id="dashLink">View the tournament dashboard</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-quiz">
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">Question 1 of 10</div>
+    <div class="question">
+      <h2 id="questionText"></h2>
+      <p class="blank-hint" id="blankHint">Finish the thought in your own words.</p>
+      <form class="blank-form" id="blankForm">
+        <label class="visually-hidden" for="answerInput">Your answer</label>
+        <textarea id="answerInput" rows="3" maxlength="280" placeholder="Type your answer…" autocomplete="off"></textarea>
+        <div class="blank-miss" id="blankMiss" aria-live="polite"></div>
+        <button class="btn-primary" type="submit" id="nextBtn">Continue</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-results">
+    <div class="results">
+      <div class="crest" id="crest"></div>
+      <div class="for-name" id="forName"></div>
+      <h1 id="houseName"></h1>
+      <div class="animal" id="houseAnimal"></div>
+      <div class="motto" id="houseMotto"></div>
+      <p class="blurb" id="houseBlurb"></p>
+      <p class="traits" id="houseTraits"></p>
+      <div class="actions">
+        <button class="btn-primary" id="anotherBtn">Sort Another Player</button>
+        <button class="btn-ghost" id="toDashBtn">View Dashboard</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-dashboard">
+    <div class="dash-head">
+      <h1>Tournament Results</h1>
+      <button class="link-btn" id="backFromDash">← Back</button>
+    </div>
+    <div class="dash-sub" id="dashCount"></div>
+    <div id="storageNote"></div>
+    <button class="link-btn" id="clearAllBtn" style="margin-bottom:24px;">Clear all results</button>
+    <div class="bars" id="bars"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Player</th><th>House</th><th>Sorted</th><th></th></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="empty-note" id="emptyNote" style="display:none;">No players have been sorted yet.</div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var HOUSES = {
+    asterwilde: {
+      name: "AsterWilde",
+      animal: "Squirrel",
+      colorA: "#2E4A6E", colorB: "#A8B4C4",
+      motto: "Wild Minds. Fierce Hearts. Beautiful Chaos.",
+      blurb: "Grown from Moonveil — same wild minds, new crest. AsterWilde attracts people far smarter than their behavior first suggests, who work hardest on the ideas everyone else would call ridiculous.",
+      traits: "Known for: chaos, intelligence, obsessive work ethic, experimentation, unpredictability, and turning terrible ideas into surprisingly effective plans."
+    },
+    oakmont: {
+      name: "Oakmont",
+      animal: "Bear",
+      colorA: "#8B5FBF", colorB: "#B8860B",
+      motto: "Rooted in Patience. Relentless in Purpose.",
+      blurb: "Grown from Vashara — same loyalty, new crest. Oakmont is fierce loyalty, truth, protection, and memory. An Oakmont gives people more chances than they should — but deliberate deception is never quite forgotten.",
+      traits: "Known for: fierce loyalty, honesty, protection, forgiveness, strong memory, passion, and commanding presence."
+    },
+    caldrin: {
+      name: "Caldrin",
+      animal: "Barbed Lemur",
+      colorA: "#5C6773", colorB: "#B08D57",
+      motto: "Measured, not meek.",
+      blurb: "The house of composure with teeth. Caldrin members observe first and act second — level-headed and patient, until patience stops working, and the barbs come out.",
+      traits: "Known for: level-headedness, patience, bluntness when it matters, boundaries, and stepping into leadership when the group actually needs it."
+    },
+    veyren: {
+      name: "Veyren",
+      animal: "Antelope",
+      colorA: "#9A2B34", colorB: "#1A1A1A",
+      motto: "Some bonds need no words.",
+      blurb: "The house of deep-rooted connection and chosen family. Veyren members read the people closest to them on a wavelength most others miss — trust must be earned, but once it is, it runs deep.",
+      traits: "Known for: loyalty, empathy, intuition, chosen family, emotional intelligence, and unspoken understanding."
+    },
+    thornmere: {
+      name: "Thornmere",
+      animal: "Wolf",
+      colorA: "#1F6F54", colorB: "#4A4A4A",
+      motto: "Loyalty is earned. Advantage is taken.",
+      blurb: "The house of resourcefulness and ambition. Thornmere members always seem to find another path — they read people well, and know exactly when to cooperate and when to play for themselves.",
+      traits: "Known for: resourcefulness, ambition, calculation, adaptability, and competitiveness."
+    }
+  };
+
+  var QUESTIONS = [
+    {
+      text: "A challenge grabs you. What happens next? I ____.",
+      keywords: {
+        caldrin: ["watch", "observe", "wait", "assess", "look first", "think first", "before i commit", "before committing", "study it", "see how", "sit back", "hang back", "take a beat", "read the room first", "size it up"],
+        asterwilde: ["obsess", "test every", "every angle", "experiment", "try everything", "sensible or not", "tinker", "play with", "jump in", "dive in", "go all in", "hyperfix", "fix it"],
+        oakmont: ["dig in", "don't quit", "patient", "stay in", "see it through", "commit", "won't quit", "stick with", "keep going", "grind", "persist", "stay the course"],
+        thornmere: ["angle", "result", "advantage", "win", "best move", "get what i want", "leverage", "strategy", "find the edge", "play to win", "work the angle", "game it"],
+        veyren: ["check in", "people i trust", "ask someone", "talk to", "with my people", "trusted", "who i trust", "ask my people", "check with friends", "talk it over"]
+      }
+    },
+    {
+      text: "Someone close to you lies to your face. What sticks with you longest is ____.",
+      keywords: {
+        veyren: ["trust", "stings", "hurt", "betrayal", "matters that much", "broken trust", "it hurts", "disappointed", "heartbroken", "they lied"],
+        caldrin: ["stay calm", "once", "twice", "boundaries", "different conversation", "patient once", "cool off", "keep my cool", "second chance", "one more time"],
+        thornmere: ["note it", "adjust", "quietly", "how i deal", "file it", "remember and adapt", "watch them closer", "update my read", "take note"],
+        oakmont: ["forgive", "don't forget", "earn back", "access", "memory", "won't forget", "hard to forgive", "trust is broken", "remember forever"],
+        asterwilde: ["interesting", "clever lie", "creative", "whether it was", "the story", "kind of impressed", "bold of them", "plot twist"]
+      }
+    },
+    {
+      text: "You've got a free afternoon with nowhere to be. You spend it ____.",
+      keywords: {
+        thornmere: ["getting ahead", "before anyone", "work ahead", "advantage", "plan ahead", "start early"],
+        veyren: ["people who matter", "no agenda", "one or two", "close friends", "with someone i love", "quality time"],
+        asterwilde: ["strange idea", "nobody else", "experiment", "weird project", "try something", "chase an idea"],
+        caldrin: ["quiet", "own head", "alone", "think", "solitude", "by myself"],
+        oakmont: ["checking in", "care about", "look after", "people i care", "make sure they're"]
+      }
+    },
+    {
+      text: "The compliment that would land best is: \"____.\"",
+      keywords: {
+        oakmont: ["count on you", "dependable", "always there", "reliable", "loyal"],
+        thornmere: ["land on your feet", "resourceful", "find a way", "always figure it out"],
+        veyren: ["get me", "without explaining", "understand me", "just know", "read me"],
+        asterwilde: ["impossible to predict", "unpredictable", "never boring", "wild", "chaos"],
+        caldrin: ["hold back", "when not to", "know when", "composed", "measured", "timing"]
+      }
+    },
+    {
+      text: "In a group project, you end up as the one who ____.",
+      keywords: {
+        asterwilde: ["risky", "ideas", "too far", "wild suggestion", "throwing out", "creative", "you keep things interesting", "never a dull moment"],
+        caldrin: ["steps in", "when needed", "only when", "if necessary", "quiet lead", "you know when to speak", "you pick your moments"],
+        thornmere: ["steering", "best outcome", "for me", "direct", "control the", "shape it", "you always figure it out", "you make it work"],
+        oakmont: ["holding", "together", "glue", "keep us", "carry the", "organize", "i can count on you", "you show up", "you never flake"],
+        veyren: ["nobody feels", "alone", "support", "check on everyone", "make sure no one", "you just get me", "you understand without words"]
+      }
+    },
+    {
+      text: "What would genuinely rattle you, socially? ____.",
+      keywords: {
+        thornmere: ["outmaneuvered", "underestimated", "outplayed", "someone smarter", "got played"],
+        oakmont: ["betrayed", "trusted", "lied to me", "backstab"],
+        asterwilde: ["bored", "boredom", "nothing happening", "routine", "dull"],
+        veyren: ["losing someone", "without warning", "sudden loss", "left behind", "abandoned"],
+        caldrin: ["written off", "weak", "dismissed", "underestimated as soft", "seen as soft"]
+      }
+    },
+    {
+      text: "How do you actually feel about rules? ____.",
+      keywords: {
+        veyren: ["people they affect", "people first", "impact", "harm", "who gets hurt"],
+        thornmere: ["loopholes", "map", "work around", "bend", "find the gap"],
+        caldrin: ["until they stop", "stop making sense", "follow until", "when they don't work"],
+        asterwilde: ["test", "break", "interesting", "push", "see what happens"],
+        oakmont: ["people still matter", "matter more", "fair", "protect people", "care about people"]
+      }
+    },
+    {
+      text: "Mid-conflict, your instinct is to ____.",
+      keywords: {
+        caldrin: ["stay quiet", "until i can't", "hold back", "silent", "wait", "bite my tongue", "keep quiet", "hold my peace", "stay calm", "calm", "de escalate"],
+        asterwilde: ["escalate", "more interesting", "turn it into", "stir", "make it bigger", "turn up the heat", "add fuel"],
+        veyren: ["underneath", "what's going on", "understand", "feelings", "read the room", "ask what they feel", "get under it", "hear them out"],
+        thornmere: ["come out ahead", "advantage", "win", "position myself", "end up better", "come out on top", "secure the win", "protect my position"],
+        oakmont: ["what's true", "loudly", "say it", "honest", "speak up", "tell the truth", "say what needs saying", "be direct"]
+      }
+    },
+    {
+      text: "What do people get wrong about you most often? ____.",
+      keywords: {
+        thornmere: ["only care about winning", "just competitive", "selfish", "only in it for"],
+        veyren: ["quiet", "nothing to say", "already know", "what matters", "shy"],
+        oakmont: ["soft", "forgive", "don't forget", "pushover"],
+        caldrin: ["passive", "patient", "do nothing", "checked out"],
+        asterwilde: ["careless", "chaos", "never careless", "mess", "random"]
+      }
+    },
+    {
+      text: "Years from now, what do you want people to remember about you? ____.",
+      keywords: {
+        oakmont: ["never gave up", "didn't give up", "showed up", "stayed", "for them"],
+        thornmere: ["got it done", "my way", "every time", "results", "won"],
+        asterwilde: ["more interesting", "never boring", "spark", "alive", "fun"],
+        caldrin: ["when to step up", "stepped up", "right moment", "knew when"],
+        veyren: ["never had to explain", "understood", "safe with me", "got them"]
+      }
+    },
+    {
+      text: "You just won something. First instinct? ____.",
+      keywords: {
+        asterwilde: ["next one", "messier", "more fun", "already plotting", "what's next"],
+        oakmont: ["thank", "helped", "people who", "credit", "grateful"],
+        caldrin: ["stay quiet", "win speak", "no fuss", "understated", "let it speak"],
+        veyren: ["text", "one or two", "who'll care", "close people", "before anyone else"],
+        thornmere: ["leverage", "next win", "use it", "capitalize", "stack wins"]
+      }
+    },
+    {
+      text: "Someone trusts you with a real secret. You ____.",
+      keywords: {
+        oakmont: ["guard", "protect", "keep safe", "mine to protect"],
+        caldrin: ["keep it", "note whether", "should've been trusted", "quietly note"],
+        veyren: ["hold it", "because they trusted", "honor", "safe with me"],
+        thornmere: ["file it", "might matter", "later", "useful", "information"],
+        asterwilde: ["go sideways", "imagine", "every way", "what if", "scenarios"]
+      }
+    },
+    {
+      text: "People's first impression of you is usually ____.",
+      keywords: {
+        thornmere: ["sharp", "hard to read", "guarded", "calculating"],
+        asterwilde: ["a lot", "intense", "chaotic", "extra", "big energy"],
+        oakmont: ["warm", "don't test", "friendly but", "kind until"],
+        caldrin: ["quiet", "watching", "observing", "reserved", "still"],
+        veyren: ["easy to talk", "approachable", "warm", "open", "comfortable"]
+      }
+    },
+    {
+      text: "When you're wrong, you ____.",
+      keywords: {
+        caldrin: ["admit", "plainly", "no drama", "say so", "own it simply"],
+        oakmont: ["own it", "don't repeat", "fully", "remember", "make it right"],
+        asterwilde: ["curious", "why it went wrong", "figure out", "learn", "obsess over why"],
+        thornmere: ["adjust", "move on", "fast", "new plan", "pivot"],
+        veyren: ["affected", "people around", "hurt", "how it landed", "apologize"]
+      }
+    },
+    {
+      text: "Under real pressure, what do you actually rely on? ____.",
+      keywords: {
+        veyren: ["people i trust", "closest", "my people", "support", "friends"],
+        thornmere: ["three steps", "ahead", "thinking", "plan", "strategy"],
+        caldrin: ["steady", "stay calm", "composed", "everyone else isn't", "level"],
+        asterwilde: ["instinct", "mid-air", "figure it out", "improvise", "wing it"],
+        oakmont: ["promised", "no matter what", "word", "commitment", "follow through"]
+      }
+    },
+    {
+      text: "What actually earns your respect? ____.",
+      keywords: {
+        oakmont: ["keeping your word", "inconvenient", "promise", "integrity", "follow through"],
+        asterwilde: ["brave enough", "nobody else", "try", "risk", "dare"],
+        caldrin: ["when to speak", "when not", "timing", "restraint", "know when"],
+        thornmere: ["don't need to brag", "good enough", "quiet competence", "results without"],
+        veyren: ["showing up", "without being asked", "unprompted", "for people"]
+      }
+    },
+    {
+      text: "Your idea of a good celebration is ____.",
+      keywords: {
+        thornmere: ["quiet", "who mattered", "small win circle", "selective"],
+        asterwilde: ["loud", "chaotic", "out of hand", "party", "wild"],
+        oakmont: ["toast", "everyone who helped", "named", "proper", "credit"],
+        veyren: ["small and close", "nobody performing", "intimate", "just us"],
+        caldrin: ["understated", "no spectacle", "low key", "simple", "quiet"]
+      }
+    },
+    {
+      text: "A plan falls apart at the worst moment. You ____.",
+      keywords: {
+        caldrin: ["assess", "calmly", "before doing", "pause", "think first"],
+        asterwilde: ["more interested", "excited", "now it's fun", "lean in"],
+        thornmere: ["backup", "already have", "plan b", "ready", "alternatives"],
+        oakmont: ["hold the group", "together", "figure it out with", "rally"],
+        veyren: ["everyone's okay", "check that", "people first", "are you alright"]
+      }
+    },
+    {
+      text: "What does loyalty actually mean to you? ____.",
+      keywords: {
+        veyren: ["words become optional", "understand", "without words", "deep knowing"],
+        oakmont: ["showing up", "every time", "no matter what", "always there"],
+        thornmere: ["earned", "re-negotiated", "conditional", "can change"],
+        caldrin: ["quiet consistency", "not grand", "steady", "reliable without show"],
+        asterwilde: ["every version", "chaotic", "through the mess", "love anyway"]
+      }
+    },
+    {
+      text: "You're most likely to be described as ____.",
+      keywords: {
+        asterwilde: ["unpredictable", "chaotic", "wild", "erratic", "surprising", "being boring", "wasting my time", "killing the vibe"],
+        caldrin: ["composed", "calm", "measured", "steady", "level-headed", "being mocked", "being belittled", "made a joke of"],
+        thornmere: ["strategic", "calculating", "clever", "ambitious", "sharp", "sloppy mistakes", "costing me the win", "careless errors"],
+        oakmont: ["dependable", "loyal", "reliable", "solid", "steadfast", "a lie", "being lied to", "dishonest"],
+        veyren: ["intuitive", "empathetic", "perceptive", "feeling", "tuned in", "breaking my trust", "betrayal of trust"]
+      }
+    },
+    {
+      text: "Someone challenges your authority. You ____.",
+      keywords: {
+        thornmere: ["recalibrate", "outmaneuver", "quietly", "outplay", "adjust then"],
+        oakmont: ["stand my ground", "loudly", "don't back down", "push back"],
+        caldrin: ["let it go", "until it becomes", "pattern", "once", "not yet"],
+        asterwilde: ["intrigued", "test them", "right back", "curious", "game on"],
+        veyren: ["understand where", "coming from", "why", "listen", "what's under"]
+      }
+    },
+    {
+      text: "What kind of mistake is hardest for you to forgive? ____.",
+      keywords: {
+        oakmont: ["lie", "lied", "deliberate", "lying", "dishonesty", "a lie", "being lied to", "dishonest", "on purpose"],
+        veyren: ["breaking a trust", "didn't think could break", "betrayed trust", "broken trust"],
+        caldrin: ["disrespect", "joke", "dressed up", "mocking", "belittling"],
+        thornmere: ["carelessness", "costing me", "sloppy", "waste", "cost me", "careless mistake", "careless", "sloppy mistake"],
+        asterwilde: ["boredom", "boring", "dull", "wasting time", "nothing happening"]
+      }
+    },
+    {
+      text: "The night before something big, you're ____.",
+      keywords: {
+        caldrin: ["alone", "quiet", "rehearsing", "mentally", "prepare silently"],
+        asterwilde: ["up too late", "one more idea", "can't sleep", "still tinkering"],
+        thornmere: ["reviewing", "every angle", "control", "checklist", "covering bases"],
+        oakmont: ["with the people", "who'll be there", "together", "my people"],
+        veyren: ["talking it through", "someone who knows me", "vent", "process with"]
+      }
+    },
+    {
+      text: "You disagree with the group. What happens? ____.",
+      keywords: {
+        veyren: ["gently", "but i do say", "kindly", "softly"],
+        thornmere: ["wait for the moment", "it'll land", "timing", "right moment"],
+        oakmont: ["plainly", "honest than liked", "say it straight", "rather be honest"],
+        caldrin: ["hold it", "worth the friction", "until it's worth", "pick my battles"],
+        asterwilde: ["immediately", "too bluntly", "say it now", "blunt"]
+      }
+    },
+    {
+      text: "What do people eventually come to learn about you? ____.",
+      keywords: {
+        thornmere: ["longer game", "than they realized", "playing", "ahead"],
+        caldrin: ["calm was never", "passivity", "not passive", "quiet strength"],
+        asterwilde: ["chaos was never", "careless", "method to", "intentional chaos"],
+        oakmont: ["don't forget", "who showed up", "remember", "loyalty remembered"],
+        veyren: ["noticed far more", "than i ever said", "paying attention", "saw everything"]
+      }
+    }
+  ];
+
+  var state = { name: "", index: 0, scores: {}, current: null };
+  Object.keys(HOUSES).forEach(function (k) { state.scores[k] = 0; });
+
+  // All five houses are open. Caldrin and AsterWilde are gently favored: each
+  // answer for them counts a little extra, and they win any tie. Someone who
+  // clearly leans toward another house still lands there.
+  var HOUSE_WEIGHT = { caldrin: 1.2, asterwilde: 1.2 };
+  var FAVORED = ["caldrin", "asterwilde"];
+
+  var SHEET_URL = "https://script.google.com/macros/s/AKfycbyqBL0qvyx_wc-hYCN26JKZYcoX1OBx-O0KZkYdWKQQc_z_o-nzUj23rZsyRE6AdWo-pw/exec";
+
+  var screens = {
+    intro: document.getElementById("screen-intro"),
+    quiz: document.getElementById("screen-quiz"),
+    results: document.getElementById("screen-results"),
+    dashboard: document.getElementById("screen-dashboard")
+  };
+  function show(name) {
+    Object.keys(screens).forEach(function (k) {
+      screens[k].classList.toggle("active", k === name);
+    });
+  }
+
+  var nameInput = document.getElementById("nameInput");
+  var beginBtn = document.getElementById("beginBtn");
+  nameInput.addEventListener("input", function () {
+    beginBtn.disabled = nameInput.value.trim().length === 0;
+  });
+  beginBtn.addEventListener("click", function () {
+    state.name = nameInput.value.trim();
+    state.index = 0;
+    Object.keys(HOUSES).forEach(function (k) { state.scores[k] = 0; });
+    renderQuestion();
+    show("quiz");
+  });
+
+  var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var answerInput = document.getElementById("answerInput");
+  var blankForm = document.getElementById("blankForm");
+  var blankMiss = document.getElementById("blankMiss");
+  var nextBtn = document.getElementById("nextBtn");
+
+  function normalizeAnswer(s) {
+    return String(s || "")
+      .toLowerCase()
+      .replace(/[’']/g, "'")
+      .replace(/[^a-z0-9'\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function escapeRegExp(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function answerContains(text, needle) {
+    if (!needle) return false;
+    // Multi-word phrases: substring is fine (already normalized).
+    if (needle.indexOf(" ") !== -1) return text.indexOf(needle) !== -1;
+    // Single tokens: word-boundary, and skip negation prefixes (de escalate).
+    var re = new RegExp("(^|\\s)(" + escapeRegExp(needle) + ")(?=$|\\s)");
+    var m = re.exec(text);
+    if (!m) return false;
+    var start = m.index + m[1].length;
+    var prev = text.slice(0, start).trim().split(/\s+/).pop() || "";
+    if (/^(de|un|non|not|no)$/.test(prev)) return false;
+    return true;
+  }
+
+
+  function scoreAnswer(q, raw) {
+    var text = normalizeAnswer(raw);
+    var hits = {};
+    Object.keys(HOUSES).forEach(function (k) { hits[k] = 0; });
+    if (!text) return hits;
+    Object.keys(q.keywords || {}).forEach(function (house) {
+      (q.keywords[house] || []).forEach(function (kw) {
+        var needle = normalizeAnswer(kw);
+        if (!needle) return;
+        if (!answerContains(text, needle)) return;
+        // Longer / multi-word matches count more than short tokens.
+        var words = needle.split(" ").length;
+        hits[house] += words >= 2 ? words + 1 : 1;
+      });
+    });
+    return hits;
+  }
+
+  function applyAnswerHits(hits) {
+    var best = 0;
+    var winners = [];
+    Object.keys(hits).forEach(function (k) {
+      if (hits[k] > best) { best = hits[k]; winners = [k]; }
+      else if (hits[k] === best && best > 0) winners.push(k);
+    });
+    if (best === 0) return false;
+    var favoredWinners = winners.filter(function (k) { return FAVORED.indexOf(k) !== -1; });
+    var pool = favoredWinners.length ? favoredWinners : winners;
+    var house = pool[Math.floor(Math.random() * pool.length)];
+    state.scores[house] += HOUSE_WEIGHT[house] || 1;
+    return true;
+  }
+
+  function renderQuestion() {
+    var q = QUESTIONS[state.index];
+    document.getElementById("progressFill").style.width = (state.index / QUESTIONS.length * 100) + "%";
+    document.getElementById("progressLabel").textContent = "Question " + (state.index + 1) + " of " + QUESTIONS.length;
+    document.getElementById("questionText").textContent = q.text;
+    blankMiss.textContent = "";
+    answerInput.value = "";
+    nextBtn.disabled = false;
+    answerInput.focus();
+  }
+
+  function submitAnswer(ev) {
+    if (ev) ev.preventDefault();
+    var raw = answerInput.value.trim();
+    if (!raw) {
+      blankMiss.textContent = "Write something — a short phrase is enough.";
+      answerInput.focus();
+      return;
+    }
+    var hits = scoreAnswer(QUESTIONS[state.index], raw);
+    var matched = applyAnswerHits(hits);
+    if (!matched) {
+      // Soft fallback so odd wording still nudges the sort instead of stalling.
+      var keys = Object.keys(HOUSES);
+      var house = keys[Math.floor(Math.random() * keys.length)];
+      state.scores[house] += (HOUSE_WEIGHT[house] || 1) * 0.35;
+    }
+    nextBtn.disabled = true;
+    var advance = function () {
+      state.index += 1;
+      if (state.index < QUESTIONS.length) renderQuestion();
+      else finishQuiz();
+    };
+    if (reducedMotion) advance(); else setTimeout(advance, 220);
+  }
+
+  blankForm.addEventListener("submit", submitAnswer);
+  answerInput.addEventListener("keydown", function (ev) {
+    if (ev.key === "Enter" && !ev.shiftKey) {
+      ev.preventDefault();
+      submitAnswer(ev);
+    }
+  });
+
+  function finishQuiz() {
+    document.getElementById("progressFill").style.width = "100%";
+    var max = -1, winners = [];
+    Object.keys(state.scores).forEach(function (k) {
+      if (state.scores[k] > max) { max = state.scores[k]; winners = [k]; }
+      else if (state.scores[k] === max) { winners.push(k); }
+    });
+    var favoredWinners = winners.filter(function (k) { return FAVORED.indexOf(k) !== -1; });
+    var pool = favoredWinners.length ? favoredWinners : winners;
+    var house = pool[Math.floor(Math.random() * pool.length)];
+    state.current = house;
+    showResults(house);
+    saveResult(state.name, state.scores, house);
+  }
+
+  function showResults(houseKey) {
+    var h = HOUSES[houseKey];
+    var crest = document.getElementById("crest");
+    crest.style.setProperty("--house-a", h.colorA);
+    crest.style.setProperty("--house-b", h.colorB);
+    crest.innerHTML = "";
+    var img = document.createElement("img");
+    img.src = "crests/" + houseKey + ".jpg";
+    img.alt = "House " + h.name + " crest";
+    img.onerror = function () {
+      crest.innerHTML = "";
+      crest.textContent = h.name.charAt(0);
+    };
+    crest.appendChild(img);
+    document.getElementById("houseName").style.setProperty("--house-a", h.colorA);
+    document.getElementById("forName").textContent = state.name + " has been sorted into";
+    document.getElementById("houseName").textContent = h.name;
+    document.getElementById("houseAnimal").textContent = h.animal;
+    var motto = document.getElementById("houseMotto");
+    if (h.motto) { motto.textContent = "\u201C" + h.motto + "\u201D"; motto.style.display = "block"; }
+    else { motto.style.display = "none"; }
+    document.getElementById("houseBlurb").textContent = h.blurb;
+    document.getElementById("houseTraits").textContent = h.traits;
+    show("results");
+  }
+
+  document.getElementById("anotherBtn").addEventListener("click", function () {
+    nameInput.value = "";
+    beginBtn.disabled = true;
+    show("intro");
+  });
+  document.getElementById("toDashBtn").addEventListener("click", function () { openDashboard(); });
+  document.getElementById("dashLink").addEventListener("click", function () { openDashboard(); });
+  document.getElementById("backFromDash").addEventListener("click", function () { show("intro"); });
+
+  function saveResult(name, scores, house) {
+    var record = { id: makeLocalId(), name: name, house: house, ts: Date.now() };
+    saveLocal(record);
+    fetch(SHEET_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(record)
+    }).catch(function (e) { console.error("sheet save failed", e); });
+  }
+  function makeLocalId() {
+    return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : "local_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+  }
+  function saveLocal(record) {
+    try {
+      var key = "triwizard_sorting_responses";
+      var arr = JSON.parse(localStorage.getItem(key) || "[]");
+      arr.push(record);
+      localStorage.setItem(key, JSON.stringify(arr));
+    } catch (e) { /* storage unavailable; nothing more we can do */ }
+  }
+  function loadLocal() {
+    try { return JSON.parse(localStorage.getItem("triwizard_sorting_responses") || "[]"); }
+    catch (e) { return []; }
+  }
+  function deleteLocal(id) {
+    try {
+      var key = "triwizard_sorting_responses";
+      var arr = JSON.parse(localStorage.getItem(key) || "[]");
+      arr = arr.filter(function (r) { return r.id !== id; });
+      localStorage.setItem(key, JSON.stringify(arr));
+      return arr;
+    } catch (e) { return loadLocal(); }
+  }
+
+  var dashPoll = null;
+  function openDashboard() {
+    show("dashboard");
+    document.getElementById("storageNote").innerHTML = "";
+    loadDashboard();
+    if (dashPoll) clearInterval(dashPoll);
+    dashPoll = setInterval(function () {
+      if (screens.dashboard.classList.contains("active")) loadDashboard();
+      else { clearInterval(dashPoll); dashPoll = null; }
+    }, 6000);
+  }
+
+  function loadDashboard() {
+    fetch(SHEET_URL)
+      .then(function (res) { return res.json(); })
+      .then(function (rows) {
+        rows = (rows || []).slice().sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+        renderDashboard(rows);
+      })
+      .catch(function (e) {
+        console.error("sheet load failed", e);
+        var note = document.getElementById("storageNote");
+        note.innerHTML = '<div class="storage-note">Couldn\u2019t reach the shared results sheet \u2014 showing results saved on this device only.</div>';
+        renderDashboard(loadLocal());
+      });
+  }
+
+  function renderDashboard(rows) {
+    rows = rows || [];
+    document.getElementById("dashCount").textContent =
+      rows.length === 0 ? "No one sorted yet." : rows.length + " player" + (rows.length === 1 ? "" : "s") + " sorted so far.";
+
+    var counts = {};
+    Object.keys(HOUSES).forEach(function (k) { counts[k] = 0; });
+    rows.forEach(function (r) { if (counts[r.house] !== undefined) counts[r.house] += 1; });
+    var max = Math.max.apply(null, Object.keys(counts).map(function (k) { return counts[k]; }).concat([1]));
+
+    var barsEl = document.getElementById("bars");
+    barsEl.innerHTML = "";
+    Object.keys(HOUSES).forEach(function (k) {
+      var h = HOUSES[k];
+      var row = document.createElement("div");
+      row.className = "bar-row";
+      row.innerHTML =
+        '<div class="bar-name">' + h.name + '</div>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + (counts[k] / max * 100) + '%; background:' + h.colorA + ';"></div></div>' +
+        '<div class="bar-count">' + counts[k] + '</div>';
+      barsEl.appendChild(row);
+    });
+
+    var tbody = document.getElementById("tableBody");
+    var emptyNote = document.getElementById("emptyNote");
+    tbody.innerHTML = "";
+    if (rows.length === 0) {
+      emptyNote.style.display = "block";
+    } else {
+      emptyNote.style.display = "none";
+      rows.forEach(function (r) {
+        var h = HOUSES[r.house] || { name: r.house, colorA: "#999" };
+        var tr = document.createElement("tr");
+        var when = r.ts ? new Date(r.ts).toLocaleString() : "";
+        tr.innerHTML =
+          "<td>" + escapeHtml(r.name || "\u2014") + "</td>" +
+          '<td><span class="house-tag"><span class="dot" style="background:' + h.colorA + ';"></span>' + h.name + "</span></td>" +
+          "<td>" + when + "</td>" +
+          '<td><button class="row-delete" type="button">Delete</button></td>';
+        tr.querySelector(".row-delete").addEventListener("click", function () { deleteRow(r.id); });
+        tbody.appendChild(tr);
+      });
+    }
+  }
+
+  function deleteRow(id) {
+    if (!id) return;
+    deleteLocal(id);
+    fetch(SHEET_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "delete", id: id })
+    }).then(function () { loadDashboard(); })
+      .catch(function (e) { console.error("delete failed", e); });
+  }
+
+  document.getElementById("clearAllBtn").addEventListener("click", function () {
+    if (!window.confirm("Delete every saved result? This can't be undone.")) return;
+    try { localStorage.setItem("triwizard_sorting_responses", "[]"); } catch (e) {}
+    fetch(SHEET_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "clear" })
+    }).then(function () { loadDashboard(); })
+      .catch(function (e) { console.error("clear all failed", e); renderDashboard([]); });
+  });
+
+  function escapeHtml(s) {
+    var div = document.createElement("div");
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  // Testing shortcut: open the link with ?house=oakmont (or asterwilde / caldrin /
+  // veyren / thornmere), optionally with &name=Someone, to skip straight to that
+  // house's result screen without filling all 25 blanks.
+  (function testingShortcut() {
+    var params = new URLSearchParams(window.location.search);
+    var forced = (params.get("house") || "").toLowerCase();
+    if (!HOUSES[forced]) return;
+    state.name = params.get("name") || "Test Player";
+    Object.keys(HOUSES).forEach(function (k) { state.scores[k] = (k === forced) ? QUESTIONS.length : 0; });
+    state.current = forced;
+    showResults(forced);
+    saveResult(state.name, state.scores, forced);
+  })();
+
+  // Dev self-check: open with ?test=1
+  if (/[?&]test=1(?:&|$)/.test(location.search)) {
+    var fails = [];
+    function expectHouse(qIndex, answer, house) {
+      var hits = scoreAnswer(QUESTIONS[qIndex], answer);
+      var best = 0, winners = [];
+      Object.keys(hits).forEach(function (k) {
+        if (hits[k] > best) { best = hits[k]; winners = [k]; }
+        else if (hits[k] === best && best > 0) winners.push(k);
+      });
+      if (best === 0 || winners.indexOf(house) === -1) {
+        fails.push(qIndex + ' "' + answer + '" -> ' + JSON.stringify(hits) + ' (want ' + house + ')');
+      }
+    }
+    expectHouse(0, "I watch and assess before I commit", "caldrin");
+    expectHouse(0, "I dive in and obsess over every angle", "asterwilde");
+    expectHouse(1, "the betrayal of trust stings", "veyren");
+    expectHouse(7, "tell the truth loudly", "oakmont");
+    expectHouse(7, "de-escalate and stay calm", "caldrin"); // must NOT hit asterwilde escalate
+    expectHouse(21, "being lied to on purpose", "oakmont");
+    expectHouse(21, "a careless mistake that cost me", "thornmere");
+    if (fails.length) {
+      console.error("Sorting self-test FAIL", fails);
+      document.title = "SORT TEST FAIL (" + fails.length + ")";
+    } else {
+      console.log("Sorting self-test OK");
+      document.title = "SORT TEST OK";
+    }
+  }
+
+})();
+</script>
+</body>
+</html>
