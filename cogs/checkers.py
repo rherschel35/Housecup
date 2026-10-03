@@ -5,7 +5,7 @@ Wizard's Checkers - standard American checkers rules, played over Discord.
     /checkers move opponent:<name> from:<sq> to:<sq> - make a move (or pick a piece, then
                                                         a square, on the board message)
     /checkers resign opponent:<name>                 - concede a match in progress
-    /checkersstats [member]                          - wins, losses, title, and active games
+    /checkers stats [member]                         - wins, losses, title, and active games
     /checkers reset member:<@user>                   - (staff) wipe someone's checkers record
 
 Rules: 8x8 board, pieces only on dark squares, forward diagonal moves,
@@ -968,9 +968,9 @@ class Checkers(commands.Cog):
 
     # -------------------------------------------------------------- stats
 
-    @app_commands.command(name="checkersstats", description="Wins, losses, title, and active games.")
+    @group.command(name="stats", description="Wins, losses, title, and active games.")
     @app_commands.describe(member="Whose stats to show (leave blank for your own)")
-    async def checkersstats(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
+    async def stats(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
         if not self._in_channel(interaction):
             await interaction.response.send_message(f"Checkers only runs in <#{CHECKERS_CHANNEL_ID}>.",
                                                      ephemeral=True)

@@ -5,7 +5,7 @@ Wizard's Chess - real chess, played out over Discord messages.
     /chess move opponent:<name> from:<sq> to:<sq> - make a move (or pick a piece, then
                                                      a square, on the board message)
     /chess resign opponent:<name>                 - concede a match in progress
-    /chessstats [member]                          - wins, losses, title, and active games
+    /chess stats [member]                         - wins, losses, title, and active games
     /chessreset member:<@user>                    - (staff) wipe someone's chess record
 
 Rules are real chess, enforced by the `chess` library - legal moves only,
@@ -853,9 +853,9 @@ class Chess(commands.Cog):
 
     # -------------------------------------------------------------- stats
 
-    @app_commands.command(name="chessstats", description="Wins, losses, title, and active games.")
+    @group.command(name="stats", description="Wins, losses, title, and active games.")
     @app_commands.describe(member="Whose stats to show (leave blank for your own)")
-    async def chessstats(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
+    async def stats(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
         if not self._in_channel(interaction):
             await interaction.response.send_message(f"Chess only runs in <#{CHESS_CHANNEL_ID}>.", ephemeral=True)
             return

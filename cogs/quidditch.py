@@ -4,7 +4,7 @@ Quidditch - team pickup matches in their own channel.
     /quidditch scramble size:<2|4>                         - casual 2v2/4v4, any houses, join either side
     /quidditch housematch house1:<H> house2:<H> size:<2|4>  - house-vs-house, only members of that house
                                                               can join that side
-    /quidditchstats                                         - your record and title
+    /quidditch stats                                        - your record and title
 
 A match is 5 rounds. Each round every joined player privately picks one
 action via button: Attack, Block, or Chase the Snitch. Attacks beat blocks
@@ -22,7 +22,7 @@ Rewards:
       house-match wins each day count. You can keep playing past that,
       it just stops adding house points for the day (your win record and
       title still climb).
-    - Titles (shown via /quidditchstats): a ladder based on total house
+    - Titles (shown via /quidditch stats): a ladder based on total house
       match wins - 5 -> Rising Chaser, 15 -> Storm Breaker, 30 -> Pitch
       Veteran, 50 -> Legend of the Pitch.
 """
@@ -302,6 +302,10 @@ class Quidditch(commands.Cog):
             await self.start_signup(interaction, is_house=True, size=size.value if size else 2,
                                     house_a=a, house_b=b)
 
+        @self.group.command(name="stats", description="Your Quidditch record and title.")
+        async def stats(interaction: discord.Interaction):
+            await self.send_stats(interaction)
+
     # ------------------------------------------------------------ signup
 
     async def start_signup(self, interaction: discord.Interaction, is_house: bool, size: int,
@@ -567,8 +571,7 @@ class Quidditch(commands.Cog):
 
     # ----------------------------------------------------------- commands
 
-    @app_commands.command(name="quidditchstats", description="Your Quidditch record and title.")
-    async def quidditchstats(self, interaction: discord.Interaction):
+    async def send_stats(self, interaction: discord.Interaction):
         if not self._in_channel(interaction):
             await interaction.response.send_message(
                 f"Quidditch can only be played in {channel_mentions(QUIDDITCH_CHANNEL_IDS)}.",
