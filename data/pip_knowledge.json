@@ -70,7 +70,7 @@
         "broom course",
         "quidditch broom race"
       ],
-      "answer": "`/broomrace` on the Quidditch pitch — private 6-stage picks on one o' 100 courses. Higher Speed/Altitude means fewer choices (the broom filters noise). Top brooms still see three: the right line, a pick that adds time, an' a trap that doubles yer time lost. Solo: 5 learning races a day (UTC) that unlock study notes. Challenge someone with `/broomrace opponent:@member` on the same track anytime — lowest time lost wins; winner gets 3 house points up to 5 wins/day, then free play with no points. Stuck mid-race or \"already mid-race\"? `/broomraceend` clears the lock — yours or anyone else's. Check leftovers on `/checklist`.",
+      "answer": "`/broomrace` on the Quidditch pitch — private 6-stage picks on one o' 100 courses. Every stage shows the full set o' lines — no spoon-feedin'. Ye gotta read; Speed/Altitude only help ye hold a clean line. Wrong picks add time; traps double it. Solo: 5 learning races a day (UTC) that unlock study notes. Challenge someone with `/broomrace opponent:@member` on the same track anytime — lowest time lost wins; winner gets 3 house points up to 5 wins/day, then free play with no points. Stuck mid-race or \"already mid-race\"? `/broomraceend` clears the lock — yours or anyone else's. Check leftovers on `/checklist`.",
       "link": "https://everything-velmora.netlify.app/quidditch"
     },
     {
