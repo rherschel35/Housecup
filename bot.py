@@ -34,8 +34,9 @@ DEV_GUILD_ID = os.getenv("DEV_GUILD_ID")  # optional: instant command sync while
 # tree actually changed. Set FORCE_COMMAND_SYNC=1 to push anyway.
 FORCE_COMMAND_SYNC = os.getenv("FORCE_COMMAND_SYNC", "").strip() in ("1", "true", "True", "yes")
 SYNC_TIMEOUT_SECONDS = int(os.getenv("COMMAND_SYNC_TIMEOUT", "45"))
-# Chess & checkers stay unloaded until ready. Set ENABLE_BOARD_GAMES=1 to ship them.
-ENABLE_BOARD_GAMES = os.getenv("ENABLE_BOARD_GAMES", "").strip() in ("1", "true", "True", "yes")
+# Chess & checkers load by default. Set ENABLE_BOARD_GAMES=0 to unload them.
+_ENABLE_BOARD_GAMES_RAW = os.getenv("ENABLE_BOARD_GAMES", "1").strip().lower()
+ENABLE_BOARD_GAMES = _ENABLE_BOARD_GAMES_RAW not in ("0", "false", "no", "off", "")
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))

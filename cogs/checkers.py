@@ -53,7 +53,8 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "checkers_state.json"
 
-CHECKERS_CHANNEL_ID = 1553366177584124014
+# Same board-games channel as Wizard's Chess.
+CHECKERS_CHANNEL_ID = 1553832675993985024
 
 POINTS_PER_WIN = 1
 DAILY_WIN_CAP = 5
