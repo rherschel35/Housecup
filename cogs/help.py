@@ -97,9 +97,9 @@ HELP = {
         "title": "Chess & Checkers",
         "staff": False,
         "note": (
-            "Board games load when ENABLE_BOARD_GAMES is on. Chess and Checkers each have their "
-            "own channel. Challenge → Accept → Make move (piece, then square). Captures are "
-            "mandatory in checkers; multi-jumps stay on the same piece."
+            "Chess and Checkers share the board-games channel. Challenge → Accept → "
+            "Make move (piece, then square). Captures are mandatory in checkers; "
+            "multi-jumps stay on the same piece."
         ),
         "entries": [
             ("chess challenge", "Challenge someone to Wizard's Chess (chess channel)."),

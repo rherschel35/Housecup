@@ -365,7 +365,7 @@
         "checkers",
         "board game"
       ],
-      "answer": "Wizard's Chess an' Wizard's Checkers — challenge in their channels with `/chess challenge` or `/checkers challenge`. Accept, then tap Make move (piece → square). Checkers jumps are mandatory; keep jumpin' with the same piece. Wins pay house points (chess 3, checkers 1), capped per day.",
+      "answer": "Wizard's Chess an' Wizard's Checkers share the board-games channel — `/chess challenge` or `/checkers challenge`. Accept, then tap Make move (piece → square). Checkers jumps are mandatory; keep jumpin' with the same piece. Wins pay house points (chess 3, checkers 1), capped per day.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {
