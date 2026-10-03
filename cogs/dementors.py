@@ -4,7 +4,8 @@ a few times a day - and a headmaster can always summon one on the spot.
 
     /cast [spell:<Patronus|Hex|Ward|Disarm|Bind|Mirror>]
         - anyone, tries the spell against whatever's here
-        - CAST_AUTO_USER_ID may omit spell: and auto-cast the right one
+        - CAST_AUTO_USER_ID always fires the creature's weakness
+          (spell: optional; a wrong pick is overridden)
     /dementor channels          - staff, set the 4 channels they can appear in
     /dementor summon [channel] [creature] - staff, make one appear right now
         (study hall is allowed for practice; Attack waves never go there)
@@ -230,9 +231,9 @@ CAST_CHOICES = [app_commands.Choice(name="Patronus", value="patronus")] + [
 SPELL_LABEL = {"patronus": "Patronus", **_DUEL_SPELL_NAMES}
 CREATURE_CHOICES = [app_commands.Choice(name=c["name"], value=key) for key, c in CREATURES.items()]
 
-# Headmaster convenience: omit spell: on /cast and the right weakness is
-# chosen automatically. Spell choices still show for everyone else.
-# Override with CAST_AUTO_USER_ID in the environment; unset/0 disables.
+# Headmaster convenience: /cast always fires the creature's weakness —
+# no spell: needed, and a wrong pick is overridden. Spell choices still
+# show for everyone else. Override with CAST_AUTO_USER_ID; unset/0 disables.
 _raw_cast_auto = os.getenv("CAST_AUTO_USER_ID", "555141900802457630")
 CAST_AUTO_USER_ID = (
     int(_raw_cast_auto) if _raw_cast_auto and str(_raw_cast_auto).isdigit() else None
@@ -518,8 +519,13 @@ class Dementors(commands.Cog):
                 )
         return "The air here feels perfectly normal. Nothing to banish."
 
-    @app_commands.command(name="cast", description="Cast a spell at whatever's in this channel.")
-    @app_commands.describe(spell="Which spell to cast (optional — some users auto-pick)")
+    @app_commands.command(
+        name="cast",
+        description="Cast at the threat in this channel (auto-picks the right spell for some users).",
+    )
+    @app_commands.describe(
+        spell="Which spell to cast. Leave blank if your cast auto-picks the monster's weakness."
+    )
     @app_commands.choices(spell=CAST_CHOICES)
     async def cast(
         self,
@@ -530,7 +536,8 @@ class Dementors(commands.Cog):
         if hexes and await hexes.deny_if_limp_wand(interaction):
             return
 
-        if spell is None and not self._can_auto_cast(interaction.user.id):
+        auto_user = self._can_auto_cast(interaction.user.id)
+        if spell is None and not auto_user:
             await interaction.response.send_message(
                 "Pick which spell to cast — the choices are on the command.",
                 ephemeral=True,
@@ -538,16 +545,22 @@ class Dementors(commands.Cog):
             return
 
         event_reply = None
+        auto_note: str | None = None
         async with self.lock:
             channel_id = interaction.channel_id
-            if spell is None:
-                spell = self._auto_spell_for(channel_id)
-                if spell is None:
+            # Auto-casters always fire the creature's weakness — blank or wrong pick.
+            if auto_user:
+                auto_spell = self._auto_spell_for(channel_id)
+                if auto_spell is None:
                     await interaction.response.send_message(
                         self._nothing_here_message(channel_id),
                         ephemeral=True,
                     )
                     return
+                spell = auto_spell
+                creature = self._creature_in_channel(channel_id)
+                name = creature["name"] if creature else "it"
+                auto_note = f"Auto-cast **{spell.name}** (weakness vs {name})."
 
             event = self.state.get("event")
             key = str(self._as_channel_id(channel_id) or channel_id)
@@ -571,7 +584,9 @@ class Dementors(commands.Cog):
                 creature = CREATURES[creature_id]
 
                 if creature_id == "dementor":
-                    await self._cast_dementor(interaction, spell, active)
+                    await self._cast_dementor(
+                        interaction, spell, active, auto_note=auto_note
+                    )
                     return
 
                 if spell.value != creature["weak"]:
@@ -590,6 +605,8 @@ class Dementors(commands.Cog):
                 if len(active["hits"]) < creature["pack"]:
                     self.save()
                     line = self.rng.choice(creature["progress"]).format(member=interaction.user.mention)
+                    if auto_note:
+                        line = f"{auto_note}\n\n{line}"
                     await interaction.response.send_message(
                         embed=discord.Embed(description=line, color=creature["color"])
                     )
@@ -600,6 +617,15 @@ class Dementors(commands.Cog):
                 self.save()
 
         if event_reply is not None:
+            if auto_note and isinstance(event_reply, dict):
+                # Surface which spell auto-fired without hiding the public hit.
+                desc = event_reply.get("embed")
+                if isinstance(desc, discord.Embed) and desc.description:
+                    desc.description = f"{auto_note}\n\n{desc.description}"
+                elif event_reply.get("content") and not event_reply.get("ephemeral"):
+                    event_reply["content"] = f"{auto_note}\n\n{event_reply['content']}"
+                elif event_reply.get("ephemeral") and event_reply.get("content"):
+                    event_reply["content"] = f"{auto_note}\n\n{event_reply['content']}"
             await self._deliver_cast_reply(interaction, event_reply)
             return
 
@@ -624,6 +650,8 @@ class Dementors(commands.Cog):
             line = self.rng.choice(creature["victory"]).format(member=interaction.user.mention, other=others)
         else:
             line = self.rng.choice(creature["victory"]).format(member=interaction.user.mention)
+        if auto_note:
+            line = f"{auto_note}\n\n{line}"
 
         embed = discord.Embed(title=f"✨ The {creature['name']} is defeated", description=line, color=creature["color"])
         from cogs.store import HOUSES
@@ -638,9 +666,9 @@ class Dementors(commands.Cog):
         else:
             await interaction.response.send_message(embed=embed)
 
-    async def _cast_dementor(self, interaction, spell, active):
-        """The original Dementor flow, unchanged: needs an already-cast
-        patronus, resolves in a single hit, uses its own flavour text."""
+    async def _cast_dementor(self, interaction, spell, active, *, auto_note: str | None = None):
+        """The original Dementor flow: needs an already-cast patronus,
+        resolves in a single hit, uses its own flavour text."""
         if spell.value != "patronus":
             await interaction.response.send_message("Nothing happens.", ephemeral=True)
             return
@@ -677,6 +705,8 @@ class Dementors(commands.Cog):
             animal=animal,
             member=interaction.user.mention,
         )
+        if auto_note:
+            line = f"{auto_note}\n\n{line}"
         embed = discord.Embed(title="✨ The Dementor is banished", description=line, color=0xC4CCD6)
         if awarded:
             from cogs.store import HOUSES
