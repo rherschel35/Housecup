@@ -15,6 +15,7 @@ import time
 from pathlib import Path
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 from dotenv import load_dotenv
 
@@ -265,6 +266,20 @@ async def sync_commands():
             "Command sync did not finish cleanly - not saving fingerprint, "
             "so the next boot will retry."
         )
+
+
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    """Always ack failed slash commands so Discord doesn't show 'application did not respond'."""
+    log.exception("Slash command error on %s", getattr(interaction.command, "qualified_name", "?"))
+    msg = "Something went wrong running that command — try again in a moment."
+    try:
+        if interaction.response.is_done():
+            await interaction.followup.send(msg, ephemeral=True)
+        else:
+            await interaction.response.send_message(msg, ephemeral=True)
+    except discord.HTTPException:
+        pass
 
 
 @bot.event

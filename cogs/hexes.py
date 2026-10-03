@@ -413,15 +413,28 @@ class Hexes(commands.Cog):
     @app_commands.command(name="unhex", description="(Headmaster) Lift a hex early.")
     @app_commands.describe(member="Whose hex to lift")
     async def unhex(self, interaction: discord.Interaction, member: discord.Member):
-        if not self._is_headmaster(interaction.user):
-            await interaction.response.send_message("Only a Headmaster may lift this.", ephemeral=True)
-            return
-        existed = self.state["hexed"].pop(str(member.id), None)
-        self.save()
-        if existed:
-            await interaction.response.send_message(f"The hex on {member.mention} has been lifted.", ephemeral=True)
-        else:
-            await interaction.response.send_message(f"{member.mention} isn't currently hexed.", ephemeral=True)
+        # Reply before disk I/O so Discord never shows "application did not respond"
+        # if save() is slow or throws after the hex was already cleared in memory.
+        try:
+            if not self._is_headmaster(interaction.user):
+                await interaction.response.send_message("Only a Headmaster may lift this.", ephemeral=True)
+                return
+            bucket = self.state.setdefault("hexed", {})
+            existed = bucket.pop(str(member.id), None)
+            if existed:
+                await interaction.response.send_message(
+                    f"The hex on {member.mention} has been lifted.", ephemeral=True)
+            else:
+                await interaction.response.send_message(
+                    f"{member.mention} isn't currently hexed.", ephemeral=True)
+            self.save()
+        except Exception:
+            log.exception("unhex failed for %s", getattr(member, "id", "?"))
+            msg = "Couldn't lift that hex — try `/unhex` again in a moment."
+            if interaction.response.is_done():
+                await interaction.followup.send(msg, ephemeral=True)
+            else:
+                await interaction.response.send_message(msg, ephemeral=True)
 
     @app_commands.command(name="hexlist", description="(Headmaster) Show who's currently hexed.")
     async def hexlist(self, interaction: discord.Interaction):
