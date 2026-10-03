@@ -41,6 +41,7 @@ class Staff(commands.Cog):
     challenge = sg.challenge
     hex_g = sg.hexes
     market = sg.market
+    usage = sg.usage
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -355,6 +356,35 @@ class Staff(commands.Cog):
             await interaction.response.send_message("Marketplace isn't loaded.", ephemeral=True)
             return
         await cog.sellreset(interaction, member)
+
+    # ---------------------------------------------------------------- usage
+
+    @usage.command(name="top", description="Most-used slash commands since tracking started.")
+    @app_commands.describe(limit="How many to show (default 25, max 50)")
+    async def usage_top(
+        self, interaction: discord.Interaction, limit: app_commands.Range[int, 1, 50] = 25
+    ):
+        cog = self._cog("Usage")
+        if not cog:
+            await interaction.response.send_message("Usage isn't loaded.", ephemeral=True)
+            return
+        await cog.show_top(interaction, limit)
+
+    @usage.command(name="unused", description="Slash commands that have never been used.")
+    async def usage_unused(self, interaction: discord.Interaction):
+        cog = self._cog("Usage")
+        if not cog:
+            await interaction.response.send_message("Usage isn't loaded.", ephemeral=True)
+            return
+        await cog.show_unused(interaction)
+
+    @usage.command(name="reset", description="Clear usage counters and start fresh.")
+    async def usage_reset(self, interaction: discord.Interaction):
+        cog = self._cog("Usage")
+        if not cog:
+            await interaction.response.send_message("Usage isn't loaded.", ephemeral=True)
+            return
+        await cog.do_reset(interaction)
 
 
 async def setup(bot: commands.Bot):
