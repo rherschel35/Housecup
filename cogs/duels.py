@@ -5,7 +5,7 @@ Wizard duels. Best of three, spells chosen in secret.
     /duelrecord [member]       - rank, wins, streak, rivals, trio/grand, points
     /duelend [member]          - clear a stuck duel lock (self, or staff for others)
     /houseduels                - each house's overall win/loss duelling record
-    /duelnight start|end       - (staff) House Duel Night: duel wins count double
+    /staff duels night start|end  - House Duel Night: duel wins count double
     /trio scramble             - open 3v3 signup (any houses)
     /trio housematch h1 h2     - house-gated 3v3 signup
     /grand @member             - Grand Duel (both need 50+ 1v1 wins)
@@ -1101,12 +1101,6 @@ class Duels(commands.Cog):
         embed.set_footer(text="Ranked by total wins • same-house duels count too")
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="duelnight", description="(staff) Start or end a House Duel Night - duel wins count double.")
-    @app_commands.describe(action="Start or end it")
-    @app_commands.choices(action=[
-        app_commands.Choice(name="start", value="start"),
-        app_commands.Choice(name="end", value="end"),
-    ])
     async def duelnight(self, interaction: discord.Interaction, action: app_commands.Choice[str]):
         store = self.bot.get_cog("Store")
         if not (store and store.is_staff(interaction.user)):

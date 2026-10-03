@@ -2,9 +2,9 @@
 Shared challenges. The bot posts one question for everyone at once and the
 first three members to answer correctly earn points for their house.
 
-    /challenge <tier>     - staff, post one right now
-    /challengeconfig      - staff, set the channel and posting time
-    /challengestatus      - what's open at the moment
+    /staff challenge post <tier>   - post one right now
+    /staff challenge config        - set the channel and posting time
+    /challengestatus               - what's open at the moment
 
 Three tiers, each on its own schedule:
 
@@ -450,13 +450,6 @@ class Quests(commands.Cog):
 
     # ------------------------------------------------------------ commands
 
-    @app_commands.command(name="challenge", description="Post a challenge to the channel right now.")
-    @app_commands.describe(tier="Which challenge to post")
-    @app_commands.choices(tier=[
-        app_commands.Choice(name="Daily (1 point)", value="daily"),
-        app_commands.Choice(name="Trial (3 points)", value="trial"),
-        app_commands.Choice(name="Weekly Rite (5 points)", value="rite"),
-    ])
     async def challenge(self, interaction: discord.Interaction, tier: app_commands.Choice[str]):
         if not self._is_staff(interaction.user):
             await interaction.response.send_message(
@@ -477,15 +470,6 @@ class Quests(commands.Cog):
                 "That didn't post — check the logs.", ephemeral=True
             )
 
-    @app_commands.command(name="challengeconfig",
-                          description="Set where and when challenges post automatically.")
-    @app_commands.describe(channel="Where challenges should appear",
-                           hour="Hour in UTC, 0-23", weekday="Which day the weekly Rite lands on")
-    @app_commands.choices(weekday=[
-        app_commands.Choice(name=d, value=i) for i, d in enumerate(
-            ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
-    ])
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def challengeconfig(self, interaction: discord.Interaction,
                               channel: discord.TextChannel, hour: int = 18,
                               weekday: app_commands.Choice[int] = None):
@@ -525,7 +509,7 @@ class Quests(commands.Cog):
                              + (f"next <t:{int(nxt)}:R>" if nxt else "not scheduled yet"))
 
         if not self.settings.get("channel_id"):
-            lines.append("\n*No channel set — staff can set one with `/challengeconfig`.*")
+            lines.append("\n*No channel set — staff can set one with `/staff challenge config`.*")
 
         await interaction.response.send_message(
             embed=discord.Embed(title="Challenges", description="\n".join(lines),

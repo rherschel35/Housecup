@@ -1,12 +1,12 @@
 """
 Setup and season management. Everything here is staff-only.
 
-    /pointsconfig              - what the bot currently thinks is true
-    /setstaffrole <role>       - who may award points besides admins
-    /sethouserole <house> <role>
-    /setannounce <channel> [day] [hour]
-    /sort <member> <house>     - pin someone to a house, ignoring roles
-    /unsort <member>           - back to reading their roles
+    /staff setup pointsconfig
+    /staff setup setstaffrole <role>
+    /staff setup sethouserole <house> <role>
+    /staff setup setannounce <channel> [day] [hour]
+    /staff houses sort <member> <house>
+    /staff houses unsort <member>
     /season rename|end|list
 """
 
@@ -55,7 +55,6 @@ class Admin(commands.Cog):
             return None
         return store
 
-    @app_commands.command(name="pointsconfig", description="Show how house points are currently set up.")
     async def pointsconfig(self, interaction: discord.Interaction):
         store = await self._guard(interaction)
         if store is None:
@@ -87,13 +86,9 @@ class Admin(commands.Cog):
         embed.add_field(name="Weekly standings", value=announce, inline=False)
         embed.add_field(name="Current season", value=f"{season['name']} (#{season['number']})")
         embed.add_field(name="Manual sorts", value=str(len(overrides)))
-        embed.set_footer(text="Houses are read from member roles unless pinned with /sort.")
+        embed.set_footer(text="Houses are read from member roles unless pinned with /staff houses sort.")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="setstaffrole",
-                          description="Let a role award points alongside admins.")
-    @app_commands.describe(role="The role that may award and deduct points")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def setstaffrole(self, interaction: discord.Interaction, role: discord.Role):
         store = self._store()
         if store is None:
@@ -104,10 +99,6 @@ class Admin(commands.Cog):
             f"{role.mention} can now award and deduct house points.", ephemeral=True
         )
 
-    @app_commands.command(name="sethouserole", description="Bind a house to a Discord role.")
-    @app_commands.describe(house="Which house", role="The role its members hold")
-    @app_commands.choices(house=HOUSE_CHOICES)
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def sethouserole(self, interaction: discord.Interaction,
                            house: app_commands.Choice[str], role: discord.Role):
         store = self._store()
@@ -119,12 +110,6 @@ class Admin(commands.Cog):
             f"{house_display(house.value)} is now {role.mention}.", ephemeral=True
         )
 
-    @app_commands.command(name="setannounce",
-                          description="Post the standings automatically once a week.")
-    @app_commands.describe(channel="Where to post", day="Which day (default Sunday)",
-                           hour="Hour in UTC, 0-23 (default 18)")
-    @app_commands.choices(day=WEEKDAY_CHOICES)
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def setannounce(self, interaction: discord.Interaction,
                           channel: discord.TextChannel,
                           day: app_commands.Choice[int] = None,
@@ -148,9 +133,6 @@ class Admin(commands.Cog):
             ephemeral=True,
         )
 
-    @app_commands.command(name="sort", description="Pin a member to a house, ignoring their roles.")
-    @app_commands.describe(member="Who to sort", house="Which house")
-    @app_commands.choices(house=HOUSE_CHOICES)
     async def sort(self, interaction: discord.Interaction, member: discord.Member,
                    house: app_commands.Choice[str]):
         store = await self._guard(interaction)
@@ -161,8 +143,6 @@ class Admin(commands.Cog):
             f"{member.display_name} is now counted under {house_display(house.value)}."
         )
 
-    @app_commands.command(name="unsort", description="Stop pinning a member and read their roles again.")
-    @app_commands.describe(member="Who to release")
     async def unsort(self, interaction: discord.Interaction, member: discord.Member):
         store = await self._guard(interaction)
         if store is None:

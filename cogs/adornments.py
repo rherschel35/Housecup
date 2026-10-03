@@ -12,7 +12,7 @@ Adornments: design your wizard, collect gear, and see it all in the Mirror.
     /whistle                   - (Beastcaller's Whistle) call the next beast now, once a week
     /secrets                   - (Keeper's Talisman) how many secrets you haven't found yet
     /nightwatch on|off         - (Nightwatch Pendant) night-beast heads-up on or off
-    /adornadmin give|take|channel|status   - staff
+    /staff adornadmin give|take|channel|status
 
 40 pieces over four slots (necklace, bracelet, ring, talisman). 26 are
 crafted from satchel materials; 14 are earned automatically from
@@ -151,7 +151,11 @@ def gear_benefit(key: str) -> str:
 
 
 class Adornments(commands.Cog):
-    admin = app_commands.Group(name="adornadmin", description="(staff) Gear and the Mirror.")
+    # Nested under /staff after load (see staff_groups.nest_pure_staff_groups).
+    admin = app_commands.Group(
+        name="adornadmin",
+        description="Gear and the Mirror.",
+    )
 
     def __init__(self, bot: commands.Bot, rng: Optional[random.Random] = None):
         self.bot = bot

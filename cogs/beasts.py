@@ -6,9 +6,9 @@ Beasts of Velmora. 70 creatures, 14 in each place, to find and befriend.
     /summon <beast>           - call one of your beasts to do something cute or cool (just for show)
     /study <beast>            - study a befriended beast (once a day); unlocks journal pages
     /journal [beast]          - your Beast Journal (overview, or one full entry)
-    /beastadmin spawn [beast] - (staff) make a beast appear right now
-    /beastadmin channel #ch   - (staff) where beasts appear
-    /beastadmin status        - (staff) what's out there, and when the next one comes
+    /staff beastadmin spawn [beast] - make a beast appear right now
+    /staff beastadmin channel #ch   - where beasts appear
+    /staff beastadmin status        - what's out there, and when the next one comes
 
 About 5-6 times a day (for the whole server, not per place) a beast wanders
 into the explore channel and says exactly what it wants. The first person
@@ -119,7 +119,11 @@ def rank_index(count: int) -> int:
 
 
 class Beasts(commands.Cog):
-    admin = app_commands.Group(name="beastadmin", description="(staff) Run the beast sightings.")
+    # Nested under /staff after load (see staff_groups.nest_pure_staff_groups).
+    admin = app_commands.Group(
+        name="beastadmin",
+        description="Run the beast sightings.",
+    )
 
     def __init__(self, bot: commands.Bot, rng: Optional[random.Random] = None):
         self.bot = bot

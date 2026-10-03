@@ -5,7 +5,7 @@ Brooms. Chosen from the same three words that chose your wand
     /broom                 - claim yours, or see it again
     /broom @member         - see someone else's
     /broomupgrade          - raise Speed or Altitude (yours or @member; you pay)
-    /upgrade broom         - (staff) free Speed or Altitude bump on anyone
+    /staff identity upgradebroom  - free Speed or Altitude bump on anyone
     /broomreset @x         - staff, free someone's broom claim (wand stays)
 
 100 fixed painted portraits (like Descent monsters). Each broom can be
@@ -879,26 +879,6 @@ class Brooms(commands.Cog):
             out.append(app_commands.Choice(name=label, value=iid))
         return out[:25]
 
-    upgrade = app_commands.Group(
-        name="upgrade",
-        description="(staff) Free upgrades.",
-    )
-
-    @upgrade.command(
-        name="broom",
-        description="(staff) Freely raise a member's broom Speed or Altitude / control.",
-    )
-    @app_commands.describe(
-        member="Whose broom to upgrade",
-        stat="Speed or Altitude (control)",
-        amount="How many points to add (default 1)",
-    )
-    @app_commands.choices(
-        stat=[
-            app_commands.Choice(name="Speed", value="speed"),
-            app_commands.Choice(name="Altitude / control", value="altitude"),
-        ],
-    )
     async def upgrade_broom(
         self,
         interaction: discord.Interaction,
@@ -941,11 +921,6 @@ class Brooms(commands.Cog):
             ephemeral=True,
         )
 
-    @app_commands.command(
-        name="broomreset",
-        description="Free someone's broom claim so they can /broom again (wand and patronus stay).",
-    )
-    @app_commands.describe(member="Whose broom to release")
     async def broomreset(self, interaction: discord.Interaction, member: discord.Member):
         store = self.bot.get_cog("Store")
         if not (store and store.is_staff(interaction.user)):

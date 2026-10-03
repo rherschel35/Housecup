@@ -1,29 +1,29 @@
 """
 Reaction roles. Post one message; reacting to it hands out a role.
 
-    /reactionroles addstatus <emoji> <role> <label>   - e.g. Champion / Alumni
-    /reactionroles addhouse <emoji> <house>           - uses the role already
-                                                         bound with /sethouserole
-    /reactionroles remove <emoji>                     - drop a mapping
-    /reactionroles setmessage [title] [intro] [reset] - custom copy for the post
-    /reactionroles post <channel>                     - publish the sign-up
+    /staff reactionroles addstatus <emoji> <role> <label>   - e.g. Champion / Alumni
+    /staff reactionroles addhouse <emoji> <house>           - uses the role already
+                                                         bound with /staff setup sethouserole
+    /staff reactionroles remove <emoji>                     - drop a mapping
+    /staff reactionroles setmessage [title] [intro] [reset] - custom copy for the post
+    /staff reactionroles post <channel>                     - publish the sign-up
                                                          message and react to it
-    /reactionroles config                             - what's configured
-    /reactionroles setmember <member> <category> <role>
+    /staff reactionroles config                             - what's configured
+    /staff reactionroles setmember <member> <category> <role>
                                                        - staff override: swap
                                                          someone's role by hand
 
 Two independent categories share one message: "status" (Champion / Alumni,
 or whatever a staff member sets up) and "house" (the five houses, reusing
-whichever role /sethouserole already bound). Reacting hands out a role only
+whichever role /staff setup sethouserole already bound). Reacting hands out a role only
 the first time - once someone holds a role in a category, reacting to
 another emoji in that same category is undone (the reaction is removed) so
 it's clear it didn't take. Un-reacting never takes a role away; the only way
-to change someone's pick afterwards is a staff member using /reactionroles
+to change someone's pick afterwards is a staff member using /staff reactionroles
 setmember (or just editing their roles directly in Discord).
 
-Custom title/intro from /reactionroles setmessage are used the next time you
-/reactionroles post — an already-posted message is not edited in place.
+Custom title/intro from /staff reactionroles setmessage are used the next time you
+/staff reactionroles post — an already-posted message is not edited in place.
 """
 
 import json
@@ -134,7 +134,11 @@ class ReactionRoles(commands.Cog):
 
     # -------------------------------------------------------------- group
 
-    reactionroles = app_commands.Group(name="reactionroles", description="Set up reaction-role sign-ups.")
+    # Nested under /staff after load (see staff_groups.nest_pure_staff_groups).
+    reactionroles = app_commands.Group(
+        name="reactionroles",
+        description="Set up reaction-role sign-ups.",
+    )
 
     @reactionroles.command(name="addstatus", description="Add a Champion/Alumni-style reaction role.")
     @app_commands.describe(emoji="The emoji people react with", role="The role it grants",
@@ -147,11 +151,11 @@ class ReactionRoles(commands.Cog):
         self.state["status"][emoji] = {"role_id": role.id, "label": label.strip() or role.name}
         self.save()
         await interaction.response.send_message(
-            f"{emoji} now grants {role.mention} (\"{label}\"). Run `/reactionroles post` when ready.",
+            f"{emoji} now grants {role.mention} (\"{label}\"). Run `/staff reactionroles post` when ready.",
             ephemeral=True,
         )
 
-    @reactionroles.command(name="addhouse", description="Add a house to the sign-up (reuses its /sethouserole binding).")
+    @reactionroles.command(name="addhouse", description="Add a house to the sign-up (reuses its /staff setup sethouserole binding).")
     @app_commands.describe(emoji="The emoji people react with", house="Which house")
     @app_commands.choices(house=HOUSE_CHOICES)
     async def addhouse(self, interaction: discord.Interaction, emoji: str,
@@ -163,13 +167,13 @@ class ReactionRoles(commands.Cog):
         if not role_id:
             await interaction.response.send_message(
                 f"House {HOUSES[house.value]['name']} isn't bound to a role yet - "
-                "run `/sethouserole` first.", ephemeral=True)
+                "run `/staff setup sethouserole` first.", ephemeral=True)
             return
         self.state["houses"][emoji] = {"role_id": role_id, "house": house.value}
         self.save()
         await interaction.response.send_message(
             f"{emoji} now sorts into House {HOUSES[house.value]['name']}. "
-            "Run `/reactionroles post` when ready.", ephemeral=True,
+            "Run `/staff reactionroles post` when ready.", ephemeral=True,
         )
 
     @reactionroles.command(name="remove", description="Remove an emoji from the sign-up.")
@@ -203,7 +207,7 @@ class ReactionRoles(commands.Cog):
             self.state["intro"] = None
             self.save()
             await interaction.response.send_message(
-                "Sign-up copy reset to defaults. Run `/reactionroles post` to publish a new message "
+                "Sign-up copy reset to defaults. Run `/staff reactionroles post` to publish a new message "
                 "(the old posted one isn't edited).",
                 ephemeral=True,
             )
@@ -213,7 +217,7 @@ class ReactionRoles(commands.Cog):
             await interaction.response.send_message(
                 f"**Title:** {self._title()}\n**Intro:** {self._intro()}\n\n"
                 "Pass `title` and/or `intro` to change them, or `reset:True` for defaults. "
-                "Then `/reactionroles post` to publish.",
+                "Then `/staff reactionroles post` to publish.",
                 ephemeral=True,
             )
             return
@@ -249,7 +253,7 @@ class ReactionRoles(commands.Cog):
         self.save()
         await interaction.response.send_message(
             f"Saved.\n**Title:** {self._title()}\n**Intro:** {self._intro()}\n\n"
-            "Run `/reactionroles post` when you want that copy live "
+            "Run `/staff reactionroles post` when you want that copy live "
             "(an already-posted message isn't edited).",
             ephemeral=True,
         )
@@ -282,7 +286,7 @@ class ReactionRoles(commands.Cog):
             return
         if not self.state["status"] and not self.state["houses"]:
             await interaction.response.send_message(
-                "Nothing configured yet - add some with `/reactionroles addstatus` / `addhouse` first.",
+                "Nothing configured yet - add some with `/staff reactionroles addstatus` / `addhouse` first.",
                 ephemeral=True)
             return
 

@@ -3,7 +3,7 @@
 
     /raid          - open (or re-show) the raid lobby in the 3Raid channel
     /raidstatus    - your weekly clear status
-    /raidreset     - (staff) clear someone's weekly lockout / force-end a run
+    /staff raid reset  - clear someone's weekly lockout / force-end a run
 
 Flow: lobby → claim Attacker / Specialty / Tank → spend 6 skill points
 (max 2 per spell, min 1 in your primary lane) → hard party Start checks →
@@ -766,8 +766,6 @@ class ThreeRaid(commands.Cog):
             e.add_field(name="Active run", value=f"Encounter {self.run.encounter_index}/10", inline=False)
         await interaction.response.send_message(embed=e, ephemeral=True)
 
-    @app_commands.command(name="raidreset", description="(staff) Clear weekly lockout or end the active raid.")
-    @app_commands.describe(member="Clear this player's weekly lockout", end_run="Force-end the active raid")
     async def raidreset(self, interaction: discord.Interaction,
                         member: Optional[discord.Member] = None,
                         end_run: bool = False):
