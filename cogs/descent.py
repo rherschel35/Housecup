@@ -4,7 +4,7 @@ The Descent - a 100-floor solo dungeon crawl.
     /descend             - fight the next monster on your current Descent floor
     /descend floor:<n>   - replay a floor you've already cleared, for practice/loot
     /descentstatus        - your floor, stats, AP, and lockout status
-    /descentunlock        - (staff) clear the 3-loss lockout without wiping progress
+    /staff descent unlock - clear the 3-loss lockout without wiping progress
 
 Ten zones of ten floors each, one primary element per zone plus a second
 element mixed in (about 30% of non-boss monsters), so a floor is never a
@@ -1083,8 +1083,6 @@ class Descent(commands.Cog):
         embed.add_field(name="⚡ Max AP", value=str(rec["max_ap"]))
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="descentreset", description="(staff) Wipe someone's Descent progress back to floor 1.")
-    @app_commands.describe(member="Whose progress to reset (leave blank for your own)")
     async def descentreset(self, interaction: discord.Interaction, member: discord.Member = None):
         store = self.bot.get_cog("Store")
         if not (store and store.is_staff(interaction.user)):
@@ -1098,11 +1096,6 @@ class Descent(commands.Cog):
         await interaction.response.send_message(
             f"{who} Descent progress has been wiped - back to floor 1, monster 1.", ephemeral=True)
 
-    @app_commands.command(
-        name="descentunlock",
-        description="(staff) Clear the 3-loss lockout without wiping Descent progress.",
-    )
-    @app_commands.describe(member="Whose lockout to clear (leave blank for your own)")
     async def descentunlock(self, interaction: discord.Interaction, member: discord.Member = None):
         """Lift the 24h floor lockout and reset the loss counter.
 
@@ -1137,16 +1130,6 @@ class Descent(commands.Cog):
             ephemeral=True,
         )
 
-    @app_commands.command(
-        name="descentboost",
-        description="(staff) Add Descent HP / Attack / Defense points to a player.",
-    )
-    @app_commands.describe(
-        member="Who to boost",
-        hp="Stat points to add to Max HP (12 HP each). Can be negative.",
-        attack="Stat points to add to Attack (2 ATK each). Can be negative.",
-        defense="Stat points to add to Defense (1 DEF each). Can be negative.",
-    )
     async def descentboost(
         self,
         interaction: discord.Interaction,

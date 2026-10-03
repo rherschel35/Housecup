@@ -3,7 +3,7 @@ Wands. The wand chooses the wizard - from three words.
 
     /wand              - receive your wand, or see it again
     /wand member:@x    - see someone else's
-    /wandreset @x      - staff, let someone be chosen again
+    /staff identity wandreset @x  - let someone be chosen again
 
 A member gives any three words - in any order, in a sentence or not - and
 the wand is read from the temperament behind them. Claude does the reading
@@ -262,11 +262,6 @@ class Wands(commands.Cog):
 
         await interaction.response.send_modal(WandModal(self))
 
-    @app_commands.command(
-        name="wandreset",
-        description="Let a wand choose someone again (their patronus goes too; broom stays — use /broomreset).",
-    )
-    @app_commands.describe(member="Whose wand to release")
     async def wandreset(self, interaction: discord.Interaction, member: discord.Member):
         store = self.bot.get_cog("Store")
         if not (store and store.is_staff(interaction.user)):

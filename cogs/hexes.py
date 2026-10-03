@@ -2,9 +2,9 @@
 Headmaster hexes - a prank spell a Headmaster can cast on a student so that,
 without warning, whatever they type comes out cursed — or their wand goes limp.
 
-    /hex member:<@user> effect:<pick one> duration:<minutes>   - cast it
-    /unhex member:<@user>                                      - lift it early
-    /hexlist                                                   - who's currently hexed
+    /staff hex cast member:<@user> effect:<pick one> duration:<minutes>
+    /staff hex lift member:<@user>
+    /staff hex list
 
 Most curses mangle chat: the bot deletes the cursed member's message and
 reposts it through a per-channel webhook wearing their name and avatar.
@@ -368,10 +368,6 @@ class Hexes(commands.Cog):
             await interaction.response.send_message(msg, ephemeral=True)
         return True
 
-    @app_commands.command(name="hex", description="(Headmaster) Curse a student with a prank hex.")
-    @app_commands.describe(member="Who to hex", effect="Which curse to cast",
-                           duration="How many minutes it lasts (0 = until lifted; Limp Wand is always 60)")
-    @app_commands.choices(effect=[app_commands.Choice(name=v["name"], value=k) for k, v in EFFECTS.items()])
     async def hex(self, interaction: discord.Interaction, member: discord.Member,
                   effect: app_commands.Choice[str], duration: app_commands.Range[int, 0, 10080]):
         if not self._is_headmaster(interaction.user):
@@ -410,8 +406,6 @@ class Hexes(commands.Cog):
             f"🪄 {member.mention} is hexed with **{spell['name']}** ({spell['description']}){replaced_note}, "
             f"{until}.", ephemeral=True)
 
-    @app_commands.command(name="unhex", description="(Headmaster) Lift a hex early.")
-    @app_commands.describe(member="Whose hex to lift")
     async def unhex(self, interaction: discord.Interaction, member: discord.Member):
         if not self._is_headmaster(interaction.user):
             await interaction.response.send_message("Only a Headmaster may lift this.", ephemeral=True)
@@ -423,7 +417,6 @@ class Hexes(commands.Cog):
         else:
             await interaction.response.send_message(f"{member.mention} isn't currently hexed.", ephemeral=True)
 
-    @app_commands.command(name="hexlist", description="(Headmaster) Show who's currently hexed.")
     async def hexlist(self, interaction: discord.Interaction):
         if not self._is_headmaster(interaction.user):
             await interaction.response.send_message("Only a Headmaster may see this.", ephemeral=True)

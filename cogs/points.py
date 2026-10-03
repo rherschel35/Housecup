@@ -1,12 +1,12 @@
 """
 Awarding and taking points.
 
-    /award <member> <points> [reason]   - staff
-    /take  <member> <points> [reason]   - staff
-    /awardhouse <house> <points> [...]  - staff, straight to a house
+    /staff points award <member> <points> [reason]
+    /staff points take  <member> <points> [reason]
+    /staff points awardhouse <house> <points> [...]
     /points [member]                    - anyone
     /history [member]                   - anyone
-    /undo                               - staff, reverses the last entry
+    /staff points undo                  - reverses the last entry
 """
 
 import logging
@@ -106,23 +106,14 @@ class Points(commands.Cog):
         embed.set_footer(text=f"by {interaction.user.display_name} • {store.current_season()['name']}")
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="award", description="Award house points to a member.")
-    @app_commands.describe(member="Who earned them", points="How many", reason="What for (optional)")
     async def award(self, interaction: discord.Interaction, member: discord.Member,
                     points: int, reason: str = ""):
         await self._change(interaction, member, points, reason, taking=False)
 
-    @app_commands.command(name="take", description="Deduct house points from a member.")
-    @app_commands.describe(member="Who loses them", points="How many", reason="What for (optional)")
     async def take(self, interaction: discord.Interaction, member: discord.Member,
                    points: int, reason: str = ""):
         await self._change(interaction, member, points, reason, taking=True)
 
-    @app_commands.command(name="awardhouse",
-                          description="Award or deduct points for a whole house at once.")
-    @app_commands.describe(house="Which house", points="Use a negative number to deduct",
-                           reason="What for (optional)")
-    @app_commands.choices(house=HOUSE_CHOICES)
     async def awardhouse(self, interaction: discord.Interaction,
                          house: app_commands.Choice[str], points: int, reason: str = ""):
         store = self._store()
@@ -213,7 +204,6 @@ class Points(commands.Cog):
         )
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="undo", description="Reverse the most recent points entry.")
     async def undo(self, interaction: discord.Interaction):
         store = self._store()
         if not await self._guard(interaction, store):

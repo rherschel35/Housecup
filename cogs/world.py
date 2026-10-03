@@ -6,7 +6,7 @@ discoveries, flags) stored in STATE_DIR/world_state.json, so something
 found in one place can matter in another.
 
 Players:  /explore  /forage  /satchel  /use  /offer  /places
-Staff:    /world eventstart | eventend | eventstatus | academy | rep | give | channel | reload
+Staff:    /staff world eventstart | eventend | eventstatus | academy | rep | give | channel | reload
 
 Secret interactions are NOT commands: they're typed as plain messages in a
 place's channel. Wrong guesses get silence. That's deliberate - Discord
@@ -131,7 +131,10 @@ class ChoiceView(discord.ui.View):
 
 
 class WorldCog(commands.Cog, name="World"):
-    world_group = app_commands.Group(name="world", description="(staff) Run Velmora's places and events.")
+    # Nested under /staff after load (see staff_groups.nest_pure_staff_groups).
+    world_group = app_commands.Group(
+        name="world", description="Run Velmora's places and events.",
+    )
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot

@@ -9,7 +9,7 @@ you'd protect - the thing that keeps you steady. No new words are asked
 for; the ones given to the wandmaker are reused, so the two always belong
 to the same person.
 
-One per person, for good. /wandreset releases both, since the patronus
+One per person, for good. /staff identity wandreset releases both, since the patronus
 comes from the wand's words. Purely cosmetic.
 """
 

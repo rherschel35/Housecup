@@ -1,9 +1,7 @@
 """
 Anti-spam guard. Personal cool-downs only — no mutes, bans, or timeouts.
 
-    /antispam on      - (staff) turn the guard on
-    /antispam off     - (staff) turn the guard off
-    /antispam status  - (staff) whether it's on, and the cool-down ladder
+    /staff antispam on|off|status
 
 Trip: 5 messages in 8 seconds, per user per channel (sliding window).
 When a user trips (or is already on cool-down), their overflowing messages
@@ -54,9 +52,10 @@ SOFT_LINE = "The castle asks you to catch your breath…"
 
 
 class AntiSpam(commands.Cog):
+    # Nested under /staff after load (see staff_groups.nest_pure_staff_groups).
     group = app_commands.Group(
         name="antispam",
-        description="(staff) Personal cool-down anti-spam guard.",
+        description="Personal cool-down anti-spam guard.",
     )
 
     def __init__(self, bot: commands.Bot):

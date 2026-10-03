@@ -65,6 +65,7 @@ bot = commands.Bot(command_prefix="!velmora-points-unused-", intents=intents, he
 
 INITIAL_COGS = (
     "cogs.store",
+    "cogs.staff",  # owns /staff root; other cogs nest staff tools under it
     "cogs.points",
     "cogs.board",
     "cogs.admin",
@@ -315,6 +316,9 @@ async def main():
                 log.info("Loaded %s", cog)
             except Exception:
                 log.exception("Failed to load %s — continuing without it", cog)
+        from cogs.staff_groups import nest_pure_staff_groups
+
+        nest_pure_staff_groups(bot)
         top_level = len(bot.tree.get_commands())
         log.info("Slash command tree: %s top-level (Discord global cap is 100)", top_level)
         if top_level > 100:

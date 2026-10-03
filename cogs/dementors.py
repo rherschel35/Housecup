@@ -5,10 +5,10 @@ a few times a day - and a headmaster can always summon one on the spot.
     /cast [spell:<Patronus|Hex|Ward|Disarm|Bind|Mirror>]
         - anyone, tries the spell against whatever's here
         - CAST_AUTO_USER_ID may omit spell: and auto-cast the right one
-    /dementor channels          - staff, set the 4 channels they can appear in
-    /dementor summon [channel] [creature] - staff, make one appear right now
+    /staff dementor channels          - set the 4 channels they can appear in
+    /staff dementor summon [channel] [creature] - make one appear right now
         (study hall is allowed for practice; Attack waves never go there)
-    /dementor status            - staff, what's configured and what's active
+    /staff dementor status            - what's configured and what's active
 
 Every creature has exactly one spell that actually works on it, and the
 post never says which - that's the whole game. Cast the wrong one and
@@ -28,9 +28,9 @@ When /explore or /forage in a dangerous place stirs one up, that student
 gets 25 seconds alone to /cast at it. After that window, anyone can try.
 Scheduled sightings and staff summons stay open to everyone from the start.
 
-    /dementor eventstart [minutes] [name]  - staff, start "Attack on Velmora"
-    /dementor eventend                     - staff, end it early
-    /dementor eventstatus                  - staff, how it's going
+    /staff dementor eventstart [minutes] [name]  - start "Attack on Velmora"
+    /staff dementor eventend                     - end it early
+    /staff dementor eventstatus                  - how it's going
 
 For a limited time (5 minutes by default), a fresh wave of monsters floods
 ALL FOUR configured channels every 23 seconds - whatever was still standing
@@ -244,7 +244,11 @@ def _article(word: str) -> str:
 
 
 class Dementors(commands.Cog):
-    group = app_commands.Group(name="dementor", description="(staff) Run the Wild Threats system.")
+    # Nested under /staff after load (see staff_groups.nest_pure_staff_groups).
+    group = app_commands.Group(
+        name="dementor",
+        description="Run the Wild Threats system.",
+    )
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -355,7 +359,7 @@ class Dementors(commands.Cog):
                     finder_id: int | None = None) -> discord.TextChannel | None:
         """Make a creature appear. Picks a random configured channel if none
         is given, and a random creature (weighted) if none is given - except
-        a manual, unspecified /dementor summon still defaults to a Dementor,
+        a manual, unspecified /staff dementor summon still defaults to a Dementor,
         same as it always has. When finder_id is set (explore/forage stir),
         that student gets FINDER_EXCLUSIVE_SECONDS alone to /cast. Returns
         the channel it landed in, or None."""
@@ -403,7 +407,7 @@ class Dementors(commands.Cog):
         async with self.lock:
             if self.state.get("active") or self.state.get("event"):
                 return False
-            # Unlike a manual /dementor summon, an ambient trigger like this
+            # Unlike a manual /staff dementor summon, an ambient trigger like this
             # should draw from the whole weighted roster, not default to a
             # plain Dementor.
             landed = await self.spawn(channel_id, creature_id or self._roll_creature(),
@@ -955,7 +959,7 @@ class Dementors(commands.Cog):
         if STUDY_HALL_CHANNEL_ID in ids:
             await interaction.response.send_message(
                 f"Study hall (<#{STUDY_HALL_CHANNEL_ID}>) is practice-only — use "
-                "`/dementor summon` there. Pick four other channels for ambient spawns "
+                "`/staff dementor summon` there. Pick four other channels for ambient spawns "
                 "and Attack waves.",
                 ephemeral=True,
             )
@@ -991,7 +995,7 @@ class Dementors(commands.Cog):
             if event and (not channel or channel.id != STUDY_HALL_CHANNEL_ID):
                 await interaction.response.send_message(
                     f"**{event['name']}** is running right now - summon in the study hall "
-                    f"(<#{STUDY_HALL_CHANNEL_ID}>) for practice, or `/dementor eventend` first.",
+                    f"(<#{STUDY_HALL_CHANNEL_ID}>) for practice, or `/staff dementor eventend` first.",
                     ephemeral=True,
                 )
                 return
@@ -1001,7 +1005,7 @@ class Dementors(commands.Cog):
                 return
             if channel and not self._summon_channel_ok(channel.id):
                 await interaction.response.send_message(
-                    "Pick one of the four `/dementor channels`, or the study hall "
+                    "Pick one of the four `/staff dementor channels`, or the study hall "
                     f"(<#{STUDY_HALL_CHANNEL_ID}>) for practice.",
                     ephemeral=True,
                 )
@@ -1011,7 +1015,7 @@ class Dementors(commands.Cog):
                                        creature.value if creature else None)
         if not landed:
             await interaction.response.send_message(
-                "No channels are configured yet - run `/dementor channels` first.", ephemeral=True)
+                "No channels are configured yet - run `/staff dementor channels` first.", ephemeral=True)
             return
         name = CREATURES[creature.value]["name"] if creature else "Dementor"
         await interaction.response.send_message(f"Summoned a {name} in {landed.mention}.", ephemeral=True)
@@ -1042,7 +1046,7 @@ class Dementors(commands.Cog):
         else:
             lines.append("Nothing active right now.")
         if self.state.get("event"):
-            lines.append(f"⚔️ An event is running - see `/dementor eventstatus`.")
+            lines.append(f"⚔️ An event is running - see `/staff dementor eventstatus`.")
         embed = discord.Embed(title="Wild Threats", description="\n".join(lines), color=DARK)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -1063,7 +1067,7 @@ class Dementors(commands.Cog):
             else:
                 pool = self._event_channel_ids()
                 if not pool:
-                    err = "No channels configured yet - run `/dementor channels` first."
+                    err = "No channels configured yet - run `/staff dementor channels` first."
                 elif not (1 <= minutes <= EVENT_MAX_MINUTES):
                     err = f"Pick a length between 1 and {EVENT_MAX_MINUTES} minutes."
                 else:
