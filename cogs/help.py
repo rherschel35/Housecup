@@ -175,6 +175,7 @@ HELP = {
             ("wizard", "Design how your wizard looks (including Feminine full-body)."),
             ("mirror", "Your wizard trading card (or anyone's): look, gear, title and stats."),
             ("jewelbox", "What you own (with perk / looks-only), what you're wearing, what you can craft."),
+            ("crafts", "Your craft book — owned pieces, every recipe, ingredient dots, what's craftable now."),
             ("craft", "Make a piece from materials in your satchel."),
             ("wear", "Put on a piece you own — shows its perk if it has one."),
             ("remove", "Take off whatever's in a slot."),
@@ -302,6 +303,9 @@ HELP = {
             ("staff antispam on", "Turn on the personal cool-down anti-spam guard."),
             ("staff antispam off", "Turn the anti-spam guard off."),
             ("staff antispam status", "Whether anti-spam is on, and the cool-down ladder."),
+            ("staff usage top", "Most-used slash commands since tracking started."),
+            ("staff usage unused", "Slash commands that have never been used."),
+            ("staff usage reset", "Clear usage counters and start fresh."),
         ],
     },
 }

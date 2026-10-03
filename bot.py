@@ -66,6 +66,7 @@ bot = commands.Bot(command_prefix="!velmora-points-unused-", intents=intents, he
 INITIAL_COGS = (
     "cogs.store",
     "cogs.staff",  # owns /staff root; other cogs nest staff tools under it
+    "cogs.usage",  # counts slash uses; /staff usage top|unused|reset
     "cogs.points",
     "cogs.board",
     "cogs.admin",

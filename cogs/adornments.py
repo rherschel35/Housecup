@@ -4,6 +4,7 @@ Adornments: design your wizard, collect gear, and see it all in the Mirror.
     /wizard                    - design how your wizard looks (menus, with a live preview)
     /mirror [member]           - someone's wizard as a trading card: look, gear, wand, title, stats
     /jewelbox [member]         - what you own, what you're wearing, what you could craft
+    /crafts                    - potions-style craft book: owned, recipes, ingredient dots
     /craft <piece>             - make a piece from materials in your satchel
     /wear <piece>              - put on a piece you own
     /remove <slot>             - take off whatever's in a slot
@@ -652,7 +653,7 @@ class Adornments(commands.Cog):
             # Stacked (not inline) so perk blurbs stay readable on mobile.
             embed.add_field(name=f"{emoji} {label}s", value=value, inline=False)
         if viewer_is_owner:
-            embed.set_footer(text="/craft to make one • /wear to put it on • /mirror to see it")
+            embed.set_footer(text="/crafts for the full recipe book • /craft to make one • /wear • /mirror")
         return embed
 
     @app_commands.command(name="jewelbox", description="Your gear: what you own, perks, what you're wearing, what you can craft.")
@@ -663,6 +664,115 @@ class Adornments(commands.Cog):
         if mine:
             await self.check_member(target)
         await interaction.response.send_message(embed=self.jewelbox_embed(target, mine), ephemeral=mine)
+
+    # ================================================================ /crafts
+
+    def _recipe_owned_line(self, recipe: dict, have: dict) -> str:
+        """Per-ingredient 🟢/🔴 for craft recipes (counts matter)."""
+        world = self.bot.get_cog("World")
+        parts = []
+        for item_id, need in recipe.items():
+            owned_n = have.get(item_id, 0)
+            mark = "🟢" if owned_n >= need else "🔴"
+            if world and item_id in world.world.items:
+                it = world.world.items[item_id]
+                label = f"{it['emoji']} **{it['name']}**"
+                if need > 1:
+                    label += f" ×{need}"
+                elif owned_n > 1:
+                    label += f" ×{owned_n}"
+            else:
+                label = f"**{item_id}**" + (f" ×{need}" if need > 1 else "")
+            parts.append(f"{mark} {label}")
+        return " · ".join(parts)
+
+    @staticmethod
+    def _add_trimmed_fields(embed: discord.Embed, title: str, lines: list[str]) -> None:
+        """Add one or more embed fields, splitting before Discord's 1024 limit."""
+        if not lines:
+            return
+        chunk: list[str] = []
+        part = 0
+        for line in lines:
+            trial = "\n".join(chunk + [line])
+            if chunk and len(trial) > 1024:
+                name = title if part == 0 else f"{title} (cont.)"
+                embed.add_field(name=name, value="\n".join(chunk), inline=False)
+                chunk = [line]
+                part += 1
+            else:
+                chunk.append(line)
+        if chunk:
+            name = title if part == 0 else f"{title} (cont.)"
+            embed.add_field(name=name, value="\n".join(chunk), inline=False)
+
+    @app_commands.command(
+        name="crafts",
+        description="Your craft book: gear you own, every recipe, and what's craftable now.",
+    )
+    async def crafts(self, interaction: discord.Interaction):
+        uid = interaction.user.id
+        await self.check_member(interaction.user)
+        owned = self.peek(uid).get("owned", {})
+        craftable_keys = crafted()
+        owned_crafted = [k for k in craftable_keys if k in owned]
+        world = self.bot.get_cog("World")
+        have = {}
+        if world:
+            have = world.state["students"].get(str(uid), {}).get("items", {})
+
+        desc = (
+            f"**{len(owned_crafted)} of {len(craftable_keys)}** crafted pieces · "
+            f"`/craft` to make one · earned gear stays in `/jewelbox`"
+        )
+        embed = discord.Embed(
+            title=f"{interaction.user.display_name}'s Crafts",
+            description=desc,
+            color=GOLD,
+        )
+
+        if owned_crafted:
+            inv = "\n".join(
+                f"{RARITY_DOT[GEAR[k]['rarity']]} {GEAR[k]['name']}" for k in owned_crafted
+            )
+        else:
+            inv = "*Nothing crafted yet.*"
+        if len(inv) > 1024:
+            inv = inv[:1000].rstrip() + "\n…*(list trimmed)*"
+        embed.add_field(name="💎 Collection", value=inv, inline=False)
+
+        by_tier: dict[str, list[str]] = {t: [] for t in RARITY_ORDER}
+        for key in craftable_keys:
+            g = GEAR[key]
+            recipe = g["recipe"]
+            ready = all(have.get(i, 0) >= n for i, n in recipe.items())
+            if key in owned:
+                tag = "✅ owned"
+            elif ready:
+                tag = "✅ craftable"
+            else:
+                tag = "🔨 not yet"
+            slot_emoji = SLOTS[g["slot"]][1]
+            line = (
+                f"{slot_emoji} **{g['name']}** — {tag}\n"
+                f"　{self._recipe_owned_line(recipe, have)}\n"
+                f"　*{gear_benefit(key)}*"
+            )
+            by_tier[g["rarity"]].append(line)
+
+        tier_titles = {
+            "common": "📖 Common",
+            "uncommon": "📖 Uncommon",
+            "rare": "📖 Rare",
+            "legendary": "📖 Legendary",
+        }
+        for tier in RARITY_ORDER:
+            self._add_trimmed_fields(embed, tier_titles[tier], by_tier[tier])
+
+        embed.set_footer(
+            text="🟢 enough · 🔴 missing · ✅ craftable = every ingredient ready · /craft <piece>"
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     # ================================================================ /craft
 

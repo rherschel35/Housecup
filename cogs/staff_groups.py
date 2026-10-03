@@ -57,6 +57,9 @@ hexes = app_commands.Group(
 market = app_commands.Group(
     name="market", parent=staff, description="Marketplace staff tools.",
 )
+usage = app_commands.Group(
+    name="usage", parent=staff, description="Slash-command usage stats.",
+)
 
 # Top-level names of pure-staff groups owned by other cogs. After load,
 # these are moved under `/staff` (bindings stay on the owning cog).
