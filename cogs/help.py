@@ -257,6 +257,7 @@ HELP = {
             ("reactionroles addstatus", "Add a Champion/Alumni-style reaction role."),
             ("reactionroles addhouse", "Add a house to the sign-up (reuses /sethouserole)."),
             ("reactionroles remove", "Drop an emoji from the sign-up."),
+            ("reactionroles setmessage", "Set the sign-up post title and intro text."),
             ("reactionroles post", "Publish the sign-up message and react to it."),
             ("reactionroles config", "What's configured for the sign-up."),
             ("reactionroles setmember", "Set someone's role by hand."),
