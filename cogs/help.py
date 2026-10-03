@@ -133,8 +133,6 @@ HELP = {
             ("broomraceend", "Clear a stuck broom race — yours or anyone else's."),
             ("broomnotes", "Permanent study notes from courses you've finished (⚠ marks known traps when studied)."),
             ("checklist", "Daily points board — broom races, potions, and the rest of today's caps."),
-            ("upgrade broom", "(staff) Freely raise anyone's broom Speed or Altitude / control."),
-            ("broomreset", "(staff) Free someone's broom claim (wand and patronus stay)."),
         ],
     },
     "explore": {
