@@ -49,6 +49,8 @@ FORCE_USER_ID = (
     int(_raw_force_uid) if _raw_force_uid and str(_raw_force_uid).isdigit() else None
 )
 FORCE_ANIMAL = os.getenv("ANIMAGUS_FORCE_ANIMAL", "Wolf")
+# Dedicated portrait for FORCE_USER_ID (black wolf, green eyes, moon chain).
+FORCE_ART_FILE = os.getenv("ANIMAGUS_FORCE_ART", "Wolf_Headmaster.png")
 
 # animal -> (personality blurb, chat sound). ~35 forms; distinct from Patronus pool.
 FORMS = {
@@ -138,7 +140,23 @@ def forced_animagus(user_id: int) -> dict | None:
     match = next((a for a in FORMS if a.lower() == FORCE_ANIMAL.lower()), None)
     if not match:
         return None
-    return _form_record(match)
+    if match == "Wolf":
+        return {
+            "animal": "Wolf",
+            "form": (
+                "Your bones settle into black fur before you can argue — "
+                "emerald eyes open, and the silver moon chain rests cold against your throat."
+            ),
+            "reading": (
+                "A black wolf with green eyes, the moon chain catching every scrap of light. "
+                "Loyal to the pack above everything — that is what you already were."
+            ),
+            "sound": FORMS["Wolf"][1],
+            "art": "headmaster",
+        }
+    rec = _form_record(match)
+    rec["art"] = "headmaster"
+    return rec
 
 
 def art_filename(animal: str, variant: int) -> str:
@@ -149,10 +167,44 @@ def art_path(animal: str, variant: int) -> Path:
     return ASSETS_DIR / art_filename(animal, variant)
 
 
+def force_art_path() -> Path:
+    return ASSETS_DIR / FORCE_ART_FILE
+
+
 def pick_art_variant(user_id: int, animal: str) -> int:
     """Stable 1..ART_VARIANTS pick so the same person always sees the same portrait."""
     digest = hashlib.sha256(f"animagus-art:{user_id}:{animal}".encode()).digest()
     return (digest[0] % ART_VARIANTS) + 1
+
+
+def resolve_portrait_path(user_id: int, rec: dict) -> Path | None:
+    """Portrait on disk for this form, including the headmaster override."""
+    animal = rec.get("animal")
+    if not animal or animal not in FORMS:
+        return None
+    if FORCE_USER_ID is not None and user_id == FORCE_USER_ID:
+        special = force_art_path()
+        if special.is_file():
+            return special
+    art = rec.get("art")
+    if art == "headmaster":
+        special = force_art_path()
+        if special.is_file():
+            return special
+    try:
+        variant = int(art or pick_art_variant(user_id, animal))
+    except (TypeError, ValueError):
+        variant = pick_art_variant(user_id, animal)
+    if variant < 1 or variant > ART_VARIANTS:
+        variant = 1
+    path = art_path(animal, variant)
+    if path.is_file():
+        return path
+    for v in range(1, ART_VARIANTS + 1):
+        alt = art_path(animal, v)
+        if alt.is_file():
+            return alt
+    return None
 
 
 def _clean(raw: dict) -> dict | None:
@@ -220,26 +272,20 @@ class Animagus(commands.Cog):
         # Backfill a stable portrait variant if missing.
         if animal in FORMS and not rec.get("art"):
             rec["art"] = pick_art_variant(user_id, animal)
+        # Keep the headmaster's forced look/text current even on old saves.
+        forced = forced_animagus(user_id)
+        if forced and rec.get("animal") == forced["animal"]:
+            for key in ("form", "reading", "sound", "art"):
+                if forced.get(key) is not None:
+                    rec[key] = forced[key]
         return rec
 
-    def portrait_file(self, rec: dict) -> discord.File | None:
+    def portrait_file(self, rec: dict, user_id: int | None = None) -> discord.File | None:
         """Attachable Animagus portrait, or None if that variant isn't on disk."""
-        animal = rec.get("animal")
-        if not animal or animal not in FORMS:
+        uid = user_id if user_id is not None else 0
+        path = resolve_portrait_path(uid, rec)
+        if path is None:
             return None
-        variant = int(rec.get("art") or 1)
-        if variant < 1 or variant > ART_VARIANTS:
-            variant = 1
-        path = art_path(animal, variant)
-        if not path.is_file():
-            # Fall back to any available variant for this animal.
-            for v in range(1, ART_VARIANTS + 1):
-                alt = art_path(animal, v)
-                if alt.is_file():
-                    path = alt
-                    break
-            else:
-                return None
         return discord.File(path, filename="animagus.png")
 
     def release(self, user_id: int) -> bool:
@@ -305,12 +351,8 @@ class Animagus(commands.Cog):
             ),
             color=GOLD,
         )
-        if animal in FORMS:
-            variant = int(rec.get("art") or 1)
-            if art_path(animal, variant).is_file() or any(
-                art_path(animal, v).is_file() for v in range(1, ART_VARIANTS + 1)
-            ):
-                embed.set_image(url="attachment://animagus.png")
+        if resolve_portrait_path(member.id, rec) is not None:
+            embed.set_image(url="attachment://animagus.png")
         if echoing:
             embed.set_footer(
                 text=f"For the next minute, your messages end with {sound}"
@@ -334,23 +376,11 @@ class Animagus(commands.Cog):
         deferred: bool = False,
     ) -> None:
         embed = self.embed_for(member, rec, fresh=fresh)
-        # portrait_file opens a new handle each call; only open once for send.
         file = None
-        animal = rec.get("animal")
-        if animal in FORMS:
-            variant = int(rec.get("art") or pick_art_variant(member.id, animal))
-            path = art_path(animal, variant)
-            if not path.is_file():
-                for v in range(1, ART_VARIANTS + 1):
-                    alt = art_path(animal, v)
-                    if alt.is_file():
-                        path = alt
-                        break
-                else:
-                    path = None
-            if path is not None:
-                file = discord.File(path, filename="animagus.png")
-                embed.set_image(url="attachment://animagus.png")
+        path = resolve_portrait_path(member.id, rec)
+        if path is not None:
+            file = discord.File(path, filename="animagus.png")
+            embed.set_image(url="attachment://animagus.png")
         kwargs = {"embed": embed}
         if file is not None:
             kwargs["file"] = file
