@@ -7,7 +7,8 @@ a few times a day - and a headmaster can always summon one on the spot.
         - CAST_AUTO_USER_ID auto-picks the right spell (no buttons)
     /staff dementor channels          - set the 4 channels they can appear in
     /staff dementor summon [channel] [creature] - make one appear right now
-        (study hall is allowed for practice; Attack waves never go there)
+        (study hall + shared games lounge are practice summons;
+         Attack waves never go there)
     /staff dementor status            - what's configured and what's active
 
 Every creature has exactly one spell that actually works on it, and the
@@ -56,8 +57,17 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from cogs.velmora_channels import STUDY_HALL_CHANNEL_ID
+from cogs.velmora_channels import (
+    SHARED_GAMES_CHANNEL_ID,
+    STUDY_HALL_CHANNEL_ID,
+)
 from cogs.world_engine import today
+
+# Summon/practice rooms — never flooded by Attack waves or ambient spawns.
+PRACTICE_SUMMON_CHANNEL_IDS = frozenset({
+    STUDY_HALL_CHANNEL_ID,
+    SHARED_GAMES_CHANNEL_ID,
+})
 
 log = logging.getLogger("velmora.dementors")
 
@@ -368,6 +378,18 @@ class Dementors(commands.Cog):
         if file:
             embed.set_image(url="attachment://monster.png")
         return file
+
+    def _dementor_defeat_art(
+        self, embed: discord.Embed, user_id: int
+    ) -> discord.File | None:
+        """Sealed caster's defeat portrait (or regular patronus art); else default."""
+        patronus_cog = self.bot.get_cog("Patronus")
+        if patronus_cog is not None:
+            art = patronus_cog.art_file_for(user_id, field="defeat_art")
+            if art is not None:
+                embed.set_image(url="attachment://patronus.png")
+                return art
+        return self._attach_art(embed, "dementor", field="defeat_image")
 
     def embed_arrival(self, creature_id: str, finder_id: int | None = None,
                        exclusive_until: float | None = None) -> discord.Embed:
@@ -732,7 +754,7 @@ class Dementors(commands.Cog):
         if awarded:
             from cogs.store import HOUSES
             embed.set_footer(text=f"+{awarded} points for House {HOUSES[house]['name']}")
-        file = self._attach_art(embed, "dementor", field="defeat_image")
+        file = self._dementor_defeat_art(embed, interaction.user.id)
         if file:
             await interaction.response.send_message(embed=embed, file=file)
         else:
@@ -777,7 +799,7 @@ class Dementors(commands.Cog):
             )
             embed = discord.Embed(title="✨ The Dementor is banished", description=line, color=0xC4CCD6)
             embed.set_footer(text=f"+{creature['points']} rep - ⚔️ {event['name']}")
-            file = self._attach_art(embed, "dementor", field="defeat_image")
+            file = self._dementor_defeat_art(embed, interaction.user.id)
             return {"embed": embed, "file": file}
 
         if spell.value != creature["weak"]:
@@ -828,11 +850,11 @@ class Dementors(commands.Cog):
     # ------------------------------------------------------- event: spawns
 
     def _event_channel_ids(self) -> list[int]:
-        """Channels Attack waves may flood. Study hall is summon/practice only."""
+        """Channels Attack waves may flood. Practice rooms stay summon-only."""
         out = []
         for raw in self.state.get("channel_ids", []):
             cid = self._as_channel_id(raw)
-            if cid is None or cid == STUDY_HALL_CHANNEL_ID:
+            if cid is None or cid in PRACTICE_SUMMON_CHANNEL_IDS:
                 continue
             out.append(cid)
         return out
@@ -1003,9 +1025,12 @@ class Dementors(commands.Cog):
         if not await self._staff(interaction):
             return
         ids = [a.id, b.id, c.id, d.id]
-        if STUDY_HALL_CHANNEL_ID in ids:
+        practice = [cid for cid in ids if cid in PRACTICE_SUMMON_CHANNEL_IDS]
+        if practice:
+            mentions = ", ".join(f"<#{cid}>" for cid in practice)
             await interaction.response.send_message(
-                f"Study hall (<#{STUDY_HALL_CHANNEL_ID}>) is practice-only — use "
+                f"{mentions} "
+                f"{'is' if len(practice) == 1 else 'are'} practice-only — use "
                 "`/staff dementor summon` there. Pick four other channels for ambient spawns "
                 "and Attack waves.",
                 ephemeral=True,
@@ -1013,21 +1038,27 @@ class Dementors(commands.Cog):
             return
         self.state["channel_ids"] = ids
         self.save()
+        practice_mentions = ", ".join(
+            f"<#{cid}>" for cid in sorted(PRACTICE_SUMMON_CHANNEL_IDS)
+        )
         await interaction.response.send_message(
             f"Wild Threats may now appear in {a.mention}, {b.mention}, {c.mention}, {d.mention}. "
-            f"Study hall (<#{STUDY_HALL_CHANNEL_ID}>) stays summon-only.",
+            f"{practice_mentions} stay summon-only.",
             ephemeral=True,
         )
 
     def _summon_channel_ok(self, channel_id: int) -> bool:
-        """Configured event channels, or study hall for practice summons."""
-        if channel_id == STUDY_HALL_CHANNEL_ID:
+        """Configured event channels, or practice rooms (study hall / games lounge)."""
+        if channel_id in PRACTICE_SUMMON_CHANNEL_IDS:
             return True
         return channel_id in self.state.get("channel_ids", [])
 
     @group.command(name="summon", description="(staff) Make one appear right now.")
     @app_commands.describe(
-        channel="Where (blank = random event channel; study hall is practice-only)",
+        channel=(
+            "Where (blank = random event channel; study hall and shared games "
+            "lounge are practice-only)"
+        ),
         creature="Which one (leave blank for a Dementor)",
     )
     @app_commands.choices(creature=CREATURE_CHOICES)
@@ -1037,12 +1068,15 @@ class Dementors(commands.Cog):
             return
         async with self.lock:
             event = self.state.get("event")
-            # Study hall stays open for practice summons during an Attack;
-            # event waves never target it.
-            if event and (not channel or channel.id != STUDY_HALL_CHANNEL_ID):
+            # Practice rooms stay open for summons during an Attack;
+            # event waves never target them.
+            if event and (not channel or channel.id not in PRACTICE_SUMMON_CHANNEL_IDS):
+                practice = ", ".join(
+                    f"<#{cid}>" for cid in sorted(PRACTICE_SUMMON_CHANNEL_IDS)
+                )
                 await interaction.response.send_message(
-                    f"**{event['name']}** is running right now - summon in the study hall "
-                    f"(<#{STUDY_HALL_CHANNEL_ID}>) for practice, or `/staff dementor eventend` first.",
+                    f"**{event['name']}** is running right now - summon in {practice} "
+                    f"for practice, or `/staff dementor eventend` first.",
                     ephemeral=True,
                 )
                 return
@@ -1051,9 +1085,12 @@ class Dementors(commands.Cog):
                     "One's already loose somewhere. Let it get dealt with first.", ephemeral=True)
                 return
             if channel and not self._summon_channel_ok(channel.id):
+                practice = ", ".join(
+                    f"<#{cid}>" for cid in sorted(PRACTICE_SUMMON_CHANNEL_IDS)
+                )
                 await interaction.response.send_message(
-                    "Pick one of the four `/staff dementor channels`, or the study hall "
-                    f"(<#{STUDY_HALL_CHANNEL_ID}>) for practice.",
+                    "Pick one of the four `/staff dementor channels`, or "
+                    f"{practice} for practice.",
                     ephemeral=True,
                 )
                 return
@@ -1073,9 +1110,12 @@ class Dementors(commands.Cog):
             return
         self._roll_day()
         pool = self.state.get("channel_ids", [])
+        practice = ", ".join(
+            f"<#{cid}>" for cid in sorted(PRACTICE_SUMMON_CHANNEL_IDS)
+        )
         lines = [
             f"Event channels: {', '.join(f'<#{c}>' for c in pool) if pool else 'none set'}",
-            f"Practice summon: <#{STUDY_HALL_CHANNEL_ID}> (never used by Attack waves)",
+            f"Practice summon: {practice} (never used by Attack waves)",
             f"Spawned today: {self.state.get('spawns_today', 0)}/{SPAWNS_PER_DAY}",
         ]
         active = self.state.get("active")
@@ -1121,9 +1161,12 @@ class Dementors(commands.Cog):
                     clean_name = name.strip() or "Attack on Velmora"
                     now = time.time()
                     # Clear encounter only if it's in an event channel; leave
-                    # a study-hall practice summon alone.
+                    # a practice-room summon alone.
                     active = self.state.get("active")
-                    if not (active and active.get("channel_id") == STUDY_HALL_CHANNEL_ID):
+                    if not (
+                        active
+                        and active.get("channel_id") in PRACTICE_SUMMON_CHANNEL_IDS
+                    ):
                         self.state["active"] = None
                     event = {
                         "name": clean_name, "started_at": now, "ends_at": now + minutes * 60,

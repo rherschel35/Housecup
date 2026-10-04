@@ -60,6 +60,7 @@ CUSTOM_PATRONUSES: dict[str, dict] = {
             "learns to move with you."
         ),
         "art": "Siren_Rowie.png",
+        "defeat_art": "Siren_Rowie_Defeat.png",
     },
     "206828442065305600": {  # Pod / Vish's Head Boy Pod
         "animal": "Griffin",
@@ -94,6 +95,39 @@ CUSTOM_PATRONUSES: dict[str, dict] = {
             "it, sees where it is going, and then refuses to turn back.**"
         ),
         "art": "Griffin_Pod.png",
+        "defeat_art": "Griffin_Pod_Defeat.png",
+    },
+    "534422209968734209": {  # Mara
+        "animal": "Margarita",
+        "form": (
+            "Golden-green light gathers in a shimmering swirl, forming the "
+            "unmistakable shape of a margarita glass. Its silvery magic glows "
+            "around the rim like frost, while a tiny lime wedge rests against "
+            "the edge, bright and mischievous. The Patronus sparkles with the "
+            "kind of energy that makes it impossible to tell whether it just "
+            "arrived to protect you or convince you to stay out another three "
+            "hours."
+        ),
+        "reading": (
+            "You carry a warmth that draws people in without trying. You're "
+            "playful, silly, and effortlessly flirty, with a talent for turning "
+            "ordinary moments into something worth remembering. You love people, "
+            "conversation, laughter, and the simple joy of being surrounded by "
+            "good company.\n\n"
+            "Your greatest strength is your generosity. You're the person who "
+            "notices when someone needs a hand, pulls them into the fun, and "
+            "somehow manages to make them feel like they belong. You give freely, "
+            "whether it's your time, your attention, your humor, or the last "
+            "drink at the table.\n\n"
+            "**Your guard is this:** you refuse to let life become too serious "
+            "for too long. You protect joy. You remind people to laugh when "
+            "they've forgotten how, to loosen their grip on the things weighing "
+            "them down, and to enjoy the moment while it's still happening.\n\n"
+            "Like a margarita, you're bright, refreshing, a little dangerous "
+            "when underestimated, and considerably more fun when shared."
+        ),
+        "art": "Margarita_Mara.png",
+        "defeat_art": "Margarita_Mara_Defeat.png",
     },
 }
 
@@ -229,18 +263,18 @@ class Patronus(commands.Cog):
             }
         return self.patronuses.get(str(user_id))
 
-    def art_path_for(self, user_id: int) -> Path | None:
+    def art_path_for(self, user_id: int, *, field: str = "art") -> Path | None:
         custom = self.custom_of(user_id)
         if not custom:
             return None
-        name = custom.get("art")
+        name = custom.get(field) or (custom.get("art") if field == "defeat_art" else None)
         if not name:
             return None
         path = ASSETS_DIR / name
         return path if path.is_file() else None
 
-    def art_file_for(self, user_id: int) -> discord.File | None:
-        path = self.art_path_for(user_id)
+    def art_file_for(self, user_id: int, *, field: str = "art") -> discord.File | None:
+        path = self.art_path_for(user_id, field=field)
         if path is None:
             return None
         return discord.File(path, filename="patronus.png")

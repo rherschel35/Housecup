@@ -10,7 +10,8 @@ STUDY_HALL_CHANNEL_ID = 1555035151208153209  # new-student study hall
 # Descent stays out of this room on purpose.
 DUELS_POTIONS_CHANNEL_ID = 1555554825616236726
 
-# Lounge where duels, potions, Quidditch, and broom races all run.
+# Lounge where duels, potions, Quidditch, broom races, and practice
+# Wild Threat summons all run (Attack waves never flood this room).
 SHARED_GAMES_CHANNEL_ID = 1556100254082924595
 SHARED_GAMES_CHANNEL_IDS = frozenset({SHARED_GAMES_CHANNEL_ID})
 
