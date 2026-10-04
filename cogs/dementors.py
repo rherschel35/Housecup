@@ -789,7 +789,7 @@ class Dementors(commands.Cog):
             )
             embed = discord.Embed(title="✨ The Dementor is banished", description=line, color=0xC4CCD6)
             embed.set_footer(text=f"+{creature['points']} rep - ⚔️ {event['name']}")
-            file = self._attach_art(embed, "dementor", field="defeat_image")
+            file = self._dementor_defeat_art(embed, interaction.user.id)
             return {"embed": embed, "file": file}
 
         if spell.value != creature["weak"]:
