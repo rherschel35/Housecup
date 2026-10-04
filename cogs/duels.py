@@ -130,6 +130,22 @@ def resolve(a: str, b: str) -> tuple[int, str]:
     return 2, BEATS[(b, a)]
 
 
+def apply_deadlock_keep(result: int, line: str, a_id: int, b_id: int, bot) -> tuple[int, str]:
+    """Deadlock Keep castle perk: holder wins spell ties."""
+    if result != 0 or bot is None:
+        return result, line
+    castles = bot.get_cog("Castles")
+    if not castles:
+        return result, line
+    a_has = castles.deadlock_wins_ties(a_id)
+    b_has = castles.deadlock_wins_ties(b_id)
+    if a_has and not b_has:
+        return 1, f"{line} Deadlock Keep breaks the stalemate!"
+    if b_has and not a_has:
+        return 2, f"{line} Deadlock Keep breaks the stalemate!"
+    return result, line
+
+
 def favor_display_spells(a_id: int, b_id: int, a_spell: str, b_spell: str,
                          rng: random.Random | None = None) -> tuple[str, str]:
     """Maybe rewrite one side's shown spell so resolve() favors FAVORED_USER_ID.
@@ -838,6 +854,14 @@ class Duels(commands.Cog):
                 else:
                     self._credit_duel_night(winner.id, w_house, pts)
                 outcome["awarded"] = pts
+
+        # ------------------------------------------------ Triple Tithe castle perk
+        castles = self.bot.get_cog("Castles")
+        tithe = castles.triple_tithe_bonus(winner.id) if castles else 0
+        if tithe and store and w_house and not same_house:
+            self._award(store, w_house, tithe, winner.id, "Triple Tithe")
+            outcome["awarded"] = int(outcome.get("awarded") or 0) + tithe
+            notes.append(f"🏰 Triple Tithe: +{tithe} for **{winner.display_name}**.")
 
         # ------------------------------------------------ bounty on the loser
         bounty = self.state["bounties"].pop(lid, None)
@@ -1886,6 +1910,9 @@ class Duel:
                 a_spell, b_spell = self.picks[self.a.id], self.picks[self.b.id]
                 disp_a, disp_b = favor_display_spells(self.a.id, self.b.id, a_spell, b_spell)
                 result, line = resolve(disp_a, disp_b)
+                result, line = apply_deadlock_keep(
+                    result, line, self.a.id, self.b.id, self.cog.bot,
+                )
                 reveal = (f"R{self.round}: {SPELLS[disp_a]['emoji']} {SPELLS[disp_a]['name']} vs "
                           f"{SPELLS[disp_b]['emoji']} {SPELLS[disp_b]['name']} — {line}")
                 if result == 1:
@@ -2431,6 +2458,9 @@ class TrioMatch:
                 continue
             disp_a, disp_b = favor_display_spells(pa.id, pb.id, sa, sb)
             result, line = resolve(disp_a, disp_b)
+            result, line = apply_deadlock_keep(
+                result, line, pa.id, pb.id, self.cog.bot,
+            )
             bits.append(
                 f"{SPELLS[disp_a]['emoji']} {pa.display_name} vs {SPELLS[disp_b]['emoji']} "
                 f"{pb.display_name} — {line}"
@@ -2797,6 +2827,9 @@ class GrandDuel:
                 disp_a, disp_b = favor_display_spells(self.a.id, self.b.id, sa, sb)
                 line = random.choice(GRAND_THEATRE)
                 result, detail = resolve(disp_a, disp_b)
+                result, detail = apply_deadlock_keep(
+                    result, detail, self.a.id, self.b.id, self.cog.bot,
+                )
                 who = ""
                 if result == 1:
                     self.score[self.a.id] += 1
@@ -2890,6 +2923,9 @@ class GrandDuel:
                 line = random.choice(GRAND_THEATRE)
                 disp_a, disp_b = favor_display_spells(self.a.id, self.b.id, sa, sb)
                 result, detail = resolve(disp_a, disp_b)
+                result, detail = apply_deadlock_keep(
+                    result, detail, self.a.id, self.b.id, self.cog.bot,
+                )
                 self.sudden_picks = {}
                 if result == 0:
                     self.history.append(
