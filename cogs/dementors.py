@@ -229,8 +229,8 @@ SPELL_LABEL = {"patronus": "Patronus", **_DUEL_SPELL_NAMES}
 CREATURE_CHOICES = [app_commands.Choice(name=c["name"], value=key) for key, c in CREATURES.items()]
 
 # Headmaster convenience: /cast auto-picks the right weakness (no buttons).
-# Everyone else gets ephemeral spell buttons — stops clipboard macros of
-# `/cast spell:Hex` etc. Override with CAST_AUTO_USER_ID; unset/0 disables.
+# Everyone else gets ephemeral spell buttons. Override with CAST_AUTO_USER_ID;
+# unset/0 disables.
 _raw_cast_auto = os.getenv("CAST_AUTO_USER_ID", "555141900802457630")
 CAST_AUTO_USER_ID = (
     int(_raw_cast_auto) if _raw_cast_auto and str(_raw_cast_auto).isdigit() else None
@@ -565,7 +565,7 @@ class Dementors(commands.Cog):
 
     @app_commands.command(name="cast", description="Cast a spell at whatever's in this channel.")
     async def cast(self, interaction: discord.Interaction):
-        """Spell is chosen via buttons (clipboard macros of spell: no longer work)."""
+        """Spell is chosen via ephemeral buttons."""
         hexes = self.bot.get_cog("Hexes")
         if hexes and await hexes.deny_if_limp_wand(interaction):
             return
