@@ -372,10 +372,10 @@ class Dementors(commands.Cog):
     def _dementor_defeat_art(
         self, embed: discord.Embed, user_id: int
     ) -> discord.File | None:
-        """Custom patronus portrait for sealed casters; else regular defeat art."""
+        """Sealed caster's defeat portrait (or regular patronus art); else default."""
         patronus_cog = self.bot.get_cog("Patronus")
         if patronus_cog is not None:
-            art = patronus_cog.art_file_for(user_id)
+            art = patronus_cog.art_file_for(user_id, field="defeat_art")
             if art is not None:
                 embed.set_image(url="attachment://patronus.png")
                 return art

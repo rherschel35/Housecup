@@ -94,6 +94,7 @@ CUSTOM_PATRONUSES: dict[str, dict] = {
             "it, sees where it is going, and then refuses to turn back.**"
         ),
         "art": "Griffin_Pod.png",
+        "defeat_art": "Griffin_Pod_Defeat.png",
     },
 }
 
@@ -229,18 +230,18 @@ class Patronus(commands.Cog):
             }
         return self.patronuses.get(str(user_id))
 
-    def art_path_for(self, user_id: int) -> Path | None:
+    def art_path_for(self, user_id: int, *, field: str = "art") -> Path | None:
         custom = self.custom_of(user_id)
         if not custom:
             return None
-        name = custom.get("art")
+        name = custom.get(field) or (custom.get("art") if field == "defeat_art" else None)
         if not name:
             return None
         path = ASSETS_DIR / name
         return path if path.is_file() else None
 
-    def art_file_for(self, user_id: int) -> discord.File | None:
-        path = self.art_path_for(user_id)
+    def art_file_for(self, user_id: int, *, field: str = "art") -> discord.File | None:
+        path = self.art_path_for(user_id, field=field)
         if path is None:
             return None
         return discord.File(path, filename="patronus.png")
