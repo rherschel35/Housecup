@@ -36,6 +36,8 @@ gaining 1 AP back automatically each round. Actions:
     - Defend (1 AP) - deal no damage, but halve the monster's hit back.
     - Rest (free) - fully refill your AP, but you take 10% extra damage
       that round for being unguarded.
+    - One-shot (Headmaster only, on their own fights) - instantly win the
+      fight with full loot / floor / trophy rewards. Normal actions stay.
 
 Floor replay: once you've cleared a floor, `/descend floor:<n>` lets you
 refight a single monster from it any time (not boss floors) - for loot,
@@ -84,6 +86,15 @@ DESCENT_CHANNEL_IDS = with_study_hall(
 
 def _descent_channel_hint() -> str:
     return f"The Descent can only be played in {channel_mentions(DESCENT_CHANNEL_IDS)}."
+
+
+# Headmaster convenience: a One-shot button on THEIR Descent fights only
+# (still grants full win rewards). Override with DESCENT_ONESHOT_USER_ID;
+# unset/0 disables. Same default id as CAST_AUTO_USER_ID.
+_raw_oneshot = os.getenv("DESCENT_ONESHOT_USER_ID", "555141900802457630")
+DESCENT_ONESHOT_USER_ID = (
+    int(_raw_oneshot) if _raw_oneshot and str(_raw_oneshot).isdigit() else None
+)
 
 # ------------------------------------------------------------- elements
 
@@ -532,6 +543,36 @@ class RestButton(discord.ui.Button):
         await self.view.cog.take_action(interaction, "rest")
 
 
+class OneShotButton(discord.ui.Button):
+    """Headmaster-only finisher — full rewards, no counterattack."""
+
+    def __init__(self):
+        super().__init__(
+            label="One-shot",
+            emoji="⚡",
+            style=discord.ButtonStyle.danger,
+            row=2,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.view.owner_id:
+            await interaction.response.send_message(
+                "That's not your fight - use `/descend` to start your own.",
+                ephemeral=True,
+            )
+            return
+        if (
+            DESCENT_ONESHOT_USER_ID is None
+            or interaction.user.id != DESCENT_ONESHOT_USER_ID
+        ):
+            await interaction.response.send_message(
+                "That button isn't for you.", ephemeral=True
+            )
+            return
+        await interaction.response.defer()
+        await self.view.cog.take_action(interaction, "oneshot")
+
+
 class FightView(discord.ui.View):
     def __init__(self, cog: "Descent", fight: Fight):
         super().__init__(timeout=600)
@@ -543,6 +584,12 @@ class FightView(discord.ui.View):
         self.add_item(HealButton(disabled=fight.ap < HEAL_AP_COST))
         self.add_item(DefendButton(disabled=fight.ap < DEFEND_AP_COST))
         self.add_item(RestButton(disabled=fight.ap >= fight.ap_max))
+        # Only on the sealed user's own fight board (others never get this control).
+        if (
+            DESCENT_ONESHOT_USER_ID is not None
+            and fight.user_id == DESCENT_ONESHOT_USER_ID
+        ):
+            self.add_item(OneShotButton())
 
 
 class StatButton(discord.ui.Button):
@@ -746,6 +793,19 @@ class Descent(commands.Cog):
             counter_mult = 1.0 if fight.rest_no_penalty else REST_DMG_MULT
             lines.append("😮‍💨 You catch your breath - AP fully restored"
                         + (" and unbothered" if fight.rest_no_penalty else " (unguarded)"))
+        elif action == "oneshot":
+            if (
+                DESCENT_ONESHOT_USER_ID is None
+                or interaction.user.id != DESCENT_ONESHOT_USER_ID
+            ):
+                await interaction.followup.send(
+                    "That button isn't for you.", ephemeral=True
+                )
+                return
+            dmg_dealt = max(fight.m_hp, 1)
+            lines.append(
+                f"⚡ You end it in one motion — **{fight.name}** never gets a turn."
+            )
         else:
             return
 
