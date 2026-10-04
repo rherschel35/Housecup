@@ -17,8 +17,9 @@ Duelist of the Week (role + house points). Only wins, ranks, streaks and
 titles are ever shown - never a win rate.
 
 Five spells. Each beats exactly two others and loses to the other two, so
-there is no safe pick - only reading your opponent. Both duelists choose
-privately, then both spells are revealed at once.
+there is no safe pick - only reading your opponent. Both duelists open a
+private cast board (spell buttons under the board, like broom races), then
+both spells are revealed at once.
 
 The winner's house earns 1 point, up to 3 duel points per person per day.
 Duels past that still count toward the win/loss record. Duels between two
@@ -1521,6 +1522,10 @@ class Duel:
         self.publish_lock = asyncio.Lock()  # one board edit at a time
         self._timer = None
         self.board_gen = 0        # bumps on every planned board publish
+        # Private cast boards (broom-race style): spell buttons live under
+        # each duelist's ephemeral board, which edits in place each round.
+        self.private_boards: dict[int, discord.Message] = {}
+        self.opened: set[int] = set()
 
     # -------------------------------------------------------------- display
 
@@ -1548,32 +1553,95 @@ class Duel:
             lines.append(f"**Round {self.round}** — "
                          + ("waiting on " + " and ".join(waiting) if waiting else "revealing…"))
         embed = discord.Embed(title="The duel", description="\n".join(lines), color=0xB8434F)
-        embed.set_footer(text=footer or f"Press Cast to choose your spell • "
-                                        f"{ROUND_TIMEOUT}s per round")
+        embed.set_footer(text=footer or (
+            f"Both duelists: Open my cast board • {ROUND_TIMEOUT}s per round"
+            if self.state == "active"
+            else f"{ROUND_TIMEOUT}s per round"
+        ))
         return embed
+
+    def private_embed(self, user_id: int, footer: str = None) -> discord.Embed:
+        """Same scoreboard as public, with a footer aimed at this caster."""
+        embed = self.board_embed(footer)
+        if footer is not None:
+            return embed
+        if self.state == "active" and user_id in self.picks:
+            spell = SPELLS[self.picks[user_id]]["name"]
+            embed.set_footer(text=f"You cast {spell}. Waiting on your opponent…")
+        elif self.state == "active":
+            embed.set_footer(
+                text=f"Pick a spell below • {ROUND_TIMEOUT}s per round"
+            )
+        return embed
+
+    def _public_view(self):
+        if self.state == "active":
+            return OpenCastBoardView(self)
+        return None
+
+    def _private_view_for(self, user_id: int):
+        if self.state != "active":
+            return None
+        if user_id in self.picks:
+            return None
+        return PrivateSpellView(self)
 
     def _snapshot(self, view=None, footer=None):
         """Bump board gen and capture embed+view. Call while holding the lock
         (or when no concurrent publisher can race)."""
         self.board_gen += 1
-        return self.board_embed(footer), view, self.board_gen
+        if view is None and self.state == "active":
+            view = self._public_view()
+        return self.board_embed(footer), view, self.board_gen, footer
 
-    async def _publish(self, embed, view, gen):
-        """Edit the public duel message only if this snapshot is still current.
+    async def _publish(self, embed, view, gen, footer=None):
+        """Edit the public duel message and any private cast boards if current.
 
         publish_lock serializes Discord edits so a slow stale write can't land
         *after* a newer board without the newer one getting to write last.
         """
-        if self.message is None:
+        if self.message is None and not self.private_boards:
             return
         async with self.publish_lock:
             async with self.lock:
                 if gen != self.board_gen:
                     return
-            try:
-                await self.message.edit(content=None, embed=embed, view=view)
-            except discord.DiscordException:
-                log.exception("Could not update the duel message.")
+                picks = dict(self.picks)
+                state = self.state
+                boards = dict(self.private_boards)
+                round_no = self.round
+            if self.message is not None:
+                try:
+                    await self.message.edit(content=None, embed=embed, view=view)
+                except discord.DiscordException:
+                    log.exception("Could not update the duel message.")
+            for uid, msg in boards.items():
+                try:
+                    priv_footer = footer
+                    if priv_footer is None and state == "active" and uid in picks:
+                        priv_footer = (
+                            f"You cast {SPELLS[picks[uid]]['name']}. "
+                            "Waiting on your opponent…"
+                        )
+                    elif priv_footer is None and state == "active":
+                        priv_footer = (
+                            f"Pick a spell below • {ROUND_TIMEOUT}s per round"
+                        )
+                    priv_embed = discord.Embed(
+                        title=embed.title,
+                        description=embed.description,
+                        color=embed.color,
+                    )
+                    if priv_footer:
+                        priv_embed.set_footer(text=priv_footer)
+                    elif embed.footer and embed.footer.text:
+                        priv_embed.set_footer(text=embed.footer.text)
+                    priv_view = None
+                    if state == "active" and uid not in picks:
+                        priv_view = PrivateSpellView(self, round_no=round_no)
+                    await msg.edit(embed=priv_embed, view=priv_view)
+                except discord.DiscordException:
+                    log.exception("Could not update private cast board for %s", uid)
 
     async def _update(self, view=None, footer=None):
         """Convenience: snapshot under the lock, then publish unlocked."""
@@ -1640,11 +1708,43 @@ class Duel:
                 self.cog.release_match(self)
                 snap = self._snapshot(view=None, footer="Too evenly matched — declared a draw.")
             else:
-                snap = self._snapshot(view=CastView(self))
+                snap = self._snapshot(view=OpenCastBoardView(self))
                 arm_round = self.round
         await self._publish(*snap)
         if arm_round is not None:
             self._arm(self._round_timeout(arm_round))
+
+    async def open_cast_board(self, interaction: discord.Interaction) -> None:
+        """Send (or refuse a duplicate) private board with spells under it."""
+        uid = interaction.user.id
+        if uid not in self.score:
+            await interaction.response.send_message(
+                "You're watching, not duelling.", ephemeral=True
+            )
+            return
+        async with self.lock:
+            if self.state != "active":
+                await interaction.response.send_message(
+                    "This duel is over.", ephemeral=True
+                )
+                return
+            if uid in self.opened or uid in self.private_boards:
+                await interaction.response.send_message(
+                    "Your cast board is already open (check your ephemeral messages).",
+                    ephemeral=True,
+                )
+                return
+            self.opened.add(uid)
+            embed = self.private_embed(uid)
+            view = self._private_view_for(uid)
+        await interaction.response.send_message(
+            embed=embed, view=view, ephemeral=True
+        )
+        try:
+            self.private_boards[uid] = await interaction.original_response()
+        except discord.HTTPException:
+            async with self.lock:
+                self.opened.discard(uid)
 
     async def cast(self, member, spell: str, round_no: int = None) -> str:
         """Lock in a spell. Returns a message for the caster.
@@ -1659,7 +1759,7 @@ class Duel:
             if self.state != "active":
                 return "This duel is over."
             if round_no is not None and round_no != self.round:
-                return "That round is already over - press Cast again for this one."
+                return "That round is already over — pick again on your cast board."
             if member.id not in self.score:
                 return "You're not in this duel."
             if member.id in self.picks:
@@ -1667,7 +1767,7 @@ class Duel:
             self.picks[member.id] = spell
 
             if len(self.picks) < 2:
-                publish = self._snapshot(view=CastView(self))
+                publish = self._snapshot(view=OpenCastBoardView(self))
                 reply = f"You cast **{SPELLS[spell]['name']}**. Waiting on your opponent…"
             else:
                 a_spell, b_spell = self.picks[self.a.id], self.picks[self.b.id]
@@ -1695,7 +1795,7 @@ class Duel:
                         publish = self._snapshot(
                             view=None, footer="Too evenly matched — declared a draw.")
                     else:
-                        publish = self._snapshot(view=CastView(self))
+                        publish = self._snapshot(view=OpenCastBoardView(self))
                         arm_round = self.round
                 reply = f"You cast **{SPELLS[spell]['name']}**."
 
@@ -1783,58 +1883,61 @@ class AcceptView(discord.ui.View):
         )
 
 
-class CastView(discord.ui.View):
+class OpenCastBoardView(discord.ui.View):
+    """Public prompt — same idea as broom race's Open my race board."""
+
     def __init__(self, duel: Duel):
+        super().__init__(timeout=ROUND_TIMEOUT * MAX_ROUNDS + 60)
+        self.duel = duel
+
+    @discord.ui.button(
+        label="Open my cast board",
+        style=discord.ButtonStyle.primary,
+        emoji="\U0001FA84",
+    )
+    async def open_board(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.duel.open_cast_board(interaction)
+
+
+class PrivateSpellView(discord.ui.View):
+    """Spell buttons attached under the private cast board (edits in place)."""
+
+    def __init__(self, duel: Duel, round_no: int | None = None):
         super().__init__(timeout=ROUND_TIMEOUT + 5)
         self.duel = duel
-
-    @discord.ui.button(label="Cast", style=discord.ButtonStyle.primary, emoji="\U0001FA84")
-    async def cast(self, interaction: discord.Interaction, button: discord.ui.Button):
-        d = self.duel
-        if interaction.user.id not in d.score:
-            await interaction.response.send_message("You're watching, not duelling.",
-                                                    ephemeral=True)
-            return
-        async with d.lock:
-            if d.state != "active":
-                await interaction.response.send_message("This duel is over.", ephemeral=True)
-                return
-            if interaction.user.id in d.picks:
-                await interaction.response.send_message("You've already cast this round.",
-                                                        ephemeral=True)
-                return
-            round_no = d.round
-        await interaction.response.send_message(
-            f"Round {round_no} — choose your spell. Only you can see this.",
-            view=SpellView(d),
-            ephemeral=True,
-        )
-
-
-class SpellView(discord.ui.View):
-    def __init__(self, duel: Duel):
-        super().__init__(timeout=ROUND_TIMEOUT)
-        self.duel = duel
-        self.round_no = duel.round
-        for key, spell in SPELLS.items():
-            self.add_item(SpellButton(key, spell))
+        self.round_no = duel.round if round_no is None else round_no
+        for i, (key, spell) in enumerate(SPELLS.items()):
+            self.add_item(SpellButton(key, spell, row=0 if i < 3 else 1))
 
 
 class SpellButton(discord.ui.Button):
-    def __init__(self, key: str, spell: dict):
-        super().__init__(label=spell["name"], emoji=spell["emoji"],
-                         style=discord.ButtonStyle.secondary)
+    def __init__(self, key: str, spell: dict, row: int = 0):
+        super().__init__(
+            label=spell["name"],
+            emoji=spell["emoji"],
+            style=discord.ButtonStyle.secondary,
+            row=row,
+        )
         self.key = key
 
     async def callback(self, interaction: discord.Interaction):
         # Discord allows 3 seconds to answer a click; resolving a round also
-        # edits the public message, so acknowledge first and report after.
+        # edits boards, so acknowledge first. Success refreshes this private
+        # board in place (options stay under the duel); errors get a followup.
+        d = self.view.duel
+        if interaction.user.id not in d.score:
+            await interaction.response.send_message(
+                "You're watching, not duelling.", ephemeral=True
+            )
+            return
         await interaction.response.defer()
-        reply = await self.view.duel.cast(interaction.user, self.key, self.view.round_no)
-        try:
-            await interaction.edit_original_response(content=reply, view=None)
-        except discord.DiscordException:
-            pass
+        before = d.board_gen
+        reply = await d.cast(interaction.user, self.key, self.view.round_no)
+        if d.board_gen == before:
+            try:
+                await interaction.followup.send(reply, ephemeral=True)
+            except discord.DiscordException:
+                pass
 
 
 # ==================================================================== Trio 3v3
@@ -1936,7 +2039,9 @@ class TrioSignup:
             match = TrioMatch(self)
             match.message = interaction.message
             match.round = 1
-            await interaction.response.edit_message(embed=match.board_embed(), view=TrioCastView(match))
+            await interaction.response.edit_message(
+                embed=match.board_embed(), view=OpenTrioCastBoardView(match)
+            )
             match._arm(match._round_timeout(1))
         else:
             await interaction.response.edit_message(embed=self.embed(), view=TrioSignupView(self))
@@ -1992,6 +2097,8 @@ class TrioMatch:
         self._timer = None
         self.board_gen = 0
         self.channel = signup.message.channel if signup.message else None
+        self.private_boards: dict[int, discord.Message] = {}
+        self.opened: set[int] = set()
 
     def all_players(self):
         return self.team_a + self.team_b
@@ -2017,7 +2124,22 @@ class TrioMatch:
             lines.append(f"**Round {self.round}** — "
                          + ("waiting on " + ", ".join(waiting) if waiting else "revealing…"))
         embed = discord.Embed(title="Trio Duel", description="\n".join(lines), color=0xB8434F)
-        embed.set_footer(text=footer or f"Press Cast to choose • {ROUND_TIMEOUT}s per round")
+        embed.set_footer(text=footer or (
+            f"Duelists: Open my cast board • {ROUND_TIMEOUT}s per round"
+            if self.state == "active"
+            else f"{ROUND_TIMEOUT}s per round"
+        ))
+        return embed
+
+    def private_embed(self, user_id: int, footer: str = None) -> discord.Embed:
+        embed = self.board_embed(footer)
+        if footer is not None:
+            return embed
+        pick = self.picks.get(user_id)
+        if self.state == "active" and pick:
+            embed.set_footer(text=f"You cast {SPELLS[pick]['name']}. Waiting…")
+        elif self.state == "active":
+            embed.set_footer(text=f"Pick a spell below • {ROUND_TIMEOUT}s per round")
         return embed
 
     def start_round(self):
@@ -2032,24 +2154,90 @@ class TrioMatch:
 
     def _snapshot(self, view=None, footer=None):
         self.board_gen += 1
-        return self.board_embed(footer), view, self.board_gen
+        if view is None and self.state == "active":
+            view = OpenTrioCastBoardView(self)
+        return self.board_embed(footer), view, self.board_gen, footer
 
-    async def _publish(self, embed, view, gen):
-        if self.message is None:
+    async def _publish(self, embed, view, gen, footer=None):
+        if self.message is None and not self.private_boards:
             return
         async with self.publish_lock:
             async with self.lock:
                 if gen != self.board_gen:
                     return
-            try:
-                await self.message.edit(content=None, embed=embed, view=view)
-            except discord.DiscordException:
-                log.exception("Could not update trio message.")
+                picks = dict(self.picks)
+                state = self.state
+                boards = dict(self.private_boards)
+                round_no = self.round
+            if self.message is not None:
+                try:
+                    await self.message.edit(content=None, embed=embed, view=view)
+                except discord.DiscordException:
+                    log.exception("Could not update trio message.")
+            for uid, msg in boards.items():
+                try:
+                    priv_footer = footer
+                    pick = picks.get(uid)
+                    if priv_footer is None and state == "active" and pick:
+                        priv_footer = f"You cast {SPELLS[pick]['name']}. Waiting…"
+                    elif priv_footer is None and state == "active":
+                        priv_footer = f"Pick a spell below • {ROUND_TIMEOUT}s per round"
+                    priv_embed = discord.Embed(
+                        title=embed.title,
+                        description=embed.description,
+                        color=embed.color,
+                    )
+                    if priv_footer:
+                        priv_embed.set_footer(text=priv_footer)
+                    elif embed.footer and embed.footer.text:
+                        priv_embed.set_footer(text=embed.footer.text)
+                    priv_view = None
+                    if state == "active" and uid not in picks:
+                        priv_view = TrioPrivateSpellView(self, round_no=round_no)
+                    await msg.edit(embed=priv_embed, view=priv_view)
+                except discord.DiscordException:
+                    log.exception("Could not update trio private cast board for %s", uid)
 
     async def _update(self, view=None, footer=None):
         async with self.lock:
             snap = self._snapshot(view=view, footer=footer)
         await self._publish(*snap)
+
+    async def open_cast_board(self, interaction: discord.Interaction) -> None:
+        uid = interaction.user.id
+        ids = {p.id for p in self.all_players()}
+        if uid not in ids:
+            await interaction.response.send_message(
+                "You're watching, not duelling.", ephemeral=True
+            )
+            return
+        async with self.lock:
+            if self.state != "active":
+                await interaction.response.send_message(
+                    "This trio is over.", ephemeral=True
+                )
+                return
+            if uid in self.opened or uid in self.private_boards:
+                await interaction.response.send_message(
+                    "Your cast board is already open (check your ephemeral messages).",
+                    ephemeral=True,
+                )
+                return
+            self.opened.add(uid)
+            embed = self.private_embed(uid)
+            view = (
+                None
+                if uid in self.picks
+                else TrioPrivateSpellView(self, round_no=self.round)
+            )
+        await interaction.response.send_message(
+            embed=embed, view=view, ephemeral=True
+        )
+        try:
+            self.private_boards[uid] = await interaction.original_response()
+        except discord.HTTPException:
+            async with self.lock:
+                self.opened.discard(uid)
 
     async def _round_timeout(self, round_no: int):
         await asyncio.sleep(ROUND_TIMEOUT)
@@ -2085,7 +2273,7 @@ class TrioMatch:
             if self.state != "active":
                 return "This trio is over."
             if round_no is not None and round_no != self.round:
-                return "That round is already over — press Cast again."
+                return "That round is already over — pick again on your cast board."
             ids = {m.id for m in self.all_players()}
             if member.id not in ids:
                 return "You're not in this trio."
@@ -2096,7 +2284,7 @@ class TrioMatch:
                 return "You've already cast this round."
             self.picks[member.id] = spell
             if len(self.picks) < len(self.all_players()):
-                publish = self._snapshot(view=TrioCastView(self))
+                publish = self._snapshot(view=OpenTrioCastBoardView(self))
             else:
                 follow = self._resolve_round_locked()
             reply = (
@@ -2164,7 +2352,7 @@ class TrioMatch:
         self.picks = {}
         arm = self.round
         return {
-            "publish": self._snapshot(view=TrioCastView(self)),
+            "publish": self._snapshot(view=OpenTrioCastBoardView(self)),
             "arm": arm,
         }
 
@@ -2215,55 +2403,55 @@ class TrioMatch:
                 log.exception("Could not post trio announcements.")
 
 
-class TrioCastView(discord.ui.View):
+class OpenTrioCastBoardView(discord.ui.View):
     def __init__(self, match: TrioMatch):
+        super().__init__(timeout=ROUND_TIMEOUT * MAX_ROUNDS + 60)
+        self.match = match
+
+    @discord.ui.button(
+        label="Open my cast board",
+        style=discord.ButtonStyle.primary,
+        emoji="\U0001FA84",
+    )
+    async def open_board(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.match.open_cast_board(interaction)
+
+
+class TrioPrivateSpellView(discord.ui.View):
+    def __init__(self, match: TrioMatch, round_no: int | None = None):
         super().__init__(timeout=ROUND_TIMEOUT + 5)
         self.match = match
-
-    @discord.ui.button(label="Cast", style=discord.ButtonStyle.primary, emoji="\U0001FA84")
-    async def cast(self, interaction: discord.Interaction, button: discord.ui.Button):
-        m = self.match
-        ids = {p.id for p in m.all_players()}
-        if interaction.user.id not in ids:
-            await interaction.response.send_message("You're watching, not duelling.", ephemeral=True)
-            return
-        async with m.lock:
-            if m.state != "active":
-                await interaction.response.send_message("This trio is over.", ephemeral=True)
-                return
-            if interaction.user.id in m.picks:
-                await interaction.response.send_message("You've already cast this round.", ephemeral=True)
-                return
-            round_no = m.round
-        await interaction.response.send_message(
-            f"Round {round_no} — choose your spell. Only you can see this.",
-            view=TrioSpellView(m),
-            ephemeral=True,
-        )
-
-
-class TrioSpellView(discord.ui.View):
-    def __init__(self, match: TrioMatch):
-        super().__init__(timeout=ROUND_TIMEOUT)
-        self.match = match
-        self.round_no = match.round
-        for key, spell in SPELLS.items():
-            self.add_item(TrioSpellButton(key, spell))
+        self.round_no = match.round if round_no is None else round_no
+        for i, (key, spell) in enumerate(SPELLS.items()):
+            self.add_item(TrioSpellButton(key, spell, row=0 if i < 3 else 1))
 
 
 class TrioSpellButton(discord.ui.Button):
-    def __init__(self, key: str, spell: dict):
-        super().__init__(label=spell["name"], emoji=spell["emoji"],
-                         style=discord.ButtonStyle.secondary)
+    def __init__(self, key: str, spell: dict, row: int = 0):
+        super().__init__(
+            label=spell["name"],
+            emoji=spell["emoji"],
+            style=discord.ButtonStyle.secondary,
+            row=row,
+        )
         self.key = key
 
     async def callback(self, interaction: discord.Interaction):
+        m = self.view.match
+        ids = {p.id for p in m.all_players()}
+        if interaction.user.id not in ids:
+            await interaction.response.send_message(
+                "You're watching, not duelling.", ephemeral=True
+            )
+            return
         await interaction.response.defer()
-        reply = await self.view.match.cast(interaction.user, self.key, self.view.round_no)
-        try:
-            await interaction.edit_original_response(content=reply, view=None)
-        except discord.DiscordException:
-            pass
+        before = m.board_gen
+        reply = await m.cast(interaction.user, self.key, self.view.round_no)
+        if m.board_gen == before:
+            try:
+                await interaction.followup.send(reply, ephemeral=True)
+            except discord.DiscordException:
+                pass
 
 
 # ==================================================================== Grand Duel
@@ -2286,6 +2474,8 @@ class GrandDuel:
         self.publish_lock = asyncio.Lock()
         self._timer = None
         self.board_gen = 0
+        self.private_boards: dict[int, discord.Message] = {}
+        self.opened: set[int] = set()
 
     def challenge_embed(self) -> discord.Embed:
         embed = discord.Embed(
@@ -2353,19 +2543,53 @@ class GrandDuel:
 
     def _snapshot(self, view=None, footer=None):
         self.board_gen += 1
-        return self.board_embed(footer), view, self.board_gen
+        return self.board_embed(footer), view, self.board_gen, footer
 
-    async def _publish(self, embed, view, gen):
-        if self.message is None:
+    async def _publish(self, embed, view, gen, footer=None):
+        if self.message is None and not self.private_boards:
             return
         async with self.publish_lock:
             async with self.lock:
                 if gen != self.board_gen:
                     return
-            try:
-                await self.message.edit(content=None, embed=embed, view=view)
-            except discord.DiscordException:
-                log.exception("Could not update Grand Duel message.")
+                state = self.state
+                sudden = dict(self.sudden_picks)
+                boards = dict(self.private_boards)
+            if self.message is not None:
+                try:
+                    await self.message.edit(content=None, embed=embed, view=view)
+                except discord.DiscordException:
+                    log.exception("Could not update Grand Duel message.")
+            # Private boards are only used in sudden death (sequence builder
+            # is its own ephemeral opened from the lock prompt).
+            if state == "sudden" or state == "done":
+                for uid, msg in boards.items():
+                    try:
+                        priv_footer = footer
+                        pick = sudden.get(uid)
+                        if priv_footer is None and state == "sudden" and pick:
+                            priv_footer = (
+                                f"You cast {SPELLS[pick]['name']}. Waiting…"
+                            )
+                        elif priv_footer is None and state == "sudden":
+                            priv_footer = "Sudden death — pick a spell below."
+                        priv_embed = discord.Embed(
+                            title=embed.title,
+                            description=embed.description,
+                            color=embed.color,
+                        )
+                        if priv_footer:
+                            priv_embed.set_footer(text=priv_footer)
+                        elif embed.footer and embed.footer.text:
+                            priv_embed.set_footer(text=embed.footer.text)
+                        priv_view = None
+                        if state == "sudden" and uid not in sudden:
+                            priv_view = GrandSuddenPrivateSpellView(self)
+                        await msg.edit(embed=priv_embed, view=priv_view)
+                    except discord.DiscordException:
+                        log.exception(
+                            "Could not update Grand sudden board for %s", uid
+                        )
 
     async def _update(self, view=None, footer=None):
         async with self.lock:
@@ -2378,10 +2602,51 @@ class GrandDuel:
         await self._update(
             view=GrandLockPromptView(self),
             footer=(
-                f"Each duelist locks a 10-spell sequence privately "
+                f"Both duelists: Open my sequence board "
                 f"({GRAND_LOCK_TIMEOUT // 60} min)."
             ),
         )
+
+    async def open_sudden_board(self, interaction: discord.Interaction) -> None:
+        uid = interaction.user.id
+        if uid not in self.score:
+            await interaction.response.send_message(
+                "You're watching, not duelling.", ephemeral=True
+            )
+            return
+        async with self.lock:
+            if self.state != "sudden":
+                await interaction.response.send_message(
+                    "Sudden death isn't open.", ephemeral=True
+                )
+                return
+            if uid in self.opened or uid in self.private_boards:
+                await interaction.response.send_message(
+                    "Your cast board is already open (check your ephemeral messages).",
+                    ephemeral=True,
+                )
+                return
+            self.opened.add(uid)
+            embed = self.board_embed()
+            if uid in self.sudden_picks:
+                embed.set_footer(
+                    text=(
+                        f"You cast {SPELLS[self.sudden_picks[uid]]['name']}. "
+                        "Waiting…"
+                    )
+                )
+                view = None
+            else:
+                embed.set_footer(text="Sudden death — pick a spell below.")
+                view = GrandSuddenPrivateSpellView(self)
+        await interaction.response.send_message(
+            embed=embed, view=view, ephemeral=True
+        )
+        try:
+            self.private_boards[uid] = await interaction.original_response()
+        except discord.HTTPException:
+            async with self.lock:
+                self.opened.discard(uid)
 
     def try_lock(self, user_id: int, sequence: list[str]) -> str:
         if self.state != "locking":
@@ -2452,8 +2717,13 @@ class GrandDuel:
                 self.state = "sudden"
                 self.sudden_picks = {}
                 self.history.append("**5–5.** Sudden death. One spell each, until someone lands a hit.")
+                # Fresh private boards for sudden death (sequence boards are done).
+                self.private_boards = {}
+                self.opened = set()
                 sudden = self._snapshot(
-                    view=GrandSuddenView(self), footer="Sudden death — Cast now.")
+                    view=OpenGrandSuddenBoardView(self),
+                    footer="Sudden death — Open my cast board.",
+                )
                 arm_sudden = self.round
             elif a_s > b_s:
                 finish = (self.a, self.b)
@@ -2500,7 +2770,7 @@ class GrandDuel:
                 return f"You've already cast {SPELLS[self.sudden_picks[member.id]]['name']}."
             self.sudden_picks[member.id] = spell
             if len(self.sudden_picks) < 2:
-                publish = self._snapshot(view=GrandSuddenView(self))
+                publish = self._snapshot(view=OpenGrandSuddenBoardView(self))
                 reply = f"You cast **{SPELLS[spell]['name']}**. Waiting…"
             else:
                 sa, sb = self.sudden_picks[self.a.id], self.sudden_picks[self.b.id]
@@ -2515,7 +2785,7 @@ class GrandDuel:
                         f"**Sudden {self.round}:** {SPELLS[disp_a]['emoji']} vs "
                         f"{SPELLS[disp_b]['emoji']} — {detail} Again."
                     )
-                    publish = self._snapshot(view=GrandSuddenView(self))
+                    publish = self._snapshot(view=OpenGrandSuddenBoardView(self))
                     arm_round = self.round
                 elif result == 1:
                     self.score[self.a.id] += 1
@@ -2618,7 +2888,11 @@ class GrandLockPromptView(discord.ui.View):
         super().__init__(timeout=GRAND_LOCK_TIMEOUT + 5)
         self.gd = gd
 
-    @discord.ui.button(label="Lock your sequence", style=discord.ButtonStyle.primary, emoji="📜")
+    @discord.ui.button(
+        label="Open my sequence board",
+        style=discord.ButtonStyle.primary,
+        emoji="📜",
+    )
     async def lock_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         d = self.gd
         if interaction.user.id not in d.sequences:
@@ -2709,48 +2983,53 @@ class GrandSeqSubmitButton(discord.ui.Button):
         await v.gd.maybe_start_play()
 
 
-class GrandSuddenView(discord.ui.View):
+class OpenGrandSuddenBoardView(discord.ui.View):
+    def __init__(self, gd: GrandDuel):
+        super().__init__(timeout=ROUND_TIMEOUT * 6 + 60)
+        self.gd = gd
+
+    @discord.ui.button(
+        label="Open my cast board",
+        style=discord.ButtonStyle.danger,
+        emoji="\U0001FA84",
+    )
+    async def open_board(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.gd.open_sudden_board(interaction)
+
+
+class GrandSuddenPrivateSpellView(discord.ui.View):
     def __init__(self, gd: GrandDuel):
         super().__init__(timeout=ROUND_TIMEOUT + 5)
         self.gd = gd
-
-    @discord.ui.button(label="Cast", style=discord.ButtonStyle.danger, emoji="\U0001FA84")
-    async def cast(self, interaction: discord.Interaction, button: discord.ui.Button):
-        d = self.gd
-        if interaction.user.id not in d.score:
-            await interaction.response.send_message("You're watching, not duelling.", ephemeral=True)
-            return
-        if interaction.user.id in d.sudden_picks:
-            await interaction.response.send_message("You've already cast.", ephemeral=True)
-            return
-        await interaction.response.send_message(
-            "Sudden death — choose your spell.",
-            view=GrandSuddenSpellView(d),
-            ephemeral=True,
-        )
-
-
-class GrandSuddenSpellView(discord.ui.View):
-    def __init__(self, gd: GrandDuel):
-        super().__init__(timeout=ROUND_TIMEOUT)
-        self.gd = gd
-        for key, spell in SPELLS.items():
-            self.add_item(GrandSuddenSpellButton(key, spell))
+        for i, (key, spell) in enumerate(SPELLS.items()):
+            self.add_item(GrandSuddenSpellButton(key, spell, row=0 if i < 3 else 1))
 
 
 class GrandSuddenSpellButton(discord.ui.Button):
-    def __init__(self, key: str, spell: dict):
-        super().__init__(label=spell["name"], emoji=spell["emoji"],
-                         style=discord.ButtonStyle.secondary)
+    def __init__(self, key: str, spell: dict, row: int = 0):
+        super().__init__(
+            label=spell["name"],
+            emoji=spell["emoji"],
+            style=discord.ButtonStyle.secondary,
+            row=row,
+        )
         self.key = key
 
     async def callback(self, interaction: discord.Interaction):
+        d = self.view.gd
+        if interaction.user.id not in d.score:
+            await interaction.response.send_message(
+                "You're watching, not duelling.", ephemeral=True
+            )
+            return
         await interaction.response.defer()
-        reply = await self.view.gd.sudden_cast(interaction.user, self.key)
-        try:
-            await interaction.edit_original_response(content=reply, view=None)
-        except discord.DiscordException:
-            pass
+        before = d.board_gen
+        reply = await d.sudden_cast(interaction.user, self.key)
+        if d.board_gen == before:
+            try:
+                await interaction.followup.send(reply, ephemeral=True)
+            except discord.DiscordException:
+                pass
 
 
 async def setup(bot: commands.Bot):

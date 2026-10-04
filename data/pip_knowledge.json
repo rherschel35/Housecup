@@ -10,7 +10,7 @@
         "three words",
         "get wand"
       ],
-      "answer": "Aye \u2014 dig out three words ye fancy an' cast `/wand`. A wand chooses ye for good. Same three words unlock `/patronus` an' `/broom` after.",
+      "answer": "Aye \u2014 dig out three words ye fancy an' cast `/wand`. A wand chooses ye for good. Same three words unlock `/patronus` an' `/broom` after. Animagus is separate — its own three words via `/animagus`.",
       "link": "https://everything-velmora.netlify.app/magic"
     },
     {
@@ -21,6 +21,18 @@
         "spirit animal"
       ],
       "answer": "Yer `/patronus` is cast from the same three words ye gave `/wand`. No wand yet? Start there first, then come back for the glow.",
+      "link": "https://everything-velmora.netlify.app/magic"
+    },
+    {
+      "id": "animagus",
+      "keywords": [
+        "animagus",
+        "animagi",
+        "animal form",
+        "transform",
+        "my animagus"
+      ],
+      "answer": "`/animagus` finds yer form from three words o' yer own (not the wand ones). Ye don't pick the animal — it picks ye. Locked for good. Right after ye first transform, every message ends with that animal's sound for a minute.",
       "link": "https://everything-velmora.netlify.app/magic"
     },
     {
@@ -215,7 +227,7 @@
         "grand duel",
         "trio"
       ],
-      "answer": "`/duel` is best of three \u2014 both pick a spell in secret. Hex, Ward, Disarm, Bind, Mirror; each beats two an' loses to two. There's also `/trio scramble`, `/trio housematch`, an' `/grand` for the big leagues. Stuck on \"already in a duel\"? Cast `/duelend` to clear the lock.",
+      "answer": "`/duel` is best of three \u2014 press **Open my cast board** an' yer spell buttons sit under that private board (same idea as broom races), so ye don't scroll the channel huntin' for Cast. Hex, Ward, Disarm, Bind, Mirror; each beats two an' loses to two. There's also `/trio scramble`, `/trio housematch`, an' `/grand` for the big leagues. Stuck on \"already in a duel\"? Cast `/duelend` to clear the lock.",
       "link": "https://everything-velmora.netlify.app/duels"
     },
     {
@@ -229,7 +241,7 @@
         "nightweaver",
         "stone golem"
       ],
-      "answer": "When a wild threat crawls into a channel, ye need a patronus ready \u2014 then `/cast` to banish it. Check `/help` under Play for the cast command.",
+      "answer": "When a wild threat crawls into a channel, `/cast` then tap the right spell button (Patronus for Dementors). If ye stirred it up explorin', ye get 25 seconds alone first.",
       "link": "https://everything-velmora.netlify.app/duels"
     },
     {

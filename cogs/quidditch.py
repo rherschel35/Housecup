@@ -43,7 +43,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from cogs.store import HOUSE_KEYS, HOUSES as STORE_HOUSES
-from cogs.velmora_channels import channel_mentions, with_study_hall
+from cogs.velmora_channels import channel_mentions, with_pitch_homes
 
 log = logging.getLogger("velmora.quidditch")
 
@@ -51,9 +51,9 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "quidditch_state.json"
 
-# Quidditch pitch + new-student study hall.
+# Quidditch pitch + study hall + shared games lounge.
 QUIDDITCH_CHANNEL_ID = 1553089438933065913
-QUIDDITCH_CHANNEL_IDS = with_study_hall(QUIDDITCH_CHANNEL_ID)
+QUIDDITCH_CHANNEL_IDS = with_pitch_homes(QUIDDITCH_CHANNEL_ID)
 
 
 def house_name(key: str | None) -> str:

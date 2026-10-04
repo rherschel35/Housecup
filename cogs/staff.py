@@ -187,6 +187,18 @@ class Staff(commands.Cog):
         await cog.broomreset(interaction, member)
 
     @identity.command(
+        name="animagusreset",
+        description="Release someone's Animagus form so they can be found again.",
+    )
+    @app_commands.describe(member="Whose Animagus form to release")
+    async def identity_animagusreset(self, interaction: discord.Interaction, member: discord.Member):
+        cog = self._cog("Animagus")
+        if not cog:
+            await interaction.response.send_message("Animagus isn't loaded.", ephemeral=True)
+            return
+        await cog.animagusreset(interaction, member)
+
+    @identity.command(
         name="upgradebroom",
         description="Freely raise a member's broom Speed or Altitude / control.",
     )
