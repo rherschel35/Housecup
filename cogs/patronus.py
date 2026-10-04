@@ -60,6 +60,7 @@ CUSTOM_PATRONUSES: dict[str, dict] = {
             "learns to move with you."
         ),
         "art": "Siren_Rowie.png",
+        "defeat_art": "Siren_Rowie_Defeat.png",
     },
     "206828442065305600": {  # Pod / Vish's Head Boy Pod
         "animal": "Griffin",
@@ -126,6 +127,7 @@ CUSTOM_PATRONUSES: dict[str, dict] = {
             "when underestimated, and considerably more fun when shared."
         ),
         "art": "Margarita_Mara.png",
+        "defeat_art": "Margarita_Mara_Defeat.png",
     },
 }
 
