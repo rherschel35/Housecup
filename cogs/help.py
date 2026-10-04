@@ -33,7 +33,7 @@ HELP = {
             ("bean", "Spend 1 point on a mystery bean. Might pay 5. Might be Mordy's socks."),
             ("wand", "Give any three words and a wand chooses you. Yours for good."),
             ("patronus", "Your patronus, cast from the same three words as your wand."),
-            ("animagus", "Your Animagus form from three words of your own — you don't pick it. First minute, messages end with its sound."),
+            ("animagus", "Your Animagus form from three words of your own — you don't pick it. Run again anytime for 1 min of animal sounds on your messages."),
             ("broom", "Claim your unique broom (see Brooms section for upgrades, races, and notes)."),
             ("rumor", "Explore secrets, student gossip, odd headmaster whispers, embarrassing ghosts."),
             ("cast", "Banish a wild threat — tap a spell button. 25s alone if you stirred it up."),
