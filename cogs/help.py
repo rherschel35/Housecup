@@ -78,9 +78,10 @@ HELP = {
         "title": "Castles & Army",
         "staff": False,
         "note": ("Army PvP in the castles channel. Bind Descent monsters, hold one of six castles, "
-                 "siege on Wed & Sat (Chicago). One castle per player — abandon before attacking another."),
+                 "siege on Wed & Sat (Chicago). Reinforce anytime except mid-assault. "
+                 "One castle per player — abandon before attacking another."),
         "entries": [
-            ("castles", "Map board: owners, perks, reinforce, siege, abandon."),
+            ("castles", "Map board: owners, perks, reinforce anytime (not mid-assault), siege, abandon."),
             ("army", "Your roster, daily recruit cap, and ATK/DEF sacrifice upgrades."),
         ],
     },
@@ -241,7 +242,7 @@ HELP = {
             ("staff descent boost", "Add Descent HP / Attack / Defense points to a player."),
             ("staff descent unlock", "Clear the 3-loss Descent lockout without wiping progress."),
             ("staff descent reset", "Wipe someone's Descent progress back to floor 1."),
-            ("staff castles unlock", "Clear all castle locks/reinforce cooldowns and allow sieges any day."),
+            ("staff castles unlock", "Clear all castle lock timers and allow sieges any day."),
             ("staff castles schedule", "Restore normal Wed/Sat siege days after a staff unlock."),
             ("staff raid reset", "Clear a player's 3Raid weekly lockout, or end the active raid."),
             ("staff market sellreset", "Clear someone's daily Marketplace sell-points cap."),
