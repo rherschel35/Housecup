@@ -538,9 +538,8 @@ class Castles(commands.Cog):
             f"**Owner:** {f'<@{owner}>' if owner else '*unclaimed*'}",
             f"**Garrison:** {force_summary(slot.get('garrison') or [])}",
             f"**Status:** {self.lock_label(slot)}",
+            "Reinforce anytime except during a live assault (20m lock only blocks new attacks).",
         ]
-        if slot.get("reinforced"):
-            desc.append("Reinforce used — available again after the next assault ends.")
         embed = discord.Embed(title=meta["name"], description="\n".join(desc), color=meta["color"])
         return embed
 
@@ -596,13 +595,12 @@ class Castles(commands.Cog):
     # ================================================================ reinforce / attack
 
     def can_reinforce(self, user_id: int, key: str) -> tuple[bool, str]:
+        """Reinforce anytime except during a live assault (lock timers don't block)."""
         slot = self.castle(key)
         if slot.get("owner_id") != user_id:
             return False, "You don't hold this castle."
         if slot.get("siege"):
             return False, "Can't reinforce during a live assault."
-        if slot.get("reinforced"):
-            return False, "You already reinforced once. Wait until the next assault ends."
         return True, ""
 
     def do_reinforce(self, user_id: int, key: str) -> tuple[bool, str]:
@@ -651,10 +649,14 @@ class Castles(commands.Cog):
 
         if not picked and not current:
             return False, "Your army is empty — bind monsters in the Descent first."
+        if not picked:
+            if need_regs <= 0 and need_bosses <= 0:
+                return False, f"Walls already at cap (**{force_summary(current)}**)."
+            return False, "No more troops available to add from your army."
 
         self.remove_units_from_army(user_id, picked)
         slot["garrison"] = current + picked
-        slot["reinforced"] = True
+        slot["reinforced"] = False  # legacy field; reinforce is no longer one-shot
         self.save()
         return True, f"Walls stocked: **{force_summary(slot['garrison'])}** (+{len(picked)} this reinforce)."
 
@@ -715,7 +717,7 @@ class Castles(commands.Cog):
         if return_attackers and attacker_id and force:
             self.return_units_to_army(attacker_id, force)
         slot["siege"] = None
-        slot["reinforced"] = False  # defender may reinforce again
+        slot["reinforced"] = False
         if lock:
             slot["locked_until"] = time.time() + LOCK_SECONDS
         self.save()
@@ -775,27 +777,23 @@ class Castles(commands.Cog):
     # ================================================================ staff
 
     async def staff_unlock_all(self, interaction: discord.Interaction) -> None:
-        """Clear every castle lock / reinforce cooldown and open sieges any day."""
+        """Clear every castle lock timer and open sieges any day."""
         store = self.bot.get_cog("Store")
         if not (store and store.is_staff(interaction.user)):
             await interaction.response.send_message("That's for staff.", ephemeral=True)
             return
         cleared_locks = 0
-        cleared_reinforce = 0
         for key in CASTLE_ORDER:
             slot = self.castle(key)
             if float(slot.get("locked_until") or 0) > 0:
                 cleared_locks += 1
             slot["locked_until"] = 0.0
-            if slot.get("reinforced"):
-                cleared_reinforce += 1
             slot["reinforced"] = False
         self.state["siege_unlocked"] = True
         self.save()
         await interaction.response.send_message(
             f"🔓 All castles unlocked.\n"
             f"• Cleared **{cleared_locks}** lock timer(s)\n"
-            f"• Reset **{cleared_reinforce}** reinforce cooldown(s)\n"
             f"• Sieges open **any day** until `/staff castles schedule`",
             ephemeral=True,
         )
