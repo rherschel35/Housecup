@@ -66,6 +66,8 @@ HELP = {
         "title": "The Descent",
         "staff": False,
         "note": ("Solo 100-floor dungeon — only in Descent channels. "
+                 "Floors 90–100 are The Shadow Veil: random hidden weaknesses each fight "
+                 "(revealed only when a cast lands super effective, or Owl's Eye). "
                  "Practice cleared floors with `/descend floor:n` for loot; nearby floors can sharpen a free stat pick."),
         "entries": [
             ("descend", "Fight the next monster on your floor (or resume an open fight)."),

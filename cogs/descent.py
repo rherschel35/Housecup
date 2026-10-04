@@ -8,8 +8,9 @@ The Descent - a 100-floor solo dungeon crawl.
 
 Ten zones of ten floors each, one primary element per zone plus a second
 element mixed in (about 30% of non-boss monsters), so a floor is never a
-single-element gimme. Every floor is a gauntlet of 10 monsters fought in
-order:
+single-element gimme. Floors 90–100 are The Shadow Veil: shadow monsters
+with a fresh random weakness every fight, hidden until you cast and find
+it. Every floor is a gauntlet of 10 monsters fought in order:
 
     - Win all 10 -> advance a floor and level up (level = deepest floor
       cleared): a stat point (HP/Attack/Defense) at monster #5, and your
@@ -20,6 +21,7 @@ order:
       When the lockout clears you restart that floor at monster #1.
     - Every 10th floor (10, 20, ... 100) ends in a boss: tougher, weak to
       two elements instead of one, and worth a floor-clear bonus.
+      Shadow bosses (90, 100) roll two random weaknesses each fight.
 
 Combat runs on an AP (action point) economy, not just "pick a spell every
 round": you start each fight with your current max AP (and full HP),
@@ -29,6 +31,8 @@ gaining 1 AP back automatically each round. Actions:
       the button says which). A monster's home element resists that same
       element (half damage) and is weak to one other (double damage) -
       neither is shown up front, so you learn it by testing spells.
+      Shadow monsters have no fixed home element — weakness is random
+      and stays hidden until a cast lands super effective (or Owl's Eye).
     - Strike (free) - a guaranteed, unglamorous hit for resisted-tier
       damage. Always available even at 0 AP.
     - Heal (3 AP) - restore half your missing HP, but you're not
@@ -88,15 +92,18 @@ def _descent_channel_hint() -> str:
 # ------------------------------------------------------------- elements
 
 ELEMENTS = ["fire", "ice", "lightning", "poison", "light"]
-ELEMENT_EMOJI = {"fire": "🔥", "ice": "❄️", "lightning": "⚡", "poison": "☠️", "light": "✨"}
-ELEMENT_NAME = {"fire": "Fire", "ice": "Ice", "lightning": "Lightning", "poison": "Poison", "light": "Light"}
+ELEMENT_EMOJI = {"fire": "🔥", "ice": "❄️", "lightning": "⚡", "poison": "☠️", "light": "✨",
+                 "shadow": "🌑"}
+ELEMENT_NAME = {"fire": "Fire", "ice": "Ice", "lightning": "Lightning", "poison": "Poison",
+                "light": "Light", "shadow": "Shadow"}
 # the attack spell each element is cast as - shown on the buttons and in
 # the round log, with the element emoji doing the job of telling players
 # which element it actually is
 SPELL_NAME = {"fire": "Incendio", "ice": "Glacius", "lightning": "Fulgur",
               "poison": "Draught", "light": "Lumos Solem"}
 # what a monster of this element is weak to (takes double damage from) -
-# never shown to the player; the point is to learn it by fighting
+# never shown to the player; the point is to learn it by fighting.
+# Shadow monsters ignore this table and roll a fresh weakness each fight.
 WEAK_TO = {"poison": "light", "fire": "ice", "ice": "lightning", "lightning": "poison", "light": "fire"}
 
 # a floor's secondary element - about 30% of its non-boss monsters are
@@ -104,6 +111,8 @@ WEAK_TO = {"poison": "light", "fire": "ice", "ice": "lightning", "lightning": "p
 # lean on one "safe" spell for the whole floor
 SECONDARY_ELEMENT = {"poison": "fire", "fire": "ice", "ice": "lightning", "lightning": "light", "light": "poison"}
 SECONDARY_CHANCE = 0.30
+
+SHADOW_FLOOR_START = 90
 
 # ---------------------------------------------------------------- zones
 
@@ -116,8 +125,8 @@ ZONES = [
     {"name": "The Overgrown Entrance — Lower Reach", "element": "poison", "start": 51, "end": 60},
     {"name": "The Ember Vaults — Deep Forge", "element": "fire", "start": 61, "end": 70},
     {"name": "The Frozen Depths — Abyssal Ice", "element": "ice", "start": 71, "end": 80},
-    {"name": "The Storm Cistern — Undertow", "element": "lightning", "start": 81, "end": 90},
-    {"name": "The Hollow Sanctum — Last Vault", "element": "light", "start": 91, "end": 100},
+    {"name": "The Storm Cistern — Undertow", "element": "lightning", "start": 81, "end": 89},
+    {"name": "The Shadow Veil", "element": "shadow", "start": 90, "end": 100},
 ]
 
 
@@ -150,6 +159,16 @@ MONSTER_NAMES = {
              ("Vault Warden", "🛡️", "humanoid")],
 }
 
+# Floors 90–100 regulars — shadow forms (reuse darker existing art).
+SHADOW_MONSTER_NAMES = [
+    ("Shade Maw", "🌑", "blob"),
+    ("Umbra Stalker", "🐺", "quadruped"),
+    ("Void Choirling", "🕊️", "flier"),
+    ("Night Husk", "💀", "humanoid"),
+    ("Gloom Warden", "🛡️", "humanoid"),
+    ("Static Shade", "⚡", "orb"),
+]
+
 BOSS_NAMES = {
     10: ("The Bloated Sovereign", "🍄", "blob"),
     20: ("Cinderlord Ashgrave", "🔥", "humanoid"),
@@ -160,8 +179,8 @@ BOSS_NAMES = {
     60: ("Blightmother Veil", "☠️", "humanoid"),
     70: ("Slagheart Tyrant", "🔥", "humanoid"),
     80: ("The Glacier Colossus", "🧊", "humanoid"),
-    90: ("The Arc Spire", "⚡", "orb"),
-    100: ("The Vault Eternal", "🚪", "humanoid"),
+    90: ("The Veil Spire", "🌑", "orb"),
+    100: ("The Night Vault", "🌑", "humanoid"),
 }
 
 # real art, supplied by the user - filename per monster name / boss floor
@@ -181,6 +200,13 @@ MONSTER_IMAGE = {
     "Hollow Choirling": "Hollow_Choirling.png",
     "Radiant Husk": "Radiant_Husk.png",
     "Vault Warden": "Vault_Warden.png",
+    # Shadow Veil regulars — darker reused portraits
+    "Shade Maw": "Bloatcap_Crawler.png",
+    "Umbra Stalker": "Glacier_Stalker.png",
+    "Void Choirling": "Hollow_Choirling.png",
+    "Night Husk": "Radiant_Husk.png",
+    "Gloom Warden": "Vault_Warden.png",
+    "Static Shade": "Static_Hollow.png",
 }
 # Dramatic /summon flourish lines for each boss trophy, written to that
 # boss's own character rather than a shared template - the whole point is
@@ -219,12 +245,12 @@ BOSS_SUMMONS = {
         "Snow doesn't fall so much as arrive already settled. The Glacier Colossus has come, and it only ever comes for {owner}.",
     ],
     90: [
-        "A needle of black crystal punches up through the floor - The Arc Spire answers {owner}, its single storm-eye already crackling.",
-        "Every metal thing in the room hums. The Arc Spire has arrived for {owner}, lightning crowning it like a living antenna.",
+        "A needle of black crystal punches up through the floor - The Veil Spire answers {owner}, its single shadowed eye already watching.",
+        "The lights dim without flickering. The Veil Spire has arrived for {owner}, darkness crowning it like a living antenna.",
     ],
     100: [
-        "The last lock at the bottom of the Descent wakes for {owner} alone. The Vault Eternal's doors part a finger's width - light pours out, and the whole room feels judged.",
-        "Key-sigils orbit in silence as The Vault Eternal answers {owner}. Not a saint. Not a monster. The door itself.",
+        "The last lock at the bottom of the Descent wakes for {owner} alone. The Night Vault's doors part a finger's width - shadow pours out, and the whole room feels judged.",
+        "Key-sigils orbit in silence as The Night Vault answers {owner}. Not a saint. Not a monster. The door itself, hung with night.",
     ],
 }
 
@@ -249,6 +275,8 @@ ZONE_ITEM = {
     "lightning": "descent_storm_relic",
     "light": "descent_light_dust",
 }
+# Shadow Veil has no home material — each drop rolls one of the five mats.
+SHADOW_LOOT_ITEMS = list(ZONE_ITEM.values())
 BOSS_ITEM = "descent_sigil"
 
 MONSTER_DROP_CHANCE = 0.40   # any regular win
@@ -400,8 +428,9 @@ class Fight:
 
     def __init__(self, user_id: int, floor: int, monster_index: int, is_boss: bool,
                  name: str, emoji: str, element: str, kind: str, weak: list[str],
-                 m_hp: int, m_atk: int, m_def: int, p_hp: int, p_atk: int, p_def: int,
-                 ap_max: int, is_practice: bool = False):
+                 resist: list[str], m_hp: int, m_atk: int, m_def: int,
+                 p_hp: int, p_atk: int, p_def: int, ap_max: int,
+                 is_practice: bool = False):
         self.user_id = user_id
         self.floor = floor
         self.monster_index = monster_index
@@ -411,6 +440,7 @@ class Fight:
         self.element = element
         self.kind = kind
         self.weak = weak
+        self.resist = resist
         self.m_hp_max = self.m_hp = m_hp
         self.m_atk = m_atk
         self.m_def = m_def
@@ -430,8 +460,15 @@ class Fight:
         self.defend_mult = DEFEND_DMG_MULT
         self.rest_no_penalty = False
         self.reveal_weakness = False
+        # Set True the first time a cast lands super effective — shadow
+        # monsters (and everyone else) keep weaknesses hidden until then.
+        self.weakness_found = False
         self.boss_dmg_mult = 1.0
         self.revive_available = False
+
+    @property
+    def is_shadow(self) -> bool:
+        return self.element == "shadow"
 
     def embed(self, member: discord.Member) -> discord.Embed:
         title = f"{self.emoji} Floor {self.floor} — {self.name}"
@@ -439,11 +476,12 @@ class Fight:
             title += " (Boss)"
         elif self.is_practice:
             title += " (Practice)"
+        color = 0xE0A526 if self.is_boss else (0x2C1B3D if self.is_shadow else 0x8B5FBF)
         e = discord.Embed(
             title=title,
             description=f"Monster {self.monster_index}/{MONSTERS_PER_FLOOR}" if not self.is_practice
                         else "Practice fight — no floor progress at stake",
-            color=0x8B5FBF if not self.is_boss else 0xE0A526,
+            color=color,
         )
         e.set_image(url="attachment://monster.png")
         e.add_field(
@@ -452,11 +490,17 @@ class Fight:
                    f"⚡ {self.ap}/{self.ap_max} AP"),
             inline=False,
         )
-        e.add_field(name=self.name, value=f"{bar(self.m_hp, self.m_hp_max)} {self.m_hp}/{self.m_hp_max}",
+        monster_label = self.name
+        if self.is_shadow and not (self.reveal_weakness or self.weakness_found):
+            monster_label = f"{self.name} · 🌑 weakness unknown"
+        e.add_field(name=monster_label,
+                    value=f"{bar(self.m_hp, self.m_hp_max)} {self.m_hp}/{self.m_hp_max}",
                     inline=False)
-        if self.reveal_weakness and self.weak:
-            e.add_field(name="🦉 Owl's Eye", value=f"Weak to {' / '.join(ELEMENT_EMOJI[w] for w in self.weak)}",
-                       inline=False)
+        if self.weak and (self.reveal_weakness or self.weakness_found):
+            label = "🦉 Owl's Eye" if self.reveal_weakness else "Weakness found"
+            e.add_field(name=label,
+                        value=f"Weak to {' / '.join(ELEMENT_EMOJI[w] for w in self.weak)}",
+                        inline=False)
         if self.log:
             e.add_field(name="Last round", value="\n".join(self.log[-2:]), inline=False)
         return e
@@ -618,21 +662,38 @@ class Descent(commands.Cog):
 
     # -------------------------------------------------------- fight setup
 
+    def _roll_shadow_affinities(self, is_boss: bool) -> tuple[list[str], list[str]]:
+        """Fresh random weakness (+ resist) every Shadow Veil fight."""
+        n_weak = 2 if is_boss else 1
+        weak = random.sample(ELEMENTS, n_weak)
+        resist_pool = [e for e in ELEMENTS if e not in weak]
+        resist = [random.choice(resist_pool)] if resist_pool else []
+        return weak, resist
+
     def _make_monster(self, floor: int, monster_index: int):
         zone = zone_for(floor)
         primary = zone["element"]
         is_boss = (floor % 10 == 0 and monster_index == MONSTERS_PER_FLOOR)
-        if is_boss:
+        if primary == "shadow" or floor >= SHADOW_FLOOR_START:
+            element = "shadow"
+            if is_boss:
+                name, emoji, kind = BOSS_NAMES[floor]
+            else:
+                name, emoji, kind = random.choice(SHADOW_MONSTER_NAMES)
+            weak, resist = self._roll_shadow_affinities(is_boss)
+        elif is_boss:
             element = primary
             name, emoji, kind = BOSS_NAMES[floor]
             weak = [WEAK_TO[element], WEAK_TO[WEAK_TO[element]]]
+            resist = [element]
         else:
             secondary = SECONDARY_ELEMENT[primary]
             element = secondary if random.random() < SECONDARY_CHANCE else primary
             name, emoji, kind = random.choice(MONSTER_NAMES[element])
             weak = [WEAK_TO[element]]
+            resist = [element]
         m_hp, m_atk, m_def = monster_stats(floor, is_boss)
-        return name, emoji, element, kind, weak, is_boss, m_hp, m_atk, m_def
+        return name, emoji, element, kind, weak, resist, is_boss, m_hp, m_atk, m_def
 
     async def _monster_file(self, fight: "Fight") -> discord.File:
         filename = BOSS_IMAGE[fight.floor] if fight.is_boss else MONSTER_IMAGE[fight.name]
@@ -674,10 +735,10 @@ class Descent(commands.Cog):
 
     async def _start_fight(self, interaction: discord.Interaction, rec: dict):
         floor, idx = rec["floor"], rec["monster_index"]
-        name, emoji, element, kind, weak, is_boss, m_hp, m_atk, m_def = self._make_monster(floor, idx)
+        name, emoji, element, kind, weak, resist, is_boss, m_hp, m_atk, m_def = self._make_monster(floor, idx)
         p_hp, p_atk, p_def = player_stats(rec)
         fight = Fight(interaction.user.id, floor, idx, is_boss, name, emoji, element, kind, weak,
-                      m_hp, m_atk, m_def, p_hp, p_atk, p_def, ap_max=rec["max_ap"])
+                      resist, m_hp, m_atk, m_def, p_hp, p_atk, p_def, ap_max=rec["max_ap"])
         self._apply_potion_mods(fight, interaction.user.id, is_boss)
         self.fights[interaction.user.id] = fight
         file = await self._monster_file(fight)
@@ -685,10 +746,11 @@ class Descent(commands.Cog):
                                                 view=FightView(self, fight), file=file)
 
     async def _start_practice_fight(self, interaction: discord.Interaction, rec: dict, floor: int):
-        name, emoji, element, kind, weak, is_boss, m_hp, m_atk, m_def = self._make_monster(floor, 1)
+        name, emoji, element, kind, weak, resist, is_boss, m_hp, m_atk, m_def = self._make_monster(floor, 1)
         p_hp, p_atk, p_def = player_stats(rec)
         fight = Fight(interaction.user.id, floor, 0, False, name, emoji, element, kind, weak,
-                      m_hp, m_atk, m_def, p_hp, p_atk, p_def, ap_max=rec["max_ap"], is_practice=True)
+                      resist, m_hp, m_atk, m_def, p_hp, p_atk, p_def, ap_max=rec["max_ap"],
+                      is_practice=True)
         self.fights[interaction.user.id] = fight
         file = await self._monster_file(fight)
         await interaction.response.send_message(embed=fight.embed(interaction.user),
@@ -712,10 +774,13 @@ class Descent(commands.Cog):
                 await interaction.followup.send("Not enough AP for that spell.", ephemeral=True)
                 return
             fight.ap -= CAST_AP_COST
-            if element == fight.element:
+            if element in fight.resist:
                 mult, note = 0.5, "resisted"
             elif element in fight.weak:
                 mult, note = 2.0, "super effective"
+                if not fight.weakness_found:
+                    fight.weakness_found = True
+                    note = "super effective — weakness revealed!"
             else:
                 mult, note = 1.0, None
             dmg_dealt = mitigate(fight.p_atk, mult, fight.m_def)
@@ -790,16 +855,29 @@ class Descent(commands.Cog):
         world_cog = self.bot.get_cog("World")
         if not world_cog:
             return None
-        item_id = ZONE_ITEM[element]
-        item = world_cog.world.items.get(item_id)
-        if not item:
-            return None
+        # Shadow Veil: each unit rolls a random Descent material.
+        if element == "shadow":
+            rolls = [random.choice(SHADOW_LOOT_ITEMS) for _ in range(n)]
+        else:
+            item_id = ZONE_ITEM.get(element)
+            if not item_id:
+                return None
+            rolls = [item_id] * n
+        counts: dict[str, int] = {}
+        for item_id in rolls:
+            counts[item_id] = counts.get(item_id, 0) + 1
+        parts: list[str] = []
         async with world_cog.lock:
             student = world_cog.student(member)
-            world_cog.world.give(student, item_id, n)
+            for item_id, qty in counts.items():
+                item = world_cog.world.items.get(item_id)
+                if not item:
+                    continue
+                world_cog.world.give(student, item_id, qty)
+                qty_txt = f" x{qty}" if qty > 1 else ""
+                parts.append(f"{item.get('emoji', '')} **{item['name']}**{qty_txt}".strip())
             world_cog.save()
-        qty = f" x{n}" if n > 1 else ""
-        return f"{item.get('emoji', '')} **{item['name']}**{qty}".strip()
+        return " · ".join(parts) if parts else None
 
     async def _drop_boss_item(self, member: discord.Member) -> Optional[str]:
         world_cog = self.bot.get_cog("World")
