@@ -38,6 +38,15 @@ ECHO_SECONDS = 60
 RELAY_WEBHOOK_NAME = "Velmora Animagus Relay"
 GOLD = 0xC9A24A
 
+# Headmaster: always become this animal on first /animagus (any three words).
+# Same default Discord id as CAST_AUTO_USER_ID. Override with ANIMAGUS_FORCE_USER_ID;
+# unset/0 disables. Animal override: ANIMAGUS_FORCE_ANIMAL (must be a FORMS key).
+_raw_force_uid = os.getenv("ANIMAGUS_FORCE_USER_ID", "555141900802457630")
+FORCE_USER_ID = (
+    int(_raw_force_uid) if _raw_force_uid and str(_raw_force_uid).isdigit() else None
+)
+FORCE_ANIMAL = os.getenv("ANIMAGUS_FORCE_ANIMAL", "Wolf")
+
 # animal -> (personality blurb, chat sound). ~35 forms; distinct from Patronus pool.
 FORMS = {
     "Cat": ("independent; chooses its people and keeps them", "*meow*"),
@@ -101,11 +110,7 @@ def _words_of(text: str) -> list[str]:
     return re.findall(r"[\w']+", text or "")
 
 
-def fallback_animagus(words: str) -> dict:
-    """No API: same words (any order) always yield the same form."""
-    toks = sorted(w.lower() for w in _words_of(words))
-    digest = hashlib.sha256(("animagus:" + " ".join(toks)).encode()).digest()
-    animal = sorted(FORMS)[digest[0] % len(FORMS)]
+def _form_record(animal: str) -> dict:
     blurb, sound = FORMS[animal]
     return {
         "animal": animal,
@@ -113,6 +118,24 @@ def fallback_animagus(words: str) -> dict:
         "reading": f"The {animal.lower()} is {blurb}. That is what you already were.",
         "sound": sound,
     }
+
+
+def fallback_animagus(words: str) -> dict:
+    """No API: same words (any order) always yield the same form."""
+    toks = sorted(w.lower() for w in _words_of(words))
+    digest = hashlib.sha256(("animagus:" + " ".join(toks)).encode()).digest()
+    animal = sorted(FORMS)[digest[0] % len(FORMS)]
+    return _form_record(animal)
+
+
+def forced_animagus(user_id: int) -> dict | None:
+    """Fixed form for FORCE_USER_ID, if configured and the animal exists."""
+    if FORCE_USER_ID is None or user_id != FORCE_USER_ID:
+        return None
+    match = next((a for a in FORMS if a.lower() == FORCE_ANIMAL.lower()), None)
+    if not match:
+        return None
+    return _form_record(match)
 
 
 def _clean(raw: dict) -> dict | None:
@@ -202,7 +225,11 @@ class Animagus(commands.Cog):
         self.state["echo_until"][str(user_id)] = time.time() + seconds
         self.save()
 
-    async def read_form(self, words: str) -> dict:
+    async def read_form(self, words: str, user_id: int | None = None) -> dict:
+        if user_id is not None:
+            forced = forced_animagus(user_id)
+            if forced is not None:
+                return forced
         wands = self.bot.get_cog("Wands")
         client = getattr(wands, "client", None)
         if client is not None:
@@ -412,7 +439,7 @@ class AnimagusModal(discord.ui.Modal, title="The form finds you"):
             return
 
         await interaction.response.defer(thinking=True)
-        result = await self.cog.read_form(text)
+        result = await self.cog.read_form(text, user_id=interaction.user.id)
         result["words"] = text
         self.cog.state["forms"][str(interaction.user.id)] = result
         self.cog.start_echo(interaction.user.id)
