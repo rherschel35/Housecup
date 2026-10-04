@@ -32,7 +32,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from cogs.velmora_channels import channel_mentions, with_study_hall
+from cogs.velmora_channels import channel_mentions, with_pitch_homes
 
 log = logging.getLogger("velmora.broom_race")
 
@@ -41,9 +41,9 @@ STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 COURSES_PATH = DATA_DIR / "broom_courses.json"
 STATE_PATH = STATE_DIR / "broom_races.json"
 
-# Same pitch as team Quidditch, plus new-student study hall.
+# Same pitch as team Quidditch, plus study hall + shared games lounge.
 QUIDDITCH_CHANNEL_ID = 1553089438933065913
-QUIDDITCH_CHANNEL_IDS = with_study_hall(QUIDDITCH_CHANNEL_ID)
+QUIDDITCH_CHANNEL_IDS = with_pitch_homes(QUIDDITCH_CHANNEL_ID)
 
 RACE_COLOR = 0x2E6B4F
 STAGE_TIMEOUT = 90
