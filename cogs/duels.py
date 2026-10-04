@@ -52,9 +52,8 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from cogs.velmora_channels import (
-    DUELS_POTIONS_CHANNEL_ID,
-    STUDY_HALL_CHANNEL_ID,
     channel_mentions,
+    duel_home_channels,
 )
 
 log = logging.getLogger("velmora.duels")
@@ -527,17 +526,13 @@ class Duels(commands.Cog):
     def _duel_channel_ids(self) -> set[int] | None:
         """Allowed duel channels, or None if unrestricted.
 
-        When DUEL_CHANNEL_ID is set, the new-student study hall is also
-        allowed so beginners can practice without leaving orientation.
+        When DUEL_CHANNEL_ID is set, study hall, the Potions/Duels room,
+        and any EXTRA_DUEL_CHANNEL_IDS are also allowed.
         """
         arena = os.getenv("DUEL_CHANNEL_ID", "")
         if not arena.isdigit():
             return None
-        return {
-            int(arena),
-            STUDY_HALL_CHANNEL_ID,
-            DUELS_POTIONS_CHANNEL_ID,
-        }
+        return set(duel_home_channels(int(arena)))
 
     def _in_duel_channel(self, interaction: discord.Interaction):
         allowed = self._duel_channel_ids()
