@@ -4,7 +4,7 @@ Adornments: design your wizard, collect gear, and see it all in the Mirror.
     /wizard                    - design how your wizard looks (menus, with a live preview)
     /mirror [member]           - someone's wizard as a trading card: look, gear, wand, title, stats
     /jewelbox [member]         - what you own, what you're wearing, what you could craft
-    /crafts                    - potions-style craft book: owned, recipes, ingredient dots
+    /crafts                    - craft book: recipes + earned goals (incl. Magpie's Eye)
     /craft <piece>             - make a piece from materials in your satchel
     /wear <piece>              - put on a piece you own
     /remove <slot>             - take off whatever's in a slot
@@ -18,7 +18,7 @@ Adornments: design your wizard, collect gear, and see it all in the Mirror.
 40 pieces over four slots (necklace, bracelet, ring, talisman). 26 are
 crafted from satchel materials; 14 are earned automatically from
 achievements and announced. Perks only come on earned pieces, only work
-while worn, and never touch duels or house points.
+while worn, and never touch duels or house points. `/crafts` lists both.
 """
 
 from __future__ import annotations
@@ -637,6 +637,7 @@ class Adornments(commands.Cog):
             have = world_cog.state["students"].get(str(uid), {}).get("items", {})
         for slot, (label, emoji) in SLOTS.items():
             lines = []
+            shown_unowned = 0
             for k in by_slot(slot):
                 g = GEAR[k]
                 if k in owned:
@@ -644,9 +645,16 @@ class Adornments(commands.Cog):
                     lines.append(f"{gear_line(k)}{mark}\n　*{gear_benefit(k)}*")
                 elif viewer_is_owner and "recipe" in g and all(have.get(i, 0) >= n for i, n in g["recipe"].items()):
                     lines.append(f"🔨 {g['name']} — *ready to craft*\n　*{gear_benefit(k)}*")
-            hidden = sum(1 for k in by_slot(slot) if k not in owned)
-            if hidden:
-                lines.append(f"-# {hidden} more to find")
+                    shown_unowned += 1
+                elif viewer_is_owner and "earn" in g:
+                    # Name locked earned goals (Magpie's Eye, etc.) so they aren't invisible.
+                    lines.append(
+                        f"🔒 {g['name']} — *{g['earn_text']}*\n　*{gear_benefit(k)}*"
+                    )
+                    shown_unowned += 1
+            hidden = sum(1 for k in by_slot(slot) if k not in owned) - shown_unowned
+            if hidden > 0:
+                lines.append(f"-# {hidden} more to craft")
             value = "\n".join(lines) or "—"
             if len(value) > 1024:
                 value = value[:1000].rstrip() + "\n…*(list trimmed)*"
@@ -708,22 +716,25 @@ class Adornments(commands.Cog):
 
     @app_commands.command(
         name="crafts",
-        description="Your craft book: gear you own, every recipe, and what's craftable now.",
+        description="Your craft book: recipes, ingredient dots, and earned gear goals.",
     )
     async def crafts(self, interaction: discord.Interaction):
         uid = interaction.user.id
         await self.check_member(interaction.user)
         owned = self.peek(uid).get("owned", {})
         craftable_keys = crafted()
+        earned_keys = earned()
         owned_crafted = [k for k in craftable_keys if k in owned]
+        owned_earned = [k for k in earned_keys if k in owned]
         world = self.bot.get_cog("World")
         have = {}
         if world:
             have = world.state["students"].get(str(uid), {}).get("items", {})
 
         desc = (
-            f"**{len(owned_crafted)} of {len(craftable_keys)}** crafted pieces · "
-            f"`/craft` to make one · earned gear stays in `/jewelbox`"
+            f"**{len(owned_crafted)} of {len(craftable_keys)}** crafted · "
+            f"**{len(owned_earned)} of {len(earned_keys)}** earned · "
+            f"`/craft` for cosmetics · earn the rest by playing"
         )
         embed = discord.Embed(
             title=f"{interaction.user.display_name}'s Crafts",
@@ -731,12 +742,13 @@ class Adornments(commands.Cog):
             color=GOLD,
         )
 
-        if owned_crafted:
+        collection = owned_crafted + owned_earned
+        if collection:
             inv = "\n".join(
-                f"{RARITY_DOT[GEAR[k]['rarity']]} {GEAR[k]['name']}" for k in owned_crafted
+                f"{RARITY_DOT[GEAR[k]['rarity']]} {GEAR[k]['name']}" for k in collection
             )
         else:
-            inv = "*Nothing crafted yet.*"
+            inv = "*Nothing collected yet.*"
         if len(inv) > 1024:
             inv = inv[:1000].rstrip() + "\n…*(list trimmed)*"
         embed.add_field(name="💎 Collection", value=inv, inline=False)
@@ -769,8 +781,24 @@ class Adornments(commands.Cog):
         for tier in RARITY_ORDER:
             self._add_trimmed_fields(embed, tier_titles[tier], by_tier[tier])
 
+        rarity_rank = {r: i for i, r in enumerate(RARITY_ORDER)}
+        earned_lines: list[str] = []
+        for key in sorted(
+            earned_keys,
+            key=lambda k: (rarity_rank[GEAR[k]["rarity"]], GEAR[k]["name"]),
+        ):
+            g = GEAR[key]
+            tag = "✅ owned" if key in owned else "🔒 earn"
+            slot_emoji = SLOTS[g["slot"]][1]
+            earned_lines.append(
+                f"{slot_emoji} **{g['name']}** — {tag}\n"
+                f"　*{g['earn_text']}*\n"
+                f"　*{gear_benefit(key)}*"
+            )
+        self._add_trimmed_fields(embed, "🏆 Earned (perks)", earned_lines)
+
         embed.set_footer(
-            text="🟢 enough · 🔴 missing · ✅ craftable = every ingredient ready · /craft <piece>"
+            text="🟢 enough · 🔴 missing · 🔒 earn = achievement gear (can't craft) · /craft <piece>"
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
