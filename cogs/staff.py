@@ -269,7 +269,7 @@ class Staff(commands.Cog):
 
     # ---------------------------------------------------------------- duels
 
-    @duels.command(name="night", description="Start or end a House Duel Night — duel wins count double.")
+    @duels.command(name="night", description="Start or end House Duel Night — double points, no daily cap.")
     @app_commands.describe(action="Start or end it")
     @app_commands.choices(action=[
         app_commands.Choice(name="start", value="start"),

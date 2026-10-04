@@ -234,7 +234,7 @@ HELP = {
             ("staff hex cast", "Curse a student — chat mangles, or Limp Wand (blocks /wand, /patronus, /broom, /cast for 1 hour)."),
             ("staff hex lift", "Lift a hex early."),
             ("staff hex list", "Show who's currently hexed."),
-            ("staff duels night", "Start or end a House Duel Night - duel wins count double."),
+            ("staff duels night", "Start or end House Duel Night — double points, no daily cap, end-night house/MVP bonuses."),
         ],
     },
     "staff_world": {
