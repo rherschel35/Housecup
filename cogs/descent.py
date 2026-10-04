@@ -46,6 +46,9 @@ or to grind. Loot always has a chance to drop. Stat-point odds on
 practice clears scale with how far behind you are: close floors are more
 likely to sharpen you, deep-behind floors still have a small chance.
 Practice fights ignore the floor-clear path and never count toward lockouts.
+
+Every monster beaten (real or practice) is bound into your army ledger with
+its floor and combat stats — foundation for army PVP.
 """
 
 from __future__ import annotations
@@ -357,7 +360,43 @@ def blank_record() -> dict:
         "pending_statup": 0,
         "max_ap": STARTING_MAX_AP,
         "bosses_bound": [],
+        # Every monster beaten (real or practice) — seed for army PVP.
+        # Each entry keeps floor + combat stats from the fight.
+        "army": [],
+        "army_seq": 0,
     }
+
+
+def recruit_from_fight(rec: dict, fight: "Fight") -> dict:
+    """Append one army unit from a won fight. Returns the unit dict."""
+    rec.setdefault("army", [])
+    seq = int(rec.get("army_seq", 0) or 0) + 1
+    rec["army_seq"] = seq
+    unit = {
+        "id": seq,
+        "name": fight.name,
+        "emoji": fight.emoji,
+        "element": fight.element,
+        "kind": fight.kind,
+        "floor": fight.floor,
+        "boss": bool(fight.is_boss),
+        "practice": bool(fight.is_practice),
+        "hp": int(fight.m_hp_max),
+        "atk": int(fight.m_atk),
+        "def": int(fight.m_def),
+        "at": int(time.time()),
+    }
+    rec["army"].append(unit)
+    return unit
+
+
+def army_floor_counts(army: list) -> dict[int, int]:
+    """floor -> how many units bound from that floor."""
+    counts: dict[int, int] = {}
+    for unit in army:
+        fl = int(unit.get("floor") or 0)
+        counts[fl] = counts.get(fl, 0) + 1
+    return counts
 
 
 def bar(current: int, maximum: int, width: int = 12) -> str:
@@ -648,6 +687,8 @@ class Descent(commands.Cog):
         rec = self.state["players"].setdefault(str(user_id), blank_record())
         rec.setdefault("max_ap", STARTING_MAX_AP)  # back-compat for records saved before AP existed
         rec.setdefault("bosses_bound", [])          # back-compat for records saved before boss trophies existed
+        rec.setdefault("army", [])                  # back-compat for records saved before army tracking
+        rec.setdefault("army_seq", len(rec.get("army") or []))
         return rec
 
     def boss_trophies(self, user_id: int) -> dict:
@@ -965,6 +1006,8 @@ class Descent(commands.Cog):
         rec = self.record(interaction.user.id)
         member = interaction.user
         await self._dismiss_oneshot(fight, interaction, used=from_oneshot)
+        recruit_from_fight(rec, fight)
+        self.save()
 
         if fight.is_practice:
             await self._on_practice_win(interaction, fight, rec, member)
@@ -1223,12 +1266,38 @@ class Descent(commands.Cog):
         if rec["highest_cleared"]:
             desc.append(f"Deepest floor cleared: **{rec['highest_cleared']}**")
 
+        army = rec.get("army") or []
+        if army:
+            counts = army_floor_counts(army)
+            floors = sorted(counts)
+            band = ", ".join(
+                f"F{fl}×{counts[fl]}" for fl in floors[-8:]  # newest-depth slice
+            )
+            if len(floors) > 8:
+                band = "… " + band
+            desc.append(
+                f"⚔️ Army: **{len(army)}** bound"
+                + (f" ({band})" if band else "")
+            )
+
         embed = discord.Embed(title=f"{interaction.user.display_name}'s Descent", description="\n".join(desc),
                               color=0x6C5CE7)
         embed.add_field(name="❤️ Max HP", value=str(p_hp))
         embed.add_field(name="⚔️ Attack", value=str(p_atk))
         embed.add_field(name="🛡️ Defense", value=str(p_def))
         embed.add_field(name="⚡ Max AP", value=str(rec["max_ap"]))
+        if army:
+            last = army[-1]
+            embed.add_field(
+                name="Last bound",
+                value=(
+                    f"{last.get('emoji', '')} **{last.get('name', '?')}** "
+                    f"(floor {last.get('floor', '?')}) — "
+                    f"HP {last.get('hp', '?')} · ATK {last.get('atk', '?')} · "
+                    f"DEF {last.get('def', '?')}"
+                ),
+                inline=False,
+            )
         await interaction.response.send_message(embed=embed)
 
     async def descentreset(self, interaction: discord.Interaction, member: discord.Member = None):
