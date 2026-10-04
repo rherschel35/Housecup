@@ -36,8 +36,9 @@ gaining 1 AP back automatically each round. Actions:
     - Defend (1 AP) - deal no damage, but halve the monster's hit back.
     - Rest (free) - fully refill your AP, but you take 10% extra damage
       that round for being unguarded.
-    - One-shot (Headmaster only, on their own fights) - instantly win the
-      fight with full loot / floor / trophy rewards. Normal actions stay.
+    - One-shot (Headmaster only) - ephemeral private button that instantly
+      wins with full loot / floor / trophy rewards. Normal actions stay on
+      the public board; spectators never see One-shot.
 
 Floor replay: once you've cleared a floor, `/descend floor:<n>` lets you
 refight a single monster from it any time (not boss floors) - for loot,
@@ -443,6 +444,8 @@ class Fight:
         self.reveal_weakness = False
         self.boss_dmg_mult = 1.0
         self.revive_available = False
+        self.message: Optional[discord.Message] = None
+        self.oneshot_message: Optional[discord.Message] = None
 
     def embed(self, member: discord.Member) -> discord.Embed:
         title = f"{self.emoji} Floor {self.floor} — {self.name}"
@@ -551,7 +554,6 @@ class OneShotButton(discord.ui.Button):
             label="One-shot",
             emoji="⚡",
             style=discord.ButtonStyle.danger,
-            row=2,
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -573,6 +575,16 @@ class OneShotButton(discord.ui.Button):
         await self.view.cog.take_action(interaction, "oneshot")
 
 
+class OneShotView(discord.ui.View):
+    """Ephemeral panel — only the sealed user receives this message."""
+
+    def __init__(self, cog: "Descent", fight: Fight):
+        super().__init__(timeout=600)
+        self.cog = cog
+        self.owner_id = fight.user_id
+        self.add_item(OneShotButton())
+
+
 class FightView(discord.ui.View):
     def __init__(self, cog: "Descent", fight: Fight):
         super().__init__(timeout=600)
@@ -584,12 +596,6 @@ class FightView(discord.ui.View):
         self.add_item(HealButton(disabled=fight.ap < HEAL_AP_COST))
         self.add_item(DefendButton(disabled=fight.ap < DEFEND_AP_COST))
         self.add_item(RestButton(disabled=fight.ap >= fight.ap_max))
-        # Only on the sealed user's own fight board (others never get this control).
-        if (
-            DESCENT_ONESHOT_USER_ID is not None
-            and fight.user_id == DESCENT_ONESHOT_USER_ID
-        ):
-            self.add_item(OneShotButton())
 
 
 class StatButton(discord.ui.Button):
@@ -719,6 +725,81 @@ class Descent(commands.Cog):
             fight.revive_available = True
             potions.consume_revive(user_id)
 
+    async def _publish_board(
+        self,
+        interaction: discord.Interaction,
+        fight: Fight,
+        embed: discord.Embed,
+        view: Optional[discord.ui.View],
+    ) -> None:
+        """Edit the public fight post (needed when One-shot is ephemeral)."""
+        if fight.message is not None:
+            try:
+                await fight.message.edit(embed=embed, view=view, attachments=[])
+                return
+            except discord.DiscordException:
+                log.exception("Could not update Descent fight board.")
+        await interaction.edit_original_response(embed=embed, view=view)
+
+    async def _dismiss_oneshot(
+        self,
+        fight: Fight,
+        interaction: Optional[discord.Interaction] = None,
+        *,
+        used: bool = False,
+    ) -> None:
+        text = "⚡ One-shot — done." if used else "Fight over."
+        if interaction is not None and interaction.message is not None:
+            oneshot = fight.oneshot_message
+            if oneshot is not None and interaction.message.id == oneshot.id:
+                try:
+                    await interaction.edit_original_response(
+                        content=text, embed=None, view=None
+                    )
+                except discord.DiscordException:
+                    pass
+                fight.oneshot_message = None
+                return
+        if fight.oneshot_message is not None:
+            try:
+                await fight.oneshot_message.edit(content=text, embed=None, view=None)
+            except discord.DiscordException:
+                pass
+            fight.oneshot_message = None
+
+    async def _offer_oneshot(
+        self, interaction: discord.Interaction, fight: Fight
+    ) -> None:
+        if (
+            DESCENT_ONESHOT_USER_ID is None
+            or fight.user_id != DESCENT_ONESHOT_USER_ID
+        ):
+            return
+        try:
+            msg = await interaction.followup.send(
+                "⚡ Private finisher — only you can see this.",
+                view=OneShotView(self, fight),
+                ephemeral=True,
+            )
+            fight.oneshot_message = msg
+        except discord.DiscordException:
+            log.exception("Could not send Descent one-shot panel.")
+
+    async def _post_fight_board(
+        self, interaction: discord.Interaction, fight: Fight
+    ) -> None:
+        file = await self._monster_file(fight)
+        await interaction.response.send_message(
+            embed=fight.embed(interaction.user),
+            view=FightView(self, fight),
+            file=file,
+        )
+        try:
+            fight.message = await interaction.original_response()
+        except discord.HTTPException:
+            fight.message = None
+        await self._offer_oneshot(interaction, fight)
+
     async def _start_fight(self, interaction: discord.Interaction, rec: dict):
         floor, idx = rec["floor"], rec["monster_index"]
         name, emoji, element, kind, weak, is_boss, m_hp, m_atk, m_def = self._make_monster(floor, idx)
@@ -727,9 +808,7 @@ class Descent(commands.Cog):
                       m_hp, m_atk, m_def, p_hp, p_atk, p_def, ap_max=rec["max_ap"])
         self._apply_potion_mods(fight, interaction.user.id, is_boss)
         self.fights[interaction.user.id] = fight
-        file = await self._monster_file(fight)
-        await interaction.response.send_message(embed=fight.embed(interaction.user),
-                                                view=FightView(self, fight), file=file)
+        await self._post_fight_board(interaction, fight)
 
     async def _start_practice_fight(self, interaction: discord.Interaction, rec: dict, floor: int):
         name, emoji, element, kind, weak, is_boss, m_hp, m_atk, m_def = self._make_monster(floor, 1)
@@ -737,9 +816,7 @@ class Descent(commands.Cog):
         fight = Fight(interaction.user.id, floor, 0, False, name, emoji, element, kind, weak,
                       m_hp, m_atk, m_def, p_hp, p_atk, p_def, ap_max=rec["max_ap"], is_practice=True)
         self.fights[interaction.user.id] = fight
-        file = await self._monster_file(fight)
-        await interaction.response.send_message(embed=fight.embed(interaction.user),
-                                                view=FightView(self, fight), file=file)
+        await self._post_fight_board(interaction, fight)
 
     # ------------------------------------------------------------ combat
 
@@ -814,7 +891,7 @@ class Descent(commands.Cog):
         fight.log.extend(lines)
 
         if fight.m_hp <= 0:
-            await self._on_win(interaction, fight)
+            await self._on_win(interaction, fight, from_oneshot=(action == "oneshot"))
             return
 
         counter_mult *= fight.boss_dmg_mult if fight.is_boss else 1.0
@@ -844,7 +921,12 @@ class Descent(commands.Cog):
                 return
 
         fight.ap = min(fight.ap_max, fight.ap + AP_REGEN_PER_TURN)
-        await interaction.edit_original_response(embed=fight.embed(interaction.user), view=FightView(self, fight))
+        await self._publish_board(
+            interaction,
+            fight,
+            fight.embed(interaction.user),
+            FightView(self, fight),
+        )
 
     async def _drop_loot(self, member: discord.Member, element: str, n: int = 1) -> Optional[str]:
         world_cog = self.bot.get_cog("World")
@@ -872,10 +954,17 @@ class Descent(commands.Cog):
             world_cog.save()
         return f"{item.get('emoji', '')} **{item['name']}**".strip()
 
-    async def _on_win(self, interaction: discord.Interaction, fight: Fight):
+    async def _on_win(
+        self,
+        interaction: discord.Interaction,
+        fight: Fight,
+        *,
+        from_oneshot: bool = False,
+    ):
         del self.fights[interaction.user.id]
         rec = self.record(interaction.user.id)
         member = interaction.user
+        await self._dismiss_oneshot(fight, interaction, used=from_oneshot)
 
         if fight.is_practice:
             await self._on_practice_win(interaction, fight, rec, member)
@@ -940,7 +1029,7 @@ class Descent(commands.Cog):
             else:
                 desc += "\n\nYou've earned a stat point for clearing the floor - pick where it goes."
             embed = discord.Embed(title=f"{fight.emoji} Victory!", description=desc, color=0x2ECC71)
-            await interaction.edit_original_response(embed=embed, view=StatUpView(self))
+            await self._publish_board(interaction, fight, embed, StatUpView(self))
             return
 
         rec["monster_index"] = cleared_index + 1
@@ -958,10 +1047,10 @@ class Descent(commands.Cog):
             rec["pending_statup"] = 1
             self.save()
             embed.description += "\n\nYou've earned a stat point - pick where it goes."
-            await interaction.edit_original_response(embed=embed, view=StatUpView(self))
+            await self._publish_board(interaction, fight, embed, StatUpView(self))
         else:
             embed.description += "\nUse `/descend` to keep going."
-            await interaction.edit_original_response(embed=embed, view=None)
+            await self._publish_board(interaction, fight, embed, None)
 
     async def _on_practice_win(self, interaction: discord.Interaction, fight: Fight, rec: dict, member: discord.Member):
         got_loot = random.random() < MONSTER_DROP_CHANCE
@@ -990,10 +1079,11 @@ class Descent(commands.Cog):
         self.save()
         embed = discord.Embed(title=f"{fight.emoji} Practice victory!", description=desc, color=0x2ECC71)
         view = StatUpView(self) if pending > 0 else None
-        await interaction.edit_original_response(embed=embed, view=view)
+        await self._publish_board(interaction, fight, embed, view)
 
     async def _on_loss(self, interaction: discord.Interaction, fight: Fight):
         del self.fights[interaction.user.id]
+        await self._dismiss_oneshot(fight, interaction)
 
         if fight.is_practice:
             embed = discord.Embed(
@@ -1002,7 +1092,7 @@ class Descent(commands.Cog):
                             f"no lockout. Use `/descend` to try again.",
                 color=0xC0392B,
             )
-            await interaction.edit_original_response(embed=embed, view=None)
+            await self._publish_board(interaction, fight, embed, None)
             return
 
         rec = self.record(interaction.user.id)
@@ -1021,7 +1111,7 @@ class Descent(commands.Cog):
         else:
             desc = f"**{fight.name}** finishes you off. Use `/descend` to try that monster again."
         embed = discord.Embed(title="Defeated", description=desc, color=0xC0392B)
-        await interaction.edit_original_response(embed=embed, view=None)
+        await self._publish_board(interaction, fight, embed, None)
 
     async def pick_stat(self, interaction: discord.Interaction, stat: str):
         rec = self.record(interaction.user.id)
@@ -1107,9 +1197,7 @@ class Descent(commands.Cog):
             return
         if interaction.user.id in self.fights:
             fight = self.fights[interaction.user.id]
-            file = await self._monster_file(fight)
-            await interaction.response.send_message(embed=fight.embed(interaction.user),
-                                                    view=FightView(self, fight), file=file)
+            await self._post_fight_board(interaction, fight)
             return
         if rec["floor"] > MAX_FLOOR:
             await interaction.response.send_message("You've already conquered the Descent.", ephemeral=True)
