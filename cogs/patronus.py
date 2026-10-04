@@ -29,9 +29,73 @@ log = logging.getLogger("velmora.patronus")
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 PATRONUS_PATH = STATE_DIR / "patronus.json"
+ASSETS_DIR = Path(__file__).resolve().parent.parent / "patronus_art_assets"
 
 MODEL = os.getenv("PATRONUS_MODEL", "claude-haiku-4-5-20251001")
 SILVER = 0xC4CCD6
+
+# Headmaster-assigned patronuses (animal need not be on ANIMALS).
+# Optional "art" filename under patronus_art_assets/. Overrides stored casts.
+CUSTOM_PATRONUSES: dict[str, dict] = {
+    "929771936408547328": {  # Rowie / Class Pres. Rowwie
+        "animal": "Siren",
+        "form": (
+            "Silver scales shimmer beneath dark, restless waves as the siren "
+            "rises from the sea, her voice carrying with the sharp clarity of "
+            "a bell across open water. She moves with deliberate confidence, "
+            "never hesitating, never asking permission from the tide."
+        ),
+        "reading": (
+            "You possess a nature that refuses to be softened for anyone else. "
+            "You say what you mean, pursue what you want, and meet competition "
+            "with a smile that suggests you already intend to win. Your strength "
+            "is your directness. You do not circle the truth when you can simply "
+            "reach for it.\n\n"
+            "**Your guard is this:** you are the current beneath the surface. "
+            "You may be calm, but you are never passive. You protect what matters "
+            "by confronting what threatens it, by refusing to back down when "
+            "challenged, and by making yourself impossible to overlook.\n\n"
+            "Like the sea, you do not need to raise your voice to prove your "
+            "power. You simply keep moving forward until everything in your path "
+            "learns to move with you."
+        ),
+        "art": "Siren_Rowie.png",
+    },
+    "206828442065305600": {  # Pod / Vish's Head Boy Pod
+        "animal": "Griffin",
+        "form": (
+            "A powerful griffin emerges from the light, its wings spreading "
+            "wide as its lion-like paws settle firmly against the ground. There "
+            "is something regal in its presence, but not distant. Its gaze is "
+            "sharp, curious, and almost mischievous, as though it has already "
+            "figured out the room before anyone else has."
+        ),
+        "reading": (
+            "You carry an unusual combination of confidence and curiosity. You "
+            "want to experience everything, meet people, build connections, and "
+            "leave something behind that matters. You can be loud, ridiculous, "
+            "flirtatious, and completely unserious one moment, then surprisingly "
+            "thoughtful and fiercely determined the next.\n\n"
+            "**Your guard is this:** you don't give up on people easily. You may "
+            "become frustrated, hurt, or disappointed, but the people you truly "
+            "claim as your own tend to stay yours. You have a stubborn instinct "
+            "to protect, encourage, and fight for the things you believe deserve "
+            "a chance.\n\n"
+            "The griffin represents the part of you that refuses to be reduced "
+            "to one thing. **You can be both tenderness and force, humor and "
+            "seriousness, ambition and loyalty.** You adapt without losing "
+            "yourself.\n\n"
+            "And beneath everything is a desire to live a life that actually "
+            "feels *alive*. To make memories. To love loudly. To build something "
+            "you're proud of. To be surrounded by people who matter and to know "
+            "that, when the moment comes, you had the courage to choose your "
+            "own path.\n\n"
+            "**The griffin does not simply guard what it loves. It rises above "
+            "it, sees where it is going, and then refuses to turn back.**"
+        ),
+        "art": "Griffin_Pod.png",
+    },
+}
 
 # Real animals only, each with what it guards. The reader must choose from
 # these, the same way the wandmaker chooses from real woods and cores.
@@ -152,10 +216,39 @@ class Patronus(commands.Cog):
         except OSError:
             log.exception("Could not save patronus records.")
 
+    def custom_of(self, user_id: int) -> dict | None:
+        return CUSTOM_PATRONUSES.get(str(user_id))
+
     def patronus_of(self, user_id: int) -> dict | None:
+        custom = self.custom_of(user_id)
+        if custom:
+            return {
+                "animal": custom["animal"],
+                "form": custom["form"],
+                "reading": custom["reading"],
+            }
         return self.patronuses.get(str(user_id))
 
+    def art_path_for(self, user_id: int) -> Path | None:
+        custom = self.custom_of(user_id)
+        if not custom:
+            return None
+        name = custom.get("art")
+        if not name:
+            return None
+        path = ASSETS_DIR / name
+        return path if path.is_file() else None
+
+    def art_file_for(self, user_id: int) -> discord.File | None:
+        path = self.art_path_for(user_id)
+        if path is None:
+            return None
+        return discord.File(path, filename="patronus.png")
+
     def release(self, user_id: int) -> bool:
+        # Custom assignments are code-level — wandreset can't erase them.
+        if self.custom_of(user_id):
+            return False
         gone = self.patronuses.pop(str(user_id), None) is not None
         if gone:
             self.save()
@@ -185,7 +278,14 @@ class Patronus(commands.Cog):
                 log.exception("Patronus reading failed; using the fallback.")
         return fallback_patronus(words)
 
-    def embed_for(self, member, patronus: dict, fresh: bool = False) -> discord.Embed:
+    def embed_for(
+        self,
+        member,
+        patronus: dict,
+        fresh: bool = False,
+        *,
+        with_art: bool = False,
+    ) -> discord.Embed:
         embed = discord.Embed(
             title=("Silver light spills from the wand…" if fresh
                    else f"{member.display_name}'s patronus"),
@@ -199,10 +299,33 @@ class Patronus(commands.Cog):
             embed.add_field(name="​",
                             value=f"It shares its shape with {HOUSES[house]['emoji']} "
                                   f"House {HOUSES[house]['name']}'s emblem.", inline=False)
+        if with_art:
+            embed.set_image(url="attachment://patronus.png")
         if fresh:
             embed.set_footer(text=f"{member.display_name}'s patronus • cast from the words "
                                   "that chose their wand")
+        elif self.custom_of(member.id):
+            embed.set_footer(text=f"{member.display_name}'s patronus • headmaster-sealed")
         return embed
+
+    async def _send_patronus(
+        self,
+        interaction: discord.Interaction,
+        member,
+        patronus: dict,
+        *,
+        fresh: bool = False,
+        followup: bool = False,
+    ) -> None:
+        art = self.art_file_for(member.id)
+        embed = self.embed_for(member, patronus, fresh=fresh, with_art=art is not None)
+        kwargs = {"embed": embed}
+        if art is not None:
+            kwargs["file"] = art
+        if followup:
+            await interaction.followup.send(**kwargs)
+        else:
+            await interaction.response.send_message(**kwargs)
 
     @app_commands.command(name="patronus",
                           description="Cast your patronus from the words that chose your wand.")
@@ -216,7 +339,7 @@ class Patronus(commands.Cog):
 
         existing = self.patronus_of(target.id)
         if existing:
-            await interaction.response.send_message(embed=self.embed_for(target, existing))
+            await self._send_patronus(interaction, target, existing)
             return
 
         if member and member.id != interaction.user.id:
@@ -239,7 +362,9 @@ class Patronus(commands.Cog):
         result = await self.cast(wand["words"])
         self.patronuses[str(target.id)] = result
         self.save()
-        await interaction.followup.send(embed=self.embed_for(target, result, fresh=True))
+        await self._send_patronus(
+            interaction, target, result, fresh=True, followup=True
+        )
 
 
 async def setup(bot: commands.Bot):
