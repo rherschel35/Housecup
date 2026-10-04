@@ -369,6 +369,18 @@ class Dementors(commands.Cog):
             embed.set_image(url="attachment://monster.png")
         return file
 
+    def _dementor_defeat_art(
+        self, embed: discord.Embed, user_id: int
+    ) -> discord.File | None:
+        """Custom patronus portrait for sealed casters; else regular defeat art."""
+        patronus_cog = self.bot.get_cog("Patronus")
+        if patronus_cog is not None:
+            art = patronus_cog.art_file_for(user_id)
+            if art is not None:
+                embed.set_image(url="attachment://patronus.png")
+                return art
+        return self._attach_art(embed, "dementor", field="defeat_image")
+
     def embed_arrival(self, creature_id: str, finder_id: int | None = None,
                        exclusive_until: float | None = None) -> discord.Embed:
         c = CREATURES[creature_id]
@@ -732,7 +744,7 @@ class Dementors(commands.Cog):
         if awarded:
             from cogs.store import HOUSES
             embed.set_footer(text=f"+{awarded} points for House {HOUSES[house]['name']}")
-        file = self._attach_art(embed, "dementor", field="defeat_image")
+        file = self._dementor_defeat_art(embed, interaction.user.id)
         if file:
             await interaction.response.send_message(embed=embed, file=file)
         else:
