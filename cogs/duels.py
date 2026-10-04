@@ -77,7 +77,7 @@ WINDOW = 24 * 3600
 # pairings, and Grand steps/sudden death. Needs DUEL_FAVORED_USER_ID in the
 # environment AND FAVORED_ENABLED True. Flip FAVORED_ENABLED to pause/resume
 # without clearing the Railway variable.
-FAVORED_ENABLED = False  # paused — set True to restore the edge
+FAVORED_ENABLED = True  # on — set False to pause the edge
 _raw_favored = os.getenv("DUEL_FAVORED_USER_ID")
 FAVORED_USER_ID = (
     int(_raw_favored)
@@ -91,11 +91,11 @@ FAVORED_USER_ID = (
 # clean closed form from a per-round bias to a match-level win rate (best
 # of 3, ties replay), so this default was tuned by simulation against a
 # random opponent: 0.455 per round -> ~85% of 1v1 matches won overall,
-# 0.342 -> ~78% (the current setting). A more adversarial opponent who
-# could somehow read your picks would knock this down toward the raw
-# per-exchange number, never above it - the bias never makes you
-# invincible, only likely.
-FAVORED_ROUND_BIAS = float(os.getenv("DUEL_FAVORED_BIAS", "0.342"))
+# 0.342 -> ~78%, 0.30 -> ~75% (the current setting). A more adversarial
+# opponent who could somehow read your picks would knock this down toward
+# the raw per-exchange number, never above it - the bias never makes you
+# invincible, only likely. Override with DUEL_FAVORED_BIAS if needed.
+FAVORED_ROUND_BIAS = float(os.getenv("DUEL_FAVORED_BIAS", "0.30"))
 
 SPELLS = {
     "hex":    {"name": "Hex",    "emoji": "⚡"},
