@@ -195,6 +195,22 @@ class Profile(commands.Cog):
             embed.add_field(name="Patronus", value="Not cast yet \u2014 `/patronus`.",
                             inline=True)
 
+        # ---------------------------------------------------------- animagus
+        animagus_cog = self.bot.get_cog("Animagus")
+        animagus = animagus_cog.form_of(member.id) if animagus_cog else None
+        if animagus:
+            embed.add_field(
+                name="Animagus",
+                value=f"**{animagus['animal']}**",
+                inline=True,
+            )
+        else:
+            embed.add_field(
+                name="Animagus",
+                value="Not found yet — `/animagus`.",
+                inline=True,
+            )
+
         # ------------------------------------------------------------- broom
         brooms_cog = self.bot.get_cog("Brooms")
         broom = brooms_cog.broom_of(member.id) if brooms_cog else None

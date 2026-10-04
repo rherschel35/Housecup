@@ -10,7 +10,7 @@
         "three words",
         "get wand"
       ],
-      "answer": "Aye \u2014 dig out three words ye fancy an' cast `/wand`. A wand chooses ye for good. Same three words unlock `/patronus` an' `/broom` after.",
+      "answer": "Aye \u2014 dig out three words ye fancy an' cast `/wand`. A wand chooses ye for good. Same three words unlock `/patronus` an' `/broom` after. Animagus is separate — its own three words via `/animagus`.",
       "link": "https://everything-velmora.netlify.app/magic"
     },
     {
@@ -21,6 +21,18 @@
         "spirit animal"
       ],
       "answer": "Yer `/patronus` is cast from the same three words ye gave `/wand`. No wand yet? Start there first, then come back for the glow.",
+      "link": "https://everything-velmora.netlify.app/magic"
+    },
+    {
+      "id": "animagus",
+      "keywords": [
+        "animagus",
+        "animagi",
+        "animal form",
+        "transform",
+        "my animagus"
+      ],
+      "answer": "`/animagus` finds yer form from three words o' yer own (not the wand ones). Ye don't pick the animal — it picks ye. Locked for good. Right after ye first transform, every message ends with that animal's sound for a minute.",
       "link": "https://everything-velmora.netlify.app/magic"
     },
     {
