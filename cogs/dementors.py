@@ -230,10 +230,14 @@ CREATURE_CHOICES = [app_commands.Choice(name=c["name"], value=key) for key, c in
 
 # Headmaster convenience: /cast auto-picks the right weakness (no buttons).
 # Everyone else gets ephemeral spell buttons. Override with CAST_AUTO_USER_ID;
-# unset/0 disables.
+# unset/0 disables. Flip CAST_AUTO_ENABLED to pause/resume without clearing
+# the Railway variable (same idea as DUEL FAVORED_ENABLED).
+CAST_AUTO_ENABLED = False  # paused — set True to resume auto-pick
 _raw_cast_auto = os.getenv("CAST_AUTO_USER_ID", "555141900802457630")
 CAST_AUTO_USER_ID = (
-    int(_raw_cast_auto) if _raw_cast_auto and str(_raw_cast_auto).isdigit() else None
+    int(_raw_cast_auto)
+    if CAST_AUTO_ENABLED and _raw_cast_auto and str(_raw_cast_auto).isdigit()
+    else None
 )
 
 
