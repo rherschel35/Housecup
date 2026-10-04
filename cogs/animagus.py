@@ -32,6 +32,8 @@ log = logging.getLogger("velmora.animagus")
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 ANIMAGUS_PATH = STATE_DIR / "animagus.json"
+ASSETS_DIR = Path(__file__).resolve().parent.parent / "animagus_art_assets"
+ART_VARIANTS = 5
 
 MODEL = os.getenv("ANIMAGUS_MODEL", os.getenv("PATRONUS_MODEL", "claude-haiku-4-5-20251001"))
 ECHO_SECONDS = 60
@@ -138,6 +140,20 @@ def forced_animagus(user_id: int) -> dict | None:
     return _form_record(match)
 
 
+def art_filename(animal: str, variant: int) -> str:
+    return f"{animal}_{variant}.png"
+
+
+def art_path(animal: str, variant: int) -> Path:
+    return ASSETS_DIR / art_filename(animal, variant)
+
+
+def pick_art_variant(user_id: int, animal: str) -> int:
+    """Stable 1..ART_VARIANTS pick so the same person always sees the same portrait."""
+    digest = hashlib.sha256(f"animagus-art:{user_id}:{animal}".encode()).digest()
+    return (digest[0] % ART_VARIANTS) + 1
+
+
 def _clean(raw: dict) -> dict | None:
     try:
         animal = str(raw["animal"]).strip()
@@ -200,7 +216,30 @@ class Animagus(commands.Cog):
         animal = rec.get("animal")
         if animal in FORMS and not rec.get("sound"):
             rec["sound"] = FORMS[animal][1]
+        # Backfill a stable portrait variant if missing.
+        if animal in FORMS and not rec.get("art"):
+            rec["art"] = pick_art_variant(user_id, animal)
         return rec
+
+    def portrait_file(self, rec: dict) -> discord.File | None:
+        """Attachable Animagus portrait, or None if that variant isn't on disk."""
+        animal = rec.get("animal")
+        if not animal or animal not in FORMS:
+            return None
+        variant = int(rec.get("art") or 1)
+        if variant < 1 or variant > ART_VARIANTS:
+            variant = 1
+        path = art_path(animal, variant)
+        if not path.is_file():
+            # Fall back to any available variant for this animal.
+            for v in range(1, ART_VARIANTS + 1):
+                alt = art_path(animal, v)
+                if alt.is_file():
+                    path = alt
+                    break
+            else:
+                return None
+        return discord.File(path, filename="animagus.png")
 
     def release(self, user_id: int) -> bool:
         uid = str(user_id)
@@ -264,6 +303,12 @@ class Animagus(commands.Cog):
             ),
             color=GOLD,
         )
+        if animal in FORMS:
+            variant = int(rec.get("art") or 1)
+            if art_path(animal, variant).is_file() or any(
+                art_path(animal, v).is_file() for v in range(1, ART_VARIANTS + 1)
+            ):
+                embed.set_image(url="attachment://animagus.png")
         if fresh:
             embed.set_footer(
                 text=f"For the next minute, your messages end with {sound}"
@@ -271,6 +316,41 @@ class Animagus(commands.Cog):
         else:
             embed.set_footer(text=f"Form sound: {sound} · found from their own three words")
         return embed
+
+    async def send_form(
+        self,
+        interaction: discord.Interaction,
+        member,
+        rec: dict,
+        *,
+        fresh: bool = False,
+        deferred: bool = False,
+    ) -> None:
+        embed = self.embed_for(member, rec, fresh=fresh)
+        # portrait_file opens a new handle each call; only open once for send.
+        file = None
+        animal = rec.get("animal")
+        if animal in FORMS:
+            variant = int(rec.get("art") or pick_art_variant(member.id, animal))
+            path = art_path(animal, variant)
+            if not path.is_file():
+                for v in range(1, ART_VARIANTS + 1):
+                    alt = art_path(animal, v)
+                    if alt.is_file():
+                        path = alt
+                        break
+                else:
+                    path = None
+            if path is not None:
+                file = discord.File(path, filename="animagus.png")
+                embed.set_image(url="attachment://animagus.png")
+        kwargs = {"embed": embed}
+        if file is not None:
+            kwargs["file"] = file
+        if deferred:
+            await interaction.followup.send(**kwargs)
+        else:
+            await interaction.response.send_message(**kwargs)
 
     @app_commands.command(
         name="animagus",
@@ -281,7 +361,7 @@ class Animagus(commands.Cog):
         target = member or interaction.user
         existing = self.form_of(target.id)
         if existing:
-            await interaction.response.send_message(embed=self.embed_for(target, existing))
+            await self.send_form(interaction, target, existing)
             return
 
         if member and member.id != interaction.user.id:
@@ -431,20 +511,19 @@ class AnimagusModal(discord.ui.Modal, title="The form finds you"):
             return
 
         if self.cog.form_of(interaction.user.id):
-            await interaction.response.send_message(
-                embed=self.cog.embed_for(
-                    interaction.user, self.cog.form_of(interaction.user.id)
-                )
+            await self.cog.send_form(
+                interaction, interaction.user, self.cog.form_of(interaction.user.id)
             )
             return
 
         await interaction.response.defer(thinking=True)
         result = await self.cog.read_form(text, user_id=interaction.user.id)
         result["words"] = text
+        result["art"] = pick_art_variant(interaction.user.id, result["animal"])
         self.cog.state["forms"][str(interaction.user.id)] = result
         self.cog.start_echo(interaction.user.id)
-        await interaction.followup.send(
-            embed=self.cog.embed_for(interaction.user, result, fresh=True)
+        await self.cog.send_form(
+            interaction, interaction.user, result, fresh=True, deferred=True
         )
 
 
