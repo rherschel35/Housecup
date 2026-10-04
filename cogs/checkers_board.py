@@ -15,7 +15,8 @@ from typing import Iterable, Optional
 from PIL import Image, ImageDraw, ImageFont
 
 SQ = 96
-MARGIN = 72
+# Wide margin so outer a–h / 1–8 labels stay large when Discord shrinks the PNG.
+MARGIN = 110
 BOARD_PX = SQ * 8
 IMG_SIZE = BOARD_PX + MARGIN * 2
 
@@ -55,8 +56,8 @@ def _load_font(paths: list[Path], size: int) -> ImageFont.FreeTypeFont | ImageFo
     return ImageFont.load_default()
 
 
-_LABEL_FONT = _load_font(_LABEL_CANDIDATES, 52)
-_SQUARE_COORD_FONT = _load_font(_LABEL_CANDIDATES, 32)
+_LABEL_FONT = _load_font(_LABEL_CANDIDATES, 88)
+_SQUARE_COORD_FONT = _load_font(_LABEL_CANDIDATES, 56)
 _CROWN_FONT = _load_font(_LABEL_CANDIDATES, 28)
 
 
@@ -137,9 +138,9 @@ def render_board(
             col, row = file, 7 - rank
             ink = COORD_ON_DARK if (file + rank) % 2 == 0 else COORD_ON_LIGHT
             if col == 0:
-                draw.text((x + 5, y + 3), ranks[rank], font=_SQUARE_COORD_FONT, fill=ink, anchor="lt")
+                draw.text((x + 6, y + 4), ranks[rank], font=_SQUARE_COORD_FONT, fill=ink, anchor="lt")
             if row == 7:
-                draw.text((x + SQ - 5, y + SQ - 3), files[file], font=_SQUARE_COORD_FONT,
+                draw.text((x + SQ - 6, y + SQ - 4), files[file], font=_SQUARE_COORD_FONT,
                           fill=ink, anchor="rb")
 
     for i in range(8):
