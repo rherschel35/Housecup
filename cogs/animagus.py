@@ -145,11 +145,13 @@ def forced_animagus(user_id: int) -> dict | None:
             "animal": "Wolf",
             "form": (
                 "Your bones settle into black fur before you can argue — "
-                "emerald eyes open, and the silver moon chain rests cold against your throat."
+                "emerald eyes open on the dark, already measuring the ground ahead."
             ),
             "reading": (
-                "A black wolf with green eyes, the moon chain catching every scrap of light. "
-                "Loyal to the pack above everything — that is what you already were."
+                "A black wolf with green eyes. You are always reading the room, "
+                "calculating the next move before anyone else has finished speaking — "
+                "not for show, but so the pack comes out ahead. You do your best for them, "
+                "every angle worked, every loyalty earned. That is what you already were."
             ),
             "sound": FORMS["Wolf"][1],
             "art": "headmaster",
