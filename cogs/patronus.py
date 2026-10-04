@@ -96,6 +96,37 @@ CUSTOM_PATRONUSES: dict[str, dict] = {
         "art": "Griffin_Pod.png",
         "defeat_art": "Griffin_Pod_Defeat.png",
     },
+    "534422209968734209": {  # Mara
+        "animal": "Margarita",
+        "form": (
+            "Golden-green light gathers in a shimmering swirl, forming the "
+            "unmistakable shape of a margarita glass. Its silvery magic glows "
+            "around the rim like frost, while a tiny lime wedge rests against "
+            "the edge, bright and mischievous. The Patronus sparkles with the "
+            "kind of energy that makes it impossible to tell whether it just "
+            "arrived to protect you or convince you to stay out another three "
+            "hours."
+        ),
+        "reading": (
+            "You carry a warmth that draws people in without trying. You're "
+            "playful, silly, and effortlessly flirty, with a talent for turning "
+            "ordinary moments into something worth remembering. You love people, "
+            "conversation, laughter, and the simple joy of being surrounded by "
+            "good company.\n\n"
+            "Your greatest strength is your generosity. You're the person who "
+            "notices when someone needs a hand, pulls them into the fun, and "
+            "somehow manages to make them feel like they belong. You give freely, "
+            "whether it's your time, your attention, your humor, or the last "
+            "drink at the table.\n\n"
+            "**Your guard is this:** you refuse to let life become too serious "
+            "for too long. You protect joy. You remind people to laugh when "
+            "they've forgotten how, to loosen their grip on the things weighing "
+            "them down, and to enjoy the moment while it's still happening.\n\n"
+            "Like a margarita, you're bright, refreshing, a little dangerous "
+            "when underestimated, and considerably more fun when shared."
+        ),
+        "art": "Margarita_Mara.png",
+    },
 }
 
 # Real animals only, each with what it guards. The reader must choose from
