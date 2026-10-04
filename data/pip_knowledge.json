@@ -32,7 +32,7 @@
         "transform",
         "my animagus"
       ],
-      "answer": "`/animagus` finds yer form from three words o' yer own (not the wand ones). Ye don't pick the animal — it picks ye. Locked for good. Right after ye first transform, every message ends with that animal's sound for a minute.",
+      "answer": "`/animagus` finds yer form from three words o' yer own (not the wand ones). Ye don't pick the animal — it picks ye. Locked for good. Cast `/animagus` again anytime to transform for a minute — every message ends with that animal's sound (e.g. *woof*).",
       "link": "https://everything-velmora.netlify.app/magic"
     },
     {
