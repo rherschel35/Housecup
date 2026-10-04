@@ -255,9 +255,13 @@
         "descentstatus",
         "solo dungeon",
         "action points",
-        "ap"
+        "ap",
+        "shadow veil",
+        "shadow monster",
+        "veil spire",
+        "night vault"
       ],
-      "answer": "The Descent is a hundred-floor solo dungeon. `/descend` fights yer next monster; `/descend floor:n` replays a cleared floor for practice an' loot. `/descentstatus` shows floor, stats, an' lockouts. Three losses on a floor locks ye out 24 hours.",
+      "answer": "The Descent is a hundred-floor solo dungeon. `/descend` fights yer next monster; `/descend floor:n` replays a cleared floor for practice an' loot. `/descentstatus` shows floor, stats, an' lockouts. Three losses on a floor locks ye out 24 hours. Floors 90–100 are The Shadow Veil — shadow monsters with a fresh random weakness every fight, hidden until ye cast the right spell (or drink Owl's Eye).",
       "link": "https://everything-velmora.netlify.app/descent"
     },
     {
