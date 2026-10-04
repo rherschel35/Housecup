@@ -36,6 +36,7 @@ class Staff(commands.Cog):
     houses = sg.houses
     identity = sg.identity
     descent = sg.descent
+    castles = sg.castles
     raid = sg.raid
     duels = sg.duels
     challenge = sg.challenge
@@ -266,6 +267,30 @@ class Staff(commands.Cog):
             await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
             return
         await cog.descentboost(interaction, member, hp, attack, defense)
+
+    # -------------------------------------------------------------- castles
+
+    @castles.command(
+        name="unlock",
+        description="Clear all castle lock timers and allow sieges any day (skip Wed/Sat).",
+    )
+    async def castles_unlock(self, interaction: discord.Interaction):
+        cog = self._cog("Castles")
+        if not cog:
+            await interaction.response.send_message("Castles isn't loaded.", ephemeral=True)
+            return
+        await cog.staff_unlock_all(interaction)
+
+    @castles.command(
+        name="schedule",
+        description="Restore normal Wed/Sat siege days (turn off staff unlock).",
+    )
+    async def castles_schedule(self, interaction: discord.Interaction):
+        cog = self._cog("Castles")
+        if not cog:
+            await interaction.response.send_message("Castles isn't loaded.", ephemeral=True)
+            return
+        await cog.staff_restore_schedule(interaction)
 
     # ----------------------------------------------------------------- raid
 
