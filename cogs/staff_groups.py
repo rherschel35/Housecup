@@ -42,6 +42,9 @@ identity = app_commands.Group(
 descent = app_commands.Group(
     name="descent", parent=staff, description="Descent staff tools.",
 )
+castles = app_commands.Group(
+    name="castles", parent=staff, description="Castle / army PvP staff tools.",
+)
 raid = app_commands.Group(
     name="raid", parent=staff, description="3Raid staff tools.",
 )

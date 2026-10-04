@@ -241,6 +241,8 @@ HELP = {
             ("staff descent boost", "Add Descent HP / Attack / Defense points to a player."),
             ("staff descent unlock", "Clear the 3-loss Descent lockout without wiping progress."),
             ("staff descent reset", "Wipe someone's Descent progress back to floor 1."),
+            ("staff castles unlock", "Clear all castle locks/reinforce cooldowns and allow sieges any day."),
+            ("staff castles schedule", "Restore normal Wed/Sat siege days after a staff unlock."),
             ("staff raid reset", "Clear a player's 3Raid weekly lockout, or end the active raid."),
             ("staff market sellreset", "Clear someone's daily Marketplace sell-points cap."),
             ("staff hex cast", "Curse a student — chat mangles, or Limp Wand (blocks /wand, /patronus, /broom, /cast for 1 hour)."),

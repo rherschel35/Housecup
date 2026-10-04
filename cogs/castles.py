@@ -322,6 +322,7 @@ class Castles(commands.Cog):
         self.state.setdefault("castles", {})
         self.state.setdefault("players", {})
         self.state.setdefault("pvp_live", True)
+        self.state.setdefault("siege_unlocked", False)  # staff: skip Wed/Sat + clear locks
         self.state.setdefault("sunday_paid", "")
         self.state.setdefault("bannerhall_week", "")
         for key in CASTLE_ORDER:
@@ -490,9 +491,15 @@ class Castles(commands.Cog):
             return f"🔒 Locked {left // 60}m {left % 60}s"
         return "Open"
 
+    def sieges_open(self, ts: Optional[float] = None) -> bool:
+        """Wed/Sat normally; staff unlock lets sieges run any day."""
+        if self.state.get("siege_unlocked"):
+            return True
+        return is_siege_day(ts)
+
     def overview_embed(self) -> discord.Embed:
         now = time.time()
-        siege_open = is_siege_day(now)
+        siege_open = self.sieges_open(now)
         lines = []
         for key in CASTLE_ORDER:
             meta = CASTLES[key]
@@ -506,7 +513,12 @@ class Castles(commands.Cog):
                 f"**{meta['name']}** — {owner_txt}{house_bit}\n"
                 f"└ {meta['perk']} · wall {meta['wall_label']} · garrison {garr} · {self.lock_label(slot, now)}"
             )
-        day = "Siege day (Wed/Sat)" if siege_open else "No sieges today (Wed & Sat only)"
+        if self.state.get("siege_unlocked"):
+            day = "⚡ Staff unlock — sieges open any day"
+        elif siege_open:
+            day = "Siege day (Wed/Sat)"
+        else:
+            day = "No sieges today (Wed & Sat only)"
         embed = discord.Embed(
             title="🏰 Velmora Castles",
             description=f"{day}\n\n" + "\n\n".join(lines),
@@ -647,7 +659,7 @@ class Castles(commands.Cog):
         return True, f"Walls stocked: **{force_summary(slot['garrison'])}** (+{len(picked)} this reinforce)."
 
     def can_start_siege(self, user_id: int, key: str) -> tuple[bool, str]:
-        if not is_siege_day():
+        if not self.sieges_open():
             return False, "Sieges are only on **Wednesday** and **Saturday** (Chicago time)."
         slot = self.castle(key)
         if slot.get("siege"):
@@ -759,6 +771,53 @@ class Castles(commands.Cog):
         else:
             embed.set_footer(text=f"Attack again within {DECISION_SECONDS}s or the assault ends · Pull back anytime")
         return embed
+
+    # ================================================================ staff
+
+    async def staff_unlock_all(self, interaction: discord.Interaction) -> None:
+        """Clear every castle lock / reinforce cooldown and open sieges any day."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        cleared_locks = 0
+        cleared_reinforce = 0
+        for key in CASTLE_ORDER:
+            slot = self.castle(key)
+            if float(slot.get("locked_until") or 0) > 0:
+                cleared_locks += 1
+            slot["locked_until"] = 0.0
+            if slot.get("reinforced"):
+                cleared_reinforce += 1
+            slot["reinforced"] = False
+        self.state["siege_unlocked"] = True
+        self.save()
+        await interaction.response.send_message(
+            f"🔓 All castles unlocked.\n"
+            f"• Cleared **{cleared_locks}** lock timer(s)\n"
+            f"• Reset **{cleared_reinforce}** reinforce cooldown(s)\n"
+            f"• Sieges open **any day** until `/staff castles schedule`",
+            ephemeral=True,
+        )
+
+    async def staff_restore_schedule(self, interaction: discord.Interaction) -> None:
+        """Turn off staff unlock — Wed/Sat siege days again."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        was = bool(self.state.get("siege_unlocked"))
+        self.state["siege_unlocked"] = False
+        self.save()
+        if was:
+            msg = "📅 Staff unlock off — sieges back to **Wednesday & Saturday** only."
+        else:
+            msg = "Siege schedule was already normal (Wed & Sat only)."
+        if self.sieges_open():
+            msg += " (Today is a siege day.)"
+        else:
+            msg += " (No sieges today.)"
+        await interaction.response.send_message(msg, ephemeral=True)
 
     # ================================================================ commands
 
