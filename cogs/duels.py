@@ -230,6 +230,41 @@ RIVAL_TITLE_TIERS = [        # (meetings, title) - highest first
     (5, "Rivals"),
 ]
 
+# Silly lines for the duel board when a pair already holds a rivalry title.
+# {a}/{b} = display names, {title} = rivalry title, {n} = meetings so far.
+RIVAL_BOARD_BANTER = {
+    "Rivals": [
+        "**{a}** and **{b}** are **{title}**. The portraits have started keeping score.",
+        "Title check: **{title}**. That's {n} meetings and counting — somebody buy them a snack.",
+        "**{title}** enter the floor. The Circle mutters 'not these two again' fondly.",
+    ],
+    "Nemeses": [
+        "**{a}** vs **{b}**: **{title}**. The stands brought snacks for rematch number {n}.",
+        "Announcing **{title}**. If this were a play, act fifteen just began.",
+        "**{title}** clash again. Somewhere, a betting pool updates in real time.",
+    ],
+    "Bound by Sparks": [
+        "**{a}** and **{b}** are **{title}**. Sparks, paperwork, and unresolved eye contact.",
+        "**{title}** ({n} meetings). The air between them has a loyalty program.",
+        "Board note: **{title}**. Their wands recognize each other on sight.",
+    ],
+    "Eternal Opposition": [
+        "**{title}**: **{a}** and **{b}**. The floor has a reserved groove for them.",
+        "{n} meetings later and they're still **{title}**. Persistence is a love language.",
+        "The Circle clears its throat. **{title}** have entered the chat.",
+    ],
+    "The Unfinished Duel": [
+        "**{a}** and **{b}** — **{title}**. Spoiler: it still isn't finished.",
+        "**{title}** rematch #{n}. Historians have given up waiting for a clean ending.",
+        "Tonight's feature: **{title}**. Bring a pillow; this saga has seasons.",
+    ],
+    "Rivals Turned Lovers": [
+        "**{a}** and **{b}** are **{title}**. The Circle is blushing. Rudely.",
+        "**{title}** ({n} meetings). Please duel responsibly — or don't.",
+        "Announcing **{title}**. Someone in the stands just dropped their popcorn.",
+    ],
+}
+
 TRIO_SIZE = 3
 TRIO_SIGNUP_TIMEOUT = 90
 TRIO_ROUNDS_TO_WIN = 2       # best of three
@@ -267,6 +302,33 @@ GRAND_RIVAL_TITLE_TIERS = [  # (grand meetings, title) - highest first
     (15, "Calendar Nemeses"),
     (5, "Scheduled Enemies"),
 ]
+
+GRAND_RIVAL_BOARD_BANTER = {
+    "Scheduled Enemies": [
+        "**{a}** and **{b}** are **{title}**. Their calendar app has trust issues.",
+        "**{title}** ({n} Grand meetings). Penciled in: mutual chaos.",
+    ],
+    "Calendar Nemeses": [
+        "**{title}**: **{a}** vs **{b}**. Even the dates are taking sides.",
+        "{n} Grand meetings. **{title}**. RSVP: dramatic.",
+    ],
+    "We Need To Stop Meeting Like This": [
+        "**{a}** and **{b}** — **{title}**. Narrator: they will not stop.",
+        "**{title}** ({n} times). The Grand floor has a frequent-duelist punch card.",
+    ],
+    "Mutual Destruction Pact": [
+        "**{title}** in effect. **{a}** and **{b}** signed in sparkles.",
+        "Clause 1 of **{title}**: show up. Clause 2: make it weird. ({n} meetings.)",
+    ],
+    "The Longest Grudge": [
+        "**{a}** vs **{b}**: **{title}**. This grudge has its own subplot.",
+        "**{title}** after {n} Grand meetings. The portraits brought opera glasses.",
+    ],
+    "Married In The Eyes Of The Circle": [
+        "**{title}**: **{a}** and **{b}**. The Circle demands a seating chart.",
+        "{n} Grand meetings later — **{title}**. Someone prepare the confetti (and the wards).",
+    ],
+}
 
 GRAND_THEATRE = [
     "The Circle holds its breath.",
@@ -359,6 +421,22 @@ def highest_title(tiers: list, count: int):
         if count >= threshold:
             return title
     return None
+
+
+def rival_banter_line(
+    a_name: str,
+    b_name: str,
+    title: str,
+    meetings: int,
+    banter: dict,
+) -> str:
+    """Pick a silly board line for an earned pair title (stable caller picks once)."""
+    templates = banter.get(title) or [
+        "**{a}** and **{b}** are **{title}** ({n} meetings). The Circle is watching fondly."
+    ]
+    return random.choice(templates).format(
+        a=a_name, b=b_name, title=title, n=meetings
+    )
 
 
 def signature_unlocks_for(tally: dict) -> list[tuple[str, int, str]]:
@@ -876,6 +954,32 @@ class Duels(commands.Cog):
         if self.has_bounty(member.id):
             label += " 🎯"
         return label + (f" *({wand})*" if wand else "")
+
+    def pair_meetings(self, a_id: int, b_id: int) -> int:
+        return int(self.state["pairs"].get(pair_key(a_id, b_id), 0))
+
+    def grand_pair_meetings(self, a_id: int, b_id: int) -> int:
+        return int(self.state["grand_pairs"].get(pair_key(a_id, b_id), 0))
+
+    def rivalry_board_line(self, a, b) -> str | None:
+        """Silly rivalry title line for a 1v1 pair, or None if untitled yet."""
+        n = self.pair_meetings(a.id, b.id)
+        title = highest_title(RIVAL_TITLE_TIERS, n)
+        if not title:
+            return None
+        return rival_banter_line(
+            a.display_name, b.display_name, title, n, RIVAL_BOARD_BANTER
+        )
+
+    def grand_rivalry_board_line(self, a, b) -> str | None:
+        """Silly grand-rivalry title line, or None if untitled yet."""
+        n = self.grand_pair_meetings(a.id, b.id)
+        title = highest_title(GRAND_RIVAL_TITLE_TIERS, n)
+        if not title:
+            return None
+        return rival_banter_line(
+            a.display_name, b.display_name, title, n, GRAND_RIVAL_BOARD_BANTER
+        )
 
     # ------------------------------------------------- Duelist of the Week
 
@@ -1526,15 +1630,22 @@ class Duel:
         # each duelist's ephemeral board, which edits in place each round.
         self.private_boards: dict[int, discord.Message] = {}
         self.opened: set[int] = set()
+        # Fixed for this duel so board edits don't reshuffle the joke.
+        self.rival_line = self.cog.rivalry_board_line(challenger, opponent)
 
     # -------------------------------------------------------------- display
 
     def challenge_embed(self) -> discord.Embed:
+        desc = (
+            f"{self.cog._duelist_label(self.a)} challenges "
+            f"{self.cog._duelist_label(self.b)}.\n\n"
+            "Best of three. Spells are chosen in secret and revealed together."
+        )
+        if self.rival_line:
+            desc += f"\n\n⚔️ {self.rival_line}"
         embed = discord.Embed(
             title="A duel is called",
-            description=f"{self.cog._duelist_label(self.a)} challenges "
-                        f"{self.cog._duelist_label(self.b)}.\n\n"
-                        "Best of three. Spells are chosen in secret and revealed together.",
+            description=desc,
             color=0xB8434F,
         )
         embed.set_footer(text=f"{self.b.display_name} has {ACCEPT_TIMEOUT // 60} minutes to answer")
@@ -1544,6 +1655,8 @@ class Duel:
         a_s, b_s = self.score[self.a.id], self.score[self.b.id]
         lines = [f"{self.cog._duelist_label(self.a)} **{a_s}** — "
                  f"**{b_s}** {self.cog._duelist_label(self.b)}"]
+        if self.rival_line:
+            lines.append(f"⚔️ {self.rival_line}")
         if self.history:
             lines.append("")
             lines.extend(self.history[-4:])
@@ -2475,15 +2588,19 @@ class GrandDuel:
         self.board_gen = 0
         self.private_boards: dict[int, discord.Message] = {}
         self.opened: set[int] = set()
+        self.rival_line = self.cog.grand_rivalry_board_line(challenger, opponent)
 
     def challenge_embed(self) -> discord.Embed:
+        desc = (
+            f"**{self.a.display_name}** challenges **{self.b.display_name}** to a Grand Duel.\n\n"
+            f"Both lock a blind sequence of **{GRAND_SLOTS}** spells. First to **{GRAND_TO_WIN}** "
+            f"round wins. Same spell = neither scores. A 5–5 goes to live sudden death."
+        )
+        if self.rival_line:
+            desc += f"\n\n⚔️ {self.rival_line}"
         embed = discord.Embed(
             title="A Grand Duel is called",
-            description=(
-                f"**{self.a.display_name}** challenges **{self.b.display_name}** to a Grand Duel.\n\n"
-                f"Both lock a blind sequence of **{GRAND_SLOTS}** spells. First to **{GRAND_TO_WIN}** "
-                f"round wins. Same spell = neither scores. A 5–5 goes to live sudden death."
-            ),
+            description=desc,
             color=0xD4A017,
         )
         embed.set_footer(text=f"{self.b.display_name} has {ACCEPT_TIMEOUT // 60} minutes to answer")
@@ -2492,6 +2609,8 @@ class GrandDuel:
     def board_embed(self, footer: str = None) -> discord.Embed:
         a_s, b_s = self.score[self.a.id], self.score[self.b.id]
         lines = [f"**{self.a.display_name}** {a_s} — {b_s} **{self.b.display_name}**"]
+        if self.rival_line:
+            lines.append(f"⚔️ {self.rival_line}")
         if self.state == "locking":
             for m in (self.a, self.b):
                 status = "sequence locked ✓" if m.id in self.locked else "building their sequence…"
