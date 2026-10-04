@@ -390,6 +390,18 @@ def recruit_from_fight(rec: dict, fight: "Fight") -> dict:
     return unit
 
 
+def clone_army_unit(rec: dict, unit: dict) -> dict:
+    """Duplicate a bound unit into the army (Fifth Muster bonus)."""
+    rec.setdefault("army", [])
+    seq = int(rec.get("army_seq", 0) or 0) + 1
+    rec["army_seq"] = seq
+    clone = dict(unit)
+    clone["id"] = seq
+    clone["at"] = int(time.time())
+    rec["army"].append(clone)
+    return clone
+
+
 def army_floor_counts(army: list) -> dict[int, int]:
     """floor -> how many units bound from that floor."""
     counts: dict[int, int] = {}
@@ -841,6 +853,12 @@ class Descent(commands.Cog):
             fight.message = None
         await self._offer_oneshot(interaction, fight)
 
+    def _apply_prelude_bastion(self, fight: Fight, user_id: int) -> None:
+        """Prelude Bastion: Descent monsters start at half attack."""
+        castles = self.bot.get_cog("Castles")
+        if castles and castles.prelude_halves_monster_atk(user_id):
+            fight.m_atk = max(1, int(fight.m_atk) // 2)
+
     async def _start_fight(self, interaction: discord.Interaction, rec: dict):
         floor, idx = rec["floor"], rec["monster_index"]
         name, emoji, element, kind, weak, is_boss, m_hp, m_atk, m_def = self._make_monster(floor, idx)
@@ -848,6 +866,7 @@ class Descent(commands.Cog):
         fight = Fight(interaction.user.id, floor, idx, is_boss, name, emoji, element, kind, weak,
                       m_hp, m_atk, m_def, p_hp, p_atk, p_def, ap_max=rec["max_ap"])
         self._apply_potion_mods(fight, interaction.user.id, is_boss)
+        self._apply_prelude_bastion(fight, interaction.user.id)
         self.fights[interaction.user.id] = fight
         await self._post_fight_board(interaction, fight)
 
@@ -856,6 +875,7 @@ class Descent(commands.Cog):
         p_hp, p_atk, p_def = player_stats(rec)
         fight = Fight(interaction.user.id, floor, 0, False, name, emoji, element, kind, weak,
                       m_hp, m_atk, m_def, p_hp, p_atk, p_def, ap_max=rec["max_ap"], is_practice=True)
+        self._apply_prelude_bastion(fight, interaction.user.id)
         self.fights[interaction.user.id] = fight
         await self._post_fight_board(interaction, fight)
 
@@ -1006,7 +1026,20 @@ class Descent(commands.Cog):
         rec = self.record(interaction.user.id)
         member = interaction.user
         await self._dismiss_oneshot(fight, interaction, used=from_oneshot)
-        recruit_from_fight(rec, fight)
+        castles = self.bot.get_cog("Castles")
+        allowed = castles.recruit_allowed(member.id, 1) if castles else 1
+        unit = None
+        if allowed > 0:
+            unit = recruit_from_fight(rec, fight)
+            if castles:
+                castles.note_recruits(member.id, 1)
+                bonus = castles.fifth_muster_bonus(member.id)
+                if bonus and castles.recruit_allowed(member.id, bonus) > 0:
+                    clone_army_unit(rec, unit)
+                    castles.note_recruits(member.id, bonus)
+        elif castles:
+            # Still tick Fifth Muster progress even when the daily cap blocks a bind.
+            castles.fifth_muster_bonus(member.id)
         self.save()
 
         if fight.is_practice:

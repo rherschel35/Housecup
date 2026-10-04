@@ -15,6 +15,10 @@ DUELS_POTIONS_CHANNEL_ID = 1555554825616236726
 SHARED_GAMES_CHANNEL_ID = 1556100254082924595
 SHARED_GAMES_CHANNEL_IDS = frozenset({SHARED_GAMES_CHANNEL_ID})
 
+# Castle / army PvP — sieges, map board, battle reports.
+CASTLES_CHANNEL_ID = 1556398769275404441
+CASTLES_CHANNEL_IDS = frozenset({CASTLES_CHANNEL_ID})
+
 # Extra rooms where /duel is allowed (in addition to DUEL_CHANNEL_ID,
 # study hall, the shared Potions/Duels room, and SHARED_GAMES_CHANNEL_ID).
 EXTRA_DUEL_CHANNEL_IDS = frozenset({

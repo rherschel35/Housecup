@@ -67,10 +67,21 @@ HELP = {
         "title": "The Descent",
         "staff": False,
         "note": ("Solo 100-floor dungeon — only in Descent channels. "
-                 "Practice cleared floors with `/descend floor:n` for loot; nearby floors can sharpen a free stat pick."),
+                 "Practice cleared floors with `/descend floor:n` for loot; nearby floors can sharpen a free stat pick. "
+                 "Wins bind monsters into your army for castle sieges."),
         "entries": [
             ("descend", "Fight the next monster on your floor (or resume an open fight)."),
             ("descentstatus", "Your floor, monster progress, stats, Max AP, and lockout."),
+        ],
+    },
+    "castles": {
+        "title": "Castles & Army",
+        "staff": False,
+        "note": ("Army PvP in the castles channel. Bind Descent monsters, hold one of six castles, "
+                 "siege on Wed & Sat (Chicago). One castle per player — abandon before attacking another."),
+        "entries": [
+            ("castles", "Map board: owners, perks, reinforce, siege, abandon."),
+            ("army", "Your roster, daily recruit cap, and ATK/DEF sacrifice upgrades."),
         ],
     },
     "potions": {

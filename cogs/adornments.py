@@ -106,6 +106,13 @@ TITLE_SCORE = {
     "Accio Self-Respect (No Response)": 40,
     "The Sorting Hat Asked Me to Leave": 40,
     "Emotionally Support Dementor": 40,
+    # Castle titles
+    "Lord of Bannerhall": 78,
+    "Warden of Deadlock Keep": 76,
+    "Marshal of the Fifth Muster": 76,
+    "Keeper of Surestroke Tower": 76,
+    "Collector of the Triple Tithe": 76,
+    "Guardian of Prelude Bastion": 76,
 }
 KEEPER_SCORE, SIGNATURE_SCORE = 66, 52
 
@@ -496,6 +503,9 @@ class Adornments(commands.Cog):
         market = self.bot.get_cog("Marketplace")
         if market:
             out += market.titles_of(uid)
+        castles = self.bot.get_cog("Castles")
+        if castles:
+            out += castles.titles_of(uid)
         seen, uniq = set(), []
         for t in out:
             if t not in seen:

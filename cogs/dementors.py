@@ -571,7 +571,10 @@ class Dementors(commands.Cog):
         return SpellPick(creature["weak"])
 
     def _can_auto_cast(self, user_id: int) -> bool:
-        return CAST_AUTO_USER_ID is not None and user_id == CAST_AUTO_USER_ID
+        if CAST_AUTO_USER_ID is not None and user_id == CAST_AUTO_USER_ID:
+            return True
+        castles = self.bot.get_cog("Castles")
+        return bool(castles and castles.surestroke_auto_cast(user_id))
 
     def _nothing_here_message(self, channel_id: int) -> str:
         """Clearer refusal when a wave is mid-landing vs truly empty air."""
