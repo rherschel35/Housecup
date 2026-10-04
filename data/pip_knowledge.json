@@ -326,16 +326,20 @@
         "craft book",
         "craftable",
         "crafts",
+        "earned gear",
         "gear",
         "gear craft",
         "how to craft gear",
         "jewelbox",
+        "magpie",
+        "magpie eye",
+        "magpie's eye",
         "recipe book gear",
         "title",
         "wear",
         "whistle"
       ],
-      "answer": "`/crafts` is yer gear recipe book \u2014 what ye own, every craftable piece by rarity, an' \ud83d\udfe2/\ud83d\udd34 ingredient dots (same idea as `/potions`). `/craft` makes one from yer satchel; `/jewelbox` shows worn an' earned gear; `/wear` an' `/remove` kit ye out. `/title` picks which earned title shows under yer name.",
+      "answer": "`/crafts` is yer gear book \u2014 crafted recipes with \ud83d\udfe2/\ud83d\udd34 dots *and* an Earned section for perk pieces (Magpie's Eye = befriend all five Nifflers, an' so on). Cosmetic bits ye `/craft` from yer satchel; earned gear unlocks when ye hit the goal. `/jewelbox` shows what ye own, ready crafts, an' locked earned goals; `/wear` an' `/remove` kit ye out. `/title` picks which earned title shows under yer name.",
       "link": "https://everything-velmora.netlify.app/cards"
     },
     {
