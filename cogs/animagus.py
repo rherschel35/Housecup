@@ -7,9 +7,10 @@ Animagus forms. The animal finds you — you don't pick it.
 
 You give any three words (separate from wand/patronus/broom). The reader
 maps the character behind them to one form from the catalog. Same words
-always yield the same form. Purely cosmetic — except right after you first
-transform, every message you send for one minute ends with that animal's
-sound (webhook relay, same idea as Headmaster hexes).
+always yield the same form. Purely cosmetic — except after you transform
+(first reveal, or any later `/animagus` on yourself), every message you
+send for one minute ends with that animal's sound (webhook relay, same
+idea as Headmaster hexes).
 """
 
 from __future__ import annotations
@@ -295,8 +296,9 @@ class Animagus(commands.Cog):
     def embed_for(self, member, rec: dict, *, fresh: bool = False) -> discord.Embed:
         animal = rec["animal"]
         sound = rec.get("sound") or FORMS.get(animal, ("", "*…*"))[1]
+        echoing = fresh or bool(self.echo_active(member.id))
         embed = discord.Embed(
-            title=("The shift takes you…" if fresh else f"{member.display_name}'s Animagus"),
+            title=("The shift takes you…" if echoing else f"{member.display_name}'s Animagus"),
             description=(
                 f"**{animal}**\n"
                 f"*{rec['form']}*\n\n{rec['reading']}"
@@ -309,12 +311,17 @@ class Animagus(commands.Cog):
                 art_path(animal, v).is_file() for v in range(1, ART_VARIANTS + 1)
             ):
                 embed.set_image(url="attachment://animagus.png")
-        if fresh:
+        if echoing:
             embed.set_footer(
                 text=f"For the next minute, your messages end with {sound}"
             )
         else:
-            embed.set_footer(text=f"Form sound: {sound} · found from their own three words")
+            embed.set_footer(
+                text=(
+                    f"Form sound: {sound} · run /animagus again to transform "
+                    f"for a minute"
+                )
+            )
         return embed
 
     async def send_form(
@@ -354,14 +361,19 @@ class Animagus(commands.Cog):
 
     @app_commands.command(
         name="animagus",
-        description="Reveal your Animagus form from three words of your own — or see it again.",
+        description="Reveal your Animagus form — or transform again (1 min of animal sounds).",
     )
     @app_commands.describe(member="Whose form to see (leave blank for your own)")
     async def animagus(self, interaction: discord.Interaction, member: discord.Member = None):
         target = member or interaction.user
         existing = self.form_of(target.id)
         if existing:
-            await self.send_form(interaction, target, existing)
+            # Re-running on yourself restarts the sound window — first cast
+            # was easy to miss (60s only, and re-views used to skip the echo).
+            fresh = target.id == interaction.user.id
+            if fresh:
+                self.start_echo(interaction.user.id)
+            await self.send_form(interaction, target, existing, fresh=fresh)
             return
 
         if member and member.id != interaction.user.id:
@@ -407,6 +419,18 @@ class Animagus(commands.Cog):
     @expiry_sweep.before_loop
     async def _before_sweep(self):
         await self.bot.wait_until_ready()
+
+    def _relay_home(
+        self, channel: discord.abc.Messageable
+    ) -> tuple[Optional[discord.TextChannel], Optional[discord.Thread]]:
+        """Webhook host channel + optional thread to post into."""
+        if isinstance(channel, discord.TextChannel):
+            return channel, None
+        if isinstance(channel, discord.Thread) and isinstance(
+            channel.parent, discord.TextChannel
+        ):
+            return channel.parent, channel
+        return None, None
 
     async def _relay_webhook(self, channel: discord.TextChannel) -> Optional[discord.Webhook]:
         cached = self._webhooks.get(channel.id)
@@ -465,29 +489,58 @@ class Animagus(commands.Cog):
                 cursed = quote + cursed
 
         cursed = cursed[:2000]
-        channel = message.channel
-        if not isinstance(channel, discord.TextChannel):
+        home, thread = self._relay_home(message.channel)
+        if home is None:
             return
-        hook = await self._relay_webhook(channel)
+        hook = await self._relay_webhook(home)
         if hook is None:
+            # No Manage Webhooks here — still append the sound as a bot line
+            # so the minute isn't a silent no-op for those channels.
+            try:
+                await message.channel.send(
+                    f"**{message.author.display_name}:** {cursed}",
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+            except discord.DiscordException:
+                log.exception(
+                    "Animagus echo fallback failed in #%s",
+                    getattr(message.channel, "name", message.channel.id),
+                )
             return
 
         try:
             await message.delete()
         except discord.DiscordException:
-            log.exception("Could not delete an animagus-echo message in #%s", channel.name)
+            log.exception(
+                "Could not delete an animagus-echo message in #%s",
+                getattr(message.channel, "name", message.channel.id),
+            )
             return
 
         try:
             files = [await a.to_file() for a in message.attachments] if message.attachments else []
-            await hook.send(
+            send_kwargs = dict(
                 content=cursed[:2000],
                 username=message.author.display_name,
                 avatar_url=message.author.display_avatar.url,
                 files=files,
             )
+            if thread is not None:
+                send_kwargs["thread"] = thread
+            await hook.send(**send_kwargs)
         except discord.DiscordException:
-            log.exception("Could not repost an animagus-echo message in #%s", channel.name)
+            log.exception(
+                "Could not repost an animagus-echo message in #%s",
+                getattr(message.channel, "name", message.channel.id),
+            )
+            self._webhooks.pop(home.id, None)
+            try:
+                await message.channel.send(
+                    f"**{message.author.display_name}:** {cursed}",
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+            except discord.DiscordException:
+                log.exception("Animagus echo recovery send also failed.")
 
 
 class AnimagusModal(discord.ui.Modal, title="The form finds you"):
@@ -511,8 +564,12 @@ class AnimagusModal(discord.ui.Modal, title="The form finds you"):
             return
 
         if self.cog.form_of(interaction.user.id):
+            self.cog.start_echo(interaction.user.id)
             await self.cog.send_form(
-                interaction, interaction.user, self.cog.form_of(interaction.user.id)
+                interaction,
+                interaction.user,
+                self.cog.form_of(interaction.user.id),
+                fresh=True,
             )
             return
 
