@@ -1554,7 +1554,7 @@ class Duel:
                          + ("waiting on " + " and ".join(waiting) if waiting else "revealing…"))
         embed = discord.Embed(title="The duel", description="\n".join(lines), color=0xB8434F)
         embed.set_footer(text=footer or (
-            f"Both duelists: Open my cast board • {ROUND_TIMEOUT}s per round"
+            f"Both duelists: Open my cast board (again if dismissed) • {ROUND_TIMEOUT}s per round"
             if self.state == "active"
             else f"{ROUND_TIMEOUT}s per round"
         ))
@@ -1570,7 +1570,7 @@ class Duel:
             embed.set_footer(text=f"You cast {spell}. Waiting on your opponent…")
         elif self.state == "active":
             embed.set_footer(
-                text=f"Pick a spell below • {ROUND_TIMEOUT}s per round"
+                text=f"Pick a spell below • Open again if dismissed • {ROUND_TIMEOUT}s per round"
             )
         return embed
 
@@ -1625,7 +1625,8 @@ class Duel:
                         )
                     elif priv_footer is None and state == "active":
                         priv_footer = (
-                            f"Pick a spell below • {ROUND_TIMEOUT}s per round"
+                            f"Pick a spell below • Open again if dismissed "
+                            f"• {ROUND_TIMEOUT}s per round"
                         )
                     priv_embed = discord.Embed(
                         title=embed.title,
@@ -1715,7 +1716,11 @@ class Duel:
             self._arm(self._round_timeout(arm_round))
 
     async def open_cast_board(self, interaction: discord.Interaction) -> None:
-        """Send (or refuse a duplicate) private board with spells under it."""
+        """Send a private board with spells under it.
+
+        Always allowed to open again — dismissing an ephemeral used to
+        leave fat-fingered duelists stuck until they forfeited the round.
+        """
         uid = interaction.user.id
         if uid not in self.score:
             await interaction.response.send_message(
@@ -1728,12 +1733,6 @@ class Duel:
                     "This duel is over.", ephemeral=True
                 )
                 return
-            if uid in self.opened or uid in self.private_boards:
-                await interaction.response.send_message(
-                    "Your cast board is already open (check your ephemeral messages).",
-                    ephemeral=True,
-                )
-                return
             self.opened.add(uid)
             embed = self.private_embed(uid)
             view = self._private_view_for(uid)
@@ -1743,8 +1742,9 @@ class Duel:
         try:
             self.private_boards[uid] = await interaction.original_response()
         except discord.HTTPException:
-            async with self.lock:
-                self.opened.discard(uid)
+            # Keep opened so publish still knows they participate; they
+            # can press Open again for a fresh board.
+            pass
 
     async def cast(self, member, spell: str, round_no: int = None) -> str:
         """Lock in a spell. Returns a message for the caster.
@@ -2125,7 +2125,7 @@ class TrioMatch:
                          + ("waiting on " + ", ".join(waiting) if waiting else "revealing…"))
         embed = discord.Embed(title="Trio Duel", description="\n".join(lines), color=0xB8434F)
         embed.set_footer(text=footer or (
-            f"Duelists: Open my cast board • {ROUND_TIMEOUT}s per round"
+            f"Duelists: Open my cast board (again if dismissed) • {ROUND_TIMEOUT}s per round"
             if self.state == "active"
             else f"{ROUND_TIMEOUT}s per round"
         ))
@@ -2139,7 +2139,9 @@ class TrioMatch:
         if self.state == "active" and pick:
             embed.set_footer(text=f"You cast {SPELLS[pick]['name']}. Waiting…")
         elif self.state == "active":
-            embed.set_footer(text=f"Pick a spell below • {ROUND_TIMEOUT}s per round")
+            embed.set_footer(
+                text=f"Pick a spell below • Open again if dismissed • {ROUND_TIMEOUT}s per round"
+            )
         return embed
 
     def start_round(self):
@@ -2181,7 +2183,10 @@ class TrioMatch:
                     if priv_footer is None and state == "active" and pick:
                         priv_footer = f"You cast {SPELLS[pick]['name']}. Waiting…"
                     elif priv_footer is None and state == "active":
-                        priv_footer = f"Pick a spell below • {ROUND_TIMEOUT}s per round"
+                        priv_footer = (
+                            f"Pick a spell below • Open again if dismissed "
+                            f"• {ROUND_TIMEOUT}s per round"
+                        )
                     priv_embed = discord.Embed(
                         title=embed.title,
                         description=embed.description,
@@ -2204,6 +2209,7 @@ class TrioMatch:
         await self._publish(*snap)
 
     async def open_cast_board(self, interaction: discord.Interaction) -> None:
+        """Send/reopen private board — dismiss is recoverable (no forfeit trap)."""
         uid = interaction.user.id
         ids = {p.id for p in self.all_players()}
         if uid not in ids:
@@ -2215,12 +2221,6 @@ class TrioMatch:
             if self.state != "active":
                 await interaction.response.send_message(
                     "This trio is over.", ephemeral=True
-                )
-                return
-            if uid in self.opened or uid in self.private_boards:
-                await interaction.response.send_message(
-                    "Your cast board is already open (check your ephemeral messages).",
-                    ephemeral=True,
                 )
                 return
             self.opened.add(uid)
@@ -2236,8 +2236,7 @@ class TrioMatch:
         try:
             self.private_boards[uid] = await interaction.original_response()
         except discord.HTTPException:
-            async with self.lock:
-                self.opened.discard(uid)
+            pass
 
     async def _round_timeout(self, round_no: int):
         await asyncio.sleep(ROUND_TIMEOUT)
@@ -2608,6 +2607,7 @@ class GrandDuel:
         )
 
     async def open_sudden_board(self, interaction: discord.Interaction) -> None:
+        """Send/reopen sudden-death board — dismiss is recoverable."""
         uid = interaction.user.id
         if uid not in self.score:
             await interaction.response.send_message(
@@ -2618,12 +2618,6 @@ class GrandDuel:
             if self.state != "sudden":
                 await interaction.response.send_message(
                     "Sudden death isn't open.", ephemeral=True
-                )
-                return
-            if uid in self.opened or uid in self.private_boards:
-                await interaction.response.send_message(
-                    "Your cast board is already open (check your ephemeral messages).",
-                    ephemeral=True,
                 )
                 return
             self.opened.add(uid)
@@ -2645,8 +2639,7 @@ class GrandDuel:
         try:
             self.private_boards[uid] = await interaction.original_response()
         except discord.HTTPException:
-            async with self.lock:
-                self.opened.discard(uid)
+            pass
 
     def try_lock(self, user_id: int, sequence: list[str]) -> str:
         if self.state != "locking":
@@ -2722,7 +2715,7 @@ class GrandDuel:
                 self.opened = set()
                 sudden = self._snapshot(
                     view=OpenGrandSuddenBoardView(self),
-                    footer="Sudden death — Open my cast board.",
+                    footer="Sudden death — Open my cast board (again if dismissed).",
                 )
                 arm_sudden = self.round
             elif a_s > b_s:
