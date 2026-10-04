@@ -2183,7 +2183,10 @@ class TrioMatch:
                     if priv_footer is None and state == "active" and pick:
                         priv_footer = f"You cast {SPELLS[pick]['name']}. Waiting…"
                     elif priv_footer is None and state == "active":
-                        priv_footer = f"Pick a spell below • {ROUND_TIMEOUT}s per round"
+                        priv_footer = (
+                            f"Pick a spell below • Open again if dismissed "
+                            f"• {ROUND_TIMEOUT}s per round"
+                        )
                     priv_embed = discord.Embed(
                         title=embed.title,
                         description=embed.description,
