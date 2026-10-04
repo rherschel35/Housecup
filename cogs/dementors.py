@@ -2,9 +2,9 @@
 Wild Threats. Something slips into one of the social channels on its own,
 a few times a day - and a headmaster can always summon one on the spot.
 
-    /cast [spell:<Patronus|Hex|Ward|Disarm|Bind|Mirror>]
-        - anyone, tries the spell against whatever's here
-        - CAST_AUTO_USER_ID may omit spell: and auto-cast the right one
+    /cast
+        - anyone, opens spell buttons against whatever's here
+        - CAST_AUTO_USER_ID auto-picks the right spell (no buttons)
     /staff dementor channels          - set the 4 channels they can appear in
     /staff dementor summon [channel] [creature] - make one appear right now
         (study hall is allowed for practice; Attack waves never go there)
@@ -224,19 +224,61 @@ SPAWN_WEIGHTS = {
 }
 
 _DUEL_SPELL_NAMES = {"hex": "Hex", "ward": "Ward", "disarm": "Disarm", "bind": "Bind", "mirror": "Mirror"}
-CAST_CHOICES = [app_commands.Choice(name="Patronus", value="patronus")] + [
-    app_commands.Choice(name=name, value=value) for value, name in _DUEL_SPELL_NAMES.items()
-]
+SPELL_ORDER = ("patronus", "hex", "ward", "disarm", "bind", "mirror")
 SPELL_LABEL = {"patronus": "Patronus", **_DUEL_SPELL_NAMES}
 CREATURE_CHOICES = [app_commands.Choice(name=c["name"], value=key) for key, c in CREATURES.items()]
 
-# Headmaster convenience: omit spell: on /cast and the right weakness is
-# chosen automatically. Spell choices still show for everyone else.
-# Override with CAST_AUTO_USER_ID in the environment; unset/0 disables.
+# Headmaster convenience: /cast auto-picks the right weakness (no buttons).
+# Everyone else gets ephemeral spell buttons. Override with CAST_AUTO_USER_ID;
+# unset/0 disables.
 _raw_cast_auto = os.getenv("CAST_AUTO_USER_ID", "555141900802457630")
 CAST_AUTO_USER_ID = (
     int(_raw_cast_auto) if _raw_cast_auto and str(_raw_cast_auto).isdigit() else None
 )
+
+
+class SpellPick:
+    """Tiny stand-in for app_commands.Choice so button casts share resolve code."""
+
+    __slots__ = ("name", "value")
+
+    def __init__(self, value: str):
+        self.value = value
+        self.name = SPELL_LABEL.get(value, value.title())
+
+
+class CastSpellButton(discord.ui.Button):
+    def __init__(self, spell_value: str):
+        label = SPELL_LABEL.get(spell_value, spell_value.title())
+        super().__init__(label=label, style=discord.ButtonStyle.secondary, custom_id=f"cast:{spell_value}")
+        self.spell_value = spell_value
+
+    async def callback(self, interaction: discord.Interaction):
+        view: CastSpellView = self.view  # type: ignore[assignment]
+        if interaction.user.id != view.owner_id:
+            await interaction.response.send_message("Those aren't your spells.", ephemeral=True)
+            return
+        view.stop()
+        for item in view.children:
+            item.disabled = True
+        try:
+            await interaction.message.edit(view=view)
+        except discord.DiscordException:
+            pass
+        await view.cog.resolve_cast(interaction, SpellPick(self.spell_value))
+
+
+class CastSpellView(discord.ui.View):
+    def __init__(self, cog: "Dementors", owner_id: int):
+        super().__init__(timeout=45)
+        self.cog = cog
+        self.owner_id = owner_id
+        for value in SPELL_ORDER:
+            self.add_item(CastSpellButton(value))
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
 
 
 def _article(word: str) -> str:
@@ -332,7 +374,7 @@ class Dementors(commands.Cog):
         c = CREATURES[creature_id]
         desc = self.rng.choice(c["arrivals"])
         if creature_id == "dementor":
-            desc += "\n\nOnly a cast patronus can drive it out - `/cast spell:Patronus`."
+            desc += "\n\nOnly a cast patronus can drive it out — `/cast`, then tap **Patronus**."
         if finder_id and exclusive_until and time.time() < exclusive_until:
             desc += (f"\n\n⏳ <@{finder_id}> stirred it up — they have until "
                      f"<t:{int(exclusive_until)}:R> to `/cast` first. "
@@ -500,12 +542,11 @@ class Dementors(commands.Cog):
             return CREATURES.get(active.get("creature"))
         return None
 
-    def _auto_spell_for(self, channel_id: int) -> app_commands.Choice[str] | None:
+    def _auto_spell_for(self, channel_id: int) -> SpellPick | None:
         creature = self._creature_in_channel(channel_id)
         if not creature:
             return None
-        weak = creature["weak"]
-        return app_commands.Choice(name=SPELL_LABEL.get(weak, weak.title()), value=weak)
+        return SpellPick(creature["weak"])
 
     def _can_auto_cast(self, user_id: int) -> bool:
         return CAST_AUTO_USER_ID is not None and user_id == CAST_AUTO_USER_ID
@@ -523,36 +564,42 @@ class Dementors(commands.Cog):
         return "The air here feels perfectly normal. Nothing to banish."
 
     @app_commands.command(name="cast", description="Cast a spell at whatever's in this channel.")
-    @app_commands.describe(spell="Which spell to cast (optional — some users auto-pick)")
-    @app_commands.choices(spell=CAST_CHOICES)
-    async def cast(
-        self,
-        interaction: discord.Interaction,
-        spell: app_commands.Choice[str] | None = None,
-    ):
+    async def cast(self, interaction: discord.Interaction):
+        """Spell is chosen via ephemeral buttons."""
         hexes = self.bot.get_cog("Hexes")
         if hexes and await hexes.deny_if_limp_wand(interaction):
             return
 
-        if spell is None and not self._can_auto_cast(interaction.user.id):
+        channel_id = interaction.channel_id
+        if self._can_auto_cast(interaction.user.id):
+            spell = self._auto_spell_for(channel_id)
+            if spell is None:
+                await interaction.response.send_message(
+                    self._nothing_here_message(channel_id),
+                    ephemeral=True,
+                )
+                return
+            await self.resolve_cast(interaction, spell)
+            return
+
+        if self._creature_in_channel(channel_id) is None:
             await interaction.response.send_message(
-                "Pick which spell to cast — the choices are on the command.",
+                self._nothing_here_message(channel_id),
                 ephemeral=True,
             )
             return
 
+        await interaction.response.send_message(
+            "Which spell?",
+            view=CastSpellView(self, interaction.user.id),
+            ephemeral=True,
+        )
+
+    async def resolve_cast(self, interaction: discord.Interaction, spell: SpellPick):
+        """Resolve a cast once the spell is known (auto-pick or button)."""
         event_reply = None
         async with self.lock:
             channel_id = interaction.channel_id
-            if spell is None:
-                spell = self._auto_spell_for(channel_id)
-                if spell is None:
-                    await interaction.response.send_message(
-                        self._nothing_here_message(channel_id),
-                        ephemeral=True,
-                    )
-                    return
-
             event = self.state.get("event")
             key = str(self._as_channel_id(channel_id) or channel_id)
             if event and key in event.get("channels", {}):
