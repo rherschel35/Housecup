@@ -295,7 +295,7 @@ TRIO_TITLE_TIERS = [         # (trio wins, title) - highest first
 
 GRAND_MIN_WINS = 50          # 1v1 wins required on both sides
 GRAND_SLOTS = 10
-GRAND_TO_WIN = 6             # first to 6 of 10 (or sudden death after 5–5)
+GRAND_TO_WIN = 6             # first to 6 of 10 (or sudden death on any tie after 10)
 GRAND_REWARD_POINTS = 2
 GRAND_REWARDED_PER_DAY = 3
 GRAND_PLAY_DELAY = 5         # seconds between announced rounds
@@ -493,6 +493,12 @@ class Duels(commands.Cog):
         if timer is not None:
             try:
                 timer.cancel()
+            except Exception:
+                pass
+        seq_task = getattr(match, "_sequence_task", None)
+        if seq_task is not None and not seq_task.done():
+            try:
+                seq_task.cancel()
             except Exception:
                 pass
         for attr in ("a", "b"):
@@ -2615,6 +2621,7 @@ class GrandDuel:
         self.lock = asyncio.Lock()
         self.publish_lock = asyncio.Lock()
         self._timer = None
+        self._sequence_task: asyncio.Task | None = None
         self.board_gen = 0
         self.private_boards: dict[int, discord.Message] = {}
         self.opened: set[int] = set()
@@ -2624,7 +2631,7 @@ class GrandDuel:
         desc = (
             f"**{self.a.display_name}** challenges **{self.b.display_name}** to a Grand Duel.\n\n"
             f"Both lock a blind sequence of **{GRAND_SLOTS}** spells. First to **{GRAND_TO_WIN}** "
-            f"round wins. Same spell = neither scores. A 5–5 goes to live sudden death."
+            f"round wins. Same spell = neither scores. A tie after 10 goes to live sudden death."
         )
         if self.rival_line:
             desc += f"\n\n⚔️ {self.rival_line}"
@@ -2807,14 +2814,49 @@ class GrandDuel:
         if len(self.locked) < 2:
             await self._update(view=GrandLockPromptView(self))
             return
+        # Only one sequence playback — both submit callbacks can race here.
+        if self.state == "playing" or (
+            self._sequence_task is not None and not self._sequence_task.done()
+        ):
+            return
         self.state = "playing"
         if self._timer:
             self._timer.cancel()
             self._timer = None
         await self._update(view=None, footer="Sequences locked. The Circle begins…")
-        asyncio.create_task(self._play_sequence())
+        # Keep a strong reference — the loop only weakly refs tasks; without
+        # this, GC can cancel mid-playback and skip sudden death after a tie.
+        self._sequence_task = asyncio.create_task(
+            self._play_sequence(),
+            name=f"grand-sequence-{self.a.id}-{self.b.id}",
+        )
 
     async def _play_sequence(self):
+        try:
+            await self._play_sequence_inner()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception(
+                "Grand Duel sequence crashed (%s vs %s)",
+                self.a.id, self.b.id,
+            )
+            try:
+                async with self.lock:
+                    if self.state not in ("done", "sudden"):
+                        self.cog.release_match(self)
+                        snap = self._snapshot(
+                            view=None,
+                            footer="The Grand sequence broke — duel dissolved. Call /grand again.",
+                        )
+                    else:
+                        snap = None
+                if snap:
+                    await self._publish(*snap)
+            except Exception:
+                log.exception("Could not recover Grand Duel after sequence crash.")
+
+    async def _play_sequence_inner(self):
         seq_a = self.sequences[self.a.id]
         seq_b = self.sequences[self.b.id]
         for i in range(GRAND_SLOTS):
@@ -2861,12 +2903,15 @@ class GrandDuel:
             elif a_s == b_s:
                 self.state = "sudden"
                 self.sudden_picks = {}
-                self.history.append("**5–5.** Sudden death. One spell each, until someone lands a hit.")
+                self.history.append(
+                    f"**{a_s}–{b_s}.** Sudden death. One spell each, until someone lands a hit."
+                )
                 # Fresh private boards for sudden death (sequence boards are done).
                 self.private_boards = {}
                 self.opened = set()
+                sudden_view = OpenGrandSuddenBoardView(self)
                 sudden = self._snapshot(
-                    view=OpenGrandSuddenBoardView(self),
+                    view=sudden_view,
                     footer="Sudden death — Open my cast board (again if dismissed).",
                 )
                 arm_sudden = self.round
@@ -2876,8 +2921,31 @@ class GrandDuel:
                 finish = (self.b, self.a)
         if finish:
             await self._finish(finish[0], finish[1])
-        elif sudden:
+            return
+        if sudden:
             await self._publish(*sudden)
+            # Belt-and-suspenders: if the board edit was dropped, post a fresh one.
+            if self.state == "sudden" and self.channel is not None:
+                embed, view, _, _ = sudden
+                try:
+                    if self.message is not None:
+                        await self.message.edit(content=None, embed=embed, view=view)
+                    else:
+                        self.message = await self.channel.send(embed=embed, view=view)
+                except discord.DiscordException:
+                    log.exception("Grand sudden-death board edit failed; posting fallback.")
+                    try:
+                        self.message = await self.channel.send(embed=embed, view=view)
+                    except discord.DiscordException:
+                        log.exception("Could not post fallback Grand sudden-death board.")
+                try:
+                    await self.channel.send(
+                        f"⚡ **Sudden death!** "
+                        f"**{self.a.display_name}** vs **{self.b.display_name}** — "
+                        f"open your cast board on the Grand Duel message."
+                    )
+                except discord.DiscordException:
+                    log.exception("Could not announce Grand sudden death.")
             self._arm(self._sudden_timeout(arm_sudden))
 
     async def _sudden_timeout(self, marker: int):
