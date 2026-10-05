@@ -34,6 +34,9 @@ DEV_GUILD_ID = os.getenv("DEV_GUILD_ID")  # optional: instant command sync while
 # tree actually changed. Set FORCE_COMMAND_SYNC=1 to push anyway.
 FORCE_COMMAND_SYNC = os.getenv("FORCE_COMMAND_SYNC", "").strip() in ("1", "true", "True", "yes")
 SYNC_TIMEOUT_SECONDS = int(os.getenv("COMMAND_SYNC_TIMEOUT", "45"))
+# Bump when sync *behavior* changes (e.g. also overwrite guild commands) so
+# the next boot re-PUTs even if the slash tree fingerprint is unchanged.
+COMMAND_SYNC_REVISION = 2
 # Chess & checkers load by default. Set ENABLE_BOARD_GAMES=0 to unload them.
 _ENABLE_BOARD_GAMES_RAW = os.getenv("ENABLE_BOARD_GAMES", "1").strip().lower()
 ENABLE_BOARD_GAMES = _ENABLE_BOARD_GAMES_RAW not in ("0", "false", "no", "off", "")
@@ -133,6 +136,7 @@ def _command_payload() -> list:
 def _fingerprint(mode: str, targets: set[int]) -> str:
     blob = json.dumps(
         {
+            "revision": COMMAND_SYNC_REVISION,
             "mode": mode,
             "targets": sorted(targets),
             "commands": _command_payload(),
