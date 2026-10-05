@@ -430,19 +430,16 @@ def practice_statup_chance(current_floor: int, practiced_floor: int) -> float:
 
 
 def stamp_owner(embed: discord.Embed, member: discord.Member) -> discord.Embed:
-    """Mark whose Descent board/result this is (shared channels get busy)."""
+    """Mark whose Descent board/result this is (shared channels get busy).
+
+    Name + avatar only — no @mention, so busy channels don't ping every round.
+    """
     icon = None
     try:
         icon = member.display_avatar.url
     except Exception:
         icon = None
     embed.set_author(name=f"{member.display_name}'s Descent", icon_url=icon)
-    owned = f"For {member.mention}"
-    if embed.description:
-        if owned not in embed.description:
-            embed.description = f"{owned}\n{embed.description}"
-    else:
-        embed.description = owned
     return embed
 
 
