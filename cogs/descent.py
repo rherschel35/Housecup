@@ -994,25 +994,29 @@ class Descent(commands.Cog):
         await self._post_fight_board(interaction, fight, followup=followup)
 
     async def _try_auto_continue(self, interaction: discord.Interaction) -> bool:
-        """If auto-play is on, start the next fight. Returns True when a fight was posted."""
+        """If auto-play is on, start the next fight. Returns True when a fight was posted.
+
+        Practice auto ignores the real-floor 24h lockout (same as `/descend floor:`).
+        """
         uid = interaction.user.id
         if not self.is_auto(uid) or uid in self.fights:
             return False
         rec = self.record(uid)
         if pending_statup_picks(rec) > 0:
             return False
-        now = time.time()
-        if rec["locked_until"] > now:
+        practice_floor = self.auto_practice_floor.get(uid)
+        # Real-floor lockout only blocks real auto — practice on cleared floors still runs.
+        if practice_floor is None and rec["locked_until"] > time.time():
             self.stop_auto(uid)
             try:
                 await interaction.followup.send(
-                    "⏹️ Auto-play stopped — floor lockout is active.",
+                    "⏹️ Auto-play stopped — floor lockout is active. "
+                    "Practice a cleared floor with `/descend floor:n auto:True` while you wait.",
                     ephemeral=True,
                 )
             except discord.DiscordException:
                 pass
             return False
-        practice_floor = self.auto_practice_floor.get(uid)
         try:
             if practice_floor is not None:
                 await self._start_practice_fight(
