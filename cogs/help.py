@@ -88,7 +88,7 @@ HELP = {
                  "One castle per player — abandon before attacking another."),
         "entries": [
             ("castles", "Map board: owners, perks, reinforce anytime (not mid-assault), siege, abandon."),
-            ("army", "Full paged roster (up to 5000) + sacrifice 500 → ATK/DEF (castles + Descent channels). Uncapped daily binds until PvP goes live."),
+            ("army", "Full paged roster + sacrifice 500 → ATK/DEF (castles + Descent channels). Size (5000) and daily bind caps start when PvP goes live."),
         ],
     },
     "potions": {
