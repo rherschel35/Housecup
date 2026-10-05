@@ -67,12 +67,14 @@ SACRIFICE_PCT_BANDS = (
 LEGACY_STEP_PCT = 5.0  # old flat ladder was +5% per 500-sacrifice step
 WALL_DEF_MULT = 1.55    # matching wall-type troops
 BOSS_WALL_DEF_MULT = 1.75  # Bannerhall boss wall
-# Assaults are bloody for the march, softer on the walls. Attackers still deal
-# damage = power into an empty-field trade, but garrison damage is scaled by
-# attacker power share so a losing/near-even defense doesn't gut the keep.
-ASSAULT_GARRISON_DAMAGE_FRAC = 0.28
-# Hard cap on defender headcount lost per clash unless the walls are cleared.
+# Assaults are bloody for the march, softer on the walls.
+ASSAULT_GARRISON_DAMAGE_FRAC = 0.55
+# March takes amplified counter-strikes — charging a keep is costly.
+SIEGE_COUNTER_MULT = 6.0
+# Hard cap on defender headcount lost per clash while the defender leads on strike.
 ASSAULT_MAX_DEF_LOSS_FRAC = 0.35
+# Average DEF this high cuts incoming army damage roughly in half.
+ARMY_DEF_MITIGATION_K = 250.0
 
 DAILY_RECRUIT_CAP = 200
 ARMY_CAP = 5000  # total monsters (home + garrison + march) — only while PvP is live
@@ -91,6 +93,214 @@ ELEMENT_EMOJI = {
     "light": "✨",
 }
 
+
+def unit_hp(unit: dict) -> int:
+    return max(1, int(unit.get("hp") or 1))
+
+
+def unit_atk(unit: dict, *, atk_pct: float = 0.0) -> float:
+    return max(1.0, float(unit.get("atk") or 1)) * (1.0 + float(atk_pct) / 100.0)
+
+
+def unit_def(
+    unit: dict,
+    *,
+    def_pct: float = 0.0,
+    wall: str = "",
+    defending: bool = False,
+) -> float:
+    d = max(1.0, float(unit.get("def") or 1)) * (1.0 + float(def_pct) / 100.0)
+    if defending:
+        el = (unit.get("element") or "").lower()
+        if wall == "boss" and unit.get("boss"):
+            d *= BOSS_WALL_DEF_MULT
+        elif wall and wall != "boss" and el == wall:
+            d *= WALL_DEF_MULT
+    return d
+
+
+def force_sum_atk(units: list[dict], *, atk_pct: float = 0.0) -> float:
+    return sum(unit_atk(u, atk_pct=atk_pct) for u in units)
+
+
+def force_avg_def(
+    units: list[dict],
+    *,
+    def_pct: float = 0.0,
+    wall: str = "",
+    defending: bool = False,
+) -> float:
+    if not units:
+        return 1.0
+    return sum(
+        unit_def(u, def_pct=def_pct, wall=wall, defending=defending) for u in units
+    ) / len(units)
+
+
+def force_sum_hp(units: list[dict]) -> int:
+    return sum(unit_hp(u) for u in units)
+
+
+def army_mitigate(attack: float, armor: float) -> float:
+    """ATK through average DEF — same shape as Descent mitigate, no RNG here."""
+    armor = max(0.0, float(armor))
+    reduction = armor / (armor + ARMY_DEF_MITIGATION_K)
+    return max(0.0, float(attack) * (1.0 - reduction))
+
+
+def force_floor_summary(units: list[dict]) -> str:
+    """Descent floor range for a force — shown on battle reports."""
+    floors = [int(u.get("floor") or 0) for u in units if int(u.get("floor") or 0) > 0]
+    if not floors:
+        return "— (no floor data)"
+    lo, hi = min(floors), max(floors)
+    avg = sum(floors) / len(floors)
+    if lo == hi:
+        return f"floor **{lo}** ({len(floors)} troops)"
+    return f"floors **{lo}–{hi}** (avg {avg:.0f}, {len(floors)} troops)"
+
+
+def force_stat_summary(
+    units: list[dict],
+    *,
+    atk_pct: float = 0.0,
+    def_pct: float = 0.0,
+    wall: str = "",
+    defending: bool = False,
+) -> str:
+    """Compact ATK (total) · DEF (avg) · HP (total) for battle reports."""
+    if not units:
+        return "ATK **0** · DEF **0** · HP **0**"
+    atk = int(round(force_sum_atk(units, atk_pct=atk_pct)))
+    deff = int(round(force_avg_def(units, def_pct=def_pct, wall=wall, defending=defending)))
+    hp = force_sum_hp(units)
+    return f"ATK **{atk:,}** · DEF **{deff:,}** · HP **{hp:,}**"
+
+
+def _kill_by_hp(units: list[dict], damage: float) -> tuple[list[dict], list[dict]]:
+    """Spend damage on weakest HP first. Each unit soaks its own HP."""
+    if not units or damage <= 0:
+        return [], [dict(u) for u in units]
+
+    copies = [dict(u) for u in units]
+    order = sorted(range(len(copies)), key=lambda i: unit_hp(copies[i]))
+    killed_idx: set[int] = set()
+    rem = float(damage)
+    for i in order:
+        soak = float(unit_hp(copies[i]))
+        if rem + 1e-9 >= soak:
+            rem -= soak
+            killed_idx.add(i)
+        else:
+            break
+    killed = [copies[i] for i in range(len(copies)) if i in killed_idx]
+    remaining = [copies[i] for i in range(len(copies)) if i not in killed_idx]
+    return killed, remaining
+
+
+def sim_clash(
+    attackers: list[dict],
+    defenders: list[dict],
+    *,
+    wall: str,
+    atk_pct: float,
+    def_pct: float,
+    rng: random.Random,
+    def_atk_pct: float = 0.0,
+) -> dict:
+    """One siege clash using each unit's HP / ATK / DEF (from Descent floor).
+
+    - Strike = sum of ATK (attackers use sacrifice ATK%; defenders use theirs too)
+    - Armor = average DEF (wall-element match boosts defending armor)
+    - Damage = strike mitigated by enemy armor, then spent on HP (weakest first)
+    - Walls take a share-scaled slice of that damage so winning defenses aren't gutted
+    """
+    att = [dict(u) for u in attackers]
+    deff = [dict(u) for u in defenders]
+
+    # No one left to fight — do not touch the garrison.
+    if not att:
+        return {
+            "att_deployed": 0,
+            "def_deployed": len(deff),
+            "att_killed": [],
+            "def_killed": [],
+            "att_remaining": [],
+            "def_remaining": deff,
+            "cleared": False,
+            "att_power": 0,
+            "def_power": int(round(force_sum_atk(deff, atk_pct=def_atk_pct))),
+            "att_floors": force_floor_summary([]),
+            "def_floors": force_floor_summary(deff),
+            "att_stats": force_stat_summary([], defending=False),
+            "def_stats": force_stat_summary(
+                deff, atk_pct=def_atk_pct, def_pct=def_pct, wall=wall, defending=True
+            ),
+            "empty_attack": True,
+        }
+
+    if not deff:
+        return {
+            "att_deployed": len(att),
+            "def_deployed": 0,
+            "att_killed": [],
+            "def_killed": [],
+            "att_remaining": att,
+            "def_remaining": [],
+            "cleared": True,
+            "att_power": int(round(force_sum_atk(att, atk_pct=atk_pct))),
+            "def_power": 0,
+            "att_floors": force_floor_summary(att),
+            "def_floors": force_floor_summary([]),
+            "att_stats": force_stat_summary(att, atk_pct=atk_pct, defending=False),
+            "def_stats": force_stat_summary([], defending=True),
+        }
+
+    att_strike = force_sum_atk(att, atk_pct=atk_pct)
+    def_strike = force_sum_atk(deff, atk_pct=def_atk_pct)
+    att_armor = force_avg_def(att, def_pct=0.0, wall=wall, defending=False)
+    def_armor = force_avg_def(deff, def_pct=def_pct, wall=wall, defending=True)
+
+    # Light noise so identical armies aren't deterministic forever.
+    att_strike *= rng.uniform(0.92, 1.08)
+    def_strike *= rng.uniform(0.92, 1.08)
+
+    raw_to_walls = army_mitigate(att_strike, def_armor)
+    raw_to_march = army_mitigate(def_strike, att_armor) * SIEGE_COUNTER_MULT
+
+    # Walls take a fraction of mitigated strike; share softens underdog marches further.
+    total_strike = max(att_strike + def_strike, 1.0)
+    att_share = att_strike / total_strike
+    att_damage = raw_to_walls * ASSAULT_GARRISON_DAMAGE_FRAC * (0.35 + 0.65 * att_share)
+    def_damage = raw_to_march
+
+    def_killed, def_rem = _kill_by_hp(deff, att_damage)
+    if def_rem and def_killed and att_strike < def_strike:
+        max_loss = max(1, int(len(deff) * ASSAULT_MAX_DEF_LOSS_FRAC))
+        if len(def_killed) > max_loss:
+            overflow = def_killed[max_loss:]
+            def_killed = def_killed[:max_loss]
+            def_rem = overflow + def_rem
+
+    att_killed, att_rem = _kill_by_hp(att, def_damage)
+    cleared = len(def_rem) == 0
+    return {
+        "att_deployed": len(att),
+        "def_deployed": len(deff),
+        "att_killed": att_killed,
+        "def_killed": def_killed,
+        "att_remaining": att_rem,
+        "def_remaining": def_rem,
+        "cleared": cleared,
+        "att_power": int(round(att_strike)),
+        "def_power": int(round(def_strike)),
+        "att_floors": force_floor_summary(att),
+        "def_floors": force_floor_summary(deff),
+        "att_stats": force_stat_summary(att, atk_pct=atk_pct, defending=False),
+        "def_stats": force_stat_summary(
+            deff, atk_pct=def_atk_pct, def_pct=def_pct, wall=wall, defending=True
+        ),
+    }
 
 CASTLES: dict[str, dict] = {
     "deadlock_keep": {
@@ -230,174 +440,6 @@ def format_bonus_pct(pct: float) -> str:
     if not text.startswith("-"):
         text = "+" + text
     return text + "%"
-
-
-def unit_power(unit: dict, *, side: str, wall: str, atk_pct: float, def_pct: float) -> float:
-    hp = max(1, int(unit.get("hp") or 1))
-    atk = max(1, int(unit.get("atk") or 1))
-    deff = max(1, int(unit.get("def") or 1))
-    base = hp * 0.12 + (atk if side == "attack" else deff)
-    if side == "attack":
-        return base * (1.0 + float(atk_pct) / 100.0)
-    mult = 1.0 + float(def_pct) / 100.0
-    el = (unit.get("element") or "").lower()
-    if wall == "boss" and unit.get("boss"):
-        mult *= BOSS_WALL_DEF_MULT
-    elif wall != "boss" and el == wall:
-        mult *= WALL_DEF_MULT
-    return base * mult
-
-
-def force_floor_summary(units: list[dict]) -> str:
-    """Descent floor range for a force — shown on battle reports."""
-    floors = [int(u.get("floor") or 0) for u in units if int(u.get("floor") or 0) > 0]
-    if not floors:
-        return "— (no floor data)"
-    lo, hi = min(floors), max(floors)
-    avg = sum(floors) / len(floors)
-    if lo == hi:
-        return f"floor **{lo}** ({len(floors)} troops)"
-    return f"floors **{lo}–{hi}** (avg {avg:.0f}, {len(floors)} troops)"
-
-
-def _kill_by_damage(
-    units: list[dict],
-    damage: float,
-    *,
-    side: str,
-    wall: str,
-    atk_pct: float,
-    def_pct: float,
-) -> tuple[list[dict], list[dict]]:
-    """Spend damage on weakest units first (soak = that unit's combat power)."""
-    if not units or damage <= 0:
-        return [], [dict(u) for u in units]
-
-    copies = [dict(u) for u in units]
-    order = sorted(
-        range(len(copies)),
-        key=lambda i: unit_power(
-            copies[i], side=side, wall=wall, atk_pct=atk_pct, def_pct=def_pct
-        ),
-    )
-    killed_idx: set[int] = set()
-    rem = float(damage)
-    for i in order:
-        soak = max(
-            1.0,
-            unit_power(copies[i], side=side, wall=wall, atk_pct=atk_pct, def_pct=def_pct),
-        )
-        if rem + 1e-9 >= soak:
-            rem -= soak
-            killed_idx.add(i)
-        else:
-            break
-    killed = [copies[i] for i in range(len(copies)) if i in killed_idx]
-    remaining = [copies[i] for i in range(len(copies)) if i not in killed_idx]
-    return killed, remaining
-
-
-def sim_clash(
-    attackers: list[dict],
-    defenders: list[dict],
-    *,
-    wall: str,
-    atk_pct: float,
-    def_pct: float,
-    rng: random.Random,
-) -> dict:
-    """One siege clash. Attackers take full garrison power; walls take a share-scaled
-    slice so a winning defense is not gutted by a near-even or weaker march.
-
-    Empty attackers deal no damage. Damage soak uses unit power (weakest first).
-    """
-    att = [dict(u) for u in attackers]
-    deff = [dict(u) for u in defenders]
-
-    # No one left to fight — do not touch the garrison.
-    if not att:
-        def_power = sum(
-            unit_power(u, side="defend", wall=wall, atk_pct=atk_pct, def_pct=def_pct)
-            for u in deff
-        )
-        return {
-            "att_deployed": 0,
-            "def_deployed": len(deff),
-            "att_killed": [],
-            "def_killed": [],
-            "att_remaining": [],
-            "def_remaining": deff,
-            "cleared": False,
-            "att_power": 0,
-            "def_power": int(def_power),
-            "att_floors": force_floor_summary([]),
-            "def_floors": force_floor_summary(deff),
-            "empty_attack": True,
-        }
-
-    if not deff:
-        return {
-            "att_deployed": len(att),
-            "def_deployed": 0,
-            "att_killed": [],
-            "def_killed": [],
-            "att_remaining": att,
-            "def_remaining": [],
-            "cleared": True,
-            "att_power": 0,
-            "def_power": 0,
-            "att_floors": force_floor_summary(att),
-            "def_floors": force_floor_summary([]),
-        }
-
-    att_power = sum(
-        unit_power(u, side="attack", wall=wall, atk_pct=atk_pct, def_pct=def_pct) for u in att
-    )
-    def_power = sum(
-        unit_power(u, side="defend", wall=wall, atk_pct=atk_pct, def_pct=def_pct) for u in deff
-    )
-    # Light noise so identical armies aren't deterministic forever.
-    att_power *= rng.uniform(0.92, 1.08)
-    def_power *= rng.uniform(0.92, 1.08)
-
-    total_power = max(att_power + def_power, 1.0)
-    att_share = att_power / total_power
-
-    # Walls: only a slice of attacker power, further cut by how outmatched they are.
-    # Example: 20% share × 0.28 ≈ 5.6% of att_power hits the garrison.
-    att_damage = att_power * ASSAULT_GARRISON_DAMAGE_FRAC * att_share
-    # March: full garrison power — sieges stay costly for attackers.
-    def_damage = def_power
-
-    def_killed, def_rem = _kill_by_damage(
-        deff, att_damage, side="defend", wall=wall, atk_pct=atk_pct, def_pct=def_pct
-    )
-    # Cap garrison losses only when the defender is ahead on power. A stronger
-    # march must still be able to chew through (and clear) weaker walls.
-    if def_rem and def_killed and att_power < def_power:
-        max_loss = max(1, int(len(deff) * ASSAULT_MAX_DEF_LOSS_FRAC))
-        if len(def_killed) > max_loss:
-            overflow = def_killed[max_loss:]
-            def_killed = def_killed[:max_loss]
-            def_rem = overflow + def_rem
-
-    att_killed, att_rem = _kill_by_damage(
-        att, def_damage, side="attack", wall=wall, atk_pct=atk_pct, def_pct=def_pct
-    )
-    cleared = len(def_rem) == 0
-    return {
-        "att_deployed": len(att),
-        "def_deployed": len(deff),
-        "att_killed": att_killed,
-        "def_killed": def_killed,
-        "att_remaining": att_rem,
-        "def_remaining": def_rem,
-        "cleared": cleared,
-        "att_power": int(att_power),
-        "def_power": int(def_power),
-        "att_floors": force_floor_summary(att),
-        "def_floors": force_floor_summary(deff),
-    }
 
 
 def pick_force(army: list[dict], *, regular_cap: int, boss_cap: int, type_cap: Optional[int]) -> list[dict]:
@@ -940,8 +982,8 @@ class Castles(commands.Cog):
                 f"Deployed: **{report['att_deployed']}**\n"
                 f"Lost: **{att_lost}**\n"
                 f"Remaining: **{att_rem}**\n"
-                f"Power: {report.get('att_power', '—')}\n"
-                f"Levels: {report.get('att_floors') or force_floor_summary(report.get('att_killed', []) + report.get('att_remaining', []))}"
+                f"Levels: {report.get('att_floors') or force_floor_summary(report.get('att_killed', []) + report.get('att_remaining', []))}\n"
+                f"{report.get('att_stats') or 'ATK **—** · DEF **—** · HP **—'}"
             ),
         )
         embed.add_field(
@@ -950,8 +992,8 @@ class Castles(commands.Cog):
                 f"Deployed: **{report['def_deployed']}**\n"
                 f"Lost: **{def_lost}**\n"
                 f"Remaining: **{def_rem}**\n"
-                f"Power: {report.get('def_power', '—')}\n"
-                f"Levels: {report.get('def_floors') or force_floor_summary(report.get('def_killed', []) + report.get('def_remaining', []))}"
+                f"Levels: {report.get('def_floors') or force_floor_summary(report.get('def_killed', []) + report.get('def_remaining', []))}\n"
+                f"{report.get('def_stats') or 'ATK **—** · DEF **—** · HP **—'}"
             ),
         )
         if report.get("cleared"):
@@ -1275,6 +1317,7 @@ class Castles(commands.Cog):
             wall=meta["wall"],
             atk_pct=self.army_atk_pct(attacker_id),
             def_pct=self.army_def_pct(owner_id) if owner_id else 0.0,
+            def_atk_pct=self.army_atk_pct(owner_id) if owner_id else 0.0,
             rng=self.rng,
         )
         self.apply_clash_deaths(key, report)
