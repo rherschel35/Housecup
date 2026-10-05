@@ -69,7 +69,7 @@ WALL_DEF_MULT = 1.55    # matching wall-type troops
 BOSS_WALL_DEF_MULT = 1.75  # Bannerhall boss wall
 
 DAILY_RECRUIT_CAP = 200
-ARMY_CAP = 5000  # total monsters you may hold (home + garrison + march)
+ARMY_CAP = 5000  # total monsters (home + garrison + march) — only while PvP is live
 ARMY_PAGE_SIZE = 12  # units listed per /army page
 SUNDAY_CASTLE_POINTS = 50
 BANNERHALL_PER_CASTLE = 30
@@ -518,14 +518,14 @@ class Castles(commands.Cog):
     def recruit_allowed(self, user_id: int, n: int = 1) -> int:
         """How many of n recruits may join (0 if size or daily capped).
 
-        Army size cap (ARMY_CAP) always applies. Daily 200 only while PvP is live;
-        pre-season every Descent win binds until the army is full.
+        Pre-season (`pvp_live` False): no size cap and no daily cap — every
+        Descent win binds. Once PvP is live: ARMY_CAP total + 200/day.
         """
+        if not self.is_pvp_live():
+            return n
         room = max(0, ARMY_CAP - self.army_owned_count(user_id))
         if room <= 0:
             return 0
-        if not self.is_pvp_live():
-            return min(n, room)
         prec = self.prec(user_id)
         day = chicago_day()
         if prec.get("recruit_day") != day:
@@ -1019,17 +1019,18 @@ class Castles(commands.Cog):
         home = len(army)
         away = owned - home
         away_bit = f" · {away} on walls/march" if away else ""
+        if self.is_pvp_live():
+            size_line = f"**{owned}/{ARMY_CAP}** bound ({bosses} bosses at home{away_bit})"
+            recruit_line = f"Recruit today: **{recruits}/{DAILY_RECRUIT_CAP}**\n"
+        else:
+            size_line = f"**{owned}** bound ({bosses} bosses at home{away_bit})"
+            recruit_line = "Recruit: **uncapped** (PvP not live yet — no size or daily cap)\n"
         embed = discord.Embed(
             title=f"⚔️ {member.display_name}'s Army",
             description=(
-                f"**{owned}/{ARMY_CAP}** bound ({bosses} bosses at home{away_bit}) · "
-                f"Castle: **{held_txt}**\n"
+                f"{size_line} · Castle: **{held_txt}**\n"
                 f"Home roster: **{home}** · "
-                + (
-                    f"Recruit today: **uncapped** (PvP not live yet)\n"
-                    if not self.is_pvp_live()
-                    else f"Recruit today: **{recruits}/{DAILY_RECRUIT_CAP}**\n"
-                )
+                + recruit_line
                 + (
                     f"Sacrifice bonuses: ATK **{format_bonus_pct(atk_pct)}** · "
                     f"DEF **{format_bonus_pct(def_pct)}** "
