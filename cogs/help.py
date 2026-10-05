@@ -68,9 +68,10 @@ HELP = {
         "staff": False,
         "note": ("Solo 100-floor dungeon — only in Descent channels. "
                  "Practice cleared floors with `/descend floor:n` for loot; nearby floors can sharpen a free stat pick. "
+                 "`/descend auto:True` posts the next monster after each win. "
                  "Wins bind monsters into your army for castle sieges."),
         "entries": [
-            ("descend", "Fight the next monster on your floor (or resume an open fight)."),
+            ("descend", "Fight the next monster (or resume). Use auto:True to chain wins without retyping."),
             ("descentstatus", "Your floor, monster progress, stats, Max AP, and lockout."),
         ],
     },

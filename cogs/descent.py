@@ -2,6 +2,7 @@
 The Descent - a 100-floor solo dungeon crawl.
 
     /descend             - fight the next monster on your current Descent floor
+    /descend auto:True   - keep posting the next monster after each win
     /descend floor:<n>   - replay a floor you've already cleared, for practice/loot
     /descentstatus        - your floor, stats, AP, and lockout status
     /staff descent unlock - clear the 3-loss lockout without wiping progress
@@ -497,6 +498,7 @@ class Fight:
         self.revive_available = False
         self.message: Optional[discord.Message] = None
         self.oneshot_message: Optional[discord.Message] = None
+        self.auto = False  # chain into the next monster after a win
 
     def embed(self, member: discord.Member) -> discord.Embed:
         title = f"{self.emoji} Floor {self.floor} — {self.name}"
@@ -504,10 +506,16 @@ class Fight:
             title += " (Boss)"
         elif self.is_practice:
             title += " (Practice)"
+        desc = (
+            f"Monster {self.monster_index}/{MONSTERS_PER_FLOOR}"
+            if not self.is_practice
+            else "Practice fight — no floor progress at stake"
+        )
+        if self.auto:
+            desc += "\n⚡ Auto-play on — next monster posts after a win."
         e = discord.Embed(
             title=title,
-            description=f"Monster {self.monster_index}/{MONSTERS_PER_FLOOR}" if not self.is_practice
-                        else "Practice fight — no floor progress at stake",
+            description=desc,
             color=0x8B5FBF if not self.is_boss else 0xE0A526,
         )
         e.set_image(url="attachment://monster.png")
@@ -636,6 +644,42 @@ class OneShotView(discord.ui.View):
         self.add_item(OneShotButton())
 
 
+class StopAutoButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(
+            label="Stop Auto",
+            emoji="⏹️",
+            style=discord.ButtonStyle.danger,
+            row=2,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.view.owner_id:
+            await interaction.response.send_message(
+                "That's not your fight - use `/descend` to start your own.",
+                ephemeral=True,
+            )
+            return
+        cog: Descent = self.view.cog
+        cog.stop_auto(interaction.user.id)
+        fight = cog.fights.get(interaction.user.id)
+        if fight is not None:
+            fight.auto = False
+            await interaction.response.edit_message(
+                embed=fight.embed(interaction.user),
+                view=FightView(cog, fight),
+            )
+            await interaction.followup.send(
+                "⏹️ Auto-play stopped. Finish this fight, then `/descend` for the next.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.send_message(
+            "⏹️ Auto-play stopped.",
+            ephemeral=True,
+        )
+
+
 class FightView(discord.ui.View):
     def __init__(self, cog: "Descent", fight: Fight):
         super().__init__(timeout=600)
@@ -647,6 +691,8 @@ class FightView(discord.ui.View):
         self.add_item(HealButton(disabled=fight.ap < HEAL_AP_COST))
         self.add_item(DefendButton(disabled=fight.ap < DEFEND_AP_COST))
         self.add_item(RestButton(disabled=fight.ap >= fight.ap_max))
+        if fight.auto:
+            self.add_item(StopAutoButton())
 
 
 class StatButton(discord.ui.Button):
@@ -680,9 +726,25 @@ class Descent(commands.Cog):
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         self.state = self._load()
         self.fights: dict[int, Fight] = {}
+        # In-memory auto-play: after a win, post the next monster without /descend.
+        self.auto_play: set[int] = set()
+        self.auto_practice_floor: dict[int, int] = {}
 
     async def cog_load(self):
         self.bot.add_view(StatUpView(self))
+
+    def is_auto(self, user_id: int) -> bool:
+        return user_id in self.auto_play
+
+    def set_auto(self, user_id: int, enabled: bool) -> None:
+        if enabled:
+            self.auto_play.add(user_id)
+        else:
+            self.stop_auto(user_id)
+
+    def stop_auto(self, user_id: int) -> None:
+        self.auto_play.discard(user_id)
+        self.auto_practice_floor.pop(user_id, None)
 
     def _load(self) -> dict:
         if STATE_PATH.exists():
@@ -839,18 +901,29 @@ class Descent(commands.Cog):
             log.exception("Could not send Descent one-shot panel.")
 
     async def _post_fight_board(
-        self, interaction: discord.Interaction, fight: Fight
+        self,
+        interaction: discord.Interaction,
+        fight: Fight,
+        *,
+        followup: bool = False,
     ) -> None:
         file = await self._monster_file(fight)
-        await interaction.response.send_message(
-            embed=fight.embed(interaction.user),
-            view=FightView(self, fight),
-            file=file,
-        )
-        try:
-            fight.message = await interaction.original_response()
-        except discord.HTTPException:
-            fight.message = None
+        embed = fight.embed(interaction.user)
+        view = FightView(self, fight)
+        use_followup = followup or interaction.response.is_done()
+        if use_followup:
+            try:
+                msg = await interaction.followup.send(embed=embed, view=view, file=file)
+                fight.message = msg
+            except discord.DiscordException:
+                log.exception("Could not post Descent fight board via followup.")
+                fight.message = None
+        else:
+            await interaction.response.send_message(embed=embed, view=view, file=file)
+            try:
+                fight.message = await interaction.original_response()
+            except discord.HTTPException:
+                fight.message = None
         await self._offer_oneshot(interaction, fight)
 
     def _apply_prelude_bastion(self, fight: Fight, user_id: int) -> None:
@@ -859,7 +932,17 @@ class Descent(commands.Cog):
         if castles and castles.prelude_halves_monster_atk(user_id):
             fight.m_atk = max(1, int(fight.m_atk) // 2)
 
-    async def _start_fight(self, interaction: discord.Interaction, rec: dict):
+    def _arm_fight(self, fight: Fight) -> None:
+        fight.auto = self.is_auto(fight.user_id)
+        self.fights[fight.user_id] = fight
+
+    async def _start_fight(
+        self,
+        interaction: discord.Interaction,
+        rec: dict,
+        *,
+        followup: bool = False,
+    ):
         floor, idx = rec["floor"], rec["monster_index"]
         name, emoji, element, kind, weak, is_boss, m_hp, m_atk, m_def = self._make_monster(floor, idx)
         p_hp, p_atk, p_def = player_stats(rec)
@@ -867,17 +950,67 @@ class Descent(commands.Cog):
                       m_hp, m_atk, m_def, p_hp, p_atk, p_def, ap_max=rec["max_ap"])
         self._apply_potion_mods(fight, interaction.user.id, is_boss)
         self._apply_prelude_bastion(fight, interaction.user.id)
-        self.fights[interaction.user.id] = fight
-        await self._post_fight_board(interaction, fight)
+        # Real runs clear any practice auto target.
+        self.auto_practice_floor.pop(interaction.user.id, None)
+        self._arm_fight(fight)
+        await self._post_fight_board(interaction, fight, followup=followup)
 
-    async def _start_practice_fight(self, interaction: discord.Interaction, rec: dict, floor: int):
+    async def _start_practice_fight(
+        self,
+        interaction: discord.Interaction,
+        rec: dict,
+        floor: int,
+        *,
+        followup: bool = False,
+    ):
         name, emoji, element, kind, weak, is_boss, m_hp, m_atk, m_def = self._make_monster(floor, 1)
         p_hp, p_atk, p_def = player_stats(rec)
         fight = Fight(interaction.user.id, floor, 0, False, name, emoji, element, kind, weak,
                       m_hp, m_atk, m_def, p_hp, p_atk, p_def, ap_max=rec["max_ap"], is_practice=True)
         self._apply_prelude_bastion(fight, interaction.user.id)
-        self.fights[interaction.user.id] = fight
-        await self._post_fight_board(interaction, fight)
+        if self.is_auto(interaction.user.id):
+            self.auto_practice_floor[interaction.user.id] = floor
+        self._arm_fight(fight)
+        await self._post_fight_board(interaction, fight, followup=followup)
+
+    async def _try_auto_continue(self, interaction: discord.Interaction) -> bool:
+        """If auto-play is on, start the next fight. Returns True when a fight was posted."""
+        uid = interaction.user.id
+        if not self.is_auto(uid) or uid in self.fights:
+            return False
+        rec = self.record(uid)
+        if pending_statup_picks(rec) > 0:
+            return False
+        now = time.time()
+        if rec["locked_until"] > now:
+            self.stop_auto(uid)
+            try:
+                await interaction.followup.send(
+                    "⏹️ Auto-play stopped — floor lockout is active.",
+                    ephemeral=True,
+                )
+            except discord.DiscordException:
+                pass
+            return False
+        practice_floor = self.auto_practice_floor.get(uid)
+        try:
+            if practice_floor is not None:
+                await self._start_practice_fight(
+                    interaction, rec, practice_floor, followup=True,
+                )
+                return True
+            if rec["floor"] > MAX_FLOOR:
+                self.stop_auto(uid)
+                await interaction.followup.send(
+                    "⏹️ Auto-play stopped — the Descent is complete.",
+                    ephemeral=True,
+                )
+                return False
+            await self._start_fight(interaction, rec, followup=True)
+            return True
+        except discord.DiscordException:
+            log.exception("Descent auto-continue failed for %s", uid)
+            return False
 
     # ------------------------------------------------------------ combat
 
@@ -1099,11 +1232,14 @@ class Descent(commands.Cog):
                         f"call it with `/summon`.")
             if floor >= MAX_FLOOR:
                 desc += "\n\n👑 **The Descent is complete.** There is nothing further down."
+                self.stop_auto(member.id)
             if clear_picks > 1:
                 desc += (f"\n\nYou've earned **{clear_picks}** stat points for clearing this Fury boss "
                          f"— pick where each one goes.")
             else:
                 desc += "\n\nYou've earned a stat point for clearing the floor - pick where it goes."
+            if self.is_auto(member.id) and floor < MAX_FLOOR:
+                desc += "\n⚡ Auto paused for your stat pick — next monster follows when you're done."
             embed = discord.Embed(title=f"{fight.emoji} Victory!", description=desc, color=0x2ECC71)
             await self._publish_board(interaction, fight, embed, StatUpView(self))
             return
@@ -1123,7 +1259,13 @@ class Descent(commands.Cog):
             rec["pending_statup"] = 1
             self.save()
             embed.description += "\n\nYou've earned a stat point - pick where it goes."
+            if self.is_auto(member.id):
+                embed.description += "\n⚡ Auto paused for your stat pick — next monster follows when you're done."
             await self._publish_board(interaction, fight, embed, StatUpView(self))
+        elif self.is_auto(member.id):
+            embed.description += "\n⚡ Auto — next monster incoming…"
+            await self._publish_board(interaction, fight, embed, None)
+            await self._try_auto_continue(interaction)
         else:
             embed.description += "\nUse `/descend` to keep going."
             await self._publish_board(interaction, fight, embed, None)
@@ -1154,18 +1296,35 @@ class Descent(commands.Cog):
 
         self.save()
         embed = discord.Embed(title=f"{fight.emoji} Practice victory!", description=desc, color=0x2ECC71)
-        view = StatUpView(self) if pending > 0 else None
-        await self._publish_board(interaction, fight, embed, view)
+        if pending > 0:
+            if self.is_auto(member.id):
+                desc += "\n⚡ Auto paused for your stat pick — practice continues when you're done."
+                embed.description = desc
+            await self._publish_board(interaction, fight, embed, StatUpView(self))
+        elif self.is_auto(member.id):
+            embed.description = desc + "\n⚡ Auto — another practice incoming…"
+            await self._publish_board(interaction, fight, embed, None)
+            await self._try_auto_continue(interaction)
+        else:
+            await self._publish_board(interaction, fight, embed, None)
 
     async def _on_loss(self, interaction: discord.Interaction, fight: Fight):
         del self.fights[interaction.user.id]
         await self._dismiss_oneshot(fight, interaction)
+        was_auto = self.is_auto(interaction.user.id)
+        # Loss breaks the chain; re-enable with `/descend auto:True`.
+        self.stop_auto(interaction.user.id)
 
         if fight.is_practice:
+            tip = (
+                "Use `/descend floor:` again"
+                if not was_auto
+                else "Auto stopped — `/descend floor:… auto:True` to grind again"
+            )
             embed = discord.Embed(
                 title="Defeated",
                 description=f"**{fight.name}** gets the better of you. It was only practice - no penalty, "
-                            f"no lockout. Use `/descend` to try again.",
+                            f"no lockout. {tip}.",
                 color=0xC0392B,
             )
             await self._publish_board(interaction, fight, embed, None)
@@ -1185,7 +1344,10 @@ class Descent(commands.Cog):
                      f"you're locked out for 24 hours. When you're back, floor {fight.floor} restarts "
                      f"at monster 1.")
         else:
-            desc = f"**{fight.name}** finishes you off. Use `/descend` to try that monster again."
+            tip = "Use `/descend` to try that monster again."
+            if was_auto:
+                tip = "Auto stopped — `/descend auto:True` to keep chaining after a win."
+            desc = f"**{fight.name}** finishes you off. {tip}"
         embed = discord.Embed(title="Defeated", description=desc, color=0xC0392B)
         await self._publish_board(interaction, fight, embed, None)
 
@@ -1211,6 +1373,17 @@ class Descent(commands.Cog):
                 view=StatUpView(self),
             )
             return
+        if self.is_auto(interaction.user.id):
+            await interaction.response.edit_message(
+                embed=discord.Embed(
+                    title="Stat raised",
+                    description=f"**+1 {label}**. ⚡ Auto — next monster incoming…",
+                    color=0x6C5CE7,
+                ),
+                view=None,
+            )
+            await self._try_auto_continue(interaction)
+            return
         await interaction.response.edit_message(
             embed=discord.Embed(title="Stat raised", description=f"**+1 {label}**. Use `/descend` to keep going.",
                                 color=0x6C5CE7),
@@ -1234,11 +1407,24 @@ class Descent(commands.Cog):
     # ----------------------------------------------------------- commands
 
     @app_commands.command(name="descend", description="Fight the next monster on your current Descent floor.")
-    @app_commands.describe(floor="Replay a floor you've already cleared, for practice/loot (not boss floors).")
-    async def descend(self, interaction: discord.Interaction, floor: Optional[int] = None):
+    @app_commands.describe(
+        floor="Replay a floor you've already cleared, for practice/loot (not boss floors).",
+        auto="After each win, post the next monster automatically (Stop Auto on the board to cancel).",
+    )
+    async def descend(
+        self,
+        interaction: discord.Interaction,
+        floor: Optional[int] = None,
+        auto: Optional[bool] = None,
+    ):
         if interaction.channel_id not in DESCENT_CHANNEL_IDS:
             await interaction.response.send_message(_descent_channel_hint(), ephemeral=True)
             return
+
+        if auto is True:
+            self.set_auto(interaction.user.id, True)
+        elif auto is False:
+            self.set_auto(interaction.user.id, False)
 
         rec = self.record(interaction.user.id)
 
@@ -1273,6 +1459,9 @@ class Descent(commands.Cog):
             return
         if interaction.user.id in self.fights:
             fight = self.fights[interaction.user.id]
+            # Re-arm auto on an open board if they toggled it with this command.
+            if auto is not None:
+                fight.auto = self.is_auto(interaction.user.id)
             await self._post_fight_board(interaction, fight)
             return
         if rec["floor"] > MAX_FLOOR:
