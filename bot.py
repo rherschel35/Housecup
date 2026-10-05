@@ -38,7 +38,7 @@ FORCE_COMMAND_SYNC = os.getenv("FORCE_COMMAND_SYNC", "").strip() in ("1", "true"
 SYNC_TIMEOUT_SECONDS = int(os.getenv("COMMAND_SYNC_TIMEOUT", "600"))
 # Bump when sync *behavior* changes (e.g. also overwrite guild commands) so
 # the next boot re-PUTs even if the slash tree fingerprint is unchanged.
-COMMAND_SYNC_REVISION = 7
+COMMAND_SYNC_REVISION = 8
 # Chess & checkers load by default. Set ENABLE_BOARD_GAMES=0 to unload them.
 _ENABLE_BOARD_GAMES_RAW = os.getenv("ENABLE_BOARD_GAMES", "1").strip().lower()
 ENABLE_BOARD_GAMES = _ENABLE_BOARD_GAMES_RAW not in ("0", "false", "no", "off", "")
@@ -121,6 +121,35 @@ async def _leave_if_unauthorized(guild: discord.Guild) -> bool:
 
 
 _synced = False
+_sync_lock = asyncio.Lock()
+_last_sync_errors: list[str] = []
+_last_sync_outcome: str = "full"  # "full" | "wipe_only" (set during sync_commands)
+WIPE_VERIFY_ATTEMPTS = 5
+WIPE_VERIFY_DELAY_SEC = 2.0
+
+
+def _clear_sync_errors() -> None:
+    _last_sync_errors.clear()
+
+
+def _note_sync_error(message: str) -> None:
+    log.error(message)
+    short = message.strip()
+    if short and short not in _last_sync_errors:
+        _last_sync_errors.append(short[:500])
+
+
+def sync_failure_hint() -> str:
+    """Short staff-facing detail after a failed sync (Railway logs have the rest)."""
+    if not _last_sync_errors:
+        return ""
+    return " Details: " + " | ".join(_last_sync_errors[:3])
+
+
+def sync_outcome_is_wipe_only() -> bool:
+    return _last_sync_outcome == "wipe_only"
+
+
 # TEMPORARY (Sept 26): guild hit Discord's 200-creates/day cap. Global sync uses
 # a separate bucket. Flip back to False after the guild limit has reset AND this
 # hash-skip path has been redeployed, so Railway restarts stop burning creates.
@@ -183,16 +212,12 @@ async def _run_sync(coro, label: str, *, timeout: int | None = None):
             return await asyncio.wait_for(coro, timeout=limit)
         return await coro
     except asyncio.TimeoutError:
-        log.error(
-            "%s timed out after %ss (likely waiting on a Discord rate limit) - "
-            "continuing without finishing sync so the bot stays online.",
-            label,
-            limit,
-        )
+        _note_sync_error(f"{label} timed out after {limit}s (Discord rate limit?).")
         return None
     except discord.HTTPException as exc:
         # 30034 = daily application command creates exhausted.
-        log.error("%s failed (%s %s): %s", label, exc.status, getattr(exc, "code", "?"), exc)
+        code = getattr(exc, "code", "?")
+        _note_sync_error(f"{label} failed ({exc.status} {code}): {exc}")
         return None
 
 
@@ -208,6 +233,38 @@ def _sync_targets() -> set[int]:
     return targets
 
 
+async def _delete_guild_commands_individually(app_id: int, guild_id: int) -> bool:
+    try:
+        fetched = await bot.http.get_guild_commands(app_id, guild_id)
+    except Exception:
+        log.exception("Could not list guild %s commands for per-command delete", guild_id)
+        return False
+
+    for cmd in fetched:
+        cmd_id = cmd.get("id")
+        if not cmd_id:
+            continue
+        try:
+            await bot.http.delete_guild_command(app_id, guild_id, cmd_id)
+        except discord.HTTPException as exc:
+            _note_sync_error(
+                f"Guild {guild_id} delete {cmd.get('name')!r} failed ({exc.status} "
+                f"{getattr(exc, 'code', '?')})"
+            )
+            return False
+
+    try:
+        remaining = await bot.http.get_guild_commands(app_id, guild_id)
+    except Exception:
+        log.exception("Could not verify guild %s after per-command delete", guild_id)
+        return False
+    if remaining:
+        names = [c.get("name") for c in remaining]
+        _note_sync_error(f"Guild {guild_id} still has commands: {names[:15]}")
+        return False
+    return True
+
+
 async def _wipe_guild_commands(guild_id: int) -> bool:
     """Delete every guild-scoped slash command so globals are visible.
 
@@ -217,7 +274,7 @@ async def _wipe_guild_commands(guild_id: int) -> bool:
     """
     app_id = bot.application_id
     if app_id is None:
-        log.error("Cannot wipe guild %s — bot.application_id is unset.", guild_id)
+        _note_sync_error(f"Cannot wipe guild {guild_id} — application_id unset.")
         return False
 
     # Drop any local guild map so we never accidentally re-PUT old cmds later.
@@ -226,40 +283,53 @@ async def _wipe_guild_commands(guild_id: int) -> bool:
     try:
         result = await bot.http.bulk_upsert_guild_commands(app_id, guild_id, [])
     except discord.HTTPException as exc:
-        log.error(
-            "Guild wipe HTTP failed for %s (%s %s): %s",
-            guild_id,
-            exc.status,
-            getattr(exc, "code", "?"),
-            exc,
+        _note_sync_error(
+            f"Guild {guild_id} bulk wipe HTTP {exc.status} "
+            f"{getattr(exc, 'code', '?')}: {exc}"
         )
         return False
     except Exception:
         log.exception("Guild wipe crashed for %s", guild_id)
+        _note_sync_error(f"Guild {guild_id} wipe crashed — see logs.")
         return False
 
     if result:
-        log.error(
-            "Guild %s wipe returned %d commands (expected 0): %s",
+        log.warning(
+            "Guild %s bulk wipe body listed %d commands (verifying via GET): %s",
             guild_id,
             len(result),
             [c.get("name") for c in result[:20]],
         )
-        return False
 
-    try:
-        fetched = await bot.http.get_guild_commands(app_id, guild_id)
-    except Exception:
-        log.exception("Could not fetch guild %s commands after wipe", guild_id)
-        return False
-
-    if fetched:
+    for attempt in range(WIPE_VERIFY_ATTEMPTS):
+        if attempt:
+            await asyncio.sleep(WIPE_VERIFY_DELAY_SEC)
+        try:
+            fetched = await bot.http.get_guild_commands(app_id, guild_id)
+        except Exception:
+            log.exception("Could not fetch guild %s commands after wipe", guild_id)
+            continue
+        if not fetched:
+            log.info(
+                "Guild %s slash commands CLEARED — globals will show through.",
+                guild_id,
+            )
+            return True
         names = [c.get("name") for c in fetched]
-        log.error("Guild %s still has commands after wipe: %s", guild_id, names[:20])
-        return False
+        log.warning(
+            "Guild %s still has %d command(s) after wipe (try %s/%s): %s",
+            guild_id,
+            len(fetched),
+            attempt + 1,
+            WIPE_VERIFY_ATTEMPTS,
+            names[:20],
+        )
 
-    log.info("Guild %s slash commands CLEARED — globals will show through.", guild_id)
-    return True
+    log.warning("Guild %s bulk wipe did not stick — deleting commands one-by-one.", guild_id)
+    if await _delete_guild_commands_individually(app_id, guild_id):
+        log.info("Guild %s cleared via per-command DELETE.", guild_id)
+        return True
+    return False
 
 
 async def sync_commands(*, force: bool = False):
@@ -273,142 +343,166 @@ async def sync_commands(*, force: bool = False):
     so flat /familiar · /play stop shadowing nested globals — even if the
     staff slash /synccmds is invisible under the old guild tree.
     """
-    # on_ready fires again after every reconnect; syncing once per start is
-    # enough, and avoids hammering Discord's rate limits. Staff /staff sync
-    # may call again with force=True in the same process.
-    global _synced
-    if _synced and not force:
-        return True
-    if not force:
-        _synced = True
+    global _synced, _last_sync_outcome
 
-    targets = _sync_targets()
-    mode = "global" if (SYNC_GLOBALLY or not targets) else "guild"
-    fingerprint = _fingerprint(mode, targets)
-    previous = _load_sync_state()
-    wipe_needed = previous.get("wipe_revision") != COMMAND_SYNC_REVISION
+    async with _sync_lock:
+        _clear_sync_errors()
+        _last_sync_outcome = "full"
 
-    if (
-        not force
-        and not FORCE_COMMAND_SYNC
-        and not wipe_needed
-        and previous.get("fingerprint") == fingerprint
-        and previous.get("mode") == mode
-        and previous.get("guilds_wiped")
-    ):
-        log.info(
-            "Slash commands unchanged (%s mode, %s) - skipping Discord sync.",
-            mode,
-            fingerprint[:12],
+        # on_ready fires again after every reconnect; syncing once per start is
+        # enough, and avoids hammering Discord's rate limits. Staff /staff sync
+        # may call again with force=True in the same process.
+        if _synced and not force:
+            return True
+        if not force:
+            _synced = True
+
+        targets = _sync_targets()
+        mode = "global" if (SYNC_GLOBALLY or not targets) else "guild"
+        fingerprint = _fingerprint(mode, targets)
+        previous = _load_sync_state()
+        wipe_needed = previous.get("wipe_revision") != COMMAND_SYNC_REVISION
+        tree_unchanged = (
+            previous.get("fingerprint") == fingerprint and previous.get("mode") == mode
         )
-        return True
-
-    if force or FORCE_COMMAND_SYNC or wipe_needed:
-        log.info(
-            "%s - syncing slash commands with Discord (wipe_needed=%s).",
-            (
-                "Staff-forced sync" if force
-                else "FORCE_COMMAND_SYNC set" if FORCE_COMMAND_SYNC
-                else "Wipe revision bump"
-            ),
-            wipe_needed,
-        )
-    else:
-        log.info(
-            "Slash commands changed (%s -> %s, %s mode) - syncing with Discord.",
-            (previous.get("fingerprint") or "none")[:12],
-            fingerprint[:12],
-            mode,
+        skip_global_sync = (
+            mode == "global" and tree_unchanged and not FORCE_COMMAND_SYNC
         )
 
-    ok = True
-
-    # 1) Wipe guild shadows FIRST — this is what unblocks nested /familiar.
-    if mode == "global":
-        if not targets:
-            log.warning(
-                "No guild ids to wipe — stale guild commands may still shadow /familiar."
+        if (
+            not force
+            and not FORCE_COMMAND_SYNC
+            and not wipe_needed
+            and tree_unchanged
+            and previous.get("guilds_wiped")
+        ):
+            log.info(
+                "Slash commands unchanged (%s mode, %s) - skipping Discord sync.",
+                mode,
+                fingerprint[:12],
             )
-            ok = False
-        for guild_id in targets:
-            if not await _wipe_guild_commands(guild_id):
-                ok = False
-                break
+            return True
 
-    # 2) Push the current global (or guild-dev) tree.
-    if mode == "global":
-        synced = await _run_sync(bot.tree.sync(), "Global command sync")
-        if synced is None:
-            ok = False
+        if force or FORCE_COMMAND_SYNC or wipe_needed:
+            log.info(
+                "%s - syncing slash commands with Discord (wipe_needed=%s, skip_global=%s).",
+                (
+                    "Staff-forced sync" if force
+                    else "FORCE_COMMAND_SYNC set" if FORCE_COMMAND_SYNC
+                    else "Wipe revision bump"
+                ),
+                wipe_needed,
+                skip_global_sync,
+            )
         else:
-            log.info("Synced %d global commands", len(synced))
-            names = sorted(c.name for c in synced)
-            if "familiar" not in names:
-                log.error("Global sync missing /familiar — tree may not have loaded.")
-                ok = False
-            if "synccmds" not in names:
-                log.warning("Global sync missing /synccmds (may still be deploying).")
-    else:
-        for guild_id in targets:
-            guild = discord.Object(id=guild_id)
-            bot.tree.clear_commands(guild=guild)
-            bot.tree.copy_global_to(guild=guild)
-            synced = await _run_sync(
-                bot.tree.sync(guild=guild),
-                f"Guild command sync ({guild_id})",
+            log.info(
+                "Slash commands changed (%s -> %s, %s mode) - syncing with Discord.",
+                (previous.get("fingerprint") or "none")[:12],
+                fingerprint[:12],
+                mode,
             )
-            if synced is None:
-                ok = False
-                break
-            names = sorted(c.name for c in synced)
-            stale = sorted(n for n in STALE_CARE_COMMANDS if n in names)
-            if stale or "familiar" not in names:
-                log.error(
-                    "Guild %s sync bad (stale=%s familiar=%s)",
-                    guild_id,
-                    stale,
-                    "familiar" in names,
+
+        wipe_ok = True
+        global_ok = True
+
+        # 1) Wipe guild shadows FIRST — this is what unblocks nested /familiar.
+        if mode == "global":
+            if not targets:
+                _note_sync_error(
+                    "No guild ids to wipe — stale guild /familiar may remain. "
+                    "Check ALLOWED_GUILD_IDS or that the bot is in the server."
                 )
-                ok = False
-                break
-            log.info("Synced %d commands to server %s", len(synced), guild_id)
+                wipe_ok = False
+            for guild_id in sorted(targets):
+                if not await _wipe_guild_commands(guild_id):
+                    wipe_ok = False
+
+        # 2) Push the current global (or guild-dev) tree.
+        if mode == "global":
+            if skip_global_sync:
+                log.info(
+                    "Slash tree fingerprint unchanged — skipping global PUT "
+                    "(guild wipe only; avoids daily create cap / 30034)."
+                )
+                _last_sync_outcome = "wipe_only"
+            else:
+                synced = await _run_sync(bot.tree.sync(), "Global command sync")
+                if synced is None:
+                    global_ok = False
+                else:
+                    log.info("Synced %d global commands", len(synced))
+                    names = sorted(c.name for c in synced)
+                    if "familiar" not in names:
+                        _note_sync_error("Global sync missing /familiar — tree may not have loaded.")
+                        global_ok = False
+                    if "synccmds" not in names:
+                        log.warning("Global sync missing /synccmds (may still be deploying).")
+        else:
+            for guild_id in targets:
+                guild = discord.Object(id=guild_id)
+                bot.tree.clear_commands(guild=guild)
+                bot.tree.copy_global_to(guild=guild)
+                synced = await _run_sync(
+                    bot.tree.sync(guild=guild),
+                    f"Guild command sync ({guild_id})",
+                )
+                if synced is None:
+                    global_ok = False
+                    break
+                names = sorted(c.name for c in synced)
+                stale = sorted(n for n in STALE_CARE_COMMANDS if n in names)
+                if stale or "familiar" not in names:
+                    _note_sync_error(
+                        f"Guild {guild_id} sync bad (stale={stale}, familiar={'familiar' in names})"
+                    )
+                    global_ok = False
+                    break
+                log.info("Synced %d commands to server %s", len(synced), guild_id)
+
+            if global_ok:
+                bot.tree.clear_commands(guild=None)
+                cleared = await _run_sync(bot.tree.sync(), "Clear global commands")
+                if cleared is None:
+                    global_ok = False
+                else:
+                    log.info("Cleared global commands so nothing appears twice")
+
+        ok = wipe_ok and (global_ok or skip_global_sync)
+        if wipe_ok and not global_ok and not skip_global_sync and tree_unchanged:
+            log.warning(
+                "Global sync failed but slash tree unchanged — guild wipe alone should fix /familiar."
+            )
+            ok = True
+            _last_sync_outcome = "wipe_only"
 
         if ok:
-            bot.tree.clear_commands(guild=None)
-            cleared = await _run_sync(bot.tree.sync(), "Clear global commands")
-            if cleared is None:
-                ok = False
-            else:
-                log.info("Cleared global commands so nothing appears twice")
-
-    if ok:
-        _synced = True
-        _save_sync_state(
-            {
-                "fingerprint": fingerprint,
-                "mode": mode,
-                "targets": sorted(targets),
-                "guilds_wiped": mode == "global",
-                "wipe_revision": COMMAND_SYNC_REVISION,
-                "synced_at": time.time(),
-            }
-        )
-        log.info(
-            "Command sync OK — guilds wiped=%s wipe_revision=%s. "
-            "Clients must fully quit Discord to refresh /familiar.",
-            mode == "global",
-            COMMAND_SYNC_REVISION,
-        )
-    else:
-        # Allow another on_ready / staff sync attempt in this process.
-        if not force:
-            _synced = False
-        log.warning(
-            "Command sync did not finish cleanly - not saving fingerprint, "
-            "so the next boot will retry. Staff: type !synccmds in chat "
-            "(works even when slash /synccmds is missing)."
-        )
-    return ok
+            _synced = True
+            _save_sync_state(
+                {
+                    "fingerprint": fingerprint,
+                    "mode": mode,
+                    "targets": sorted(targets),
+                    "guilds_wiped": mode == "global" and wipe_ok,
+                    "wipe_revision": COMMAND_SYNC_REVISION if wipe_ok else previous.get("wipe_revision"),
+                    "synced_at": time.time(),
+                }
+            )
+            log.info(
+                "Command sync OK — guilds wiped=%s wipe_revision=%s outcome=%s. "
+                "Clients must fully quit Discord to refresh /familiar.",
+                wipe_ok and mode == "global",
+                COMMAND_SYNC_REVISION if wipe_ok else previous.get("wipe_revision"),
+                _last_sync_outcome,
+            )
+        else:
+            if not force:
+                _synced = False
+            log.warning(
+                "Command sync did not finish cleanly - not saving fingerprint, "
+                "so the next boot will retry. Staff: type !synccmds in chat "
+                "(works even when slash /synccmds is missing)."
+            )
+        return ok
 
 
 @bot.event
@@ -446,9 +540,13 @@ async def on_message(message: discord.Message):
         return
 
     if ok:
+        if sync_outcome_is_wipe_only():
+            lead = "Done. **Guild slash lists wiped** (global tree unchanged — no full Discord re-upload)."
+        else:
+            lead = "Done. Guild slash lists wiped; globals refreshed."
         await status.edit(
             content=(
-                "Done. Guild slash lists wiped; globals refreshed.\n"
+                f"{lead}\n"
                 "**Fully quit Discord** (swipe away on mobile) and reopen `/`.\n"
                 "• `/familiar` should show status / adopt / feed / pet / play / scout\n"
                 "• Top-level `/play` · `/feed` · `/scout` should be gone"
@@ -457,8 +555,9 @@ async def on_message(message: discord.Message):
     else:
         await status.edit(
             content=(
-                "Sync didn't finish cleanly (rate limit or timeout). "
+                "Sync didn't finish cleanly (rate limit, timeout, or guild wipe failed). "
                 "Wait a few minutes and type `!synccmds` again, or check Railway logs."
+                f"{sync_failure_hint()}"
             )
         )
 

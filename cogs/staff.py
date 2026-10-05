@@ -452,17 +452,28 @@ class Staff(commands.Cog):
             )
             return
         if ok:
+            import bot as bot_module
+
+            if bot_module.sync_outcome_is_wipe_only():
+                lead = (
+                    "Guild slash lists wiped clean (global tree unchanged — no full re-upload). "
+                )
+            else:
+                lead = "Global commands pushed and guild slash lists wiped clean. "
             await interaction.followup.send(
-                "Global commands pushed and guild slash lists wiped clean. "
+                f"{lead}"
                 "Fully quit Discord and reopen `/`.\n"
                 "• `/familiar` → status / adopt / name / feed / pet / play / scout\n"
                 "• Top-level `/play` · `/feed` · `/pet` · `/scout` should be gone",
                 ephemeral=True,
             )
         else:
+            import bot as bot_module
+
             await interaction.followup.send(
-                "Sync didn't finish cleanly (rate limit or timeout). "
-                "Try again in a few minutes, or set FORCE_COMMAND_SYNC=1 and redeploy.",
+                "Sync didn't finish cleanly (rate limit, timeout, or guild wipe failed). "
+                "Try again in a few minutes, or set FORCE_COMMAND_SYNC=1 and redeploy."
+                f"{bot_module.sync_failure_hint()}",
                 ephemeral=True,
             )
 
