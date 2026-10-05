@@ -1,16 +1,15 @@
-"""Shared `/staff` slash-command tree.
+"""Shared staff slash-command trees.
 
-Every staff-only command nests under this root so player-facing verbs
-(`/wand`, `/duel`, `/broom`, …) can stay short top-level names without
-blowing Discord's 100 top-level command cap.
+Player-facing verbs stay short top-level names. Staff tools split across
+several roots because Discord caps each command group at 8000 characters —
+one giant `/staff` tree exceeded that once world, dementor, and reaction
+roles nested under it.
 
-Import `staff` (and subgroups) from here — always the same Group objects
-for groups owned by the Staff cog.
+Import `staff`, subgroups, and extra roots from here.
 
-Staff-only groups that live on *other* cogs (world, dementor, …) stay
-top-level at class definition time so discord.py binds callbacks to the
-right cog, then `nest_pure_staff_groups` moves them under `/staff` after
-all cogs have loaded.
+Pure-staff groups owned by other cogs load top-level first; then
+`nest_pure_staff_groups` moves them under the right staff root after all
+cogs load.
 """
 
 from __future__ import annotations
@@ -24,70 +23,71 @@ log = logging.getLogger("velmora.staff_groups")
 
 staff = app_commands.Group(
     name="staff",
-    description="Staff tools for running Velmora.",
+    description="Core staff: points, setup, houses, usage.",
+)
+staffworld = app_commands.Group(
+    name="staffworld",
+    description="Staff: world events and dementors.",
+)
+staffgame = app_commands.Group(
+    name="staffgame",
+    description="Staff: descent, castles, duels, hex, market.",
+)
+staffops = app_commands.Group(
+    name="staffops",
+    description="Staff: beasts, gear admin, reaction roles, antispam.",
 )
 
 points = app_commands.Group(
-    name="points", parent=staff, description="Award and manage house points.",
+    name="points", parent=staff, description="Award and manage house points."
 )
 setup = app_commands.Group(
-    name="setup", parent=staff, description="Bot and house configuration.",
+    name="setup", parent=staff, description="Bot and house configuration."
 )
 houses = app_commands.Group(
-    name="houses", parent=staff, description="Pin members to houses.",
+    name="houses", parent=staff, description="Pin members to houses."
 )
 identity = app_commands.Group(
-    name="identity", parent=staff, description="Wand, broom, and Animagus staff tools.",
+    name="identity", parent=staff, description="Wand, broom, and Animagus staff tools."
 )
 descent = app_commands.Group(
-    name="descent", parent=staff, description="Descent staff tools.",
+    name="descent", parent=staffgame, description="Descent staff tools."
 )
 castles = app_commands.Group(
-    name="castles", parent=staff, description="Castle / army PvP staff tools.",
+    name="castles", parent=staffgame, description="Castle / army PvP staff tools."
 )
 raid = app_commands.Group(
-    name="raid", parent=staff, description="3Raid staff tools.",
+    name="raid", parent=staffgame, description="3Raid staff tools."
 )
 duels = app_commands.Group(
-    name="duels", parent=staff, description="Duel staff tools.",
+    name="duels", parent=staffgame, description="Duel staff tools."
 )
 challenge = app_commands.Group(
-    name="challenge", parent=staff, description="Challenge staff tools.",
+    name="challenge", parent=staffgame, description="Challenge staff tools."
 )
 hexes = app_commands.Group(
-    name="hex", parent=staff, description="Headmaster hexes.",
+    name="hex", parent=staffgame, description="Headmaster hexes."
 )
 market = app_commands.Group(
-    name="market", parent=staff, description="Marketplace staff tools.",
+    name="market", parent=staffgame, description="Marketplace staff tools."
 )
 usage = app_commands.Group(
-    name="usage", parent=staff, description="Slash-command usage stats.",
+    name="usage", parent=staff, description="Slash-command usage stats."
 )
 
-# Top-level names of pure-staff groups owned by other cogs. After load,
-# these are moved under `/staff` (bindings stay on the owning cog).
-PURE_STAFF_GROUPS = (
-    "world",
-    "dementor",
-    "beastadmin",
-    "adornadmin",
-    "reactionroles",
-    "antispam",
-)
+# Top-level names of pure-staff groups owned by other cogs → staff root to nest under.
+NEST_UNDER_STAFFWORLD = ("world", "dementor")
+NEST_UNDER_STAFFOPS = ("beastadmin", "adornadmin", "reactionroles", "antispam")
 
 
-def nest_pure_staff_groups(bot: commands.Bot) -> list[str]:
-    """Move pure-staff top-level groups under the tree's `/staff` root.
-
-    Returns the names that were nested.
-    """
-    staff_root = bot.tree.get_command("staff")
-    if staff_root is None or not isinstance(staff_root, app_commands.Group):
-        log.warning("No /staff group on the tree — skipping staff nesting.")
+def _nest_under(bot: commands.Bot, root_name: str, group_names: tuple[str, ...]) -> list[str]:
+    root = bot.tree.get_command(root_name)
+    if root is None or not isinstance(root, app_commands.Group):
+        log.warning("No /%s group on the tree — skipping nest.", root_name)
         return []
 
     nested: list[str] = []
-    for name in PURE_STAFF_GROUPS:
+    for name in group_names:
         cmd = bot.tree.get_command(name)
         if cmd is None:
             continue
@@ -95,9 +95,17 @@ def nest_pure_staff_groups(bot: commands.Bot) -> list[str]:
             log.warning("/%s is not a group — leaving it top-level.", name)
             continue
         bot.tree.remove_command(name)
-        cmd.parent = staff_root
-        staff_root.add_command(cmd)
+        cmd.parent = root
+        root.add_command(cmd)
         nested.append(name)
+    return nested
+
+
+def nest_pure_staff_groups(bot: commands.Bot) -> list[str]:
+    """Move pure-staff top-level groups under the right staff root."""
+    nested: list[str] = []
+    nested.extend(_nest_under(bot, "staffworld", NEST_UNDER_STAFFWORLD))
+    nested.extend(_nest_under(bot, "staffops", NEST_UNDER_STAFFOPS))
     if nested:
-        log.info("Nested under /staff: %s", ", ".join(nested))
+        log.info("Nested staff groups: %s", ", ".join(nested))
     return nested

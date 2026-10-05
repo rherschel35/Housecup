@@ -38,7 +38,7 @@ FORCE_COMMAND_SYNC = os.getenv("FORCE_COMMAND_SYNC", "").strip() in ("1", "true"
 SYNC_TIMEOUT_SECONDS = int(os.getenv("COMMAND_SYNC_TIMEOUT", "600"))
 # Bump when sync *behavior* changes (e.g. also overwrite guild commands) so
 # the next boot re-PUTs even if the slash tree fingerprint is unchanged.
-COMMAND_SYNC_REVISION = 8
+COMMAND_SYNC_REVISION = 9
 # Chess & checkers load by default. Set ENABLE_BOARD_GAMES=0 to unload them.
 _ENABLE_BOARD_GAMES_RAW = os.getenv("ENABLE_BOARD_GAMES", "1").strip().lower()
 ENABLE_BOARD_GAMES = _ENABLE_BOARD_GAMES_RAW not in ("0", "false", "no", "off", "")
@@ -154,6 +154,32 @@ def sync_outcome_is_wipe_only() -> bool:
 # a separate bucket. Flip back to False after the guild limit has reset AND this
 # hash-skip path has been redeployed, so Railway restarts stop burning creates.
 SYNC_GLOBALLY = True
+
+
+DISCORD_COMMAND_GROUP_MAX_CHARS = 8000
+
+
+def _command_group_json_size(cmd) -> int:
+    import json
+
+    return len(json.dumps(cmd.to_dict(bot.tree), separators=(",", ":")))
+
+
+def _warn_oversized_command_groups() -> None:
+    """Discord rejects command groups whose serialized definition exceeds 8000 chars."""
+    from discord import app_commands
+
+    for cmd in bot.tree.get_commands():
+        if not isinstance(cmd, app_commands.Group):
+            continue
+        size = _command_group_json_size(cmd)
+        if size > DISCORD_COMMAND_GROUP_MAX_CHARS:
+            log.error(
+                "Slash group /%s is %s chars (Discord max %s) — global sync will fail.",
+                cmd.name,
+                size,
+                DISCORD_COMMAND_GROUP_MAX_CHARS,
+            )
 
 
 def _command_payload() -> list:
@@ -607,6 +633,7 @@ async def main():
         from cogs.staff_groups import nest_pure_staff_groups
 
         nest_pure_staff_groups(bot)
+        _warn_oversized_command_groups()
         top_level = len(bot.tree.get_commands())
         log.info("Slash command tree: %s top-level (Discord global cap is 100)", top_level)
         if top_level > 100:

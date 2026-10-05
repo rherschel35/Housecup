@@ -501,7 +501,7 @@
         "usage top",
         "command usage"
       ],
-      "answer": "Staff tools live under `/staff` now \u2014 points, setup, houses, identity, descent, raid, duels, challenge, hex, market, world, dementor, beastadmin, adornadmin, reactionroles, antispam. Type `/staff` an' Discord shows the menu. `/staff usage top` an' `/staff usage unused` show what the server actually uses. Player verbs (`/wand`, `/duel`, `/broom`\u2026) never moved. Staff see the full list in `/help`.",
+      "answer": "Staff tools split across four roots (Discord size cap): `/staff` (points, setup, houses, identity, usage, sync), `/staffgame` (descent, castles, raid, duels, challenge, hex, market), `/staffworld` (world, dementor), `/staffops` (beasts, gear admin, reaction roles, antispam). `/staff usage top` an' `/staff usage unused` show what the server uses. Player verbs (`/wand`, `/duel`, `/broom`\u2026) never moved. Full list in `/help`.",
       "link": "https://everything-velmora.netlify.app/commands"
     }
   ]
