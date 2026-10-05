@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Castles &amp; Army PvP · Velmora</title><meta name="description" content="Six castles, Descent armies, Wednesday and Saturday sieges. Hold a keep, earn its perk, and fight for the map.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Alegreya:ital,wght@0,400;0,500;0,700;1,400&family=Alegreya+Sans+SC:wght@500;700&display=swap"><link rel="stylesheet" href="style.css">
+<script>try{var t=localStorage.getItem('vc-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head><body>
+<header class="top"><div class="top-in"><a class="brand" href="index.html">Velmora <span>Compendium</span></a>
+<nav class="nav" aria-label="Sections"><a href="index.html">Home</a><a href="houses.html">Houses &amp; Cup</a><a href="ghosts.html">Ghosts</a><a href="explore.html">Explore</a><a href="beasts.html">Beasts</a><a href="duels.html">Duels &amp; Threats</a><a href="descent.html">Descent</a><a href="castles.html" aria-current="page">Castles</a><a href="quidditch.html">Quidditch</a><a href="magic.html">Wands &amp; Familiars</a><a href="brooms.html">Brooms</a><a href="cards.html">Cards &amp; Gear</a><a href="tales.html">Tales</a><a href="commands.html">Commands</a></nav>
+<button class="theme" type="button" onclick="(function(){var d=document.documentElement,n=(d.dataset.theme==='dark'||(!d.dataset.theme&&matchMedia('(prefers-color-scheme: dark)').matches))?'light':'dark';d.dataset.theme=n;try{localStorage.setItem('vc-theme',n)}catch(e){}})()">Light / dark</button>
+</div></header>
+<main class="wrap">
+<div class="head"><p class="eyebrow">Velmora · army PvP</p><h1>Castles &amp; Army</h1><p class="lede">Six castles on the map. Bind monsters from the Descent into an army, hold one keep, and siege on Wednesday and Saturday.</p><nav class="jump" aria-label="On this page"><a href="#overview">Overview</a><a href="#army">Your army</a><a href="#castles">The six castles</a><a href="#siege">Sieges</a><a href="#rewards">Rewards</a><a href="#commands">Commands</a></nav></div>
+
+<section id="overview"><h2>What it is</h2>
+<p>Castle PvP is a season of holding ground. Every Descent win (real or practice) can bind that monster into your army. From the castles channel you open the map with <code>/castles</code>, reinforce the walls you hold, abandon a keep, or march on someone else's. You may only hold <b>one</b> castle at a time — abandon before you siege another.</p>
+<p class="sub">Before the season is marked live, every Descent win binds with no daily or size cap. Once PvP is live, binds cap at <b>200 per day</b> and your total army (home + garrison + march) caps at <b>5,000</b>.</p>
+</section>
+
+<section id="army"><h2>Building an army</h2>
+<div class="grid wide">
+<div class="card"><h3>Bind from Descent</h3><p>Beat a monster in any Descent channel and it joins your roster with its floor and combat stats. Practice wins bind the same way.</p></div>
+<div class="card"><h3>Check the roster</h3><p><code>/army</code> works in the castles channel and every Descent channel. It shows a paged full roster, mix by type, and your sacrifice bonuses.</p></div>
+<div class="card"><h3>Sacrifice 500 → ATK or DEF</h3><p>Burn <b>500</b> regular monsters (lowest floors first) for a permanent army Attack or Defense bonus. Bosses can't be sacrificed. Floors 1–9 give no boost; higher floors pay more per monster.</p></div>
+</div>
+<div class="tbl"><table><thead><tr><th>Floor band</th><th>Boost per sacrificed regular</th></tr></thead><tbody>
+<tr><td>1–9</td><td>None</td></tr>
+<tr><td>10–39</td><td>+0.00002%</td></tr>
+<tr><td>40–69</td><td>+0.00004%</td></tr>
+<tr><td>70–90</td><td>+0.0001%</td></tr>
+<tr><td>91–100</td><td>+0.00014%</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="castles"><h2>The six castles</h2>
+<p class="sub">Each keep has a wall element, a title for its owner, and a perk that lasts while you hold it. Matching wall-type troops defend harder.</p>
+<div class="grid wide">
+<div class="card"><img src="castles/Deadlock_Keep.jpg" alt="Deadlock Keep" width="640" height="400" loading="lazy" style="width:100%;height:auto;border-radius:4px;margin-bottom:.6rem"><h3>Deadlock Keep</h3><p class="meta">Poison wall · Warden of Deadlock Keep</p><p>Win all duel ties while you hold it.</p></div>
+<div class="card"><img src="castles/Fifth_Muster.jpg" alt="The Fifth Muster" width="640" height="400" loading="lazy" style="width:100%;height:auto;border-radius:4px;margin-bottom:.6rem"><h3>The Fifth Muster</h3><p class="meta">Fire wall · Marshal of the Fifth Muster</p><p>Every 5 Descent beats → +1 army monster (a clone of one you just bound).</p></div>
+<div class="card"><img src="castles/Surestroke_Tower.jpg" alt="Surestroke Tower" width="640" height="400" loading="lazy" style="width:100%;height:auto;border-radius:4px;margin-bottom:.6rem"><h3>Surestroke Tower</h3><p class="meta">Ice wall · Keeper of Surestroke Tower</p><p>Wild Threat <code>/cast</code> auto-picks the right spell for you.</p></div>
+<div class="card"><img src="castles/Triple_Tithe.jpg" alt="The Triple Tithe" width="640" height="400" loading="lazy" style="width:100%;height:auto;border-radius:4px;margin-bottom:.6rem"><h3>The Triple Tithe</h3><p class="meta">Lightning wall · Collector of the Triple Tithe</p><p>+3 house points on duel wins (still subject to the usual daily duel-point rules).</p></div>
+<div class="card"><img src="castles/Prelude_Bastion.jpg" alt="Prelude Bastion" width="640" height="400" loading="lazy" style="width:100%;height:auto;border-radius:4px;margin-bottom:.6rem"><h3>Prelude Bastion</h3><p class="meta">Light wall · Guardian of Prelude Bastion</p><p>Descent monsters start at half attack while you hold it.</p></div>
+<div class="card"><img src="castles/Bannerhall.jpg" alt="Bannerhall" width="640" height="400" loading="lazy" style="width:100%;height:auto;border-radius:4px;margin-bottom:.6rem"><h3>Bannerhall</h3><p class="meta">Boss wall · Lord of Bannerhall</p><p>Once a week, your house earns +30 × how many castles that house holds.</p></div>
+</div>
+</section>
+
+<section id="siege"><h2>How sieges work</h2>
+<p>Sieges open on <b>Wednesday</b> and <b>Saturday</b> (Chicago time). Pick a castle from the <code>/castles</code> board — reinforce, siege, or abandon from there.</p>
+<div class="grid wide">
+<div class="card"><h3>Reinforce anytime</h3><p>Stock your walls whenever you like — except mid-assault. Garrison caps: <b>350</b> regulars, <b>1</b> boss, and up to <b>5</b> element types among regulars. Troops move from your home army into the walls.</p></div>
+<div class="card"><h3>March on a keep</h3><p>Attack force caps: <b>200</b> regulars and <b>2</b> bosses (strongest first). You can't siege a castle you already own, and you must abandon your current keep before attacking another. Empty armies can't march.</p></div>
+<div class="card"><h3>Ten-minute assault</h3><p>Once the march starts you have <b>10 minutes</b> on the clock. Drive clashes from the board. After each clash that doesn't capture the keep, you get <b>30 seconds</b> to attack again or pull back. Time out or pull back and the castle locks for <b>20 minutes</b>.</p></div>
+<div class="card"><h3>Capture &amp; abandon</h3><p>Clear the garrison and the keep is yours — title, perk, and all. Abandoned garrisons return to your army. You can't abandon while under assault. Captured leftover walls are wiped.</p></div>
+</div>
+<div class="note"><p>Matching the wall's element makes defenders tougher (boss walls at Bannerhall tougher still). Sacrifice ATK/DEF bonuses apply to your whole army in the clash.</p></div>
+</section>
+
+<section id="rewards"><h2>Sunday &amp; weekly pay</h2>
+<div class="grid wide">
+<div class="card"><h3>Sunday stipend</h3><p>Every Sunday (Chicago time), each held castle pays <b>+50</b> house points to the owner's house.</p></div>
+<div class="card"><h3>Bannerhall weekly</h3><p>If your house holds Bannerhall, once per Chicago week it also pays <b>+30 × N</b>, where N is how many castles that house holds on the map.</p></div>
+</div>
+</section>
+
+<section id="commands"><h2>Commands</h2>
+<ul class="cmds">
+<li><code>/castles</code> Map board in the castles channel — owners, perks, reinforce, siege, abandon.</li>
+<li><code>/army</code> Full paged roster + sacrifice 500 → ATK/DEF (castles channel and every Descent channel).</li>
+</ul>
+<div class="note"><p>Army monsters come from the <a href="descent.html">Descent</a>. Wins there fill the roster you'll march with here.</p></div>
+</section>
+
+<footer class="site">Kept by the House Cup. Everything here comes straight from the bots that run Velmora. The secrets are not written down anywhere. You'll have to find those yourself.</footer>
+</main><script>(function(){var h=document.querySelector('.top');function s(){document.documentElement.style.setProperty('--tb',h.offsetHeight+'px')}s();addEventListener('resize',s);var n=document.querySelector('.nav'),c=n&&n.querySelector('[aria-current]');if(c&&n.scrollWidth>n.clientWidth)n.scrollLeft=(c.offsetLeft-n.offsetLeft)-n.clientWidth/2+c.clientWidth/2;})();</script></body></html>

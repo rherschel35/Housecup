@@ -5,11 +5,11 @@
 <script>try{var t=localStorage.getItem('vc-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 </head><body>
 <header class="top"><div class="top-in"><a class="brand" href="index.html">Velmora <span>Compendium</span></a>
-<nav class="nav" aria-label="Sections"><a href="index.html">Home</a><a href="houses.html">Houses &amp; Cup</a><a href="ghosts.html">Ghosts</a><a href="explore.html">Explore</a><a href="beasts.html">Beasts</a><a href="duels.html">Duels &amp; Threats</a><a href="descent.html" aria-current="page">Descent</a><a href="quidditch.html">Quidditch</a><a href="magic.html">Wands &amp; Familiars</a><a href="brooms.html">Brooms</a><a href="cards.html">Cards &amp; Gear</a><a href="tales.html">Tales</a><a href="commands.html">Commands</a></nav>
+<nav class="nav" aria-label="Sections"><a href="index.html">Home</a><a href="houses.html">Houses &amp; Cup</a><a href="ghosts.html">Ghosts</a><a href="explore.html">Explore</a><a href="beasts.html">Beasts</a><a href="duels.html">Duels &amp; Threats</a><a href="descent.html" aria-current="page">Descent</a><a href="castles.html">Castles</a><a href="quidditch.html">Quidditch</a><a href="magic.html">Wands &amp; Familiars</a><a href="brooms.html">Brooms</a><a href="cards.html">Cards &amp; Gear</a><a href="tales.html">Tales</a><a href="commands.html">Commands</a></nav>
 <button class="theme" type="button" onclick="(function(){var d=document.documentElement,n=(d.dataset.theme==='dark'||(!d.dataset.theme&&matchMedia('(prefers-color-scheme: dark)').matches))?'light':'dark';d.dataset.theme=n;try{localStorage.setItem('vc-theme',n)}catch(e){}})()">Light / dark</button>
 </div></header>
 <main class="wrap">
-<div class="head"><p class="eyebrow">Velmora · beneath the school</p><h1>The Descent</h1><p class="lede">A hundred floors down, and something new to fight on every one. No shared runs, no shortcuts - just you, your action points, and whatever's waiting on the next floor.</p><nav class="jump" aria-label="On this page"><a href="#overview">Overview</a><a href="#rules">How a floor works</a><a href="#combat">Combat</a><a href="#weaknesses">Weaknesses</a><a href="#replay">Practice &amp; replay</a><a href="#zones">The ten zones</a><a href="#loot">Loot &amp; gear</a><a href="#commands">Commands</a></nav></div>
+<div class="head"><p class="eyebrow">Velmora · beneath the school</p><h1>The Descent</h1><p class="lede">A hundred floors down, and something new to fight on every one. No shared runs, no shortcuts - just you, your action points, and whatever's waiting on the next floor. Wins also bind monsters into your army for <a href="castles.html">castle sieges</a>.</p><nav class="jump" aria-label="On this page"><a href="#overview">Overview</a><a href="#rules">How a floor works</a><a href="#combat">Combat</a><a href="#weaknesses">Weaknesses</a><a href="#replay">Practice &amp; replay</a><a href="#auto">Auto &amp; idle</a><a href="#army">Army binds</a><a href="#zones">The ten zones</a><a href="#loot">Loot &amp; gear</a><a href="#commands">Commands</a></nav></div>
 
 <section id="overview"><h2>What it is</h2>
 <p>The Descent is a solo dungeon beneath Velmora - one hundred floors, each guarded by a gauntlet of ten monsters. Every player has their own run: your floor, your losses, your gear are yours alone. There's no racing anyone else down, only the next monster in front of you. Every monster and boss has its own hand-drawn portrait shown right in the fight - no two floors look alike.</p></section>
@@ -50,6 +50,21 @@
 <li>Boss floors can&#x27;t be practiced this way — only the ten regular floors in each zone.</li>
 </ul></section>
 
+<section id="auto"><h2>Auto-play &amp; stuck fights</h2>
+<div class="grid wide">
+<div class="card"><h3>Chain with auto</h3><p><code>/descend auto:True</code> keeps posting the next monster after each win, so you don't retype the command between fights. Turn it off with <code>auto:False</code>, or it stops on a loss / forfeit.</p></div>
+<div class="card"><h3>Idle forfeit</h3><p>Leave a fight with no button press for <b>3 minutes</b> and it counts as a <b>loss</b> — same as failing the monster. Your lockout and floor rules apply as usual.</p></div>
+<div class="card"><h3>End it yourself</h3><p><code>/descendend</code> forfeits your open fight as a loss so you can start fresh. Staff can <code>/descendend @member</code> if someone is stuck.</p></div>
+</div></section>
+
+<section id="army"><h2>Army binds</h2>
+<p>Every monster you beat — on a real floor or in practice — is bound into your army ledger with its floor and combat stats. That roster is what you march with in <a href="castles.html">Castles &amp; Army PvP</a>.</p>
+<ul class="cmds">
+<li>Before PvP is live: every win binds — no daily or size cap.</li>
+<li>Once PvP is live: up to <b>200</b> binds per day, and <b>5,000</b> total monsters (home + garrison + march).</li>
+<li><code>/army</code> works in every Descent channel (and the castles channel) to review the roster and sacrifice 500 regulars for ATK or DEF.</li>
+</ul></section>
+
 <section id="zones"><h2>The ten zones</h2>
 <p class="sub">Ten zones of ten floors each. Every zone belongs to one element, and its boss floor closes it out.</p>
 <div class="grid wide">
@@ -85,11 +100,13 @@
 
 <section id="commands"><h2>Commands</h2>
 <ul class="cmds">
-<li><code>/descend</code> Fight the next monster on your current floor, or resume a fight already in progress.</li>
+<li><code>/descend</code> Fight the next monster on your current floor, or resume a fight already in progress. Add <code>auto:True</code> to chain wins.</li>
 <li><code>/descend floor:&lt;n&gt;</code> Practice a floor you&#x27;ve already cleared — loot, and a chance to sharpen if it&#x27;s nearby.</li>
+<li><code>/descendend</code> Forfeit an open fight (counts as a loss). Idle 3 minutes with no button also loses. Staff can forfeit others.</li>
 <li><code>/descentstatus</code> Check your floor, monster progress, stats, Max AP, and any active lockout.</li>
+<li><code>/army</code> Full army roster + sacrifice 500 → ATK/DEF (also works in the castles channel).</li>
 </ul>
-<div class="note"><p>The Descent only runs in its Descent channels — commands used elsewhere won&#x27;t start a fight.</p></div></section>
+<div class="note"><p>The Descent only runs in its Descent channels — commands used elsewhere won&#x27;t start a fight. <code>/army</code> is the exception for army review.</p></div></section>
 
 <footer class="site">Kept by the House Cup. Everything here comes straight from the bots that run Velmora. The secrets are not written down anywhere. You'll have to find those yourself.</footer>
 </main><script>(function(){var h=document.querySelector('.top');function s(){document.documentElement.style.setProperty('--tb',h.offsetHeight+'px')}s();addEventListener('resize',s);var n=document.querySelector('.nav'),c=n&&n.querySelector('[aria-current]');if(c&&n.scrollWidth>n.clientWidth)n.scrollLeft=(c.offsetLeft-n.offsetLeft)-n.clientWidth/2+c.clientWidth/2;})();</script></body></html>

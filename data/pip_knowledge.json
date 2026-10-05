@@ -143,7 +143,7 @@
         "raven",
         "fox"
       ],
-      "answer": "`/familiar` adopts one for good \u2014 salamander, raven, or fox. Feed, pet, an' play once a day, an' send it `/scout` for a lil' find.",
+      "answer": "`/familiar adopt` picks salamander, raven, or fox for good. Care lives under the same group: `/familiar feed`, `/familiar pet`, `/familiar play` (once a day each), an' `/familiar scout` for a lil' find. Check in with `/familiar status`; rename with `/familiar name`.",
       "link": "https://everything-velmora.netlify.app/magic"
     },
     {
@@ -253,11 +253,16 @@
         "floor",
         "practice floor",
         "descentstatus",
+        "descendend",
+        "descend auto",
+        "auto descend",
         "solo dungeon",
         "action points",
-        "ap"
+        "ap",
+        "stuck descent",
+        "idle fight"
       ],
-      "answer": "The Descent is a hundred-floor solo dungeon. `/descend` fights yer next monster; `/descend floor:n` replays a cleared floor for practice an' loot. `/descentstatus` shows floor, stats, an' lockouts. Three losses on a floor locks ye out 24 hours.",
+      "answer": "The Descent is a hundred-floor solo dungeon — only in Descent channels. `/descend` fights yer next monster; add `auto:True` to chain the next fight after each win. `/descend floor:n` replays a cleared floor for practice an' loot. Idle 3 minutes with no button counts as a loss; `/descendend` forfeits the same way so ye can start fresh. `/descentstatus` shows floor, stats, an' lockouts. Three losses on a floor locks ye out 24 hours. Every win binds that monster into yer army for castle sieges.",
       "link": "https://everything-velmora.netlify.app/descent"
     },
     {
@@ -269,8 +274,32 @@
         "practice +1",
         "replay floor"
       ],
-      "answer": "Replay a cleared floor with `/descend floor:n` (not bosses). Practice can sharpen ye with a free stat pick \u2014 closer floors more often. Spend any pending stat pick first, or the grind won't award another.",
+      "answer": "Replay a cleared floor with `/descend floor:n` (not bosses). Practice can sharpen ye with a free stat pick \u2014 closer floors more often. Spend any pending stat pick first, or the grind won't award another. Practice wins still bind monsters into yer army.",
       "link": "https://everything-velmora.netlify.app/descent"
+    },
+    {
+      "id": "castles_army",
+      "keywords": [
+        "castle",
+        "castles",
+        "army",
+        "pvp",
+        "siege",
+        "reinforce",
+        "abandon castle",
+        "garrison",
+        "sacrifice army",
+        "deadlock keep",
+        "fifth muster",
+        "surestroke",
+        "triple tithe",
+        "prelude bastion",
+        "bannerhall",
+        "hold a castle",
+        "castle perk"
+      ],
+      "answer": "Castle PvP lives in the castles channel. Descent wins bind monsters into yer army — `/army` shows the roster (castles + Descent channels) an' lets ye sacrifice 500 regulars for ATK or DEF. `/castles` opens the map: reinforce anytime (not mid-assault), siege on Wed & Sat (Chicago), or abandon. One castle per player. Before PvP goes live, binds are uncapped; once live it's 200/day an' 5,000 total. Each keep has a perk (duel ties, Descent half-attack, `/cast` auto-pick, an' more) — full list on the Compendium Castles page.",
+      "link": "https://everything-velmora.netlify.app/castles"
     },
     {
       "id": "quidditch",

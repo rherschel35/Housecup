@@ -5,11 +5,11 @@
 <script>try{var t=localStorage.getItem('vc-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 </head><body>
 <header class="top"><div class="top-in"><a class="brand" href="index.html">Velmora <span>Compendium</span></a>
-<nav class="nav" aria-label="Sections"><a href="index.html">Home</a><a href="houses.html">Houses &amp; Cup</a><a href="ghosts.html">Ghosts</a><a href="explore.html">Explore</a><a href="beasts.html">Beasts</a><a href="duels.html">Duels &amp; Threats</a><a href="descent.html">Descent</a><a href="quidditch.html">Quidditch</a><a href="magic.html">Wands &amp; Familiars</a><a href="brooms.html">Brooms</a><a href="cards.html">Cards &amp; Gear</a><a href="tales.html">Tales</a><a href="commands.html" aria-current="page">Commands</a></nav>
+<nav class="nav" aria-label="Sections"><a href="index.html">Home</a><a href="houses.html">Houses &amp; Cup</a><a href="ghosts.html">Ghosts</a><a href="explore.html">Explore</a><a href="beasts.html">Beasts</a><a href="duels.html">Duels &amp; Threats</a><a href="descent.html">Descent</a><a href="castles.html">Castles</a><a href="quidditch.html">Quidditch</a><a href="magic.html">Wands &amp; Familiars</a><a href="brooms.html">Brooms</a><a href="cards.html">Cards &amp; Gear</a><a href="tales.html">Tales</a><a href="commands.html" aria-current="page">Commands</a></nav>
 <button class="theme" type="button" onclick="(function(){var d=document.documentElement,n=(d.dataset.theme==='dark'||(!d.dataset.theme&&matchMedia('(prefers-color-scheme: dark)').matches))?'light':'dark';d.dataset.theme=n;try{localStorage.setItem('vc-theme',n)}catch(e){}})()">Light / dark</button>
 </div></header>
 <main class="wrap">
-<div class="head"><p class="eyebrow">Velmora · quick reference</p><h1>Every Command</h1><p class="lede">Every command a student can use. Staff commands are left out.</p><nav class="jump" aria-label="On this page"><a href="#play">Play</a><a href="#market">Marketplace</a><a href="#descent">The Descent</a><a href="#potions">Potions</a><a href="#quidditch">Quidditch</a><a href="#explore">Explore Velmora</a><a href="#beasts">Beasts</a><a href="#adornments">Your wizard &amp; gear</a><a href="#challenges">Challenges</a><a href="#standing">Your standing</a></nav></div>
+<div class="head"><p class="eyebrow">Velmora · quick reference</p><h1>Every Command</h1><p class="lede">Every command a student can use. Staff commands are left out.</p><nav class="jump" aria-label="On this page"><a href="#play">Play</a><a href="#market">Marketplace</a><a href="#descent">The Descent</a><a href="#castles">Castles &amp; Army</a><a href="#potions">Potions</a><a href="#quidditch">Quidditch</a><a href="#explore">Explore Velmora</a><a href="#beasts">Beasts</a><a href="#adornments">Your wizard &amp; gear</a><a href="#challenges">Challenges</a><a href="#standing">Your standing</a></nav></div>
 
 <section id="play"><h2>Play</h2><ul class="cmds">
 <li><code>/duel</code> Challenge someone. Best of three, spells chosen in secret.</li>
@@ -56,11 +56,20 @@
 </ul></section>
 
 <section id="descent"><h2>The Descent</h2>
-<p class="sub">Solo 100-floor dungeon — only in Descent channels. Practice cleared floors with <code>/descend floor:n</code> for loot; nearby floors can sharpen a free stat pick.</p>
+<p class="sub">Solo 100-floor dungeon — only in Descent channels. Practice cleared floors with <code>/descend floor:n</code> for loot; nearby floors can sharpen a free stat pick. Wins bind monsters into your army for castle sieges. <code>/descend auto:True</code> chains the next fight after each win. Idle 3 minutes with no button counts as a loss.</p>
 <ul class="cmds">
-<li><code>/descend</code> Fight the next monster on your floor (or resume an open fight).</li>
+<li><code>/descend</code> Fight the next monster on your floor (or resume an open fight). Use <code>auto:True</code> to chain wins.</li>
 <li><code>/descend floor:&lt;n&gt;</code> Replay a floor you&#x27;ve already cleared, for loot (and a chance to sharpen if it&#x27;s in range).</li>
+<li><code>/descendend</code> Forfeit an open fight (counts as a loss). Idle 3 min with no button also loses. Staff can <code>/descendend @member</code>.</li>
 <li><code>/descentstatus</code> Your floor, monster progress, stats, Max AP, and lockout.</li>
+<li><code>/army</code> Full army roster (paged) + sacrifice 500 → ATK/DEF — also works here in Descent channels.</li>
+</ul></section>
+
+<section id="castles"><h2>Castles &amp; Army</h2>
+<p class="sub">Army PvP in the castles channel. Bind Descent monsters, hold one of six castles, siege on Wed &amp; Sat (Chicago). Reinforce anytime except mid-assault. One castle per player — abandon before attacking another. See the <a href="castles.html">Castles</a> page.</p>
+<ul class="cmds">
+<li><code>/castles</code> Map board: owners, perks, reinforce anytime (not mid-assault), siege, abandon.</li>
+<li><code>/army</code> Full paged roster + sacrifice 500 → ATK/DEF (castles + Descent channels). Size (5,000) and daily bind caps (200/day) start when PvP goes live.</li>
 </ul></section>
 
 <section id="potions"><h2>Potions</h2>
