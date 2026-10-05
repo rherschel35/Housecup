@@ -724,22 +724,20 @@ class Adornments(commands.Cog):
             name = title if part == 0 else f"{title} (cont.)"
             embed.add_field(name=name, value="\n".join(chunk), inline=False)
 
-    @app_commands.command(
-        name="crafts",
-        description="Your craft book: recipes, ingredient dots, and earned gear goals.",
-    )
-    async def crafts(self, interaction: discord.Interaction):
-        uid = interaction.user.id
-        await self.check_member(interaction.user)
-        owned = self.peek(uid).get("owned", {})
+    def _crafts_embed(
+        self,
+        member: discord.abc.User,
+        *,
+        owned: dict,
+        have: dict,
+        compact: bool = False,
+    ) -> discord.Embed:
+        """Build the /crafts book. compact=True drops perk lines to stay under Discord's
+        6000-character embed cap (the full book was blowing past it and failing)."""
         craftable_keys = crafted()
         earned_keys = earned()
         owned_crafted = [k for k in craftable_keys if k in owned]
         owned_earned = [k for k in earned_keys if k in owned]
-        world = self.bot.get_cog("World")
-        have = {}
-        if world:
-            have = world.state["students"].get(str(uid), {}).get("items", {})
 
         desc = (
             f"**{len(owned_crafted)} of {len(craftable_keys)}** crafted · "
@@ -747,7 +745,7 @@ class Adornments(commands.Cog):
             f"`/craft` for cosmetics · earn the rest by playing"
         )
         embed = discord.Embed(
-            title=f"{interaction.user.display_name}'s Crafts",
+            title=f"{member.display_name}'s Crafts",
             description=desc,
             color=GOLD,
         )
@@ -775,11 +773,17 @@ class Adornments(commands.Cog):
             else:
                 tag = "🔨 not yet"
             slot_emoji = SLOTS[g["slot"]][1]
-            line = (
-                f"{slot_emoji} **{g['name']}** — {tag}\n"
-                f"　{self._recipe_owned_line(recipe, have)}\n"
-                f"　*{gear_benefit(key)}*"
-            )
+            if compact:
+                line = (
+                    f"{slot_emoji} **{g['name']}** — {tag}\n"
+                    f"　{self._recipe_owned_line(recipe, have)}"
+                )
+            else:
+                line = (
+                    f"{slot_emoji} **{g['name']}** — {tag}\n"
+                    f"　{self._recipe_owned_line(recipe, have)}\n"
+                    f"　*{gear_benefit(key)}*"
+                )
             by_tier[g["rarity"]].append(line)
 
         tier_titles = {
@@ -800,17 +804,67 @@ class Adornments(commands.Cog):
             g = GEAR[key]
             tag = "✅ owned" if key in owned else "🔒 earn"
             slot_emoji = SLOTS[g["slot"]][1]
-            earned_lines.append(
-                f"{slot_emoji} **{g['name']}** — {tag}\n"
-                f"　*{g['earn_text']}*\n"
-                f"　*{gear_benefit(key)}*"
-            )
+            if compact:
+                earned_lines.append(
+                    f"{slot_emoji} **{g['name']}** — {tag}\n"
+                    f"　*{g['earn_text']}*"
+                )
+            else:
+                earned_lines.append(
+                    f"{slot_emoji} **{g['name']}** — {tag}\n"
+                    f"　*{g['earn_text']}*\n"
+                    f"　*{gear_benefit(key)}*"
+                )
         self._add_trimmed_fields(embed, "🏆 Earned (perks)", earned_lines)
 
         embed.set_footer(
-            text="🟢 enough · 🔴 missing · 🔒 earn = achievement gear (can't craft) · /craft <piece>"
+            text=(
+                "🟢 enough · 🔴 missing · 🔒 earn = achievement · /craft · "
+                "perks also on /jewelbox"
+            )
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return embed
+
+    @staticmethod
+    def _embed_size(embed: discord.Embed) -> int:
+        n = len(embed.title or "") + len(embed.description or "")
+        n += len(embed.footer.text or "") if embed.footer else 0
+        for field in embed.fields:
+            n += len(field.name or "") + len(field.value or "")
+        return n
+
+    @app_commands.command(
+        name="crafts",
+        description="Your craft book: recipes, ingredient dots, and earned gear goals.",
+    )
+    async def crafts(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            uid = interaction.user.id
+            await self.check_member(interaction.user)
+            owned = self.peek(uid).get("owned", {})
+            world = self.bot.get_cog("World")
+            have = {}
+            if world:
+                have = world.state.get("students", {}).get(str(uid), {}).get("items", {}) or {}
+
+            embed = self._crafts_embed(interaction.user, owned=owned, have=have, compact=False)
+            # Discord rejects embeds over ~6000 characters → "This interaction failed".
+            if self._embed_size(embed) > 5500 or len(embed.fields) > 25:
+                embed = self._crafts_embed(
+                    interaction.user, owned=owned, have=have, compact=True
+                )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception:
+            log.exception("/crafts failed for %s", interaction.user.id)
+            try:
+                await interaction.followup.send(
+                    "Couldn't open the craft book just now — try `/jewelbox`, "
+                    "or ask staff if it keeps failing.",
+                    ephemeral=True,
+                )
+            except discord.DiscordException:
+                pass
 
     # ================================================================ /craft
 

@@ -459,7 +459,8 @@ class Staff(commands.Cog):
             await interaction.followup.send(
                 "Slash commands synced (global + every joined guild overwritten). "
                 "Fully quit Discord and reopen `/` — `/familiar` should show "
-                "status / adopt / name / feed / pet / play / scout.",
+                "status / adopt / name / feed / pet / play / scout. "
+                "Top-level `/play` · `/feed` · `/pet` · `/scout` should be gone.",
                 ephemeral=True,
             )
         else:
