@@ -292,6 +292,18 @@ class Staff(commands.Cog):
             return
         await cog.staff_restore_schedule(interaction)
 
+    @castles.command(
+        name="pvplive",
+        description="Turn the 200/day army bind cap on (season live) or off (pre-season uncapped).",
+    )
+    @app_commands.describe(live="True = PvP season live (200 binds/day). False = uncapped binds.")
+    async def castles_pvplive(self, interaction: discord.Interaction, live: bool):
+        cog = self._cog("Castles")
+        if not cog:
+            await interaction.response.send_message("Castles isn't loaded.", ephemeral=True)
+            return
+        await cog.staff_set_pvp_live(interaction, live)
+
     # ----------------------------------------------------------------- raid
 
     @raid.command(name="reset", description="Clear weekly lockout or end the active raid.")

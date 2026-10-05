@@ -349,15 +349,22 @@ class Castles(commands.Cog):
         self.state = _read(STATE_PATH, {})
         self.state.setdefault("castles", {})
         self.state.setdefault("players", {})
-        self.state.setdefault("pvp_live", True)
+        # Daily 200-bind cap only while PvP season is live. Pre-season: uncapped.
+        self.state.setdefault("pvp_live", False)
+        self.state.setdefault("pvp_live_staff_set", False)
         self.state.setdefault("siege_unlocked", False)  # staff: skip Wed/Sat + clear locks
         self.state.setdefault("sunday_paid", "")
         self.state.setdefault("bannerhall_week", "")
+        # Existing deploys defaulted pvp_live True before season start — reopen binds
+        # until staff explicitly flips the season on.
+        if not self.state.get("pvp_live_staff_set"):
+            self.state["pvp_live"] = False
         for key in CASTLE_ORDER:
             slot = self.state["castles"].setdefault(key, blank_castle())
             for k, v in blank_castle().items():
                 slot.setdefault(k, v)
         self._siege_tasks: dict[str, asyncio.Task] = {}
+        self.save()
 
     async def cog_load(self):
         self.sunday_loop.start()
@@ -473,9 +480,15 @@ class Castles(commands.Cog):
 
     # ================================================================ recruit cap / musters
 
+    def is_pvp_live(self) -> bool:
+        return bool(self.state.get("pvp_live"))
+
     def recruit_allowed(self, user_id: int, n: int = 1) -> int:
-        """How many of n recruits may join the army today (0 if capped)."""
-        if not self.state.get("pvp_live", True):
+        """How many of n recruits may join the army today (0 if capped).
+
+        Pre-season (`pvp_live` False): no daily cap — every Descent win binds.
+        """
+        if not self.is_pvp_live():
             return n
         prec = self.prec(user_id)
         day = chicago_day()
@@ -486,7 +499,7 @@ class Castles(commands.Cog):
         return min(n, left)
 
     def note_recruits(self, user_id: int, n: int) -> None:
-        if n <= 0 or not self.state.get("pvp_live", True):
+        if n <= 0 or not self.is_pvp_live():
             return
         prec = self.prec(user_id)
         day = chicago_day()
@@ -858,6 +871,27 @@ class Castles(commands.Cog):
             msg += " (No sieges today.)"
         await interaction.response.send_message(msg, ephemeral=True)
 
+    async def staff_set_pvp_live(self, interaction: discord.Interaction, live: bool) -> None:
+        """Turn the 200/day army bind cap on (season live) or off (pre-season)."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        self.state["pvp_live"] = bool(live)
+        self.state["pvp_live_staff_set"] = True
+        self.save()
+        if live:
+            msg = (
+                f"🏰 Castle PvP marked **live** — Descent army binds capped at "
+                f"**{DAILY_RECRUIT_CAP}/day**."
+            )
+        else:
+            msg = (
+                "🏰 Castle PvP marked **not live** — Descent army binds are "
+                "**uncapped** (every win binds again)."
+            )
+        await interaction.response.send_message(msg, ephemeral=True)
+
     # ================================================================ commands
 
     @app_commands.command(name="castles", description="Castle map: owners, perks, reinforce, siege, abandon.")
@@ -909,10 +943,16 @@ class Castles(commands.Cog):
             title=f"⚔️ {member.display_name}'s Army",
             description=(
                 f"**{len(army)}** bound ({bosses} bosses) · Castle: **{held_txt}**\n"
-                f"Recruit today: **{recruits}/{DAILY_RECRUIT_CAP}**\n"
+                + (
+                    f"Recruit today: **uncapped** (PvP not live yet)\n"
+                    if not self.is_pvp_live()
+                    else f"Recruit today: **{recruits}/{DAILY_RECRUIT_CAP}**\n"
+                )
+                + (
                 f"Sacrifice bonuses: ATK **{format_bonus_pct(atk_pct)}** · "
                 f"DEF **{format_bonus_pct(def_pct)}** "
                 f"(burn {SACRIFICE_COUNT} regulars; rate by floor)"
+                )
             ),
             color=STONE,
         )
