@@ -435,11 +435,7 @@ class Staff(commands.Cog):
             return
         await cog.do_reset(interaction)
 
-    @staff.command(
-        name="sync",
-        description="Force-push the slash command tree to Discord (fixes stale /feed · /familiar).",
-    )
-    async def staff_sync(self, interaction: discord.Interaction):
+    async def _run_command_sync(self, interaction: discord.Interaction) -> None:
         store = self.bot.get_cog("Store")
         if not (store and store.is_staff(interaction.user)):
             await interaction.response.send_message("That's for staff.", ephemeral=True)
@@ -457,10 +453,10 @@ class Staff(commands.Cog):
             return
         if ok:
             await interaction.followup.send(
-                "Slash commands wiped + reinstalled (global + every joined guild). "
-                "Fully quit Discord and reopen `/` — `/familiar` should show "
-                "status / adopt / name / feed / pet / play / scout. "
-                "Top-level `/play` · `/feed` · `/pet` · `/scout` should be gone.",
+                "Global commands pushed and guild slash lists wiped clean. "
+                "Fully quit Discord and reopen `/`.\n"
+                "• `/familiar` → status / adopt / name / feed / pet / play / scout\n"
+                "• Top-level `/play` · `/feed` · `/pet` · `/scout` should be gone",
                 ephemeral=True,
             )
         else:
@@ -469,6 +465,21 @@ class Staff(commands.Cog):
                 "Try again in a few minutes, or set FORCE_COMMAND_SYNC=1 and redeploy.",
                 ephemeral=True,
             )
+
+    @staff.command(
+        name="sync",
+        description="Force-push slash commands (clears stale /feed · /familiar).",
+    )
+    async def staff_sync(self, interaction: discord.Interaction):
+        await self._run_command_sync(interaction)
+
+    @app_commands.command(
+        name="synccmds",
+        description="Staff: wipe stale guild slash commands and refresh Discord's command list.",
+    )
+    async def synccmds(self, interaction: discord.Interaction):
+        """Top-level alias — easier to find on mobile than /staff → sync."""
+        await self._run_command_sync(interaction)
 
 
 async def setup(bot: commands.Bot):
