@@ -266,13 +266,13 @@ class Checklist(commands.Cog):
                 scout_ready = not day.get("scouted")
                 lines.append(_line(
                     care_left == 0, "Familiar care",
-                    f"**{care_left}/3** left (feed/pet/play)", chi_reset, "day resets"))
+                    f"**{care_left}/3** left (`/familiar` feed·pet·play)", chi_reset, "day resets"))
                 lines.append(_line(
                     not scout_ready, "Familiar scout",
                     "ready (small chance of bonus pts)" if scout_ready else "already sent",
                     chi_reset, "day resets"))
             else:
-                lines.append("⬜ **Familiar** — none yet · adopt with `/familiar`")
+                lines.append("⬜ **Familiar** — none yet · `/familiar adopt`")
 
         # ---- Open challenges ----
         quests = self.bot.get_cog("Quests")
