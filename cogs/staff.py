@@ -435,6 +435,40 @@ class Staff(commands.Cog):
             return
         await cog.do_reset(interaction)
 
+    @staff.command(
+        name="sync",
+        description="Force-push the slash command tree to Discord (fixes stale /feed · /familiar).",
+    )
+    async def staff_sync(self, interaction: discord.Interaction):
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        try:
+            import bot as bot_module
+
+            ok = await bot_module.sync_commands(force=True)
+        except Exception:
+            log.exception("Staff-forced command sync failed")
+            await interaction.followup.send(
+                "Command sync crashed — check the bot logs.", ephemeral=True
+            )
+            return
+        if ok:
+            await interaction.followup.send(
+                "Slash commands synced (global + guild overwrite). "
+                "Discord may take a minute to refresh — reopen the `/` menu. "
+                "Familiar care is now `/familiar feed` · `pet` · `play` · `scout`.",
+                ephemeral=True,
+            )
+        else:
+            await interaction.followup.send(
+                "Sync didn't finish cleanly (rate limit or timeout). "
+                "Try again in a few minutes, or set FORCE_COMMAND_SYNC=1 and redeploy.",
+                ephemeral=True,
+            )
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Staff(bot))

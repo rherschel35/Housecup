@@ -34,6 +34,9 @@ DEV_GUILD_ID = os.getenv("DEV_GUILD_ID")  # optional: instant command sync while
 # tree actually changed. Set FORCE_COMMAND_SYNC=1 to push anyway.
 FORCE_COMMAND_SYNC = os.getenv("FORCE_COMMAND_SYNC", "").strip() in ("1", "true", "True", "yes")
 SYNC_TIMEOUT_SECONDS = int(os.getenv("COMMAND_SYNC_TIMEOUT", "45"))
+# Bump when sync *behavior* changes (e.g. also overwrite guild commands) so
+# the next boot re-PUTs even if the slash tree fingerprint is unchanged.
+COMMAND_SYNC_REVISION = 2
 # Chess & checkers load by default. Set ENABLE_BOARD_GAMES=0 to unload them.
 _ENABLE_BOARD_GAMES_RAW = os.getenv("ENABLE_BOARD_GAMES", "1").strip().lower()
 ENABLE_BOARD_GAMES = _ENABLE_BOARD_GAMES_RAW not in ("0", "false", "no", "off", "")
@@ -133,6 +136,7 @@ def _command_payload() -> list:
 def _fingerprint(mode: str, targets: set[int]) -> str:
     blob = json.dumps(
         {
+            "revision": COMMAND_SYNC_REVISION,
             "mode": mode,
             "targets": sorted(targets),
             "commands": _command_payload(),
@@ -183,19 +187,25 @@ async def _run_sync(coro, label: str):
         return None
 
 
-async def sync_commands():
+async def sync_commands(*, force: bool = False):
     """Register slash commands only when the tree (or sync mode) changed.
 
     Railway redeploys on every GitHub push. Re-PUTting the whole command tree
     on each boot burned Discord's daily create budget and froze the bot. Skip
-    when nothing changed; FORCE_COMMAND_SYNC=1 overrides.
+    when nothing changed; FORCE_COMMAND_SYNC=1 (or force=True) overrides.
+
+    When syncing globally we also overwrite each allowed guild's command list.
+    Stale guild commands (from older guild-scoped syncs) shadow globals and can
+    leave dead `/feed` · `/play` entries that "do not respond".
     """
     # on_ready fires again after every reconnect; syncing once per start is
-    # enough, and avoids hammering Discord's rate limits.
+    # enough, and avoids hammering Discord's rate limits. Staff /staff sync
+    # may call again with force=True in the same process.
     global _synced
-    if _synced:
-        return
-    _synced = True
+    if _synced and not force:
+        return True
+    if not force:
+        _synced = True
 
     targets = set(ALLOWED_GUILD_IDS or ())
     if DEV_GUILD_ID:
@@ -206,7 +216,8 @@ async def sync_commands():
     previous = _load_sync_state()
 
     if (
-        not FORCE_COMMAND_SYNC
+        not force
+        and not FORCE_COMMAND_SYNC
         and previous.get("fingerprint") == fingerprint
         and previous.get("mode") == mode
     ):
@@ -215,10 +226,13 @@ async def sync_commands():
             mode,
             fingerprint[:12],
         )
-        return
+        return True
 
-    if FORCE_COMMAND_SYNC:
-        log.info("FORCE_COMMAND_SYNC set - syncing even if unchanged.")
+    if force or FORCE_COMMAND_SYNC:
+        log.info(
+            "%s - syncing slash commands with Discord.",
+            "Staff-forced sync" if force else "FORCE_COMMAND_SYNC set",
+        )
     else:
         log.info(
             "Slash commands changed (%s -> %s, %s mode) - syncing with Discord.",
@@ -233,6 +247,23 @@ async def sync_commands():
         if synced is not None:
             log.info("Synced %d global commands", len(synced))
             ok = True
+            # Overwrite guild command lists so old guild-scoped registrations
+            # (e.g. pre-group /feed /play) stop shadowing the new tree.
+            for guild_id in targets:
+                guild = discord.Object(id=guild_id)
+                bot.tree.copy_global_to(guild=guild)
+                guild_synced = await _run_sync(
+                    bot.tree.sync(guild=guild),
+                    f"Guild command overwrite ({guild_id})",
+                )
+                if guild_synced is None:
+                    ok = False
+                    break
+                log.info(
+                    "Overwrote %d guild commands on server %s",
+                    len(guild_synced),
+                    guild_id,
+                )
     else:
         ok = True
         for guild_id in targets:
@@ -258,6 +289,7 @@ async def sync_commands():
                 log.info("Cleared global commands so nothing appears twice")
 
     if ok:
+        _synced = True
         _save_sync_state(
             {
                 "fingerprint": fingerprint,
@@ -271,6 +303,7 @@ async def sync_commands():
             "Command sync did not finish cleanly - not saving fingerprint, "
             "so the next boot will retry."
         )
+    return ok
 
 
 @bot.event
