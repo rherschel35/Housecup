@@ -303,10 +303,33 @@ def sim_clash(
     """One clash: each side deals damage = power; kills scale with that, not headcount %.
 
     Old formula applied a ~30%+ loss fraction to defender *count*, so a 1-troop
-    poke could wipe a third of a huge garrison. Damage soak uses unit power.
+    poke (or even an empty march) could wipe a third of a huge garrison.
+    Damage soak uses unit power. Empty attackers deal no damage.
     """
     att = [dict(u) for u in attackers]
     deff = [dict(u) for u in defenders]
+
+    # No one left to fight — do not touch the garrison.
+    if not att:
+        def_power = sum(
+            unit_power(u, side="defend", wall=wall, atk_pct=atk_pct, def_pct=def_pct)
+            for u in deff
+        )
+        return {
+            "att_deployed": 0,
+            "def_deployed": len(deff),
+            "att_killed": [],
+            "def_killed": [],
+            "att_remaining": [],
+            "def_remaining": deff,
+            "cleared": False,
+            "att_power": 0,
+            "def_power": int(def_power),
+            "att_floors": force_floor_summary([]),
+            "def_floors": force_floor_summary(deff),
+            "empty_attack": True,
+        }
+
     if not deff:
         return {
             "att_deployed": len(att),
@@ -979,6 +1002,68 @@ class Castles(commands.Cog):
             )
         await interaction.response.send_message(msg, ephemeral=True)
 
+    async def staff_seed_army(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        count: int = 350,
+        floor: int = 69,
+        clear: bool = False,
+    ) -> None:
+        """Staff test helper: inject fake Descent army units onto a player."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        descent = self._descent()
+        if not descent:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+
+        count = max(1, min(int(count), 2000))
+        floor = max(1, min(int(floor), 100))
+
+        from cogs.descent import ELEMENTS, monster_stats
+
+        rec = descent.record(member.id)
+        if clear:
+            rec["army"] = []
+        army = rec.setdefault("army", [])
+        seq = int(rec.get("army_seq", 0) or 0)
+        hp, atk, deff = monster_stats(floor, False)
+        added = 0
+        for i in range(count):
+            seq += 1
+            el = ELEMENTS[i % len(ELEMENTS)]
+            army.append(
+                {
+                    "id": seq,
+                    "name": f"Test {el.title()}",
+                    "emoji": "🧪",
+                    "element": el,
+                    "kind": "staff_seed",
+                    "floor": floor,
+                    "boss": False,
+                    "practice": False,
+                    "hp": int(hp),
+                    "atk": int(atk),
+                    "def": int(deff),
+                    "at": int(time.time()),
+                }
+            )
+            added += 1
+        rec["army_seq"] = seq
+        descent.save()
+        total = len(army)
+        owned = self.army_owned_count(member.id)
+        await interaction.response.send_message(
+            f"🧪 Seeded **{added}** floor-**{floor}** troops for {member.mention} "
+            f"(cleared first: **{clear}**).\n"
+            f"Home army: **{total}** · owned (home+garrison+march): **{owned}**.\n"
+            f"Use `/army` to inspect; reinforce/siege as usual.",
+            ephemeral=True,
+        )
+
     # ================================================================ commands
 
     @app_commands.command(name="castles", description="Castle map: owners, perks, reinforce, siege, abandon.")
@@ -1150,10 +1235,20 @@ class Castles(commands.Cog):
             await interaction.followup.send("The 10-minute assault clock ran out. Castle locked 20 minutes.")
             return
 
+        force = list(siege.get("attack_force") or [])
+        if not force:
+            # Prior clash wiped the march; "Attack again" must not ghost-kill the garrison.
+            self.end_siege(key, lock=True, return_attackers=False)
+            await interaction.followup.send(
+                f"💀 **{interaction.user.display_name}**'s march on **{CASTLES[key]['name']}** "
+                "is gone — no troops left to send. Assault ends; castle locked 20 minutes."
+            )
+            return
+
         meta = CASTLES[key]
         owner_id = slot.get("owner_id")
         report = sim_clash(
-            siege.get("attack_force") or [],
+            force,
             slot.get("garrison") or [],
             wall=meta["wall"],
             atk_pct=self.army_atk_pct(attacker_id),
@@ -1165,6 +1260,12 @@ class Castles(commands.Cog):
         attacker = interaction.user
         embed = self.battle_report_embed(key, report, attacker)
 
+        if report.get("empty_attack"):
+            self.end_siege(key, lock=True, return_attackers=False)
+            embed.set_footer(text="No attackers left — assault ends; castle locked 20 minutes.")
+            await interaction.followup.send(embed=embed)
+            return
+
         if report["cleared"]:
             store = self.bot.get_cog("Store")
             house = store.member_house(attacker) if store else None
@@ -1175,6 +1276,13 @@ class Castles(commands.Cog):
                 self.return_units_to_army(attacker.id, survivors)
             self.assign_castle(key, attacker, house)
             embed.description = (embed.description or "") + f"\n\n🏰 **{attacker.display_name}** captures **{meta['name']}**!"
+            await interaction.followup.send(embed=embed)
+            return
+
+        # March wiped — end assault; don't offer Attack again with 0 troops.
+        if not report.get("att_remaining"):
+            self.end_siege(key, lock=True, return_attackers=False)
+            embed.set_footer(text="Attackers wiped — assault ends; castle locked 20 minutes.")
             await interaction.followup.send(embed=embed)
             return
 

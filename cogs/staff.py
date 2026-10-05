@@ -307,6 +307,30 @@ class Staff(commands.Cog):
             return
         await cog.staff_set_pvp_live(interaction, live)
 
+    @castles.command(
+        name="seedarmy",
+        description="Staff test: add fake Descent army troops to a player.",
+    )
+    @app_commands.describe(
+        member="Who gets the troops",
+        count="How many to add (default 350, max 2000)",
+        floor="Descent floor stats to use (default 69)",
+        clear="Wipe their home army first, then seed",
+    )
+    async def castles_seedarmy(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        count: app_commands.Range[int, 1, 2000] = 350,
+        floor: app_commands.Range[int, 1, 100] = 69,
+        clear: bool = False,
+    ):
+        cog = self._cog("Castles")
+        if not cog:
+            await interaction.response.send_message("Castles isn't loaded.", ephemeral=True)
+            return
+        await cog.staff_seed_army(interaction, member, count=count, floor=floor, clear=clear)
+
     # ----------------------------------------------------------------- raid
 
     @raid.command(name="reset", description="Clear weekly lockout or end the active raid.")
