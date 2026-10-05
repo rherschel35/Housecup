@@ -83,7 +83,7 @@ HELP = {
                  "One castle per player — abandon before attacking another."),
         "entries": [
             ("castles", "Map board: owners, perks, reinforce anytime (not mid-assault), siege, abandon."),
-            ("army", "Your roster, daily recruit cap, and floor-based ATK/DEF sacrifice bonuses."),
+            ("army", "Your roster, recruit progress (uncapped until PvP goes live), and floor-based ATK/DEF sacrifice bonuses."),
         ],
     },
     "potions": {
@@ -245,6 +245,7 @@ HELP = {
             ("staff descent reset", "Wipe someone's Descent progress back to floor 1."),
             ("staff castles unlock", "Clear all castle lock timers and allow sieges any day."),
             ("staff castles schedule", "Restore normal Wed/Sat siege days after a staff unlock."),
+            ("staff castles pvplive", "Turn 200/day army binds on (season live) or off (pre-season uncapped)."),
             ("staff raid reset", "Clear a player's 3Raid weekly lockout, or end the active raid."),
             ("staff market sellreset", "Clear someone's daily Marketplace sell-points cap."),
             ("staff hex cast", "Curse a student — chat mangles, or Limp Wand (blocks /wand, /patronus, /broom, /cast for 1 hour)."),
