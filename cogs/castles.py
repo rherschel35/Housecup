@@ -54,8 +54,15 @@ DECISION_SECONDS = 30
 LOCK_SECONDS = 20 * 60
 
 SACRIFICE_COUNT = 500
-ATK_STEP_BONUS = 0.05   # +5% army ATK per sacrifice step
-DEF_STEP_BONUS = 0.05
+# Per-monster sacrifice boost (percent points added to army ATK or DEF).
+# Example: floor 10–39 → +0.00002% each.
+SACRIFICE_PCT_BANDS = (
+    (10, 39, 0.00002),
+    (40, 69, 0.00004),
+    (70, 90, 0.0001),
+    (91, 100, 0.00014),
+)
+LEGACY_STEP_PCT = 5.0  # old flat ladder was +5% per 500-sacrifice step
 WALL_DEF_MULT = 1.55    # matching wall-type troops
 BOSS_WALL_DEF_MULT = 1.75  # Bannerhall boss wall
 
@@ -186,7 +193,9 @@ def blank_castle() -> dict:
 
 def blank_player() -> dict:
     return {
-        "army_atk_steps": 0,
+        "army_atk_pct": 0.0,   # cumulative % points from sacrifices
+        "army_def_pct": 0.0,
+        "army_atk_steps": 0,   # legacy; migrated into army_*_pct
         "army_def_steps": 0,
         "recruit_day": "",
         "recruits_today": 0,
@@ -194,14 +203,33 @@ def blank_player() -> dict:
     }
 
 
-def unit_power(unit: dict, *, side: str, wall: str, atk_steps: int, def_steps: int) -> float:
+def sacrifice_pct_for_unit(unit: dict) -> float:
+    """Percent-point boost one sacrificed regular grants (0 if below floor 10)."""
+    fl = int(unit.get("floor") or 0)
+    for lo, hi, pct in SACRIFICE_PCT_BANDS:
+        if lo <= fl <= hi:
+            return pct
+    return 0.0
+
+
+def format_bonus_pct(pct: float) -> str:
+    if abs(pct) < 1e-15:
+        return "+0%"
+    # Enough decimals for the tiny per-monster rates; trim trailing zeros.
+    text = f"{pct:.8f}".rstrip("0").rstrip(".")
+    if not text.startswith("-"):
+        text = "+" + text
+    return text + "%"
+
+
+def unit_power(unit: dict, *, side: str, wall: str, atk_pct: float, def_pct: float) -> float:
     hp = max(1, int(unit.get("hp") or 1))
     atk = max(1, int(unit.get("atk") or 1))
     deff = max(1, int(unit.get("def") or 1))
     base = hp * 0.12 + (atk if side == "attack" else deff)
     if side == "attack":
-        return base * (1.0 + atk_steps * ATK_STEP_BONUS)
-    mult = 1.0 + def_steps * DEF_STEP_BONUS
+        return base * (1.0 + float(atk_pct) / 100.0)
+    mult = 1.0 + float(def_pct) / 100.0
     el = (unit.get("element") or "").lower()
     if wall == "boss" and unit.get("boss"):
         mult *= BOSS_WALL_DEF_MULT
@@ -215,8 +243,8 @@ def sim_clash(
     defenders: list[dict],
     *,
     wall: str,
-    atk_steps: int,
-    def_steps: int,
+    atk_pct: float,
+    def_pct: float,
     rng: random.Random,
 ) -> dict:
     """One Evony-style clash. Returns killed lists + remaining."""
@@ -235,8 +263,8 @@ def sim_clash(
             "def_power": 0,
         }
 
-    att_power = sum(unit_power(u, side="attack", wall=wall, atk_steps=atk_steps, def_steps=def_steps) for u in att)
-    def_power = sum(unit_power(u, side="defend", wall=wall, atk_steps=atk_steps, def_steps=def_steps) for u in deff)
+    att_power = sum(unit_power(u, side="attack", wall=wall, atk_pct=atk_pct, def_pct=def_pct) for u in att)
+    def_power = sum(unit_power(u, side="defend", wall=wall, atk_pct=atk_pct, def_pct=def_pct) for u in deff)
     # Light noise so identical armies aren't deterministic forever.
     att_power *= rng.uniform(0.92, 1.08)
     def_power *= rng.uniform(0.92, 1.08)
@@ -356,7 +384,20 @@ class Castles(commands.Cog):
         r = self.state["players"].setdefault(str(user_id), blank_player())
         for k, v in blank_player().items():
             r.setdefault(k, v)
+        # One-time migrate old flat +5%/step ladder into cumulative % points.
+        if not r.get("_pct_migrated"):
+            if float(r.get("army_atk_pct") or 0) == 0 and int(r.get("army_atk_steps") or 0):
+                r["army_atk_pct"] = int(r["army_atk_steps"]) * LEGACY_STEP_PCT
+            if float(r.get("army_def_pct") or 0) == 0 and int(r.get("army_def_steps") or 0):
+                r["army_def_pct"] = int(r["army_def_steps"]) * LEGACY_STEP_PCT
+            r["_pct_migrated"] = True
         return r
+
+    def army_atk_pct(self, user_id: int) -> float:
+        return float(self.prec(user_id).get("army_atk_pct") or 0)
+
+    def army_def_pct(self, user_id: int) -> float:
+        return float(self.prec(user_id).get("army_def_pct") or 0)
 
     def castle(self, key: str) -> dict:
         return self.state["castles"][key]
@@ -862,16 +903,27 @@ class Castles(commands.Cog):
             f"{' · boss' if u.get('boss') else ''})"
             for u in recent
         ) or "*Empty — win Descent fights to bind monsters.*"
+        atk_pct = self.army_atk_pct(member.id)
+        def_pct = self.army_def_pct(member.id)
         embed = discord.Embed(
             title=f"⚔️ {member.display_name}'s Army",
             description=(
                 f"**{len(army)}** bound ({bosses} bosses) · Castle: **{held_txt}**\n"
                 f"Recruit today: **{recruits}/{DAILY_RECRUIT_CAP}**\n"
-                f"Sacrifice ladder: ATK **+{int(prec['army_atk_steps'] * ATK_STEP_BONUS * 100)}%** · "
-                f"DEF **+{int(prec['army_def_steps'] * DEF_STEP_BONUS * 100)}%** "
-                f"(spend {SACRIFICE_COUNT} regulars per step)"
+                f"Sacrifice bonuses: ATK **{format_bonus_pct(atk_pct)}** · "
+                f"DEF **{format_bonus_pct(def_pct)}** "
+                f"(burn {SACRIFICE_COUNT} regulars; rate by floor)"
             ),
             color=STONE,
+        )
+        embed.add_field(
+            name="Sacrifice rates (per monster)",
+            value=(
+                "F10–39 → **+0.00002%** · F40–69 → **+0.00004%**\n"
+                "F70–90 → **+0.0001%** · F91–100 → **+0.00014%**\n"
+                "F1–9 → no boost · bosses can't be sacrificed"
+            ),
+            inline=False,
         )
         embed.add_field(name="Troop mix", value=mix, inline=False)
         embed.add_field(name="Recent binds", value=recent_txt, inline=False)
@@ -884,19 +936,21 @@ class Castles(commands.Cog):
         fodder = [u for u in army if not u.get("boss")]
         if len(fodder) < SACRIFICE_COUNT:
             return False, f"Need **{SACRIFICE_COUNT}** regular monsters (you have {len(fodder)}). Bosses can't be sacrificed."
-        # Own a castle garrison uses some units — only sacrifice from home army (already).
-        fodder.sort(key=lambda u: int(u.get("hp") or 0))  # burn weakest
+        # Burn lowest floors first (cheapest value), then weakest HP — keep deep troops.
+        fodder.sort(key=lambda u: (int(u.get("floor") or 0), int(u.get("hp") or 0)))
         burn = fodder[:SACRIFICE_COUNT]
+        gained = sum(sacrifice_pct_for_unit(u) for u in burn)
         self.remove_units_from_army(user_id, burn)
         prec = self.prec(user_id)
-        if track == "atk":
-            prec["army_atk_steps"] = int(prec.get("army_atk_steps") or 0) + 1
-            label = f"Army ATK now +{int(prec['army_atk_steps'] * ATK_STEP_BONUS * 100)}%"
-        else:
-            prec["army_def_steps"] = int(prec.get("army_def_steps") or 0) + 1
-            label = f"Army DEF now +{int(prec['army_def_steps'] * DEF_STEP_BONUS * 100)}%"
+        key = "army_atk_pct" if track == "atk" else "army_def_pct"
+        prec[key] = float(prec.get(key) or 0) + gained
+        label = "ATK" if track == "atk" else "DEF"
         self.save()
-        return True, f"Sacrificed **{SACRIFICE_COUNT}** troops. {label}."
+        return True, (
+            f"Sacrificed **{SACRIFICE_COUNT}** troops for "
+            f"**{format_bonus_pct(gained)}** {label}. "
+            f"Army {label} now **{format_bonus_pct(float(prec[key]))}**."
+        )
 
     # ================================================================ siege runtime
 
@@ -917,15 +971,13 @@ class Castles(commands.Cog):
             return
 
         meta = CASTLES[key]
-        att_prec = self.prec(attacker_id)
         owner_id = slot.get("owner_id")
-        def_prec = self.prec(owner_id) if owner_id else blank_player()
         report = sim_clash(
             siege.get("attack_force") or [],
             slot.get("garrison") or [],
             wall=meta["wall"],
-            atk_steps=int(att_prec.get("army_atk_steps") or 0),
-            def_steps=int(def_prec.get("army_def_steps") or 0),
+            atk_pct=self.army_atk_pct(attacker_id),
+            def_pct=self.army_def_pct(owner_id) if owner_id else 0.0,
             rng=self.rng,
         )
         self.apply_clash_deaths(key, report)
