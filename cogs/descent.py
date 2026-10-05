@@ -1708,7 +1708,6 @@ class Descent(commands.Cog):
         castles = self.bot.get_cog("Castles")
         owned = castles.army_owned_count(interaction.user.id) if castles else len(army)
         if owned:
-            from cogs.castles import ARMY_CAP
             counts = army_floor_counts(army)
             floors = sorted(counts)
             band = ", ".join(
@@ -1716,8 +1715,13 @@ class Descent(commands.Cog):
             )
             if len(floors) > 8:
                 band = "… " + band
+            if castles and castles.is_pvp_live():
+                from cogs.castles import ARMY_CAP
+                size = f"**{owned}/{ARMY_CAP}**"
+            else:
+                size = f"**{owned}**"
             desc.append(
-                f"⚔️ Army: **{owned}/{ARMY_CAP}** bound"
+                f"⚔️ Army: {size} bound"
                 + (f" ({band})" if band else "")
             )
 
