@@ -94,8 +94,8 @@ CUSTOM_PATRONUSES: dict[str, dict] = {
             "**The griffin does not simply guard what it loves. It rises above "
             "it, sees where it is going, and then refuses to turn back.**"
         ),
-        "art": "Griffin_Pod.png",
-        "defeat_art": "Griffin_Pod_Defeat.png",
+        "art": "Griffin_Pod.jpg",
+        "defeat_art": "Griffin_Pod_Defeat.jpg",
     },
     "534422209968734209": {  # Mara
         "animal": "Margarita",
@@ -128,6 +128,44 @@ CUSTOM_PATRONUSES: dict[str, dict] = {
         ),
         "art": "Margarita_Mara.png",
         "defeat_art": "Margarita_Mara_Defeat.png",
+    },
+    "793895185896439838": {  # Saro
+        "animal": "Chimera",
+        "form": (
+            "Silver mist gathers and coils through the air, shimmering brighter "
+            "as it takes shape. First come the eyes of a lion, fierce and "
+            "unwavering, followed by the long, powerful head of a dragon. Great "
+            "dragon wings unfold from its back, scattering ribbons of luminous "
+            "silver through the darkness. It does not emerge gently. It arrives "
+            "like something ancient remembering exactly what it was made to protect."
+        ),
+        "reading": (
+            "You carry both the quiet independence of the lion and the untamed "
+            "power of the dragon. You know your own strength, and you have no "
+            "need to constantly prove it. You can stand alone when you have to, "
+            "but your strength becomes something far greater when you choose to "
+            "stand beside someone you love.\n\n"
+            "Your chimera knows that loyalty is not given freely. It is earned. "
+            "You are selective about who gets close enough to see the softer "
+            "parts of you, but once someone has earned their place, you protect "
+            "them with a ferocity that can surprise anyone who mistook your "
+            "independence for indifference.\n\n"
+            "The lion in your Patronus represents your courage, pride, and "
+            "unwavering sense of self. The dragon represents the part of you "
+            "that refuses to be diminished, controlled, or made smaller for "
+            "someone else's comfort. Its silver form reflects something deeper: "
+            "you have learned that your strength does not have to be loud to be "
+            "powerful.\n\n"
+            "When danger comes, the chimera doesn't simply defend you.\n\n"
+            "It rises.\n\n"
+            "Its wings spread wide, its lion's roar becomes a thunderous "
+            "dragon's cry, and the silver mist around it burns brighter until "
+            "there is nowhere left for darkness to hide.\n\n"
+            "It is not a creature that asks permission to exist.\n\n"
+            "It knows exactly what it is."
+        ),
+        "art": "Chimera_Saro.jpg",
+        "defeat_art": "Chimera_Saro_Defeat.jpg",
     },
 }
 
