@@ -94,8 +94,8 @@ CUSTOM_PATRONUSES: dict[str, dict] = {
             "**The griffin does not simply guard what it loves. It rises above "
             "it, sees where it is going, and then refuses to turn back.**"
         ),
-        "art": "Griffin_Pod.png",
-        "defeat_art": "Griffin_Pod_Defeat.png",
+        "art": "Griffin_Pod.jpg",
+        "defeat_art": "Griffin_Pod_Defeat.jpg",
     },
     "534422209968734209": {  # Mara
         "animal": "Margarita",
