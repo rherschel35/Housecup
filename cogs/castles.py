@@ -68,13 +68,18 @@ LEGACY_STEP_PCT = 5.0  # old flat ladder was +5% per 500-sacrifice step
 WALL_DEF_MULT = 1.55    # matching wall-type troops
 BOSS_WALL_DEF_MULT = 1.75  # Bannerhall boss wall
 # Assaults are bloody for the march, softer on the walls.
-ASSAULT_GARRISON_DAMAGE_FRAC = 0.55
+ASSAULT_GARRISON_DAMAGE_FRAC = 0.65
 # March takes amplified counter-strikes — charging a keep is costly.
-SIEGE_COUNTER_MULT = 6.0
+SIEGE_COUNTER_MULT = 3.8
 # Hard cap on defender headcount lost per clash while the defender leads on strike.
-ASSAULT_MAX_DEF_LOSS_FRAC = 0.35
+ASSAULT_MAX_DEF_LOSS_FRAC = 0.40
 # Average DEF this high cuts incoming army damage roughly in half.
-ARMY_DEF_MITIGATION_K = 250.0
+ARMY_DEF_MITIGATION_K = 220.0
+# Attacker avg floor must be within this many floors of the garrison avg to CLEAR.
+# Floor-40 vs floor-70 (gap 30) can never capture; floor-100 vs floor-70 can.
+FLOOR_CLEAR_MAX_GAP = 20
+# Below this att/def floor ratio, wall damage is crushed (outclassed poke).
+FLOOR_OUTCLASS_RATIO = 0.72
 
 DAILY_RECRUIT_CAP = 200
 ARMY_CAP = 5000  # total monsters (home + garrison + march) — only while PvP is live
@@ -135,6 +140,13 @@ def force_avg_def(
     return sum(
         unit_def(u, def_pct=def_pct, wall=wall, defending=defending) for u in units
     ) / len(units)
+
+
+def force_avg_floor(units: list[dict]) -> float:
+    floors = [int(u.get("floor") or 0) for u in units if int(u.get("floor") or 0) > 0]
+    if not floors:
+        return 0.0
+    return sum(floors) / len(floors)
 
 
 def force_sum_hp(units: list[dict]) -> int:
@@ -213,7 +225,9 @@ def sim_clash(
     - Strike = sum of ATK (attackers use sacrifice ATK%; defenders use theirs too)
     - Armor = average DEF (wall-element match boosts defending armor)
     - Damage = strike mitigated by enemy armor, then spent on HP (weakest first)
-    - Walls take a share-scaled slice of that damage so winning defenses aren't gutted
+    - Walls take a share-scaled slice; higher-floor marches hit much harder
+    - Cannot CLEAR if attacker avg floor is more than FLOOR_CLEAR_MAX_GAP below garrison
+      (floor-40 never captures floor-70 walls)
     """
     att = [dict(u) for u in attackers]
     deff = [dict(u) for u in defenders]
@@ -261,17 +275,37 @@ def sim_clash(
     att_armor = force_avg_def(att, def_pct=0.0, wall=wall, defending=False)
     def_armor = force_avg_def(deff, def_pct=def_pct, wall=wall, defending=True)
 
+    att_floor = force_avg_floor(att)
+    def_floor = force_avg_floor(deff)
+    floor_ratio = (att_floor / def_floor) if def_floor > 0 else 1.0
+    # Higher floors hit walls harder; outclassed marches barely scratch.
+    quality_wall = max(0.04, min(3.2, floor_ratio ** 2.3))
+    if floor_ratio < FLOOR_OUTCLASS_RATIO:
+        quality_wall = min(quality_wall, 0.06)
+    # Stronger march survives the counter better (reward quality).
+    quality_counter = max(0.28, min(1.45, (1.0 / max(floor_ratio, 0.4)) ** 1.35))
+
     # Light noise so identical armies aren't deterministic forever.
     att_strike *= rng.uniform(0.92, 1.08)
     def_strike *= rng.uniform(0.92, 1.08)
 
     raw_to_walls = army_mitigate(att_strike, def_armor)
-    raw_to_march = army_mitigate(def_strike, att_armor) * SIEGE_COUNTER_MULT
+    raw_to_march = army_mitigate(def_strike, att_armor) * SIEGE_COUNTER_MULT * quality_counter
 
-    # Walls take a fraction of mitigated strike; share softens underdog marches further.
     total_strike = max(att_strike + def_strike, 1.0)
     att_share = att_strike / total_strike
-    att_damage = raw_to_walls * ASSAULT_GARRISON_DAMAGE_FRAC * (0.35 + 0.65 * att_share)
+    share_factor = (0.35 + 0.65 * att_share)
+    # Big floor leads punch through full garrisons instead of dying to headcount.
+    if floor_ratio >= 1.35:
+        share_factor = 1.0
+        quality_wall = max(quality_wall, 2.8)
+        quality_counter = min(quality_counter, 0.28)
+        raw_to_march = army_mitigate(def_strike, att_armor) * SIEGE_COUNTER_MULT * quality_counter
+    elif floor_ratio >= 1.25:
+        share_factor = max(share_factor, 0.85)
+        quality_counter = min(quality_counter, 0.4)
+        raw_to_march = army_mitigate(def_strike, att_armor) * SIEGE_COUNTER_MULT * quality_counter
+    att_damage = raw_to_walls * ASSAULT_GARRISON_DAMAGE_FRAC * share_factor * quality_wall
     def_damage = raw_to_march
 
     def_killed, def_rem = _kill_by_hp(deff, att_damage)
@@ -282,8 +316,20 @@ def sim_clash(
             def_killed = def_killed[:max_loss]
             def_rem = overflow + def_rem
 
+    # Hard rule: outclassed marches cannot clear (e.g. floor-40 vs floor-70).
+    floor_gap = def_floor - att_floor
+    outclassed = floor_gap > FLOOR_CLEAR_MAX_GAP
+    if outclassed and not def_rem and deff:
+        # Leave the strongest defender standing — capture denied.
+        if def_killed:
+            survivor = def_killed.pop()  # last killed = highest HP among killed set order... 
+            # _kill_by_hp kills weakest first, so last in def_killed is the strongest killed.
+            def_rem = [survivor] + def_rem
+        else:
+            def_rem = [dict(deff[-1])]
+
     att_killed, att_rem = _kill_by_hp(att, def_damage)
-    cleared = len(def_rem) == 0
+    cleared = len(def_rem) == 0 and not outclassed
     return {
         "att_deployed": len(att),
         "def_deployed": len(deff),
@@ -300,6 +346,7 @@ def sim_clash(
         "def_stats": force_stat_summary(
             deff, atk_pct=def_atk_pct, def_pct=def_pct, wall=wall, defending=True
         ),
+        "outclassed": outclassed,
     }
 
 CASTLES: dict[str, dict] = {
@@ -998,6 +1045,13 @@ class Castles(commands.Cog):
         )
         if report.get("cleared"):
             embed.set_footer(text="Defense cleared — castle captured!")
+        elif report.get("outclassed"):
+            embed.set_footer(
+                text=(
+                    f"Garrison outclasses this march (need within {FLOOR_CLEAR_MAX_GAP} floors to capture) "
+                    f"· Attack again within {DECISION_SECONDS}s or the assault ends"
+                )
+            )
         else:
             embed.set_footer(text=f"Attack again within {DECISION_SECONDS}s or the assault ends · Pull back anytime")
         return embed
