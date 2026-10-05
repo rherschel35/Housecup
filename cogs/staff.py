@@ -457,9 +457,9 @@ class Staff(commands.Cog):
             return
         if ok:
             await interaction.followup.send(
-                "Slash commands synced (global + guild overwrite). "
-                "Discord may take a minute to refresh — reopen the `/` menu. "
-                "Familiar care is now `/familiar feed` · `pet` · `play` · `scout`.",
+                "Slash commands synced (global + every joined guild overwritten). "
+                "Fully quit Discord and reopen `/` — `/familiar` should show "
+                "status / adopt / name / feed / pet / play / scout.",
                 ephemeral=True,
             )
         else:
