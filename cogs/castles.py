@@ -242,6 +242,55 @@ def unit_power(unit: dict, *, side: str, wall: str, atk_pct: float, def_pct: flo
     return base * mult
 
 
+def force_floor_summary(units: list[dict]) -> str:
+    """Descent floor range for a force — shown on battle reports."""
+    floors = [int(u.get("floor") or 0) for u in units if int(u.get("floor") or 0) > 0]
+    if not floors:
+        return "— (no floor data)"
+    lo, hi = min(floors), max(floors)
+    avg = sum(floors) / len(floors)
+    if lo == hi:
+        return f"floor **{lo}** ({len(floors)} troops)"
+    return f"floors **{lo}–{hi}** (avg {avg:.0f}, {len(floors)} troops)"
+
+
+def _kill_by_damage(
+    units: list[dict],
+    damage: float,
+    *,
+    side: str,
+    wall: str,
+    atk_pct: float,
+    def_pct: float,
+) -> tuple[list[dict], list[dict]]:
+    """Spend damage on weakest units first (soak = that unit's combat power)."""
+    if not units or damage <= 0:
+        return [], [dict(u) for u in units]
+
+    copies = [dict(u) for u in units]
+    order = sorted(
+        range(len(copies)),
+        key=lambda i: unit_power(
+            copies[i], side=side, wall=wall, atk_pct=atk_pct, def_pct=def_pct
+        ),
+    )
+    killed_idx: set[int] = set()
+    rem = float(damage)
+    for i in order:
+        soak = max(
+            1.0,
+            unit_power(copies[i], side=side, wall=wall, atk_pct=atk_pct, def_pct=def_pct),
+        )
+        if rem + 1e-9 >= soak:
+            rem -= soak
+            killed_idx.add(i)
+        else:
+            break
+    killed = [copies[i] for i in range(len(copies)) if i in killed_idx]
+    remaining = [copies[i] for i in range(len(copies)) if i not in killed_idx]
+    return killed, remaining
+
+
 def sim_clash(
     attackers: list[dict],
     defenders: list[dict],
@@ -251,7 +300,11 @@ def sim_clash(
     def_pct: float,
     rng: random.Random,
 ) -> dict:
-    """One Evony-style clash. Returns killed lists + remaining."""
+    """One clash: each side deals damage = power; kills scale with that, not headcount %.
+
+    Old formula applied a ~30%+ loss fraction to defender *count*, so a 1-troop
+    poke could wipe a third of a huge garrison. Damage soak uses unit power.
+    """
     att = [dict(u) for u in attackers]
     deff = [dict(u) for u in defenders]
     if not deff:
@@ -265,33 +318,27 @@ def sim_clash(
             "cleared": True,
             "att_power": 0,
             "def_power": 0,
+            "att_floors": force_floor_summary(att),
+            "def_floors": force_floor_summary([]),
         }
 
-    att_power = sum(unit_power(u, side="attack", wall=wall, atk_pct=atk_pct, def_pct=def_pct) for u in att)
-    def_power = sum(unit_power(u, side="defend", wall=wall, atk_pct=atk_pct, def_pct=def_pct) for u in deff)
+    att_power = sum(
+        unit_power(u, side="attack", wall=wall, atk_pct=atk_pct, def_pct=def_pct) for u in att
+    )
+    def_power = sum(
+        unit_power(u, side="defend", wall=wall, atk_pct=atk_pct, def_pct=def_pct) for u in deff
+    )
     # Light noise so identical armies aren't deterministic forever.
     att_power *= rng.uniform(0.92, 1.08)
     def_power *= rng.uniform(0.92, 1.08)
-    total = max(att_power + def_power, 1.0)
-    att_share = att_power / total
-    def_share = def_power / total
 
-    # Stronger side loses fewer; loser loses more. Cap so a clash never wipes both sides fully unless one is tiny.
-    att_loss_frac = min(0.85, 0.25 + def_share * 0.7)
-    def_loss_frac = min(0.95, 0.30 + att_share * 0.75)
-    att_kill_n = min(len(att), int(round(len(att) * att_loss_frac)))
-    def_kill_n = min(len(deff), int(round(len(deff) * def_loss_frac)))
-
-    # Kill weakest first (by HP).
-    att_sorted = sorted(range(len(att)), key=lambda i: int(att[i].get("hp") or 0))
-    def_sorted = sorted(range(len(deff)), key=lambda i: int(deff[i].get("hp") or 0))
-    att_kill_idx = set(att_sorted[:att_kill_n])
-    def_kill_idx = set(def_sorted[:def_kill_n])
-
-    att_killed = [att[i] for i in range(len(att)) if i in att_kill_idx]
-    def_killed = [deff[i] for i in range(len(deff)) if i in def_kill_idx]
-    att_rem = [att[i] for i in range(len(att)) if i not in att_kill_idx]
-    def_rem = [deff[i] for i in range(len(deff)) if i not in def_kill_idx]
+    # Attackers deal att_power into the garrison; defenders deal def_power into the march.
+    def_killed, def_rem = _kill_by_damage(
+        deff, att_power, side="defend", wall=wall, atk_pct=atk_pct, def_pct=def_pct
+    )
+    att_killed, att_rem = _kill_by_damage(
+        att, def_power, side="attack", wall=wall, atk_pct=atk_pct, def_pct=def_pct
+    )
     cleared = len(def_rem) == 0
     return {
         "att_deployed": len(att),
@@ -303,6 +350,8 @@ def sim_clash(
         "cleared": cleared,
         "att_power": int(att_power),
         "def_power": int(def_power),
+        "att_floors": force_floor_summary(att),
+        "def_floors": force_floor_summary(deff),
     }
 
 
@@ -846,7 +895,8 @@ class Castles(commands.Cog):
                 f"Deployed: **{report['att_deployed']}**\n"
                 f"Lost: **{att_lost}**\n"
                 f"Remaining: **{att_rem}**\n"
-                f"Power: {report.get('att_power', '—')}"
+                f"Power: {report.get('att_power', '—')}\n"
+                f"Levels: {report.get('att_floors') or force_floor_summary(report.get('att_killed', []) + report.get('att_remaining', []))}"
             ),
         )
         embed.add_field(
@@ -855,7 +905,8 @@ class Castles(commands.Cog):
                 f"Deployed: **{report['def_deployed']}**\n"
                 f"Lost: **{def_lost}**\n"
                 f"Remaining: **{def_rem}**\n"
-                f"Power: {report.get('def_power', '—')}"
+                f"Power: {report.get('def_power', '—')}\n"
+                f"Levels: {report.get('def_floors') or force_floor_summary(report.get('def_killed', []) + report.get('def_remaining', []))}"
             ),
         )
         if report.get("cleared"):
