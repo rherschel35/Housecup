@@ -251,6 +251,7 @@ HELP = {
             ("staffgame castles unlock", "Clear all castle lock timers and allow sieges any day."),
             ("staffgame castles schedule", "Restore normal Wed/Sat siege days after a staff unlock."),
             ("staffgame castles pvplive", "Turn 200/day army binds on (season live) or off (pre-season uncapped)."),
+            ("staffgame castles seedarmy", "Test helper: add fake army troops (default 350 at floor 69)."),
             ("staff sync", "Force-push slash commands (wipes stale guild /feed · /play · flat /familiar)."),
             ("synccmds", "Same as /staff sync — top-level, easier on mobile."),
             ("staffgame raid reset", "Clear a player's 3Raid weekly lockout, or end the active raid."),

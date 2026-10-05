@@ -242,6 +242,55 @@ def unit_power(unit: dict, *, side: str, wall: str, atk_pct: float, def_pct: flo
     return base * mult
 
 
+def force_floor_summary(units: list[dict]) -> str:
+    """Descent floor range for a force — shown on battle reports."""
+    floors = [int(u.get("floor") or 0) for u in units if int(u.get("floor") or 0) > 0]
+    if not floors:
+        return "— (no floor data)"
+    lo, hi = min(floors), max(floors)
+    avg = sum(floors) / len(floors)
+    if lo == hi:
+        return f"floor **{lo}** ({len(floors)} troops)"
+    return f"floors **{lo}–{hi}** (avg {avg:.0f}, {len(floors)} troops)"
+
+
+def _kill_by_damage(
+    units: list[dict],
+    damage: float,
+    *,
+    side: str,
+    wall: str,
+    atk_pct: float,
+    def_pct: float,
+) -> tuple[list[dict], list[dict]]:
+    """Spend damage on weakest units first (soak = that unit's combat power)."""
+    if not units or damage <= 0:
+        return [], [dict(u) for u in units]
+
+    copies = [dict(u) for u in units]
+    order = sorted(
+        range(len(copies)),
+        key=lambda i: unit_power(
+            copies[i], side=side, wall=wall, atk_pct=atk_pct, def_pct=def_pct
+        ),
+    )
+    killed_idx: set[int] = set()
+    rem = float(damage)
+    for i in order:
+        soak = max(
+            1.0,
+            unit_power(copies[i], side=side, wall=wall, atk_pct=atk_pct, def_pct=def_pct),
+        )
+        if rem + 1e-9 >= soak:
+            rem -= soak
+            killed_idx.add(i)
+        else:
+            break
+    killed = [copies[i] for i in range(len(copies)) if i in killed_idx]
+    remaining = [copies[i] for i in range(len(copies)) if i not in killed_idx]
+    return killed, remaining
+
+
 def sim_clash(
     attackers: list[dict],
     defenders: list[dict],
@@ -251,9 +300,36 @@ def sim_clash(
     def_pct: float,
     rng: random.Random,
 ) -> dict:
-    """One Evony-style clash. Returns killed lists + remaining."""
+    """One clash: each side deals damage = power; kills scale with that, not headcount %.
+
+    Old formula applied a ~30%+ loss fraction to defender *count*, so a 1-troop
+    poke (or even an empty march) could wipe a third of a huge garrison.
+    Damage soak uses unit power. Empty attackers deal no damage.
+    """
     att = [dict(u) for u in attackers]
     deff = [dict(u) for u in defenders]
+
+    # No one left to fight — do not touch the garrison.
+    if not att:
+        def_power = sum(
+            unit_power(u, side="defend", wall=wall, atk_pct=atk_pct, def_pct=def_pct)
+            for u in deff
+        )
+        return {
+            "att_deployed": 0,
+            "def_deployed": len(deff),
+            "att_killed": [],
+            "def_killed": [],
+            "att_remaining": [],
+            "def_remaining": deff,
+            "cleared": False,
+            "att_power": 0,
+            "def_power": int(def_power),
+            "att_floors": force_floor_summary([]),
+            "def_floors": force_floor_summary(deff),
+            "empty_attack": True,
+        }
+
     if not deff:
         return {
             "att_deployed": len(att),
@@ -265,33 +341,27 @@ def sim_clash(
             "cleared": True,
             "att_power": 0,
             "def_power": 0,
+            "att_floors": force_floor_summary(att),
+            "def_floors": force_floor_summary([]),
         }
 
-    att_power = sum(unit_power(u, side="attack", wall=wall, atk_pct=atk_pct, def_pct=def_pct) for u in att)
-    def_power = sum(unit_power(u, side="defend", wall=wall, atk_pct=atk_pct, def_pct=def_pct) for u in deff)
+    att_power = sum(
+        unit_power(u, side="attack", wall=wall, atk_pct=atk_pct, def_pct=def_pct) for u in att
+    )
+    def_power = sum(
+        unit_power(u, side="defend", wall=wall, atk_pct=atk_pct, def_pct=def_pct) for u in deff
+    )
     # Light noise so identical armies aren't deterministic forever.
     att_power *= rng.uniform(0.92, 1.08)
     def_power *= rng.uniform(0.92, 1.08)
-    total = max(att_power + def_power, 1.0)
-    att_share = att_power / total
-    def_share = def_power / total
 
-    # Stronger side loses fewer; loser loses more. Cap so a clash never wipes both sides fully unless one is tiny.
-    att_loss_frac = min(0.85, 0.25 + def_share * 0.7)
-    def_loss_frac = min(0.95, 0.30 + att_share * 0.75)
-    att_kill_n = min(len(att), int(round(len(att) * att_loss_frac)))
-    def_kill_n = min(len(deff), int(round(len(deff) * def_loss_frac)))
-
-    # Kill weakest first (by HP).
-    att_sorted = sorted(range(len(att)), key=lambda i: int(att[i].get("hp") or 0))
-    def_sorted = sorted(range(len(deff)), key=lambda i: int(deff[i].get("hp") or 0))
-    att_kill_idx = set(att_sorted[:att_kill_n])
-    def_kill_idx = set(def_sorted[:def_kill_n])
-
-    att_killed = [att[i] for i in range(len(att)) if i in att_kill_idx]
-    def_killed = [deff[i] for i in range(len(deff)) if i in def_kill_idx]
-    att_rem = [att[i] for i in range(len(att)) if i not in att_kill_idx]
-    def_rem = [deff[i] for i in range(len(deff)) if i not in def_kill_idx]
+    # Attackers deal att_power into the garrison; defenders deal def_power into the march.
+    def_killed, def_rem = _kill_by_damage(
+        deff, att_power, side="defend", wall=wall, atk_pct=atk_pct, def_pct=def_pct
+    )
+    att_killed, att_rem = _kill_by_damage(
+        att, def_power, side="attack", wall=wall, atk_pct=atk_pct, def_pct=def_pct
+    )
     cleared = len(def_rem) == 0
     return {
         "att_deployed": len(att),
@@ -303,6 +373,8 @@ def sim_clash(
         "cleared": cleared,
         "att_power": int(att_power),
         "def_power": int(def_power),
+        "att_floors": force_floor_summary(att),
+        "def_floors": force_floor_summary(deff),
     }
 
 
@@ -846,7 +918,8 @@ class Castles(commands.Cog):
                 f"Deployed: **{report['att_deployed']}**\n"
                 f"Lost: **{att_lost}**\n"
                 f"Remaining: **{att_rem}**\n"
-                f"Power: {report.get('att_power', '—')}"
+                f"Power: {report.get('att_power', '—')}\n"
+                f"Levels: {report.get('att_floors') or force_floor_summary(report.get('att_killed', []) + report.get('att_remaining', []))}"
             ),
         )
         embed.add_field(
@@ -855,7 +928,8 @@ class Castles(commands.Cog):
                 f"Deployed: **{report['def_deployed']}**\n"
                 f"Lost: **{def_lost}**\n"
                 f"Remaining: **{def_rem}**\n"
-                f"Power: {report.get('def_power', '—')}"
+                f"Power: {report.get('def_power', '—')}\n"
+                f"Levels: {report.get('def_floors') or force_floor_summary(report.get('def_killed', []) + report.get('def_remaining', []))}"
             ),
         )
         if report.get("cleared"):
@@ -927,6 +1001,68 @@ class Castles(commands.Cog):
                 "**uncapped** (every win binds again)."
             )
         await interaction.response.send_message(msg, ephemeral=True)
+
+    async def staff_seed_army(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        count: int = 350,
+        floor: int = 69,
+        clear: bool = False,
+    ) -> None:
+        """Staff test helper: inject fake Descent army units onto a player."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        descent = self._descent()
+        if not descent:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+
+        count = max(1, min(int(count), 2000))
+        floor = max(1, min(int(floor), 100))
+
+        from cogs.descent import ELEMENTS, monster_stats
+
+        rec = descent.record(member.id)
+        if clear:
+            rec["army"] = []
+        army = rec.setdefault("army", [])
+        seq = int(rec.get("army_seq", 0) or 0)
+        hp, atk, deff = monster_stats(floor, False)
+        added = 0
+        for i in range(count):
+            seq += 1
+            el = ELEMENTS[i % len(ELEMENTS)]
+            army.append(
+                {
+                    "id": seq,
+                    "name": f"Test {el.title()}",
+                    "emoji": "🧪",
+                    "element": el,
+                    "kind": "staff_seed",
+                    "floor": floor,
+                    "boss": False,
+                    "practice": False,
+                    "hp": int(hp),
+                    "atk": int(atk),
+                    "def": int(deff),
+                    "at": int(time.time()),
+                }
+            )
+            added += 1
+        rec["army_seq"] = seq
+        descent.save()
+        total = len(army)
+        owned = self.army_owned_count(member.id)
+        await interaction.response.send_message(
+            f"🧪 Seeded **{added}** floor-**{floor}** troops for {member.mention} "
+            f"(cleared first: **{clear}**).\n"
+            f"Home army: **{total}** · owned (home+garrison+march): **{owned}**.\n"
+            f"Use `/army` to inspect; reinforce/siege as usual.",
+            ephemeral=True,
+        )
 
     # ================================================================ commands
 
@@ -1099,10 +1235,20 @@ class Castles(commands.Cog):
             await interaction.followup.send("The 10-minute assault clock ran out. Castle locked 20 minutes.")
             return
 
+        force = list(siege.get("attack_force") or [])
+        if not force:
+            # Prior clash wiped the march; "Attack again" must not ghost-kill the garrison.
+            self.end_siege(key, lock=True, return_attackers=False)
+            await interaction.followup.send(
+                f"💀 **{interaction.user.display_name}**'s march on **{CASTLES[key]['name']}** "
+                "is gone — no troops left to send. Assault ends; castle locked 20 minutes."
+            )
+            return
+
         meta = CASTLES[key]
         owner_id = slot.get("owner_id")
         report = sim_clash(
-            siege.get("attack_force") or [],
+            force,
             slot.get("garrison") or [],
             wall=meta["wall"],
             atk_pct=self.army_atk_pct(attacker_id),
@@ -1114,6 +1260,12 @@ class Castles(commands.Cog):
         attacker = interaction.user
         embed = self.battle_report_embed(key, report, attacker)
 
+        if report.get("empty_attack"):
+            self.end_siege(key, lock=True, return_attackers=False)
+            embed.set_footer(text="No attackers left — assault ends; castle locked 20 minutes.")
+            await interaction.followup.send(embed=embed)
+            return
+
         if report["cleared"]:
             store = self.bot.get_cog("Store")
             house = store.member_house(attacker) if store else None
@@ -1124,6 +1276,13 @@ class Castles(commands.Cog):
                 self.return_units_to_army(attacker.id, survivors)
             self.assign_castle(key, attacker, house)
             embed.description = (embed.description or "") + f"\n\n🏰 **{attacker.display_name}** captures **{meta['name']}**!"
+            await interaction.followup.send(embed=embed)
+            return
+
+        # March wiped — end assault; don't offer Attack again with 0 troops.
+        if not report.get("att_remaining"):
+            self.end_siege(key, lock=True, return_attackers=False)
+            embed.set_footer(text="Attackers wiped — assault ends; castle locked 20 minutes.")
             await interaction.followup.send(embed=embed)
             return
 
