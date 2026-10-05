@@ -602,6 +602,14 @@ class Castles(commands.Cog):
                 return key
         return None
 
+    def assault_castle_key(self, user_id: int) -> Optional[str]:
+        """Castle key if this user is mid-assault (single march until assault ends)."""
+        for key in CASTLE_ORDER:
+            siege = self.castle(key).get("siege") or {}
+            if siege.get("attacker_id") == user_id:
+                return key
+        return None
+
     def owns_castle(self, user_id: int, key: str) -> bool:
         return self.castle(key).get("owner_id") == user_id
 
@@ -945,6 +953,14 @@ class Castles(commands.Cog):
             return False, f"Castle locked for {left // 60}m {left % 60}s after the last assault."
         if slot.get("owner_id") == user_id:
             return False, "You already hold this castle."
+        marching = self.assault_castle_key(user_id)
+        if marching:
+            name = CASTLES[marching]["name"]
+            return False, (
+                f"Your march at **{name}** is still active — keep fighting with survivors, "
+                "pull back, wipe out, or wait for the 10-minute assault timer. "
+                "After the assault ends, that castle locks **20 minutes** before anyone can send a new full march."
+            )
         owned = self.owner_castle_key(user_id)
         if owned:
             return False, f"Abandon **{CASTLES[owned]['name']}** before sieging another castle."
@@ -1048,12 +1064,18 @@ class Castles(commands.Cog):
         elif report.get("outclassed"):
             embed.set_footer(
                 text=(
-                    f"Garrison outclasses this march (need within {FLOOR_CLEAR_MAX_GAP} floors to capture) "
-                    f"· Attack again within {DECISION_SECONDS}s or the assault ends"
+                    f"Garrison outclasses this march (need within {FLOOR_CLEAR_MAX_GAP} floors to capture) · "
+                    f"**{att_rem}** survivors only (no fresh 200) · "
+                    f"Attack again within {DECISION_SECONDS}s or assault ends + 20m lock"
                 )
             )
         else:
-            embed.set_footer(text=f"Attack again within {DECISION_SECONDS}s or the assault ends · Pull back anytime")
+            embed.set_footer(
+                text=(
+                    f"**{att_rem}** march survivors — next clash uses them only (no fresh 200) · "
+                    f"Attack again within {DECISION_SECONDS}s or assault ends + 20m castle lock · Pull back anytime"
+                )
+            )
         return embed
 
     # ================================================================ staff
@@ -1656,8 +1678,10 @@ class CastleActionsView(discord.ui.View):
         view = ConfirmSiegeView(self.cog, self.key)
         await interaction.response.send_message(
             f"Siege **{CASTLES[self.key]['name']}**?\n"
-            f"You'll march with up to **{ATTACK_REGULAR_CAP}** troops + **{ATTACK_BOSS_CAP}** bosses "
-            f"(auto-picked from your strongest). 10-minute assault once you send.",
+            f"You'll deploy **one march**: up to **{ATTACK_REGULAR_CAP}** troops + **{ATTACK_BOSS_CAP}** bosses "
+            f"(auto-picked from your strongest). **Attack again** only uses survivors — no fresh 200 until the "
+            f"assault ends (pull back, wipe out, or 10-minute timer), then this castle locks **20 minutes** "
+            f"before a new full march.",
             view=view,
             ephemeral=True,
         )
