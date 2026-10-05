@@ -36,7 +36,7 @@ FORCE_COMMAND_SYNC = os.getenv("FORCE_COMMAND_SYNC", "").strip() in ("1", "true"
 SYNC_TIMEOUT_SECONDS = int(os.getenv("COMMAND_SYNC_TIMEOUT", "45"))
 # Bump when sync *behavior* changes (e.g. also overwrite guild commands) so
 # the next boot re-PUTs even if the slash tree fingerprint is unchanged.
-COMMAND_SYNC_REVISION = 2
+COMMAND_SYNC_REVISION = 3
 # Chess & checkers load by default. Set ENABLE_BOARD_GAMES=0 to unload them.
 _ENABLE_BOARD_GAMES_RAW = os.getenv("ENABLE_BOARD_GAMES", "1").strip().lower()
 ENABLE_BOARD_GAMES = _ENABLE_BOARD_GAMES_RAW not in ("0", "false", "no", "off", "")
@@ -194,9 +194,10 @@ async def sync_commands(*, force: bool = False):
     on each boot burned Discord's daily create budget and froze the bot. Skip
     when nothing changed; FORCE_COMMAND_SYNC=1 (or force=True) overrides.
 
-    When syncing globally we also overwrite each allowed guild's command list.
-    Stale guild commands (from older guild-scoped syncs) shadow globals and can
-    leave dead `/feed` · `/play` entries that "do not respond".
+    When syncing globally we also overwrite command lists on every guild the
+    bot is in (plus ALLOWED_GUILD_IDS / DEV_GUILD_ID). Stale guild commands
+    from older guild-scoped syncs shadow globals and leave dead `/feed` ·
+    `/play` entries that "do not respond".
     """
     # on_ready fires again after every reconnect; syncing once per start is
     # enough, and avoids hammering Discord's rate limits. Staff /staff sync
@@ -210,6 +211,10 @@ async def sync_commands(*, force: bool = False):
     targets = set(ALLOWED_GUILD_IDS or ())
     if DEV_GUILD_ID:
         targets.add(int(DEV_GUILD_ID))
+    # Live membership matters more than the allowlist env — that's where
+    # leftover guild-scoped /familiar · /feed commands actually live.
+    for guild in bot.guilds:
+        targets.add(guild.id)
 
     mode = "global" if (SYNC_GLOBALLY or not targets) else "guild"
     fingerprint = _fingerprint(mode, targets)
@@ -247,6 +252,11 @@ async def sync_commands(*, force: bool = False):
         if synced is not None:
             log.info("Synced %d global commands", len(synced))
             ok = True
+            if not targets:
+                log.warning(
+                    "Global sync ok, but no guild ids to overwrite — "
+                    "stale guild commands may still shadow /familiar."
+                )
             # Overwrite guild command lists so old guild-scoped registrations
             # (e.g. pre-group /feed /play) stop shadowing the new tree.
             for guild_id in targets:
