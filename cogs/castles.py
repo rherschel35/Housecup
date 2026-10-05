@@ -69,6 +69,7 @@ WALL_DEF_MULT = 1.55    # matching wall-type troops
 BOSS_WALL_DEF_MULT = 1.75  # Bannerhall boss wall
 
 DAILY_RECRUIT_CAP = 200
+ARMY_CAP = 5000  # total monsters you may hold (home + garrison + march)
 ARMY_PAGE_SIZE = 12  # units listed per /army page
 SUNDAY_CASTLE_POINTS = 50
 BANNERHALL_PER_CASTLE = 30
@@ -469,6 +470,18 @@ class Castles(commands.Cog):
             return []
         return list(descent.record(user_id).get("army") or [])
 
+    def army_owned_count(self, user_id: int) -> int:
+        """Total monsters you hold — home roster + garrison + active march."""
+        n = len(self.army_of(user_id))
+        key = self.owner_castle_key(user_id)
+        if key:
+            n += len(self.castle(key).get("garrison") or [])
+        for slot in self.state.get("castles", {}).values():
+            siege = slot.get("siege") or {}
+            if siege.get("attacker_id") == user_id:
+                n += len(siege.get("attack_force") or [])
+        return n
+
     def _save_descent(self) -> None:
         descent = self._descent()
         if descent:
@@ -503,19 +516,23 @@ class Castles(commands.Cog):
         return bool(self.state.get("pvp_live"))
 
     def recruit_allowed(self, user_id: int, n: int = 1) -> int:
-        """How many of n recruits may join the army today (0 if capped).
+        """How many of n recruits may join (0 if size or daily capped).
 
-        Pre-season (`pvp_live` False): no daily cap — every Descent win binds.
+        Army size cap (ARMY_CAP) always applies. Daily 200 only while PvP is live;
+        pre-season every Descent win binds until the army is full.
         """
+        room = max(0, ARMY_CAP - self.army_owned_count(user_id))
+        if room <= 0:
+            return 0
         if not self.is_pvp_live():
-            return n
+            return min(n, room)
         prec = self.prec(user_id)
         day = chicago_day()
         if prec.get("recruit_day") != day:
             prec["recruit_day"] = day
             prec["recruits_today"] = 0
         left = max(0, DAILY_RECRUIT_CAP - int(prec.get("recruits_today") or 0))
-        return min(n, left)
+        return min(n, left, room)
 
     def note_recruits(self, user_id: int, n: int) -> None:
         if n <= 0 or not self.is_pvp_live():
@@ -998,19 +1015,25 @@ class Castles(commands.Cog):
             roster = roster[:997] + "…"
         atk_pct = self.army_atk_pct(member.id)
         def_pct = self.army_def_pct(member.id)
+        owned = self.army_owned_count(member.id)
+        home = len(army)
+        away = owned - home
+        away_bit = f" · {away} on walls/march" if away else ""
         embed = discord.Embed(
             title=f"⚔️ {member.display_name}'s Army",
             description=(
-                f"**{len(army)}** bound ({bosses} bosses) · Castle: **{held_txt}**\n"
+                f"**{owned}/{ARMY_CAP}** bound ({bosses} bosses at home{away_bit}) · "
+                f"Castle: **{held_txt}**\n"
+                f"Home roster: **{home}** · "
                 + (
                     f"Recruit today: **uncapped** (PvP not live yet)\n"
                     if not self.is_pvp_live()
                     else f"Recruit today: **{recruits}/{DAILY_RECRUIT_CAP}**\n"
                 )
                 + (
-                f"Sacrifice bonuses: ATK **{format_bonus_pct(atk_pct)}** · "
-                f"DEF **{format_bonus_pct(def_pct)}** "
-                f"(burn {SACRIFICE_COUNT} regulars; rate by floor)"
+                    f"Sacrifice bonuses: ATK **{format_bonus_pct(atk_pct)}** · "
+                    f"DEF **{format_bonus_pct(def_pct)}** "
+                    f"(burn {SACRIFICE_COUNT} regulars; rate by floor)"
                 )
             ),
             color=STONE,
