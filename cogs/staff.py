@@ -28,9 +28,12 @@ HEX_CHOICES = [
 
 
 class Staff(commands.Cog):
-    """Owns the `/staff` tree (subgroups are shared Group objects)."""
+    """Owns the staff slash trees (subgroups are shared Group objects)."""
 
     staff = sg.staff
+    staffworld = sg.staffworld
+    staffgame = sg.staffgame
+    staffops = sg.staffops
     points = sg.points
     staff_setup = sg.setup
     houses = sg.houses
