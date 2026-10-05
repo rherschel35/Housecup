@@ -693,62 +693,187 @@ class Castles(commands.Cog):
             return False, "Can't reinforce during a live assault."
         return True, ""
 
-    def do_reinforce(self, user_id: int, key: str) -> tuple[bool, str]:
+    def reinforce_context(self, user_id: int, key: str) -> dict:
+        """Limits + home-roster availability for the reinforce picker."""
         ok, why = self.can_reinforce(user_id, key)
         if not ok:
-            return False, why
+            return {"ok": False, "error": why}
+
         slot = self.castle(key)
         army = self.army_of(user_id)
-        # Units already in garrison stay; top up toward caps.
         current = list(slot.get("garrison") or [])
         current_ids = {int(u.get("id") or 0) for u in current}
         available = [u for u in army if int(u.get("id") or 0) not in current_ids]
+
         cur_regs = [u for u in current if not u.get("boss")]
         cur_bosses = [u for u in current if u.get("boss")]
         need_regs = max(0, DEFEND_REGULAR_CAP - len(cur_regs))
         need_bosses = max(0, DEFEND_BOSS_CAP - len(cur_bosses))
-        types = {(u.get("element") or "").lower() for u in current if not u.get("boss")}
-        type_room = max(0, DEFEND_TYPE_CAP - len(types))
+        garrison_types = {(u.get("element") or "").lower() for u in current if not u.get("boss")}
+        type_room = max(0, DEFEND_TYPE_CAP - len(garrison_types))
 
-        # Prefer filling existing types first, then new types if room.
-        picked = []
-        avail_bosses = [u for u in available if u.get("boss")]
-        avail_regs = [u for u in available if not u.get("boss")]
-        avail_bosses.sort(key=lambda u: int(u.get("hp") or 0), reverse=True)
-        avail_regs.sort(key=lambda u: int(u.get("hp") or 0), reverse=True)
+        avail_by_el: dict[str, int] = {el: 0 for el in ELEMENTS}
+        avail_bosses = 0
+        for u in available:
+            if u.get("boss"):
+                avail_bosses += 1
+            else:
+                el = (u.get("element") or "").lower()
+                if el in avail_by_el:
+                    avail_by_el[el] += 1
 
-        for u in avail_bosses[:need_bosses]:
-            picked.append(u)
+        return {
+            "ok": True,
+            "need_regs": need_regs,
+            "need_bosses": need_bosses,
+            "type_room": type_room,
+            "garrison_types": garrison_types,
+            "avail_by_el": avail_by_el,
+            "avail_bosses": avail_bosses,
+            "current_summary": force_summary(current),
+            "available": available,
+            "current": current,
+        }
 
-        same_type = [u for u in avail_regs if (u.get("element") or "").lower() in types]
-        new_type = [u for u in avail_regs if (u.get("element") or "").lower() not in types]
-        for u in same_type:
-            if len([p for p in picked if not p.get("boss")]) >= need_regs:
-                break
-            picked.append(u)
-        new_types_used: set[str] = set()
-        for u in new_type:
-            if len([p for p in picked if not p.get("boss")]) >= need_regs:
-                break
-            el = (u.get("element") or "").lower()
-            if el not in new_types_used:
-                if len(new_types_used) >= type_room:
-                    continue
-                new_types_used.add(el)
-            picked.append(u)
+    def _select_reinforce_units(
+        self,
+        available: list[dict],
+        counts: dict[str, int],
+        *,
+        boss_n: int,
+    ) -> list[dict]:
+        """Pick strongest home troops matching requested element counts (+ bosses)."""
+        picked: list[dict] = []
+        used: set[int] = set()
 
-        if not picked and not current:
-            return False, "Your army is empty — bind monsters in the Descent first."
+        bosses = [u for u in available if u.get("boss")]
+        bosses.sort(key=lambda u: int(u.get("hp") or 0), reverse=True)
+        for u in bosses[: max(0, boss_n)]:
+            uid = int(u.get("id") or 0)
+            if uid:
+                picked.append(u)
+                used.add(uid)
+
+        for el in ELEMENTS:
+            want = max(0, int(counts.get(el) or 0))
+            if want <= 0:
+                continue
+            regs = [
+                u
+                for u in available
+                if not u.get("boss")
+                and (u.get("element") or "").lower() == el
+                and int(u.get("id") or 0) not in used
+            ]
+            regs.sort(key=lambda u: int(u.get("hp") or 0), reverse=True)
+            for u in regs[:want]:
+                uid = int(u.get("id") or 0)
+                if uid:
+                    picked.append(u)
+                    used.add(uid)
+        return picked
+
+    def _validate_reinforce_pick(
+        self,
+        ctx: dict,
+        counts: dict[str, int],
+        *,
+        boss_n: int,
+    ) -> tuple[bool, str]:
+        if not ctx.get("ok"):
+            return False, ctx.get("error") or "Can't reinforce."
+
+        total_regs = sum(max(0, int(counts.get(el) or 0)) for el in ELEMENTS)
+        if total_regs <= 0 and boss_n <= 0:
+            return False, "Pick at least one troop or boss to send to the walls."
+
+        if total_regs > ctx["need_regs"]:
+            return False, (
+                f"You can add at most **{ctx['need_regs']}** more regular troops "
+                f"(cap {DEFEND_REGULAR_CAP})."
+            )
+        if boss_n > ctx["need_bosses"]:
+            return False, f"You can add at most **{ctx['need_bosses']}** more boss."
+        if boss_n > ctx["avail_bosses"]:
+            return False, f"You only have **{ctx['avail_bosses']}** boss(es) at home."
+
+        for el in ELEMENTS:
+            n = max(0, int(counts.get(el) or 0))
+            if n > ctx["avail_by_el"].get(el, 0):
+                emoji = ELEMENT_EMOJI.get(el, "")
+                return False, f"Only **{ctx['avail_by_el'].get(el, 0)}** {emoji}{el} troops at home."
+
+        new_types = {
+            el for el in ELEMENTS if int(counts.get(el) or 0) > 0 and el not in ctx["garrison_types"]
+        }
+        if len(new_types) > ctx["type_room"]:
+            return False, (
+                f"Garrison allows **{DEFEND_TYPE_CAP}** element types — "
+                f"only **{ctx['type_room']}** new type(s) left."
+            )
+        return True, ""
+
+    def do_reinforce_manual(
+        self,
+        user_id: int,
+        key: str,
+        counts: dict[str, int],
+        *,
+        boss_n: int = 0,
+    ) -> tuple[bool, str]:
+        ctx = self.reinforce_context(user_id, key)
+        ok, why = self._validate_reinforce_pick(ctx, counts, boss_n=boss_n)
+        if not ok:
+            return False, why
+
+        picked = self._select_reinforce_units(ctx["available"], counts, boss_n=boss_n)
         if not picked:
-            if need_regs <= 0 and need_bosses <= 0:
-                return False, f"Walls already at cap (**{force_summary(current)}**)."
-            return False, "No more troops available to add from your army."
+            if not ctx["current"]:
+                return False, "Your army is empty — bind monsters in the Descent first."
+            return False, "No matching troops found in your army."
 
+        slot = self.castle(key)
+        current = list(ctx["current"])
         self.remove_units_from_army(user_id, picked)
         slot["garrison"] = current + picked
-        slot["reinforced"] = False  # legacy field; reinforce is no longer one-shot
+        slot["reinforced"] = False
         self.save()
-        return True, f"Walls stocked: **{force_summary(slot['garrison'])}** (+{len(picked)} this reinforce)."
+        return True, (
+            f"Walls stocked: **{force_summary(slot['garrison'])}** "
+            f"(+{len(picked)} this reinforce)."
+        )
+
+    def do_reinforce(self, user_id: int, key: str) -> tuple[bool, str]:
+        """Auto top-up (legacy); UI uses do_reinforce_manual."""
+        ctx = self.reinforce_context(user_id, key)
+        if not ctx.get("ok"):
+            return False, ctx.get("error") or "Can't reinforce."
+        if ctx["need_regs"] <= 0 and ctx["need_bosses"] <= 0:
+            return False, f"Walls already at cap (**{ctx['current_summary']}**)."
+
+        counts = {el: 0 for el in ELEMENTS}
+        boss_n = min(ctx["need_bosses"], ctx["avail_bosses"])
+        remaining = ctx["need_regs"]
+        types = set(ctx["garrison_types"])
+        type_room = ctx["type_room"]
+
+        # Same-type fill first, then new types.
+        for el in sorted(ELEMENTS, key=lambda e: -ctx["avail_by_el"].get(e, 0)):
+            if remaining <= 0:
+                break
+            avail = ctx["avail_by_el"].get(el, 0)
+            if avail <= 0:
+                continue
+            if el not in types and type_room <= 0:
+                continue
+            take = min(avail, remaining)
+            counts[el] = take
+            remaining -= take
+            if el not in types:
+                types.add(el)
+                type_room -= 1
+
+        return self.do_reinforce_manual(user_id, key, counts, boss_n=boss_n)
 
     def can_start_siege(self, user_id: int, key: str) -> tuple[bool, str]:
         if not self.sieges_open():
@@ -1349,22 +1474,49 @@ class CastleActionsView(discord.ui.View):
         if interaction.channel_id not in CASTLES_CHANNEL_IDS:
             await interaction.response.send_message("Wrong channel.", ephemeral=True)
             return
-        ok, msg = self.cog.do_reinforce(interaction.user.id, self.key)
-        if ok:
-            await interaction.response.send_message(f"🛡️ {msg}", ephemeral=True)
-            # Refresh public board if still showing this castle.
-            try:
-                embed = self.cog.castle_embed(self.key)
-                art = self.cog.art_file(self.key)
-                if art:
-                    embed.set_image(url=f"attachment://{CASTLES[self.key]['art']}")
-                    await interaction.message.edit(embed=embed, attachments=[art], view=self)
-                else:
-                    await interaction.message.edit(embed=embed, view=self)
-            except discord.DiscordException:
-                pass
-        else:
-            await interaction.response.send_message(msg, ephemeral=True)
+        ctx = self.cog.reinforce_context(interaction.user.id, self.key)
+        if not ctx.get("ok"):
+            await interaction.response.send_message(ctx.get("error") or "Can't reinforce.", ephemeral=True)
+            return
+        if ctx["need_regs"] <= 0 and ctx["need_bosses"] <= 0:
+            await interaction.response.send_message(
+                f"Walls already at cap (**{ctx['current_summary']}**).",
+                ephemeral=True,
+            )
+            return
+        if not ctx["available"]:
+            await interaction.response.send_message(
+                "No troops at home to send — bind monsters in the Descent first.",
+                ephemeral=True,
+            )
+            return
+
+        lines = [
+            f"**Garrison now:** {ctx['current_summary']}",
+            f"**Room:** up to **{ctx['need_regs']}** troops + **{ctx['need_bosses']}** boss "
+            f"({DEFEND_TYPE_CAP} element types max; **{ctx['type_room']}** new type(s) left).",
+            "**At home (not on walls):**",
+        ]
+        for el in ELEMENTS:
+            n = ctx["avail_by_el"].get(el, 0)
+            if n:
+                lines.append(f"{ELEMENT_EMOJI.get(el, '•')} **{el.title()}:** {n}")
+        if ctx["avail_bosses"]:
+            lines.append(f"💀 **Boss:** {ctx['avail_bosses']}")
+        lines.append("\nChoose how many of each type to reinforce.")
+
+        embed = discord.Embed(
+            description="\n".join(lines),
+            color=STONE,
+        )
+        view = ReinforcePickerView(
+            self.cog,
+            self.key,
+            ctx,
+            board_message=interaction.message,
+            board_view=self,
+        )
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     @discord.ui.button(label="Siege", style=discord.ButtonStyle.danger)
     async def siege(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1400,6 +1552,160 @@ class CastleActionsView(discord.ui.View):
             f"🏳️ **{interaction.user.display_name}** abandons **{CASTLES[self.key]['name']}**. "
             "Garrison returns home. Title dropped.",
         )
+
+
+async def _refresh_castle_detail(
+    cog: Castles,
+    key: str,
+    message: discord.Message,
+    view: discord.ui.View,
+) -> None:
+    try:
+        embed = cog.castle_embed(key)
+        art = cog.art_file(key)
+        if art:
+            embed.set_image(url=f"attachment://{CASTLES[key]['art']}")
+            await message.edit(embed=embed, attachments=[art], view=view)
+        else:
+            await message.edit(embed=embed, view=view)
+    except discord.DiscordException:
+        pass
+
+
+class ReinforceBossSelect(discord.ui.Select):
+    def __init__(self, ctx: dict):
+        options = [discord.SelectOption(label="No boss", value="0", default=True)]
+        if ctx["need_bosses"] > 0 and ctx["avail_bosses"] > 0:
+            options.append(
+                discord.SelectOption(
+                    label=f"Send 1 boss (home: {ctx['avail_bosses']})",
+                    value="1",
+                )
+            )
+        super().__init__(
+            placeholder="Boss for the walls…",
+            options=options,
+            min_values=1,
+            max_values=1,
+        )
+        self.boss_n = 0
+
+    async def callback(self, interaction: discord.Interaction):
+        self.view.boss_n = int(self.values[0])  # type: ignore[attr-defined]
+        await interaction.response.defer()
+
+
+class ReinforcePickerView(discord.ui.View):
+    def __init__(
+        self,
+        cog: Castles,
+        key: str,
+        ctx: dict,
+        *,
+        board_message: discord.Message,
+        board_view: discord.ui.View,
+    ):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.key = key
+        self.ctx = ctx
+        self.board_message = board_message
+        self.board_view = board_view
+        self.boss_n = 0
+        if ctx["need_bosses"] > 0 and ctx["avail_bosses"] > 0:
+            self.add_item(ReinforceBossSelect(ctx))
+
+    @discord.ui.button(label="Set troop counts…", style=discord.ButtonStyle.primary)
+    async def open_modal(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(
+            ReinforceModal(
+                self.cog,
+                self.key,
+                self.ctx,
+                boss_n=self.boss_n,
+                board_message=self.board_message,
+                board_view=self.board_view,
+            )
+        )
+
+
+class ReinforceModal(discord.ui.Modal, title="Reinforce garrison"):
+    def __init__(
+        self,
+        cog: Castles,
+        key: str,
+        ctx: dict,
+        *,
+        boss_n: int,
+        board_message: discord.Message,
+        board_view: discord.ui.View,
+    ):
+        super().__init__()
+        self.cog = cog
+        self.key = key
+        self.ctx = ctx
+        self.boss_n = boss_n
+        self.board_message = board_message
+        self.board_view = board_view
+
+        for el in ELEMENTS:
+            home = ctx["avail_by_el"].get(el, 0)
+            if home <= 0:
+                continue
+            emoji = ELEMENT_EMOJI.get(el, "")
+            label = f"{emoji} {el.title()} (max {home})"[:45]
+            field = discord.ui.TextInput(
+                label=label,
+                placeholder="0",
+                required=False,
+                max_length=4,
+                custom_id=f"rein_{el}",
+            )
+            self.add_item(field)
+
+        if not self.children:
+            field = discord.ui.TextInput(
+                label="Troops (0 if none at home)",
+                placeholder="0",
+                required=False,
+                max_length=4,
+                custom_id="rein_none",
+            )
+            self.add_item(field)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        counts = {el: 0 for el in ELEMENTS}
+        for child in self.children:
+            if not isinstance(child, discord.ui.TextInput):
+                continue
+            cid = child.custom_id or ""
+            if not cid.startswith("rein_") or cid == "rein_none":
+                continue
+            el = cid.removeprefix("rein_")
+            if el not in counts:
+                continue
+            raw = (child.value or "").strip() or "0"
+            try:
+                counts[el] = max(0, int(raw))
+            except ValueError:
+                await interaction.response.send_message(
+                    f"**{el.title()}** must be a whole number.",
+                    ephemeral=True,
+                )
+                return
+
+        ok, msg = self.cog.do_reinforce_manual(
+            interaction.user.id,
+            self.key,
+            counts,
+            boss_n=self.boss_n,
+        )
+        if not ok:
+            await interaction.response.send_message(msg, ephemeral=True)
+            return
+
+        await interaction.response.send_message(f"🛡️ {msg}", ephemeral=True)
+        await _refresh_castle_detail(self.cog, self.key, self.board_message, self.board_view)
 
 
 class ConfirmSiegeView(discord.ui.View):
