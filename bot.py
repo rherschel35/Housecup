@@ -36,7 +36,7 @@ FORCE_COMMAND_SYNC = os.getenv("FORCE_COMMAND_SYNC", "").strip() in ("1", "true"
 SYNC_TIMEOUT_SECONDS = int(os.getenv("COMMAND_SYNC_TIMEOUT", "45"))
 # Bump when sync *behavior* changes (e.g. also overwrite guild commands) so
 # the next boot re-PUTs even if the slash tree fingerprint is unchanged.
-COMMAND_SYNC_REVISION = 3
+COMMAND_SYNC_REVISION = 4
 # Chess & checkers load by default. Set ENABLE_BOARD_GAMES=0 to unload them.
 _ENABLE_BOARD_GAMES_RAW = os.getenv("ENABLE_BOARD_GAMES", "1").strip().lower()
 ENABLE_BOARD_GAMES = _ENABLE_BOARD_GAMES_RAW not in ("0", "false", "no", "off", "")
@@ -258,9 +258,12 @@ async def sync_commands(*, force: bool = False):
                     "stale guild commands may still shadow /familiar."
                 )
             # Overwrite guild command lists so old guild-scoped registrations
-            # (e.g. pre-group /feed /play) stop shadowing the new tree.
+            # (e.g. pre-group /feed /play /familiar) stop shadowing the new tree.
+            # clear_commands first: copy_global_to *merges* into any existing
+            # local guild map, which can re-upload dead top-level /play etc.
             for guild_id in targets:
                 guild = discord.Object(id=guild_id)
+                bot.tree.clear_commands(guild=guild)
                 bot.tree.copy_global_to(guild=guild)
                 guild_synced = await _run_sync(
                     bot.tree.sync(guild=guild),
@@ -269,8 +272,27 @@ async def sync_commands(*, force: bool = False):
                 if guild_synced is None:
                     ok = False
                     break
+                names = sorted(c.name for c in guild_synced)
+                stale = sorted(
+                    n for n in ("play", "feed", "pet", "scout") if n in names
+                )
+                if stale:
+                    log.error(
+                        "Guild %s still has top-level %s after overwrite — "
+                        "nested /familiar may stay shadowed.",
+                        guild_id,
+                        stale,
+                    )
+                    ok = False
+                    break
+                if "familiar" not in names:
+                    log.error(
+                        "Guild %s missing /familiar after overwrite.", guild_id
+                    )
+                    ok = False
+                    break
                 log.info(
-                    "Overwrote %d guild commands on server %s",
+                    "Overwrote %d guild commands on server %s (familiar ok, no stale care cmds)",
                     len(guild_synced),
                     guild_id,
                 )
@@ -278,8 +300,8 @@ async def sync_commands(*, force: bool = False):
         ok = True
         for guild_id in targets:
             guild = discord.Object(id=guild_id)
-            # One overwrite per sync. (A clear-then-rebuild step used to live here; it doubled
-            # the requests and tripped Discord's rate limit during rapid redeploys.)
+            # Clear local guild map first so copy_global_to doesn't merge leftovers.
+            bot.tree.clear_commands(guild=guild)
             bot.tree.copy_global_to(guild=guild)
             synced = await _run_sync(
                 bot.tree.sync(guild=guild),
