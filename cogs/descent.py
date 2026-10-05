@@ -4,6 +4,8 @@ The Descent - a 100-floor solo dungeon crawl.
     /descend             - fight the next monster on your current Descent floor
     /descend auto:True   - keep posting the next monster after each win
     /descend floor:<n>   - replay a floor you've already cleared, for practice/loot
+    /descendend [member] - forfeit (counts as a loss) so you can /descend again;
+                           idle fights also auto-forfeit after 3 minutes
     /descentstatus        - your floor, stats, AP, and lockout status
     /staff descent unlock - clear the 3-loss lockout without wiping progress
 
@@ -54,6 +56,7 @@ its floor and combat stats — foundation for army PVP.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -325,6 +328,8 @@ def mitigate(attack: int, multiplier: float, defense: int) -> int:
 
 MAX_LOSSES = 3
 LOCKOUT_SECONDS = 24 * 3600
+# No button press for this long → fight ends as a loss (practice: no penalty).
+IDLE_TIMEOUT = 3 * 60
 STATUP_AT_MONSTER = 5
 MONSTERS_PER_FLOOR = 10
 MAX_FLOOR = 100
@@ -513,6 +518,24 @@ class Fight:
         self.message: Optional[discord.Message] = None
         self.oneshot_message: Optional[discord.Message] = None
         self.auto = False  # chain into the next monster after a win
+        self._idle_task: Optional[asyncio.Task] = None
+        self._idle_gen = 0
+
+    def cancel_idle(self) -> None:
+        self._idle_gen += 1
+        task = self._idle_task
+        self._idle_task = None
+        if task is not None and not task.done():
+            task.cancel()
+
+    def arm_idle(self, cog: "Descent") -> None:
+        """Restart the 3-minute no-press timer (counts as a loss when it fires)."""
+        self.cancel_idle()
+        gen = self._idle_gen
+        self._idle_task = asyncio.create_task(
+            cog._idle_timeout(self, gen),
+            name=f"descent-idle-{self.user_id}",
+        )
 
     def embed(self, member: discord.Member) -> discord.Embed:
         title = f"{self.emoji} Floor {self.floor} — {self.name}"
@@ -527,6 +550,7 @@ class Fight:
         )
         if self.auto:
             desc += "\n⚡ Auto-play on — next monster posts after a win."
+        desc += f"\n⏱️ Idle **{IDLE_TIMEOUT // 60} min** with no button press = loss."
         e = discord.Embed(
             title=title,
             description=desc,
@@ -697,7 +721,8 @@ class StopAutoButton(discord.ui.Button):
 
 class FightView(discord.ui.View):
     def __init__(self, cog: "Descent", fight: Fight):
-        super().__init__(timeout=600)
+        # Slightly longer than IDLE_TIMEOUT so our asyncio timer fires first.
+        super().__init__(timeout=IDLE_TIMEOUT + 30)
         self.cog = cog
         self.owner_id = fight.user_id
         for el in ELEMENTS:
@@ -748,6 +773,10 @@ class Descent(commands.Cog):
     async def cog_load(self):
         self.bot.add_view(StatUpView(self))
 
+    async def cog_unload(self):
+        for fight in list(self.fights.values()):
+            fight.cancel_idle()
+
     def is_auto(self, user_id: int) -> bool:
         return user_id in self.auto_play
 
@@ -760,6 +789,96 @@ class Descent(commands.Cog):
     def stop_auto(self, user_id: int) -> None:
         self.auto_play.discard(user_id)
         self.auto_practice_floor.pop(user_id, None)
+
+    async def _idle_timeout(self, fight: Fight, gen: int) -> None:
+        try:
+            await asyncio.sleep(IDLE_TIMEOUT)
+        except asyncio.CancelledError:
+            return
+        if fight._idle_gen != gen:
+            return
+        if self.fights.get(fight.user_id) is not fight:
+            return
+        await self._forfeit_fight(fight, reason="idle")
+
+    async def _forfeit_fight(self, fight: Fight, *, reason: str) -> dict:
+        """End an open fight as a loss (idle timeout or /descendend).
+
+        Practice fights still take no penalty. Returns a small result dict
+        for command replies: ``practice``, ``locked``, ``losses``.
+        """
+        if self.fights.get(fight.user_id) is fight:
+            del self.fights[fight.user_id]
+        fight.cancel_idle()
+        await self._dismiss_oneshot(fight)
+        was_auto = self.is_auto(fight.user_id)
+        self.stop_auto(fight.user_id)
+
+        if reason == "idle":
+            why = (
+                f"No button pressed for **{IDLE_TIMEOUT // 60} minutes** — "
+                f"**{fight.name}** claims the fight."
+            )
+        else:
+            why = f"**{fight.name}** encounter forfeited."
+
+        if fight.is_practice:
+            tip = (
+                "Use `/descend floor:` again"
+                if not was_auto
+                else "Auto stopped — `/descend floor:… auto:True` to grind again"
+            )
+            embed = discord.Embed(
+                title="Timed out" if reason == "idle" else "Forfeited",
+                description=(
+                    f"{why} It was only practice — no penalty, no lockout. {tip}."
+                ),
+                color=0x95A5A6,
+            )
+            await self._edit_fight_message(fight, embed)
+            return {"practice": True, "locked": False, "losses": 0}
+
+        rec = self.record(fight.user_id)
+        rec["losses"] += 1
+        locked = rec["losses"] >= MAX_LOSSES
+        if locked:
+            rec["locked_until"] = time.time() + LOCKOUT_SECONDS
+            rec["losses"] = 0
+            rec["monster_index"] = 1
+        self.save()
+
+        if locked:
+            desc = (
+                f"{why} That's 3 losses on floor {fight.floor} — "
+                f"you're locked out for 24 hours. When you're back, floor "
+                f"{fight.floor} restarts at monster 1."
+            )
+        else:
+            tip = "Use `/descend` to try that monster again."
+            if was_auto:
+                tip = "Auto stopped — `/descend auto:True` to keep chaining after a win."
+            desc = f"{why} {tip}"
+        embed = discord.Embed(
+            title="Timed out" if reason == "idle" else "Forfeited",
+            description=desc,
+            color=0xC0392B,
+        )
+        await self._edit_fight_message(fight, embed)
+        return {
+            "practice": False,
+            "locked": locked,
+            "losses": 0 if locked else int(rec["losses"]),
+        }
+
+    async def _edit_fight_message(
+        self, fight: Fight, embed: discord.Embed
+    ) -> None:
+        if fight.message is None:
+            return
+        try:
+            await fight.message.edit(embed=embed, view=None, attachments=[])
+        except discord.DiscordException:
+            log.exception("Could not edit Descent fight message after forfeit")
 
     def _load(self) -> dict:
         if STATE_PATH.exists():
@@ -955,6 +1074,7 @@ class Descent(commands.Cog):
     def _arm_fight(self, fight: Fight) -> None:
         fight.auto = self.is_auto(fight.user_id)
         self.fights[fight.user_id] = fight
+        fight.arm_idle(self)
 
     async def _start_fight(
         self,
@@ -1044,6 +1164,8 @@ class Descent(commands.Cog):
             await interaction.followup.send("That fight isn't active anymore - use `/descend` to start again.",
                                             ephemeral=True)
             return
+        # Any button press resets the idle clock.
+        fight.arm_idle(self)
         fight.round += 1
         dmg_dealt = 0
         counter_mult = BASELINE_DMG_MULT
@@ -1180,6 +1302,7 @@ class Descent(commands.Cog):
         from_oneshot: bool = False,
     ):
         del self.fights[interaction.user.id]
+        fight.cancel_idle()
         rec = self.record(interaction.user.id)
         member = interaction.user
         await self._dismiss_oneshot(fight, interaction, used=from_oneshot)
@@ -1334,6 +1457,7 @@ class Descent(commands.Cog):
 
     async def _on_loss(self, interaction: discord.Interaction, fight: Fight):
         del self.fights[interaction.user.id]
+        fight.cancel_idle()
         await self._dismiss_oneshot(fight, interaction)
         was_auto = self.is_auto(interaction.user.id)
         # Loss breaks the chain; re-enable with `/descend auto:True`.
@@ -1456,7 +1580,11 @@ class Descent(commands.Cog):
 
         if floor is not None:
             if interaction.user.id in self.fights:
-                await interaction.response.send_message("Finish your current fight first.", ephemeral=True)
+                await interaction.response.send_message(
+                    "Finish your current fight first — `/descendend` forfeits it "
+                    f"(counts as a loss). Idle {IDLE_TIMEOUT // 60} min also counts.",
+                    ephemeral=True,
+                )
                 return
             if floor < 1 or floor > rec["highest_cleared"]:
                 await interaction.response.send_message(
@@ -1488,12 +1616,74 @@ class Descent(commands.Cog):
             # Re-arm auto on an open board if they toggled it with this command.
             if auto is not None:
                 fight.auto = self.is_auto(interaction.user.id)
+            fight.arm_idle(self)
             await self._post_fight_board(interaction, fight)
             return
         if rec["floor"] > MAX_FLOOR:
             await interaction.response.send_message("You've already conquered the Descent.", ephemeral=True)
             return
         await self._start_fight(interaction, rec)
+
+    @app_commands.command(
+        name="descendend",
+        description="Forfeit your Descent fight (counts as a loss). Staff can forfeit others.",
+    )
+    @app_commands.describe(member="Whose fight to forfeit (staff only; leave blank for yourself)")
+    async def descendend(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member | None = None,
+    ):
+        if interaction.channel_id not in DESCENT_CHANNEL_IDS:
+            await interaction.response.send_message(_descent_channel_hint(), ephemeral=True)
+            return
+
+        target = member or interaction.user
+        if target.id != interaction.user.id:
+            store = self.bot.get_cog("Store")
+            if not (store and store.is_staff(interaction.user)):
+                await interaction.response.send_message(
+                    "Only staff can forfeit someone else's fight. "
+                    "Use `/descendend` with no one tagged for yourself.",
+                    ephemeral=True,
+                )
+                return
+
+        fight = self.fights.get(target.id)
+        if fight is None:
+            # Also clear a dangling auto flag with nothing to forfeit.
+            if self.is_auto(target.id):
+                self.stop_auto(target.id)
+                who = "Your" if target.id == interaction.user.id else f"{target.display_name}'s"
+                await interaction.response.send_message(
+                    f"{who} auto-play was stopped (no open fight).",
+                    ephemeral=True,
+                )
+                return
+            who = (
+                "You aren't"
+                if target.id == interaction.user.id
+                else f"{target.display_name} isn't"
+            )
+            await interaction.response.send_message(
+                f"{who} in an active Descent fight right now.",
+                ephemeral=True,
+            )
+            return
+
+        result = await self._forfeit_fight(fight, reason="forfeit")
+        who = "Your" if target.id == interaction.user.id else f"{target.display_name}'s"
+        if result["practice"]:
+            detail = "practice — no loss counted"
+        elif result["locked"]:
+            detail = "3rd loss — 24h lockout"
+        else:
+            detail = f"loss recorded ({result['losses']}/{MAX_LOSSES})"
+        await interaction.response.send_message(
+            f"{who} Descent fight is forfeited ({detail}). "
+            f"{'You' if target.id == interaction.user.id else 'They'} can `/descend` again.",
+            ephemeral=True,
+        )
 
     @app_commands.command(name="descentstatus", description="Your Descent progress: floor, stats, and lockout.")
     async def descentstatus(self, interaction: discord.Interaction):
@@ -1557,7 +1747,9 @@ class Descent(commands.Cog):
             await interaction.response.send_message("That's for staff.", ephemeral=True)
             return
         target = member or interaction.user
-        self.fights.pop(target.id, None)
+        old = self.fights.pop(target.id, None)
+        if old is not None:
+            old.cancel_idle()
         self.state["players"][str(target.id)] = blank_record()
         self.save()
         who = "Your" if target.id == interaction.user.id else f"{target.display_name}'s"
@@ -1580,7 +1772,9 @@ class Descent(commands.Cog):
         rec["locked_until"] = 0.0
         rec["losses"] = 0
         # Drop a stuck fight so the next /descend starts clean on this floor.
-        self.fights.pop(target.id, None)
+        old = self.fights.pop(target.id, None)
+        if old is not None:
+            old.cancel_idle()
         self.save()
 
         who = "Your" if target.id == interaction.user.id else f"{target.display_name}'s"
@@ -1623,7 +1817,9 @@ class Descent(commands.Cog):
         pts["atk"] = max(0, pts.get("atk", 0) + attack)
         pts["def"] = max(0, pts.get("def", 0) + defense)
         # Active fight keeps old stats; drop it so the next /descend uses the boost.
-        self.fights.pop(member.id, None)
+        old = self.fights.pop(member.id, None)
+        if old is not None:
+            old.cancel_idle()
         self.save()
 
         p_hp, p_atk, p_def = player_stats(rec)

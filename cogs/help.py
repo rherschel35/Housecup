@@ -37,11 +37,13 @@ HELP = {
             ("broom", "Claim your unique broom (see Brooms section for upgrades, races, and notes)."),
             ("rumor", "Explore secrets, student gossip, odd headmaster whispers, embarrassing ghosts."),
             ("cast", "Banish a wild threat — tap a spell button. 25s alone if you stirred it up."),
-            ("familiar", "Adopt a familiar (once, for good), name it, or see the one you have."),
-            ("feed", "Feed your familiar. Once a day."),
-            ("pet", "Pet your familiar. Once a day."),
-            ("play", "Play with your familiar. Once a day."),
-            ("scout", "Send your familiar out to bring something back. Once a day."),
+            ("familiar status", "Check in on your familiar — friendship and today's care checklist."),
+            ("familiar adopt", "Adopt a salamander, raven, or fox for good (once)."),
+            ("familiar name", "Give your familiar a name, or rename it."),
+            ("familiar feed", "Feed your familiar. Once a day."),
+            ("familiar pet", "Pet your familiar. Once a day."),
+            ("familiar play", "Play with your familiar. Once a day."),
+            ("familiar scout", "Send your familiar out to bring something back. Once a day."),
             ("raid", "Open a 3Raid lobby — Attacker, Specialty, Tank, 10 encounters."),
             ("raidstatus", "Your 3Raid weekly clear status."),
             ("piphowdoi", "Ask Pip Wick how to do something (public hearthling answer from help + Compendium)."),
@@ -69,10 +71,13 @@ HELP = {
         "note": ("Solo 100-floor dungeon — only in Descent channels. "
                  "Practice cleared floors with `/descend floor:n` for loot; nearby floors can sharpen a free stat pick. "
                  "`/descend auto:True` posts the next monster after each win. "
+                 "Idle 3 minutes with no button press counts as a loss. "
                  "Wins bind monsters into your army for castle sieges."),
         "entries": [
             ("descend", "Fight the next monster (or resume). Use auto:True to chain wins without retyping."),
+            ("descendend", "Forfeit an open fight (counts as a loss). Idle 3 min with no button also loses. Staff can forfeit others."),
             ("descentstatus", "Your floor, monster progress, stats, Max AP, and lockout."),
+            ("army", "Full army roster (paged) + sacrifice 500 → ATK/DEF — also works here in Descent channels."),
         ],
     },
     "castles": {
@@ -83,7 +88,7 @@ HELP = {
                  "One castle per player — abandon before attacking another."),
         "entries": [
             ("castles", "Map board: owners, perks, reinforce anytime (not mid-assault), siege, abandon."),
-            ("army", "Your roster (up to 5000), daily recruit cap, and floor-based ATK/DEF sacrifice bonuses."),
+            ("army", "Full paged roster (up to 5000) + sacrifice 500 → ATK/DEF (castles + Descent channels). Uncapped daily binds until PvP goes live."),
         ],
     },
     "potions": {
@@ -245,6 +250,7 @@ HELP = {
             ("staff descent reset", "Wipe someone's Descent progress back to floor 1."),
             ("staff castles unlock", "Clear all castle lock timers and allow sieges any day."),
             ("staff castles schedule", "Restore normal Wed/Sat siege days after a staff unlock."),
+            ("staff castles pvplive", "Turn 200/day army binds on (season live) or off (pre-season uncapped)."),
             ("staff raid reset", "Clear a player's 3Raid weekly lockout, or end the active raid."),
             ("staff market sellreset", "Clear someone's daily Marketplace sell-points cap."),
             ("staff hex cast", "Curse a student — chat mangles, or Limp Wand (blocks /wand, /patronus, /broom, /cast for 1 hour)."),
