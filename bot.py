@@ -36,7 +36,7 @@ FORCE_COMMAND_SYNC = os.getenv("FORCE_COMMAND_SYNC", "").strip() in ("1", "true"
 SYNC_TIMEOUT_SECONDS = int(os.getenv("COMMAND_SYNC_TIMEOUT", "45"))
 # Bump when sync *behavior* changes (e.g. also overwrite guild commands) so
 # the next boot re-PUTs even if the slash tree fingerprint is unchanged.
-COMMAND_SYNC_REVISION = 4
+COMMAND_SYNC_REVISION = 5
 # Chess & checkers load by default. Set ENABLE_BOARD_GAMES=0 to unload them.
 _ENABLE_BOARD_GAMES_RAW = os.getenv("ENABLE_BOARD_GAMES", "1").strip().lower()
 ENABLE_BOARD_GAMES = _ENABLE_BOARD_GAMES_RAW not in ("0", "false", "no", "off", "")
@@ -187,6 +187,76 @@ async def _run_sync(coro, label: str):
         return None
 
 
+STALE_CARE_COMMANDS = ("play", "feed", "pet", "scout")
+
+
+async def _wipe_and_install_guild(guild_id: int) -> bool:
+    """Remove every guild-scoped slash command, then install the global tree.
+
+    Guild commands shadow globals. After nesting /familiar, Discord still had
+    flat /familiar · /play · /feed on the guild — one PUT of the new tree can
+    leave clients stuck. An empty sync first is the reliable clear.
+    """
+    guild = discord.Object(id=guild_id)
+
+    bot.tree.clear_commands(guild=guild)
+    wiped = await _run_sync(
+        bot.tree.sync(guild=guild),
+        f"Guild wipe ({guild_id})",
+    )
+    if wiped is None:
+        return False
+    log.info("Wiped guild %s slash commands (Discord now has %d)", guild_id, len(wiped))
+
+    bot.tree.copy_global_to(guild=guild)
+    installed = await _run_sync(
+        bot.tree.sync(guild=guild),
+        f"Guild install ({guild_id})",
+    )
+    if installed is None:
+        return False
+
+    names = sorted(c.name for c in installed)
+    stale = sorted(n for n in STALE_CARE_COMMANDS if n in names)
+    if stale:
+        log.error(
+            "Guild %s still has top-level %s after wipe+install.",
+            guild_id,
+            stale,
+        )
+        return False
+    if "familiar" not in names:
+        log.error("Guild %s missing /familiar after wipe+install.", guild_id)
+        return False
+
+    # Confirm Discord agrees (not just the sync return payload).
+    try:
+        fetched = await asyncio.wait_for(
+            bot.tree.fetch_commands(guild=guild),
+            timeout=SYNC_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        log.exception("Could not fetch guild %s commands after install", guild_id)
+        fetched = installed
+    fetched_names = sorted(c.name for c in fetched)
+    stale_fetched = sorted(n for n in STALE_CARE_COMMANDS if n in fetched_names)
+    if stale_fetched or "familiar" not in fetched_names:
+        log.error(
+            "Guild %s fetch check failed (names=%s stale=%s)",
+            guild_id,
+            fetched_names[:20],
+            stale_fetched,
+        )
+        return False
+
+    log.info(
+        "Installed %d guild commands on server %s (familiar ok, care cmds nested)",
+        len(installed),
+        guild_id,
+    )
+    return True
+
+
 async def sync_commands(*, force: bool = False):
     """Register slash commands only when the tree (or sync mode) changed.
 
@@ -194,8 +264,8 @@ async def sync_commands(*, force: bool = False):
     on each boot burned Discord's daily create budget and froze the bot. Skip
     when nothing changed; FORCE_COMMAND_SYNC=1 (or force=True) overrides.
 
-    When syncing globally we also overwrite command lists on every guild the
-    bot is in (plus ALLOWED_GUILD_IDS / DEV_GUILD_ID). Stale guild commands
+    When syncing globally we also wipe + reinstall command lists on every guild
+    the bot is in (plus ALLOWED_GUILD_IDS / DEV_GUILD_ID). Stale guild commands
     from older guild-scoped syncs shadow globals and leave dead `/feed` ·
     `/play` entries that "do not respond".
     """
@@ -257,60 +327,16 @@ async def sync_commands(*, force: bool = False):
                     "Global sync ok, but no guild ids to overwrite — "
                     "stale guild commands may still shadow /familiar."
                 )
-            # Overwrite guild command lists so old guild-scoped registrations
-            # (e.g. pre-group /feed /play /familiar) stop shadowing the new tree.
-            # clear_commands first: copy_global_to *merges* into any existing
-            # local guild map, which can re-upload dead top-level /play etc.
             for guild_id in targets:
-                guild = discord.Object(id=guild_id)
-                bot.tree.clear_commands(guild=guild)
-                bot.tree.copy_global_to(guild=guild)
-                guild_synced = await _run_sync(
-                    bot.tree.sync(guild=guild),
-                    f"Guild command overwrite ({guild_id})",
-                )
-                if guild_synced is None:
+                if not await _wipe_and_install_guild(guild_id):
                     ok = False
                     break
-                names = sorted(c.name for c in guild_synced)
-                stale = sorted(
-                    n for n in ("play", "feed", "pet", "scout") if n in names
-                )
-                if stale:
-                    log.error(
-                        "Guild %s still has top-level %s after overwrite — "
-                        "nested /familiar may stay shadowed.",
-                        guild_id,
-                        stale,
-                    )
-                    ok = False
-                    break
-                if "familiar" not in names:
-                    log.error(
-                        "Guild %s missing /familiar after overwrite.", guild_id
-                    )
-                    ok = False
-                    break
-                log.info(
-                    "Overwrote %d guild commands on server %s (familiar ok, no stale care cmds)",
-                    len(guild_synced),
-                    guild_id,
-                )
     else:
         ok = True
         for guild_id in targets:
-            guild = discord.Object(id=guild_id)
-            # Clear local guild map first so copy_global_to doesn't merge leftovers.
-            bot.tree.clear_commands(guild=guild)
-            bot.tree.copy_global_to(guild=guild)
-            synced = await _run_sync(
-                bot.tree.sync(guild=guild),
-                f"Guild command sync ({guild_id})",
-            )
-            if synced is None:
+            if not await _wipe_and_install_guild(guild_id):
                 ok = False
                 break
-            log.info("Synced %d commands to server %s", len(synced), guild_id)
 
         if ok:
             bot.tree.clear_commands(guild=None)
@@ -331,9 +357,12 @@ async def sync_commands(*, force: bool = False):
             }
         )
     else:
+        # Allow another on_ready / staff sync attempt in this process.
+        if not force:
+            _synced = False
         log.warning(
             "Command sync did not finish cleanly - not saving fingerprint, "
-            "so the next boot will retry."
+            "so the next boot will retry. Staff: /staff sync"
         )
     return ok
 

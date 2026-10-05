@@ -1,0 +1,3 @@
+# Netlify / manual deploy drops. Not required at runtime.
+*.zip
+!velmora-compendium-site.zip
