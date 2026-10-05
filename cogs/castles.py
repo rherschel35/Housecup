@@ -1,10 +1,11 @@
 """
 Castles & Army PvP — six castles, Descent armies, Wed/Sat sieges.
 
-    /castles   - map board: owners, perks, lock timers, siege/reinforce/abandon
-    /army      - roster, ATK/DEF sacrifice ladder, daily recruit progress
+    /castles       - map board: owners, perks, lock timers, siege/reinforce/abandon
+    /army          - full roster (paged) + sacrifice 500 → ATK/DEF (castles channel)
+    /descendarmy   - same army panel in Descent channels (owned by Descent cog)
 
-Lives in the castles channel only. Armies come from Descent wins.
+Armies come from Descent wins.
 """
 
 from __future__ import annotations
@@ -67,6 +68,7 @@ WALL_DEF_MULT = 1.55    # matching wall-type troops
 BOSS_WALL_DEF_MULT = 1.75  # Bannerhall boss wall
 
 DAILY_RECRUIT_CAP = 200
+ARMY_PAGE_SIZE = 12  # units listed per /army · /descendarmy page
 SUNDAY_CASTLE_POINTS = 50
 BANNERHALL_PER_CASTLE = 30
 
@@ -901,17 +903,40 @@ class Castles(commands.Cog):
         view = CastleBoardView(self)
         await interaction.response.send_message(embed=self.overview_embed(), view=view)
 
-    @app_commands.command(name="army", description="Your Descent army roster and ATK/DEF sacrifice upgrades.")
+    @app_commands.command(name="army", description="Your full Descent army roster and sacrifice 500 → ATK/DEF.")
     async def army_cmd(self, interaction: discord.Interaction):
         if await self._deny_channel(interaction):
             return
+        await self.send_army_panel(interaction)
+
+    async def send_army_panel(self, interaction: discord.Interaction, *, page: int = 0) -> None:
+        """Shared by /army and /descendarmy — ephemeral paged roster + sacrifice."""
+        view = ArmyView(self, interaction.user.id, page=page)
         await interaction.response.send_message(
-            embed=self.army_embed(interaction.user),
-            view=ArmyView(self, interaction.user.id),
+            embed=self.army_embed(interaction.user, page=view.page),
+            view=view,
             ephemeral=True,
         )
 
-    def army_embed(self, member: discord.Member) -> discord.Embed:
+    def army_pages(self, user_id: int) -> list[list[dict]]:
+        army = sorted(
+            self.army_of(user_id),
+            key=lambda u: (
+                -int(u.get("floor") or 0),
+                -int(u.get("hp") or 0),
+                int(u.get("id") or 0),
+            ),
+        )
+        if not army:
+            return [[]]
+        return [
+            army[i:i + ARMY_PAGE_SIZE]
+            for i in range(0, len(army), ARMY_PAGE_SIZE)
+        ]
+
+    def army_embed(self, member: discord.Member, page: int = 0) -> discord.Embed:
+        pages = self.army_pages(member.id)
+        page = max(0, min(int(page), len(pages) - 1))
         army = self.army_of(member.id)
         prec = self.prec(member.id)
         day = chicago_day()
@@ -921,22 +946,36 @@ class Castles(commands.Cog):
             recruits = int(prec.get("recruits_today") or 0)
         bosses = sum(1 for u in army if u.get("boss"))
         by_el: dict[str, int] = {}
+        by_floor: dict[int, int] = {}
         for u in army:
             el = (u.get("element") or "?").lower()
             by_el[el] = by_el.get(el, 0) + 1
+            fl = int(u.get("floor") or 0)
+            by_floor[fl] = by_floor.get(fl, 0) + 1
         mix = ", ".join(
             f"{ELEMENT_EMOJI.get(el, '•')} **{el}** ×{n}"
             for el, n in sorted(by_el.items(), key=lambda x: -x[1])
         ) or "—"
+        floor_bits = [
+            f"F{fl}×{by_floor[fl]}"
+            for fl in sorted(by_floor, reverse=True)[:12]
+        ]
+        if len(by_floor) > 12:
+            floor_bits.append("…")
+        floors_txt = ", ".join(floor_bits) or "—"
         held = self.owner_castle_key(member.id)
         held_txt = CASTLES[held]["name"] if held else "none"
-        recent = army[-8:] if army else []
-        recent_txt = "\n".join(
-            f"{u.get('emoji', '•')} {u.get('name', '?')} "
-            f"(F{u.get('floor', '?')} · HP {u.get('hp', '?')}"
-            f"{' · boss' if u.get('boss') else ''})"
-            for u in recent
+        chunk = pages[page]
+        roster = "\n".join(
+            f"{u.get('emoji', '•')} **{u.get('name', '?')}** · "
+            f"F{u.get('floor', '?')} · HP {u.get('hp', '?')} · "
+            f"ATK {u.get('atk', '?')} · DEF {u.get('def', '?')}"
+            f"{' · boss' if u.get('boss') else ''}"
+            for u in chunk
         ) or "*Empty — win Descent fights to bind monsters.*"
+        # Discord field value max 1024; keep roster short enough.
+        if len(roster) > 1000:
+            roster = roster[:997] + "…"
         atk_pct = self.army_atk_pct(member.id)
         def_pct = self.army_def_pct(member.id)
         embed = discord.Embed(
@@ -966,7 +1005,13 @@ class Castles(commands.Cog):
             inline=False,
         )
         embed.add_field(name="Troop mix", value=mix, inline=False)
-        embed.add_field(name="Recent binds", value=recent_txt, inline=False)
+        embed.add_field(name="By floor", value=floors_txt, inline=False)
+        embed.add_field(
+            name=f"Full roster · page {page + 1}/{len(pages)}",
+            value=roster,
+            inline=False,
+        )
+        embed.set_footer(text=f"Sacrifice {SACRIFICE_COUNT} lowest-floor regulars → army ATK or DEF")
         return embed
 
     def sacrifice(self, user_id: int, track: str) -> tuple[bool, str]:
@@ -1375,36 +1420,87 @@ class SiegeDecisionView(discord.ui.View):
 
 
 class ArmyView(discord.ui.View):
-    def __init__(self, cog: Castles, user_id: int):
-        super().__init__(timeout=180)
+    def __init__(self, cog: Castles, user_id: int, page: int = 0):
+        super().__init__(timeout=300)
         self.cog = cog
         self.user_id = user_id
+        pages = cog.army_pages(user_id)
+        self.page = max(0, min(int(page), len(pages) - 1))
+        # Disable page buttons at the ends.
+        for child in self.children:
+            if getattr(child, "custom_id", None) == "army:prev":
+                child.disabled = self.page <= 0
+            elif getattr(child, "custom_id", None) == "army:next":
+                child.disabled = self.page >= len(pages) - 1
 
-    @discord.ui.button(label=f"Sacrifice {SACRIFICE_COUNT} → +ATK", style=discord.ButtonStyle.danger)
+    async def _refresh(self, interaction: discord.Interaction) -> None:
+        await interaction.response.edit_message(
+            embed=self.cog.army_embed(interaction.user, page=self.page),
+            view=ArmyView(self.cog, self.user_id, page=self.page),
+        )
+
+    @discord.ui.button(
+        label="◀ Prev", style=discord.ButtonStyle.secondary, custom_id="army:prev", row=0,
+    )
+    async def prev_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("Not your army.", ephemeral=True)
+            return
+        self.page = max(0, self.page - 1)
+        await self._refresh(interaction)
+
+    @discord.ui.button(
+        label="Next ▶", style=discord.ButtonStyle.secondary, custom_id="army:next", row=0,
+    )
+    async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("Not your army.", ephemeral=True)
+            return
+        pages = self.cog.army_pages(self.user_id)
+        self.page = min(len(pages) - 1, self.page + 1)
+        await self._refresh(interaction)
+
+    @discord.ui.button(
+        label=f"Sacrifice {SACRIFICE_COUNT} → +ATK",
+        style=discord.ButtonStyle.danger,
+        row=1,
+    )
     async def sac_atk(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("Not your army.", ephemeral=True)
             return
         ok, msg = self.cog.sacrifice(interaction.user.id, "atk")
-        await interaction.response.send_message(msg, ephemeral=True)
         if ok:
-            await interaction.edit_original_response(
-                embed=self.cog.army_embed(interaction.user),
-                view=ArmyView(self.cog, self.user_id),
+            pages = self.cog.army_pages(self.user_id)
+            self.page = min(self.page, len(pages) - 1)
+            await interaction.response.edit_message(
+                embed=self.cog.army_embed(interaction.user, page=self.page),
+                view=ArmyView(self.cog, self.user_id, page=self.page),
             )
+            await interaction.followup.send(msg, ephemeral=True)
+        else:
+            await interaction.response.send_message(msg, ephemeral=True)
 
-    @discord.ui.button(label=f"Sacrifice {SACRIFICE_COUNT} → +DEF", style=discord.ButtonStyle.primary)
+    @discord.ui.button(
+        label=f"Sacrifice {SACRIFICE_COUNT} → +DEF",
+        style=discord.ButtonStyle.primary,
+        row=1,
+    )
     async def sac_def(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("Not your army.", ephemeral=True)
             return
         ok, msg = self.cog.sacrifice(interaction.user.id, "def")
-        await interaction.response.send_message(msg, ephemeral=True)
         if ok:
-            await interaction.edit_original_response(
-                embed=self.cog.army_embed(interaction.user),
-                view=ArmyView(self.cog, self.user_id),
+            pages = self.cog.army_pages(self.user_id)
+            self.page = min(self.page, len(pages) - 1)
+            await interaction.response.edit_message(
+                embed=self.cog.army_embed(interaction.user, page=self.page),
+                view=ArmyView(self.cog, self.user_id, page=self.page),
             )
+            await interaction.followup.send(msg, ephemeral=True)
+        else:
+            await interaction.response.send_message(msg, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
