@@ -2,8 +2,8 @@
 Castles & Army PvP — six castles, Descent armies, Wed/Sat sieges.
 
     /castles       - map board: owners, perks, lock timers, siege/reinforce/abandon
-    /army          - full roster (paged) + sacrifice 500 → ATK/DEF (castles channel)
-    /descendarmy   - same army panel in Descent channels (owned by Descent cog)
+    /army          - full roster (paged) + sacrifice 500 → ATK/DEF
+                     (castles channel and every Descent channel)
 
 Armies come from Descent wins.
 """
@@ -24,6 +24,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
+from cogs.descent import DESCENT_CHANNEL_IDS
 from cogs.velmora_channels import CASTLES_CHANNEL_IDS, channel_mentions
 
 log = logging.getLogger("velmora.castles")
@@ -68,7 +69,7 @@ WALL_DEF_MULT = 1.55    # matching wall-type troops
 BOSS_WALL_DEF_MULT = 1.75  # Bannerhall boss wall
 
 DAILY_RECRUIT_CAP = 200
-ARMY_PAGE_SIZE = 12  # units listed per /army · /descendarmy page
+ARMY_PAGE_SIZE = 12  # units listed per /army page
 SUNDAY_CASTLE_POINTS = 50
 BANNERHALL_PER_CASTLE = 30
 
@@ -431,10 +432,26 @@ class Castles(commands.Cog):
     def _in_channel(self, interaction: discord.Interaction) -> bool:
         return interaction.channel_id in CASTLES_CHANNEL_IDS
 
+    def _army_channel_ok(self, interaction: discord.Interaction) -> bool:
+        """ /army is allowed in the castles channel and all Descent rooms. """
+        cid = interaction.channel_id
+        return cid in CASTLES_CHANNEL_IDS or cid in DESCENT_CHANNEL_IDS
+
     async def _deny_channel(self, interaction: discord.Interaction) -> bool:
         if self._in_channel(interaction):
             return False
-        msg = f"Castle & army commands only work in {channel_mentions(CASTLES_CHANNEL_IDS)}."
+        msg = f"Castle commands only work in {channel_mentions(CASTLES_CHANNEL_IDS)}."
+        if interaction.response.is_done():
+            await interaction.followup.send(msg, ephemeral=True)
+        else:
+            await interaction.response.send_message(msg, ephemeral=True)
+        return True
+
+    async def _deny_army_channel(self, interaction: discord.Interaction) -> bool:
+        if self._army_channel_ok(interaction):
+            return False
+        allowed = CASTLES_CHANNEL_IDS | DESCENT_CHANNEL_IDS
+        msg = f"/army only works in {channel_mentions(allowed)}."
         if interaction.response.is_done():
             await interaction.followup.send(msg, ephemeral=True)
         else:
@@ -903,14 +920,17 @@ class Castles(commands.Cog):
         view = CastleBoardView(self)
         await interaction.response.send_message(embed=self.overview_embed(), view=view)
 
-    @app_commands.command(name="army", description="Your full Descent army roster and sacrifice 500 → ATK/DEF.")
+    @app_commands.command(
+        name="army",
+        description="Your full Descent army roster and sacrifice 500 → ATK/DEF.",
+    )
     async def army_cmd(self, interaction: discord.Interaction):
-        if await self._deny_channel(interaction):
+        if await self._deny_army_channel(interaction):
             return
         await self.send_army_panel(interaction)
 
     async def send_army_panel(self, interaction: discord.Interaction, *, page: int = 0) -> None:
-        """Shared by /army and /descendarmy — ephemeral paged roster + sacrifice."""
+        """Ephemeral paged roster + sacrifice (castles + Descent channels)."""
         view = ArmyView(self, interaction.user.id, page=page)
         await interaction.response.send_message(
             embed=self.army_embed(interaction.user, page=view.page),

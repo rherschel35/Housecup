@@ -73,7 +73,7 @@ HELP = {
         "entries": [
             ("descend", "Fight the next monster (or resume). Use auto:True to chain wins without retyping."),
             ("descentstatus", "Your floor, monster progress, stats, Max AP, and lockout."),
-            ("descendarmy", "Full army roster (paged) — sacrifice 500 regulars for army ATK or DEF."),
+            ("army", "Full army roster (paged) + sacrifice 500 → ATK/DEF — also works here in Descent channels."),
         ],
     },
     "castles": {
@@ -84,7 +84,7 @@ HELP = {
                  "One castle per player — abandon before attacking another."),
         "entries": [
             ("castles", "Map board: owners, perks, reinforce anytime (not mid-assault), siege, abandon."),
-            ("army", "Full paged roster + sacrifice 500 → ATK/DEF (castles channel; also /descendarmy). Uncapped binds until PvP goes live."),
+            ("army", "Full paged roster + sacrifice 500 → ATK/DEF (castles + Descent channels). Uncapped binds until PvP goes live."),
         ],
     },
     "potions": {
