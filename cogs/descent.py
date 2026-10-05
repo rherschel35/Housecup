@@ -429,6 +429,20 @@ def practice_statup_chance(current_floor: int, practiced_floor: int) -> float:
     return PRACTICE_STATUP_FAR
 
 
+def stamp_owner(embed: discord.Embed, member: discord.Member) -> discord.Embed:
+    """Mark whose Descent board/result this is (shared channels get busy).
+
+    Name + avatar only — no @mention, so busy channels don't ping every round.
+    """
+    icon = None
+    try:
+        icon = member.display_avatar.url
+    except Exception:
+        icon = None
+    embed.set_author(name=f"{member.display_name}'s Descent", icon_url=icon)
+    return embed
+
+
 def pending_statup_picks(rec: dict) -> int:
     """How many free stat picks the player still owes. Supports legacy
     True/False saves as well as an integer pick count."""
@@ -518,9 +532,10 @@ class Fight:
             description=desc,
             color=0x8B5FBF if not self.is_boss else 0xE0A526,
         )
+        stamp_owner(e, member)
         e.set_image(url="attachment://monster.png")
         e.add_field(
-            name=f"{member.display_name}",
+            name=f"{member.display_name}'s HP",
             value=(f"{bar(self.p_hp, self.p_hp_max)} {self.p_hp}/{self.p_hp_max}\n"
                    f"⚡ {self.ap}/{self.ap_max} AP"),
             inline=False,
@@ -848,6 +863,11 @@ class Descent(commands.Cog):
         view: Optional[discord.ui.View],
     ) -> None:
         """Edit the public fight post (needed when One-shot is ephemeral)."""
+        owner = interaction.user if interaction.user.id == fight.user_id else None
+        if owner is None and interaction.guild is not None:
+            owner = interaction.guild.get_member(fight.user_id)
+        if owner is not None:
+            stamp_owner(embed, owner)
         if fight.message is not None:
             try:
                 await fight.message.edit(embed=embed, view=view, attachments=[])
@@ -1363,32 +1383,32 @@ class Descent(commands.Cog):
         self.save()
         label = {"hp": "Max HP", "atk": "Attack", "def": "Defense"}[stat]
         if remaining > 0:
-            await interaction.response.edit_message(
-                embed=discord.Embed(
-                    title="Stat raised",
-                    description=(f"**+1 {label}**. {remaining} pick"
-                                 f"{'s' if remaining != 1 else ''} left — choose another."),
-                    color=0x6C5CE7,
-                ),
-                view=StatUpView(self),
+            embed = discord.Embed(
+                title="Stat raised",
+                description=(f"**+1 {label}**. {remaining} pick"
+                             f"{'s' if remaining != 1 else ''} left — choose another."),
+                color=0x6C5CE7,
             )
+            stamp_owner(embed, interaction.user)
+            await interaction.response.edit_message(embed=embed, view=StatUpView(self))
             return
         if self.is_auto(interaction.user.id):
-            await interaction.response.edit_message(
-                embed=discord.Embed(
-                    title="Stat raised",
-                    description=f"**+1 {label}**. ⚡ Auto — next monster incoming…",
-                    color=0x6C5CE7,
-                ),
-                view=None,
+            embed = discord.Embed(
+                title="Stat raised",
+                description=f"**+1 {label}**. ⚡ Auto — next monster incoming…",
+                color=0x6C5CE7,
             )
+            stamp_owner(embed, interaction.user)
+            await interaction.response.edit_message(embed=embed, view=None)
             await self._try_auto_continue(interaction)
             return
-        await interaction.response.edit_message(
-            embed=discord.Embed(title="Stat raised", description=f"**+1 {label}**. Use `/descend` to keep going.",
-                                color=0x6C5CE7),
-            view=None,
+        embed = discord.Embed(
+            title="Stat raised",
+            description=f"**+1 {label}**. Use `/descend` to keep going.",
+            color=0x6C5CE7,
         )
+        stamp_owner(embed, interaction.user)
+        await interaction.response.edit_message(embed=embed, view=None)
 
     async def _prompt_statup(self, interaction: discord.Interaction, rec: dict) -> bool:
         """If the player still owes a pick, show the picker and return True."""
@@ -1397,9 +1417,11 @@ class Descent(commands.Cog):
             return False
         tip = "Pick your remaining stat points first." if left > 1 else "Pick your stat point first."
         desc = f"{left} picks remaining." if left > 1 else None
+        embed = discord.Embed(title="Choose a stat to raise", description=desc, color=0x6C5CE7)
+        stamp_owner(embed, interaction.user)
         await interaction.response.send_message(
             tip,
-            embed=discord.Embed(title="Choose a stat to raise", description=desc, color=0x6C5CE7),
+            embed=embed,
             view=StatUpView(self),
         )
         return True
