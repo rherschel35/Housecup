@@ -1060,7 +1060,71 @@ class Castles(commands.Cog):
             f"🧪 Seeded **{added}** floor-**{floor}** troops for {member.mention} "
             f"(cleared first: **{clear}**).\n"
             f"Home army: **{total}** · owned (home+garrison+march): **{owned}**.\n"
-            f"Use `/army` to inspect; reinforce/siege as usual.",
+            f"Use `/army` to inspect; reinforce/siege as usual.\n"
+            f"Remove test troops later with `/staffgame castles clearseed`.",
+            ephemeral=True,
+        )
+
+    async def staff_clear_seed_army(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        *,
+        all_home: bool = False,
+    ) -> None:
+        """Remove staff-seeded test troops (or wipe the whole home army)."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        descent = self._descent()
+        if not descent:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+
+        rec = descent.record(member.id)
+        army = list(rec.get("army") or [])
+        if all_home:
+            removed_home = len(army)
+            rec["army"] = []
+        else:
+            keep = [u for u in army if u.get("kind") != "staff_seed"]
+            removed_home = len(army) - len(keep)
+            rec["army"] = keep
+        descent.save()
+
+        removed_garrison = 0
+        key = self.owner_castle_key(member.id)
+        if key:
+            slot = self.castle(key)
+            garr = list(slot.get("garrison") or [])
+            keep_g = [u for u in garr if u.get("kind") != "staff_seed"]
+            removed_garrison = len(garr) - len(keep_g)
+            if removed_garrison:
+                slot["garrison"] = keep_g
+                self.save()
+
+        removed_march = 0
+        for slot in self.state.get("castles", {}).values():
+            siege = slot.get("siege") or {}
+            if siege.get("attacker_id") != member.id:
+                continue
+            force = list(siege.get("attack_force") or [])
+            keep_f = [u for u in force if u.get("kind") != "staff_seed"]
+            removed_march += len(force) - len(keep_f)
+            if removed_march:
+                siege["attack_force"] = keep_f
+                slot["siege"] = siege
+        if removed_march:
+            self.save()
+
+        left = len(rec.get("army") or [])
+        mode = "entire home army" if all_home else "seeded test troops (🧪)"
+        await interaction.response.send_message(
+            f"🧹 Cleared **{mode}** for {member.mention}.\n"
+            f"Removed: home **{removed_home}** · garrison **{removed_garrison}** · "
+            f"march **{removed_march}**.\n"
+            f"Home army left: **{left}**.",
             ephemeral=True,
         )
 

@@ -331,6 +331,26 @@ class Staff(commands.Cog):
             return
         await cog.staff_seed_army(interaction, member, count=count, floor=floor, clear=clear)
 
+    @castles.command(
+        name="clearseed",
+        description="Staff test: remove seeded test army troops from a player.",
+    )
+    @app_commands.describe(
+        member="Whose test troops to remove",
+        all_home="Also wipe their entire home army (not just 🧪 seeded units)",
+    )
+    async def castles_clearseed(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        all_home: bool = False,
+    ):
+        cog = self._cog("Castles")
+        if not cog:
+            await interaction.response.send_message("Castles isn't loaded.", ephemeral=True)
+            return
+        await cog.staff_clear_seed_army(interaction, member, all_home=all_home)
+
     # ----------------------------------------------------------------- raid
 
     @raid.command(name="reset", description="Clear weekly lockout or end the active raid.")
