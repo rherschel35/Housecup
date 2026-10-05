@@ -2,19 +2,20 @@
 Familiars. Adopt one, name it, care for it every day, and it brings things
 back.
 
-    /familiar [choose] [name]   - adopt one for good, name or rename it,
-                                   or just see the one you have
-    /feed                       - once a day, raises friendship
-    /pet                        - once a day, raises friendship
-    /play                       - once a day, raises friendship
-    /scout                      - once a day; sends it out into Velmora
+    /familiar status            - see the one you have (friendship, today's checklist)
+    /familiar adopt             - adopt one for good (salamander / raven / fox)
+    /familiar name              - give it a name (or rename)
+    /familiar feed              - once a day, raises friendship
+    /familiar pet               - once a day, raises friendship
+    /familiar play              - once a day, raises friendship
+    /familiar scout             - once a day; sends it out into Velmora
 
 Three familiars to choose from - a Salamander, a Raven, a Fox - one per
 person, for good, like a patronus. Feed/pet/play each raise friendship
 once per day no matter how many times you run them; the friendship you've
-built decides how often /scout comes back with something, and how good it
-is. Scouted finds land in your satchel (the same one /forage fills), so a
-devoted familiar is worth having even outside the Garden.
+built decides how often /familiar scout comes back with something, and how
+good it is. Scouted finds land in your satchel (the same one /forage fills),
+so a devoted familiar is worth having even outside the Garden.
 """
 
 import json
@@ -47,7 +48,7 @@ FAMILIARS = {
     "fox":        {"label": "Fox",        "emoji": "🦊", "article": "a"},
 }
 
-# (friendship floor, tier name, chance /scout finds anything, rarity weights)
+# (friendship floor, tier name, chance /familiar scout finds anything, rarity weights)
 TIERS = [
     (0,  "Wary",         0.55, {"common": 90, "uncommon": 10}),
     (10, "Curious",      0.70, {"common": 70, "uncommon": 25, "rare": 5}),
@@ -124,6 +125,11 @@ def _tier(friendship: int):
 
 
 class Familiars(commands.Cog):
+    group = app_commands.Group(
+        name="familiar",
+        description="Adopt, care for, and scout with your familiar.",
+    )
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.rng_module = __import__("random").Random()
@@ -171,82 +177,116 @@ class Familiars(commands.Cog):
             return f"**{rec['name']}** the {meta['label']}"
         return f"{meta['article']} {meta['label']}"
 
-    # ------------------------------------------------------------ /familiar
+    # ------------------------------------------------------------ /familiar status
 
-    @app_commands.command(name="familiar", description="Adopt, name, or check in on your familiar.")
-    @app_commands.describe(choose="Adopt this familiar for good, if you don't have one yet",
-                           name="Give it a name (or change the one it has)")
+    @group.command(name="status", description="Check in on your familiar — friendship and today's care.")
+    async def status(self, interaction: discord.Interaction):
+        rec = self.record(interaction.user.id)
+        if not rec["species"]:
+            await interaction.response.send_message(
+                "You haven't adopted a familiar yet — `/familiar adopt` to pick one.",
+                ephemeral=True,
+            )
+            return
+
+        meta = FAMILIARS[rec["species"]]
+        _, tier_name, _, _ = _tier(rec["friendship"])
+        day = rec["day"]
+        checklist = "  ".join(
+            f"{'✅' if day.get(k) else '⬜'} {k.capitalize()}"
+            for k in ("fed", "pet", "played", "scouted")
+        )
+        embed = discord.Embed(
+            title=f"{meta['emoji']} {self.fam_word(rec)}",
+            description=(
+                f"Friendship: **{rec['friendship']}** ({tier_name})\n\n"
+                f"Today: {checklist}\n\n"
+                "`/familiar feed` · `/familiar pet` · `/familiar play` · `/familiar scout`"
+                + ("" if rec.get("name") else "\n\nGive it a name with `/familiar name`.")
+            ),
+            color=WARM,
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    # ------------------------------------------------------------ /familiar adopt
+
+    @group.command(name="adopt", description="Adopt a familiar for good (once).")
+    @app_commands.describe(
+        choose="Which familiar bonds with you",
+        name="Optional name to give it right away",
+    )
     @app_commands.choices(choose=[
         app_commands.Choice(name="🦎 Salamander", value="salamander"),
         app_commands.Choice(name="🐦 Raven", value="raven"),
         app_commands.Choice(name="🦊 Fox", value="fox"),
     ])
-    async def familiar(self, interaction: discord.Interaction,
-                        choose: app_commands.Choice[str] = None, name: str = None):
+    async def adopt(
+        self,
+        interaction: discord.Interaction,
+        choose: app_commands.Choice[str],
+        name: str | None = None,
+    ):
         rec = self.record(interaction.user.id)
+        if rec["species"]:
+            await interaction.response.send_message(
+                f"You already have {self.fam_word(rec)} - familiars bond for good.",
+                ephemeral=True,
+            )
+            return
 
         if name is not None:
             name = name.strip()
             if not (1 <= len(name) <= NAME_MAX_LEN):
                 await interaction.response.send_message(
-                    f"Names need to be 1-{NAME_MAX_LEN} characters.", ephemeral=True)
-                return
-            if not rec["species"] and not choose:
-                await interaction.response.send_message(
-                    "Adopt a familiar first with the `choose` option, then name it.", ephemeral=True)
+                    f"Names need to be 1-{NAME_MAX_LEN} characters.",
+                    ephemeral=True,
+                )
                 return
 
-        if choose:
-            if rec["species"]:
-                await interaction.response.send_message(
-                    f"You already have {self.fam_word(rec)} - familiars bond for good.",
-                    ephemeral=True)
-                return
-            rec["species"] = choose.value
-            rec["friendship"] = 0
-            if name:
-                rec["name"] = name
-            self.save()
-            meta = FAMILIARS[choose.value]
-            embed = discord.Embed(
-                title=f"{meta['emoji']} A bond is formed",
-                description=(f"{self.fam_word(rec)} has chosen to stay with "
-                              f"{interaction.user.mention}.\n\nFeed it, pet it, and play with it - once a day "
-                              "each raises its friendship. The more it trusts you, the more it brings back "
-                              "when you send it out with `/scout`."
-                              + ("" if name else " Give it a name any time with `/familiar name:`.")),
-                color=WARM,
-            )
-            await interaction.response.send_message(embed=embed)
-            return
-
-        if not rec["species"]:
-            await interaction.response.send_message(
-                "You haven't adopted a familiar yet - run `/familiar` and pick one with the `choose` option.",
-                ephemeral=True)
-            return
-
-        if name is not None:
+        rec["species"] = choose.value
+        rec["friendship"] = 0
+        if name:
             rec["name"] = name
-            self.save()
-            await interaction.response.send_message(
-                f"From now on, {FAMILIARS[rec['species']]['label'].lower()} answers to **{name}**.")
-            return
-
-        meta = FAMILIARS[rec["species"]]
-        floor, tier_name, _, _ = _tier(rec["friendship"])
-        day = rec["day"]
-        checklist = "  ".join(
-            f"{'✅' if day.get(k) else '⬜'} {k.capitalize()}" for k in ("fed", "pet", "played", "scouted")
-        )
+        self.save()
+        meta = FAMILIARS[choose.value]
         embed = discord.Embed(
-            title=f"{meta['emoji']} {self.fam_word(rec)}",
-            description=(f"Friendship: **{rec['friendship']}** ({tier_name})\n\nToday: {checklist}\n\n"
-                         "`/feed` · `/pet` · `/play` · `/scout`" +
-                         ("" if rec.get("name") else "\n\nGive it a name with `/familiar name:`.")),
+            title=f"{meta['emoji']} A bond is formed",
+            description=(
+                f"{self.fam_word(rec)} has chosen to stay with "
+                f"{interaction.user.mention}.\n\n"
+                "Feed it, pet it, and play with it - once a day each raises its "
+                "friendship. The more it trusts you, the more it brings back "
+                "when you send it out with `/familiar scout`."
+                + ("" if name else " Give it a name any time with `/familiar name`.")
+            ),
             color=WARM,
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
+
+    # ------------------------------------------------------------ /familiar name
+
+    @group.command(name="name", description="Give your familiar a name (or rename it).")
+    @app_commands.describe(name="What it answers to")
+    async def rename(self, interaction: discord.Interaction, name: str):
+        rec = self.record(interaction.user.id)
+        if not rec["species"]:
+            await interaction.response.send_message(
+                "Adopt a familiar first with `/familiar adopt`, then name it.",
+                ephemeral=True,
+            )
+            return
+        name = name.strip()
+        if not (1 <= len(name) <= NAME_MAX_LEN):
+            await interaction.response.send_message(
+                f"Names need to be 1-{NAME_MAX_LEN} characters.",
+                ephemeral=True,
+            )
+            return
+        rec["name"] = name
+        self.save()
+        await interaction.response.send_message(
+            f"From now on, {FAMILIARS[rec['species']]['label'].lower()} answers to **{name}**."
+        )
 
     # ------------------------------------------------------------ feed/pet/play
 
@@ -254,7 +294,9 @@ class Familiars(commands.Cog):
         rec = self.record(interaction.user.id)
         if not rec["species"]:
             await interaction.response.send_message(
-                "You don't have a familiar yet - run `/familiar` to adopt one.", ephemeral=True)
+                "You don't have a familiar yet - `/familiar adopt` to pick one.",
+                ephemeral=True,
+            )
             return
         if rec["day"].get(action):
             await interaction.response.send_message(already, ephemeral=True)
@@ -278,30 +320,34 @@ class Familiars(commands.Cog):
             except Exception:
                 log.exception("Gear check after familiar care failed")
 
-    @app_commands.command(name="feed", description="Feed your familiar. Once a day.")
+    @group.command(name="feed", description="Feed your familiar. Once a day.")
     async def feed(self, interaction: discord.Interaction):
         await self._care(interaction, "fed", FEED_LINES, "Already fed today - its belly's full.")
 
-    @app_commands.command(name="pet", description="Pet your familiar. Once a day.")
+    @group.command(name="pet", description="Pet your familiar. Once a day.")
     async def pet(self, interaction: discord.Interaction):
         await self._care(interaction, "pet", PET_LINES, "Already had its fill of pets today.")
 
-    @app_commands.command(name="play", description="Play with your familiar. Once a day.")
+    @group.command(name="play", description="Play with your familiar. Once a day.")
     async def play(self, interaction: discord.Interaction):
         await self._care(interaction, "played", PLAY_LINES, "It's already worn out from playing today.")
 
-    # ------------------------------------------------------------ /scout
+    # ------------------------------------------------------------ /familiar scout
 
-    @app_commands.command(name="scout", description="Send your familiar out to bring something back. Once a day.")
+    @group.command(name="scout", description="Send your familiar out to bring something back. Once a day.")
     async def scout(self, interaction: discord.Interaction):
         rec = self.record(interaction.user.id)
         if not rec["species"]:
             await interaction.response.send_message(
-                "You don't have a familiar yet - run `/familiar` to adopt one.", ephemeral=True)
+                "You don't have a familiar yet - `/familiar adopt` to pick one.",
+                ephemeral=True,
+            )
             return
         if rec["day"].get("scouted"):
             await interaction.response.send_message(
-                "It's already out (or resting from its last trip) - try again tomorrow.", ephemeral=True)
+                "It's already out (or resting from its last trip) - try again tomorrow.",
+                ephemeral=True,
+            )
             return
         rec["day"]["scouted"] = True
         self.save()
@@ -335,15 +381,26 @@ class Familiars(commands.Cog):
                 store = self.bot.get_cog("Store")
                 house = store.member_house(interaction.user) if store else None
                 if store and house:
-                    store.record(house=house, delta=bonus, actor_id=self.bot.user.id if self.bot.user else 0,
-                                 target_id=interaction.user.id, reason=f"{fam} scouted something rare")
+                    store.record(
+                        house=house,
+                        delta=bonus,
+                        actor_id=self.bot.user.id if self.bot.user else 0,
+                        target_id=interaction.user.id,
+                        reason=f"{fam} scouted something rare",
+                    )
                     awarded = bonus
         else:
             lines.append(SCOUT_EMPTY[species].format(fam=fam))
 
-        embed = discord.Embed(title=f"{FAMILIARS[species]['emoji']} Scouting report",
-                              description="\n".join(lines), color=WARM)
-        embed.set_footer(text=f"Friendship: {tier_name}" + (f"  ·  +{awarded} bonus points" if awarded else ""))
+        embed = discord.Embed(
+            title=f"{FAMILIARS[species]['emoji']} Scouting report",
+            description="\n".join(lines),
+            color=WARM,
+        )
+        embed.set_footer(
+            text=f"Friendship: {tier_name}"
+            + (f"  ·  +{awarded} bonus points" if awarded else "")
+        )
         await interaction.response.send_message(embed=embed)
 
 

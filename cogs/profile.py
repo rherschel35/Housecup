@@ -243,7 +243,7 @@ class Profile(commands.Cog):
                 inline=True,
             )
         else:
-            embed.add_field(name="Familiar", value="Not adopted yet \u2014 `/familiar`.",
+            embed.add_field(name="Familiar", value="Not adopted yet \u2014 `/familiar adopt`.",
                             inline=True)
 
         # -------------------------------------------------------- adornments
