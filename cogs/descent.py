@@ -5,7 +5,6 @@ The Descent - a 100-floor solo dungeon crawl.
     /descend auto:True   - keep posting the next monster after each win
     /descend floor:<n>   - replay a floor you've already cleared, for practice/loot
     /descentstatus        - your floor, stats, AP, and lockout status
-    /descendarmy          - full army roster (paged) + sacrifice 500 → ATK/DEF
     /staff descent unlock - clear the 3-loss lockout without wiping progress
 
 Ten zones of ten floors each, one primary element per zone plus a second
@@ -1495,22 +1494,6 @@ class Descent(commands.Cog):
             await interaction.response.send_message("You've already conquered the Descent.", ephemeral=True)
             return
         await self._start_fight(interaction, rec)
-
-    @app_commands.command(
-        name="descendarmy",
-        description="Your full Descent army roster — page through it and sacrifice 500 for ATK or DEF.",
-    )
-    async def descendarmy(self, interaction: discord.Interaction):
-        if interaction.channel_id not in DESCENT_CHANNEL_IDS:
-            await interaction.response.send_message(_descent_channel_hint(), ephemeral=True)
-            return
-        castles = self.bot.get_cog("Castles")
-        if not castles:
-            await interaction.response.send_message(
-                "Army tools aren't loaded right now.", ephemeral=True,
-            )
-            return
-        await castles.send_army_panel(interaction)
 
     @app_commands.command(name="descentstatus", description="Your Descent progress: floor, stats, and lockout.")
     async def descentstatus(self, interaction: discord.Interaction):
