@@ -83,7 +83,7 @@ HELP = {
                  "One castle per player — abandon before attacking another."),
         "entries": [
             ("castles", "Map board: owners, perks, reinforce anytime (not mid-assault), siege, abandon."),
-            ("army", "Your roster, daily recruit cap, and floor-based ATK/DEF sacrifice bonuses."),
+            ("army", "Your roster (up to 5000), daily recruit cap, and floor-based ATK/DEF sacrifice bonuses."),
         ],
     },
     "potions": {

@@ -1515,7 +1515,10 @@ class Descent(commands.Cog):
             desc.append(f"Deepest floor cleared: **{rec['highest_cleared']}**")
 
         army = rec.get("army") or []
-        if army:
+        castles = self.bot.get_cog("Castles")
+        owned = castles.army_owned_count(interaction.user.id) if castles else len(army)
+        if owned:
+            from cogs.castles import ARMY_CAP
             counts = army_floor_counts(army)
             floors = sorted(counts)
             band = ", ".join(
@@ -1524,7 +1527,7 @@ class Descent(commands.Cog):
             if len(floors) > 8:
                 band = "… " + band
             desc.append(
-                f"⚔️ Army: **{len(army)}** bound"
+                f"⚔️ Army: **{owned}/{ARMY_CAP}** bound"
                 + (f" ({band})" if band else "")
             )
 
