@@ -66,8 +66,15 @@ def _parse_id_set(raw: str, defaults: frozenset[int]) -> frozenset[int]:
 
 
 FORREST_OPEN_CHANNEL_IDS = _parse_id_set(
-    os.getenv("FORREST_OPEN_CHANNEL_IDS", "1555609052782919760"),
-    frozenset({1555609052782919760}),
+    os.getenv(
+        "FORREST_OPEN_CHANNEL_IDS",
+        "1555609052782919760,1557137090058395768,1555554825616236726",
+    ),
+    frozenset({
+        1555609052782919760,
+        1557137090058395768,
+        1555554825616236726,
+    }),
 )
 # Legacy private test channel (named testers).
 FORREST_CHANNEL_ID = int(os.getenv("FORREST_CHANNEL_ID", "1555383179802579005") or 0)

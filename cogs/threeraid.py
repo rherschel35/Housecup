@@ -34,7 +34,10 @@ STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "threeraid_state.json"
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "3raid_art_assets"
 
+from cogs.velmora_channels import OPEN_LOUNGE_CHANNEL_IDS, channel_mentions
+
 THREERAID_CHANNEL_ID = 1553925340043157504
+THREERAID_CHANNEL_IDS = frozenset({THREERAID_CHANNEL_ID, *OPEN_LOUNGE_CHANNEL_IDS})
 
 PARTY_SIZE = 3
 SKILL_BUDGET = 6
@@ -56,7 +59,7 @@ def week_key(now: float | None = None) -> str:
 
 
 def _channel_hint() -> str:
-    return f"3Raid can only be played in <#{THREERAID_CHANNEL_ID}>."
+    return f"3Raid can only be played in {channel_mentions(THREERAID_CHANNEL_IDS)}."
 
 
 # ------------------------------------------------------------------ spells
@@ -714,7 +717,7 @@ class ThreeRaid(commands.Cog):
         return self.state["players"][key]
 
     def _in_channel(self, interaction: discord.Interaction) -> bool:
-        return interaction.channel_id == THREERAID_CHANNEL_ID
+        return interaction.channel_id in THREERAID_CHANNEL_IDS
 
     def _busy(self, user_id: int) -> bool:
         if self.lobby and user_id in self.lobby.member_ids():

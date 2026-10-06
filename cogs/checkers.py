@@ -54,7 +54,10 @@ STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "checkers_state.json"
 
 # Same board-games channel as Wizard's Chess.
+from cogs.velmora_channels import OPEN_LOUNGE_CHANNEL_IDS, channel_mentions
+
 CHECKERS_CHANNEL_ID = 1553832675993985024
+CHECKERS_CHANNEL_IDS = frozenset({CHECKERS_CHANNEL_ID, *OPEN_LOUNGE_CHANNEL_IDS})
 
 POINTS_PER_WIN = 1
 DAILY_WIN_CAP = 5
@@ -517,7 +520,7 @@ class Checkers(commands.Cog):
         return [m for m in self.matches.values() if user_id in m.player_ids()]
 
     def _in_channel(self, interaction: discord.Interaction) -> bool:
-        return interaction.channel_id == CHECKERS_CHANNEL_ID
+        return interaction.channel_id in CHECKERS_CHANNEL_IDS
 
     # -------------------------------------------------------- move menus
 
@@ -771,7 +774,7 @@ class Checkers(commands.Cog):
     @app_commands.describe(member="Who to challenge")
     async def challenge(self, interaction: discord.Interaction, member: discord.Member):
         if not self._in_channel(interaction):
-            await interaction.response.send_message(f"Checkers only runs in <#{CHECKERS_CHANNEL_ID}>.",
+            await interaction.response.send_message(f"Checkers only runs in {channel_mentions(CHECKERS_CHANNEL_IDS)}.",
                                                      ephemeral=True)
             return
         if member.bot or member.id == interaction.user.id:
@@ -858,7 +861,7 @@ class Checkers(commands.Cog):
     async def move(self, interaction: discord.Interaction, opponent: discord.Member,
                    from_square: str, to_square: str):
         if not self._in_channel(interaction):
-            await interaction.response.send_message(f"Checkers only runs in <#{CHECKERS_CHANNEL_ID}>.",
+            await interaction.response.send_message(f"Checkers only runs in {channel_mentions(CHECKERS_CHANNEL_IDS)}.",
                                                      ephemeral=True)
             return
         m = self.match_between(interaction.user.id, opponent.id)
@@ -952,7 +955,7 @@ class Checkers(commands.Cog):
     @app_commands.describe(opponent="Who you're conceding to")
     async def resign(self, interaction: discord.Interaction, opponent: discord.Member):
         if not self._in_channel(interaction):
-            await interaction.response.send_message(f"Checkers only runs in <#{CHECKERS_CHANNEL_ID}>.",
+            await interaction.response.send_message(f"Checkers only runs in {channel_mentions(CHECKERS_CHANNEL_IDS)}.",
                                                      ephemeral=True)
             return
         m = self.match_between(interaction.user.id, opponent.id)
@@ -972,7 +975,7 @@ class Checkers(commands.Cog):
     @app_commands.describe(member="Whose stats to show (leave blank for your own)")
     async def stats(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
         if not self._in_channel(interaction):
-            await interaction.response.send_message(f"Checkers only runs in <#{CHECKERS_CHANNEL_ID}>.",
+            await interaction.response.send_message(f"Checkers only runs in {channel_mentions(CHECKERS_CHANNEL_IDS)}.",
                                                      ephemeral=True)
             return
         target = member or interaction.user

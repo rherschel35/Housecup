@@ -7,7 +7,7 @@ The Velmora Marketplace — spend (and sell for) house points.
     /market scroll              - buy a Hex Scroll (30 pts)
     /market broomtoken          - buy a Speed or Altitude broom upgrade token (50 pts)
     /market title               - buy an exclusive shop title (50 pts)
-    /market room                - Room of Requirement (100 pts); pings @headmasters
+    /market room                - Room of Requirement (500 pts); pings @headmasters
     /hexscroll member           - cast one owned Hex Scroll (30 min, random effect)
     /staff market sellreset member  - clear someone's daily sell-points cap
 
@@ -49,7 +49,7 @@ SELL_MAX_BATCHES = SELL_DAILY_CAP // SELL_SET_PAYOUT  # 7
 SCROLL_PRICE = 30
 SCROLL_DURATION_MIN = 30
 TITLE_PRICE = 50
-ROOM_PRICE = 100
+ROOM_PRICE = 500
 
 SHOP_TITLES = [
     "Accio Self-Respect (No Response)",
