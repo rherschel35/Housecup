@@ -1490,96 +1490,35 @@ class Dementors(commands.Cog):
         channel: discord.TextChannel | None = None,
         minutes: int = EVENT_DEFAULT_MINUTES,
     ):
-        if not await self._staff(interaction):
+        # Ack Discord first — anything before this can cause "did not respond".
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except discord.HTTPException:
+            log.exception("practice: could not defer interaction")
             return
-
-        target = channel or interaction.channel
-        target_id = getattr(target, "id", None) or interaction.channel_id
-        if not target_id:
-            await interaction.response.send_message(
-                "Pick a text channel for the practice swarm.", ephemeral=True,
-            )
-            return
-        if target_id in PRACTICE_SUMMON_CHANNEL_IDS:
-            await interaction.response.send_message(
-                "Study hall and the games lounge stay summon-only. "
-                "Run house practice in a house channel instead.",
-                ephemeral=True,
-            )
-            return
-        if not (1 <= minutes <= EVENT_MAX_MINUTES):
-            await interaction.response.send_message(
-                f"Pick a length between 1 and {EVENT_MAX_MINUTES} minutes.",
-                ephemeral=True,
-            )
-            return
-
-        # Ack Discord before waiting on the shared lock / posting waves.
-        await interaction.response.defer(ephemeral=True)
 
         try:
-            err = None
-            start = None
-            async with self.lock:
-                if self.state.get("event"):
-                    running = self.state["event"]
-                    kind = "practice swarm" if running.get("practice") else "Attack"
-                    err = (
-                        f"**{running['name']}** ({kind}) is already running — "
-                        "`/staff dementor eventend` first."
-                    )
-                else:
-                    clean_name = "House Practice Swarm"
-                    now = time.time()
-                    active = self.state.get("active")
-                    if active and active.get("channel_id") == target_id:
-                        self.state["active"] = None
-                    event = {
-                        "name": clean_name,
-                        "started_at": now,
-                        "ends_at": now + minutes * 60,
-                        "minutes": minutes,
-                        "guild_id": interaction.guild_id,
-                        "channels": {},
-                        "tally": {},
-                        "practice": True,
-                        "channel_ids": [int(target_id)],
-                    }
-                    self.state["event"] = event
-                    self.save()
-                    intro = discord.Embed(
-                        title=f"Practice — {clean_name}",
-                        description=(
-                            "House drill — same waves as Attack on Velmora, but **nothing "
-                            "awards points or rewards**. Learn the creatures, practice `/cast`, "
-                            f"then clear out.\n\nWaves keep coming for the next {minutes} minute(s)."
-                        ),
-                        color=EVENT_COLOR,
-                    )
-                    payloads = self._prepare_wave(event)
-                    start = (event["started_at"], payloads, clean_name, minutes, intro, [int(target_id)])
-
-            if err:
-                await interaction.followup.send(err, ephemeral=True)
+            store = self.bot.get_cog("Store")
+            if not (store and store.is_staff(interaction.user)):
+                await interaction.followup.send("That's for staff.", ephemeral=True)
                 return
 
-            started_at, payloads, clean_name, minutes, intro, pool = start
-            mention = f"<#{pool[0]}>" if pool else "this channel"
-            await interaction.followup.send(
-                f"**{clean_name}** begins in {mention} for {minutes} minute(s) — practice only.",
-                ephemeral=True,
+            target = channel or interaction.channel
+            target_id = getattr(target, "id", None) or interaction.channel_id
+            if not target_id:
+                await interaction.followup.send(
+                    "Pick a text channel for the practice swarm.", ephemeral=True,
+                )
+                return
+
+            ok, msg, start = await self._begin_practice(
+                channel_id=int(target_id),
+                guild_id=interaction.guild_id,
+                minutes=minutes,
             )
-
-            for cid in pool:
-                ch = await self._get_channel(cid)
-                if ch is None:
-                    continue
-                try:
-                    await ch.send(embed=intro)
-                except discord.HTTPException:
-                    continue
-
-            await self._deliver_wave(started_at, payloads)
+            await interaction.followup.send(msg, ephemeral=True)
+            if ok and start:
+                await self._announce_practice_wave(start)
         except Exception:
             log.exception("House practice swarm failed to start")
             try:
@@ -1589,6 +1528,90 @@ class Dementors(commands.Cog):
                 )
             except discord.HTTPException:
                 pass
+
+    async def _begin_practice(
+        self,
+        *,
+        channel_id: int,
+        guild_id: int | None,
+        minutes: int,
+    ) -> tuple[bool, str, tuple | None]:
+        """Start a practice swarm. Returns (ok, user_message, start_tuple_or_None)."""
+        if channel_id in PRACTICE_SUMMON_CHANNEL_IDS:
+            return (
+                False,
+                "Study hall and the games lounge stay summon-only. "
+                "Run house practice in a house channel instead.",
+                None,
+            )
+        if not (1 <= minutes <= EVENT_MAX_MINUTES):
+            return (
+                False,
+                f"Pick a length between 1 and {EVENT_MAX_MINUTES} minutes.",
+                None,
+            )
+
+        if self.lock is None:
+            return False, "Wild Threats is still starting up — try again in a few seconds.", None
+
+        async with self.lock:
+            if self.state.get("event"):
+                running = self.state["event"]
+                kind = "practice swarm" if running.get("practice") else "Attack"
+                return (
+                    False,
+                    f"**{running['name']}** ({kind}) is already running — "
+                    "`/staff dementor eventend` first.",
+                    None,
+                )
+
+            clean_name = "House Practice Swarm"
+            now = time.time()
+            active = self.state.get("active")
+            if active and active.get("channel_id") == channel_id:
+                self.state["active"] = None
+            event = {
+                "name": clean_name,
+                "started_at": now,
+                "ends_at": now + minutes * 60,
+                "minutes": minutes,
+                "guild_id": guild_id,
+                "channels": {},
+                "tally": {},
+                "practice": True,
+                "channel_ids": [channel_id],
+            }
+            self.state["event"] = event
+            self.save()
+            intro = discord.Embed(
+                title=f"Practice — {clean_name}",
+                description=(
+                    "House drill — same waves as Attack on Velmora, but **nothing "
+                    "awards points or rewards**. Learn the creatures, practice `/cast`, "
+                    f"then clear out.\n\nWaves keep coming for the next {minutes} minute(s)."
+                ),
+                color=EVENT_COLOR,
+            )
+            payloads = self._prepare_wave(event)
+            start = (event["started_at"], payloads, clean_name, minutes, intro, [channel_id])
+
+        return (
+            True,
+            f"**{clean_name}** begins in <#{channel_id}> for {minutes} minute(s) — practice only.",
+            start,
+        )
+
+    async def _announce_practice_wave(self, start: tuple) -> None:
+        started_at, payloads, _clean_name, _minutes, intro, pool = start
+        for cid in pool:
+            ch = await self._get_channel(cid)
+            if ch is None:
+                continue
+            try:
+                await ch.send(embed=intro)
+            except discord.HTTPException:
+                continue
+        await self._deliver_wave(started_at, payloads)
 
     @group.command(name="eventend", description="(staff) End the running event early and tally it up.")
     async def eventend(self, interaction: discord.Interaction):
