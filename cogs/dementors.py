@@ -1387,80 +1387,94 @@ class Dementors(commands.Cog):
             return
         minutes = int(length.value)
         preset = EVENT_PRESETS[minutes]
-        err = None
-        start = None  # (started_at, payloads, clean_name, minutes, intro, pool)
-        async with self.lock:
-            if self.state.get("event"):
-                err = f"**{self.state['event']['name']}** is already running."
-            else:
-                pool = self._event_channel_ids()
-                if not pool:
-                    err = "No channels configured yet - run `/staff dementor channels` first."
+
+        # Ack Discord before waiting on the shared lock / posting waves.
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            err = None
+            start = None  # (started_at, payloads, clean_name, minutes, intro, pool, preset)
+            async with self.lock:
+                if self.state.get("event"):
+                    err = f"**{self.state['event']['name']}** is already running."
                 else:
-                    clean_name = name.strip() or "Attack on Velmora"
-                    now = time.time()
-                    # Clear encounter only if it's in an event channel; leave
-                    # a practice-room summon alone.
-                    active = self.state.get("active")
-                    if not (
-                        active
-                        and active.get("channel_id") in PRACTICE_SUMMON_CHANNEL_IDS
-                    ):
-                        self.state["active"] = None
-                    pool_pts = EVENT_KILL_POOL * preset["point_mult"]
-                    mult_line = (
-                        f"Top **{preset['reward_top']}** by kills share **{pool_pts}** pts "
-                        f"(kills ÷ total swarm kills × {pool_pts})"
-                        + (" — double pool." if preset["point_mult"] > 1 else ".")
-                    )
-                    event = {
-                        "name": clean_name,
-                        "started_at": now,
-                        "ends_at": now + minutes * 60,
-                        "minutes": minutes,
-                        "reward_top": preset["reward_top"],
-                        "point_mult": preset["point_mult"],
-                        "guild_id": interaction.guild_id,
-                        "channels": {},
-                        "tally": {},
-                    }
-                    self.state["event"] = event
-                    self.save()
-                    intro = discord.Embed(
-                        title=f"⚔️ {clean_name}",
-                        description=(
-                            self.rng.choice(ATTACK_INTRO)
-                            + f"\n\n**{preset['label']}** swarm — waves for the next "
-                            f"**{minutes}** minutes. {mult_line} "
-                            f"House turnout: **+{EVENT_HOUSE_TURNOUT_BONUS}** · "
-                            f"MVP: **+{EVENT_MVP_BONUS}**."
-                        ),
-                        color=EVENT_COLOR,
-                    )
-                    payloads = self._prepare_wave(event)
-                    start = (event["started_at"], payloads, clean_name, minutes, intro, pool, preset)
+                    pool = self._event_channel_ids()
+                    if not pool:
+                        err = "No channels configured yet - run `/staff dementor channels` first."
+                    else:
+                        clean_name = name.strip() or "Attack on Velmora"
+                        now = time.time()
+                        # Clear encounter only if it's in an event channel; leave
+                        # a practice-room summon alone.
+                        active = self.state.get("active")
+                        if not (
+                            active
+                            and active.get("channel_id") in PRACTICE_SUMMON_CHANNEL_IDS
+                        ):
+                            self.state["active"] = None
+                        pool_pts = EVENT_KILL_POOL * preset["point_mult"]
+                        mult_line = (
+                            f"Top **{preset['reward_top']}** by kills share **{pool_pts}** pts "
+                            f"(kills ÷ total swarm kills × {pool_pts})"
+                            + (" — double pool." if preset["point_mult"] > 1 else ".")
+                        )
+                        event = {
+                            "name": clean_name,
+                            "started_at": now,
+                            "ends_at": now + minutes * 60,
+                            "minutes": minutes,
+                            "reward_top": preset["reward_top"],
+                            "point_mult": preset["point_mult"],
+                            "guild_id": interaction.guild_id,
+                            "channels": {},
+                            "tally": {},
+                        }
+                        self.state["event"] = event
+                        self.save()
+                        intro = discord.Embed(
+                            title=f"⚔️ {clean_name}",
+                            description=(
+                                self.rng.choice(ATTACK_INTRO)
+                                + f"\n\n**{preset['label']}** swarm — waves for the next "
+                                f"**{minutes}** minutes. {mult_line} "
+                                f"House turnout: **+{EVENT_HOUSE_TURNOUT_BONUS}** · "
+                                f"MVP: **+{EVENT_MVP_BONUS}**."
+                            ),
+                            color=EVENT_COLOR,
+                        )
+                        payloads = self._prepare_wave(event)
+                        start = (event["started_at"], payloads, clean_name, minutes, intro, pool, preset)
 
-        if err:
-            await interaction.response.send_message(err, ephemeral=True)
-            return
+            if err:
+                await interaction.followup.send(err, ephemeral=True)
+                return
 
-        started_at, payloads, clean_name, minutes, intro, pool, preset = start
-        await interaction.response.send_message(
-            f"**{clean_name}** begins now — **{preset['label']}** "
-            f"(top {preset['reward_top']} share {EVENT_KILL_POOL * preset['point_mult']} kill pts).",
-            ephemeral=True,
-        )
+            started_at, payloads, clean_name, minutes, intro, pool, preset = start
+            await interaction.followup.send(
+                f"**{clean_name}** begins now — **{preset['label']}** "
+                f"(top {preset['reward_top']} share {EVENT_KILL_POOL * preset['point_mult']} kill pts).",
+                ephemeral=True,
+            )
 
-        for cid in pool:
-            channel = await self._get_channel(cid)
-            if channel is None:
-                continue
+            for cid in pool:
+                channel = await self._get_channel(cid)
+                if channel is None:
+                    continue
+                try:
+                    await channel.send(embed=intro)
+                except discord.HTTPException:
+                    continue
+
+            await self._deliver_wave(started_at, payloads)
+        except Exception:
+            log.exception("Attack on Velmora failed to start")
             try:
-                await channel.send(embed=intro)
+                await interaction.followup.send(
+                    "Attack failed to start — check the bot logs.",
+                    ephemeral=True,
+                )
             except discord.HTTPException:
-                continue
-
-        await self._deliver_wave(started_at, payloads)
+                pass
 
     @group.command(
         name="practice",
@@ -1473,87 +1487,108 @@ class Dementors(commands.Cog):
     async def practice(
         self,
         interaction: discord.Interaction,
-        channel: discord.TextChannel = None,
+        channel: discord.TextChannel | None = None,
         minutes: int = EVENT_DEFAULT_MINUTES,
     ):
         if not await self._staff(interaction):
             return
+
         target = channel or interaction.channel
-        if not isinstance(target, discord.TextChannel):
+        target_id = getattr(target, "id", None) or interaction.channel_id
+        if not target_id:
             await interaction.response.send_message(
                 "Pick a text channel for the practice swarm.", ephemeral=True,
             )
             return
-        if target.id in PRACTICE_SUMMON_CHANNEL_IDS:
+        if target_id in PRACTICE_SUMMON_CHANNEL_IDS:
             await interaction.response.send_message(
                 "Study hall and the games lounge stay summon-only. "
                 "Run house practice in a house channel instead.",
                 ephemeral=True,
             )
             return
-
-        err = None
-        start = None
-        async with self.lock:
-            if self.state.get("event"):
-                running = self.state["event"]
-                kind = "practice swarm" if running.get("practice") else "Attack"
-                err = f"**{running['name']}** ({kind}) is already running — `/staff dementor eventend` first."
-            elif not (1 <= minutes <= EVENT_MAX_MINUTES):
-                err = f"Pick a length between 1 and {EVENT_MAX_MINUTES} minutes."
-            else:
-                clean_name = "House Practice Swarm"
-                now = time.time()
-                active = self.state.get("active")
-                if active and active.get("channel_id") == target.id:
-                    self.state["active"] = None
-                elif active and active.get("channel_id") not in PRACTICE_SUMMON_CHANNEL_IDS:
-                    # Don't wipe a live ambient threat elsewhere; practice is local.
-                    pass
-                event = {
-                    "name": clean_name,
-                    "started_at": now,
-                    "ends_at": now + minutes * 60,
-                    "guild_id": interaction.guild_id,
-                    "channels": {},
-                    "tally": {},
-                    "practice": True,
-                    "channel_ids": [target.id],
-                }
-                self.state["event"] = event
-                self.save()
-                intro = discord.Embed(
-                    title=f"🛡️ {clean_name}",
-                    description=(
-                        "House drill — same waves as Attack on Velmora, but **nothing "
-                        "awards points or rewards**. Learn the creatures, practice `/cast`, "
-                        f"then clear out.\n\nWaves keep coming for the next {minutes} minute(s)."
-                    ),
-                    color=EVENT_COLOR,
-                )
-                payloads = self._prepare_wave(event)
-                start = (event["started_at"], payloads, clean_name, minutes, intro, [target.id])
-
-        if err:
-            await interaction.response.send_message(err, ephemeral=True)
+        if not (1 <= minutes <= EVENT_MAX_MINUTES):
+            await interaction.response.send_message(
+                f"Pick a length between 1 and {EVENT_MAX_MINUTES} minutes.",
+                ephemeral=True,
+            )
             return
 
-        started_at, payloads, clean_name, minutes, intro, pool = start
-        await interaction.response.send_message(
-            f"**{clean_name}** begins in {target.mention} for {minutes} minute(s) — practice only.",
-            ephemeral=True,
-        )
+        # Ack Discord before waiting on the shared lock / posting waves.
+        await interaction.response.defer(ephemeral=True)
 
-        for cid in pool:
-            ch = await self._get_channel(cid)
-            if ch is None:
-                continue
+        try:
+            err = None
+            start = None
+            async with self.lock:
+                if self.state.get("event"):
+                    running = self.state["event"]
+                    kind = "practice swarm" if running.get("practice") else "Attack"
+                    err = (
+                        f"**{running['name']}** ({kind}) is already running — "
+                        "`/staff dementor eventend` first."
+                    )
+                else:
+                    clean_name = "House Practice Swarm"
+                    now = time.time()
+                    active = self.state.get("active")
+                    if active and active.get("channel_id") == target_id:
+                        self.state["active"] = None
+                    event = {
+                        "name": clean_name,
+                        "started_at": now,
+                        "ends_at": now + minutes * 60,
+                        "minutes": minutes,
+                        "guild_id": interaction.guild_id,
+                        "channels": {},
+                        "tally": {},
+                        "practice": True,
+                        "channel_ids": [int(target_id)],
+                    }
+                    self.state["event"] = event
+                    self.save()
+                    intro = discord.Embed(
+                        title=f"Practice — {clean_name}",
+                        description=(
+                            "House drill — same waves as Attack on Velmora, but **nothing "
+                            "awards points or rewards**. Learn the creatures, practice `/cast`, "
+                            f"then clear out.\n\nWaves keep coming for the next {minutes} minute(s)."
+                        ),
+                        color=EVENT_COLOR,
+                    )
+                    payloads = self._prepare_wave(event)
+                    start = (event["started_at"], payloads, clean_name, minutes, intro, [int(target_id)])
+
+            if err:
+                await interaction.followup.send(err, ephemeral=True)
+                return
+
+            started_at, payloads, clean_name, minutes, intro, pool = start
+            mention = f"<#{pool[0]}>" if pool else "this channel"
+            await interaction.followup.send(
+                f"**{clean_name}** begins in {mention} for {minutes} minute(s) — practice only.",
+                ephemeral=True,
+            )
+
+            for cid in pool:
+                ch = await self._get_channel(cid)
+                if ch is None:
+                    continue
+                try:
+                    await ch.send(embed=intro)
+                except discord.HTTPException:
+                    continue
+
+            await self._deliver_wave(started_at, payloads)
+        except Exception:
+            log.exception("House practice swarm failed to start")
             try:
-                await ch.send(embed=intro)
+                await interaction.followup.send(
+                    "Practice swarm failed to start — check the bot logs.",
+                    ephemeral=True,
+                )
             except discord.HTTPException:
-                continue
-
-        await self._deliver_wave(started_at, payloads)
+                pass
 
     @group.command(name="eventend", description="(staff) End the running event early and tally it up.")
     async def eventend(self, interaction: discord.Interaction):
