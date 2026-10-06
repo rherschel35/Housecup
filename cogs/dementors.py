@@ -104,6 +104,7 @@ THREAT_ALERT_COLOR = 0xC0392B  # every "X has appeared" alert, regardless of cre
 
 EVENT_WAVE_SECONDS = 23
 EVENT_DEFAULT_MINUTES = 5
+EVENT_MAX_MINUTES = 60  # house practice can run custom lengths; Attack uses presets
 EVENT_MVP_BONUS = 5
 EVENT_KILL_POOL = 100  # shared by the kill cut: floor((kills / swarm total) × pool)
 EVENT_HOUSE_TURNOUT_BONUS = 10  # house with the most fighters who registered a kill
@@ -1519,11 +1520,12 @@ class Dementors(commands.Cog):
             await interaction.followup.send(msg, ephemeral=True)
             if ok and start:
                 await self._announce_practice_wave(start)
-        except Exception:
+        except Exception as exc:
             log.exception("House practice swarm failed to start")
             try:
                 await interaction.followup.send(
-                    "Practice swarm failed to start — check the bot logs.",
+                    f"Practice swarm failed to start (`{type(exc).__name__}`). "
+                    "Check the bot logs.",
                     ephemeral=True,
                 )
             except discord.HTTPException:

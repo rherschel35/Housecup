@@ -542,11 +542,53 @@ async def on_message(message: discord.Message):
 
     Old guild-scoped /familiar · /play shadow the slash tree, so staff had no
     slash way to trigger a wipe. A plain chat trigger breaks that deadlock.
+
+    !swarmpractice [minutes] starts a no-points house practice swarm in this
+    channel when the slash command is stuck.
     """
     if message.author.bot or not message.guild:
         return
-    text = (message.content or "").strip().lower()
-    if text not in ("!synccmds", "!wipecommands", "!synccommands"):
+    text = (message.content or "").strip()
+    lower = text.lower()
+
+    if lower.startswith("!swarmpractice"):
+        store = bot.get_cog("Store")
+        if not (store and store.is_staff(message.author)):
+            await message.reply("That's for staff.", mention_author=False)
+            return
+        cog = bot.get_cog("Dementors")
+        if cog is None:
+            await message.reply("Wild Threats isn't loaded.", mention_author=False)
+            return
+        minutes = 5
+        parts = text.split()
+        if len(parts) >= 2:
+            try:
+                minutes = int(parts[1])
+            except ValueError:
+                await message.reply(
+                    "Usage: `!swarmpractice` or `!swarmpractice 10`",
+                    mention_author=False,
+                )
+                return
+        status = await message.reply("Starting house practice swarm…", mention_author=False)
+        try:
+            ok, msg, start = await cog._begin_practice(
+                channel_id=message.channel.id,
+                guild_id=message.guild.id,
+                minutes=minutes,
+            )
+            await status.edit(content=msg)
+            if ok and start:
+                await cog._announce_practice_wave(start)
+        except Exception as exc:
+            log.exception("!swarmpractice failed")
+            await status.edit(
+                content=f"Practice swarm failed (`{type(exc).__name__}`). Check Railway logs."
+            )
+        return
+
+    if lower not in ("!synccmds", "!wipecommands", "!synccommands"):
         return
 
     store = bot.get_cog("Store")
