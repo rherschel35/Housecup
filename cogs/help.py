@@ -24,7 +24,7 @@ HELP = {
         "title": "Play",
         "staff": False,
         "entries": [
-            ("duel", "Challenge someone. Best of three, spells chosen in secret."),
+            ("duel", "Challenge someone. Best of 3 by default, or pick best of 5/7/9."),
             ("trio scramble", "Open a casual 3v3 trio duel — any houses, join either side."),
             ("trio housematch", "Open a house-vs-house 3v3 trio duel (house role gated)."),
             ("grand", "Challenge someone to a Grand Duel (both need 50+ 1v1 wins)."),
