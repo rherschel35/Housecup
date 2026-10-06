@@ -1,5 +1,5 @@
 """
-Wizard duels. Best of three, spells chosen in secret.
+Wizard duels. Best of three by default (or best of 5/7/9), spells chosen in secret.
 
     /duel @member              - challenge someone (1v1)
     /duelrecord [member]       - rank, wins, streak, rivals, trio/grand, points
@@ -63,9 +63,23 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 DUELS_PATH = STATE_DIR / "duels.json"
 
-ROUNDS_TO_WIN = 2          # best of three
-MAX_ROUNDS = 9             # ties replay; this stops an endless run of them
+ROUNDS_TO_WIN = 2          # default best of three
+MAX_ROUNDS = 9             # default tie cap for best of three
+# Optional longer 1v1s: /duel best_of:5|7|9 → first to 3/4/5
+BEST_OF_OPTIONS = (3, 5, 7, 9)
 ACCEPT_TIMEOUT = 120
+
+
+def rounds_to_win_for(best_of: int) -> int:
+    """Best of N → first to (N // 2 + 1)."""
+    return int(best_of) // 2 + 1
+
+
+def max_rounds_for(best_of: int) -> int:
+    """Cap total rounds (including ties) so a match can't run forever."""
+    return int(best_of) + 6
+
+
 ROUND_TIMEOUT = 60
 GRAND_LOCK_TIMEOUT = ACCEPT_TIMEOUT  # 2 min to lock both sequences, same as accept
 REWARD_POINTS = 1
@@ -1103,8 +1117,22 @@ class Duels(commands.Cog):
     # ------------------------------------------------------------ commands
 
     @app_commands.command(name="duel", description="Challenge someone to a wizard's duel.")
-    @app_commands.describe(opponent="Who you're challenging")
-    async def duel(self, interaction: discord.Interaction, opponent: discord.Member):
+    @app_commands.describe(
+        opponent="Who you're challenging",
+        best_of="Match length: 3 (default), 5, 7, or 9 — first to majority wins",
+    )
+    @app_commands.choices(best_of=[
+        app_commands.Choice(name="Best of 3 (default)", value=3),
+        app_commands.Choice(name="Best of 5", value=5),
+        app_commands.Choice(name="Best of 7", value=7),
+        app_commands.Choice(name="Best of 9", value=9),
+    ])
+    async def duel(
+        self,
+        interaction: discord.Interaction,
+        opponent: discord.Member,
+        best_of: app_commands.Choice[int] = None,
+    ):
         me = interaction.user
         ok, arena = self._in_duel_channel(interaction)
         if not ok:
@@ -1129,7 +1157,10 @@ class Duels(commands.Cog):
             )
             return
 
-        duel = Duel(self, interaction.channel, me, opponent)
+        length = int(best_of.value) if best_of is not None else 3
+        if length not in BEST_OF_OPTIONS:
+            length = 3
+        duel = Duel(self, interaction.channel, me, opponent, best_of=length)
         self.mark_busy(duel, me, opponent)
         await interaction.response.send_message(
             content=opponent.mention,
@@ -1641,12 +1672,15 @@ class Duel:
     """One duel, held in memory. Duels last a couple of minutes, so they
     aren't saved - a redeploy mid-duel simply ends it."""
 
-    def __init__(self, cog: Duels, channel, challenger, opponent):
+    def __init__(self, cog: Duels, channel, challenger, opponent, *, best_of: int = 3):
         self.cog = cog
         self.channel = channel
         self.a = challenger
         self.b = opponent
         self.message = None
+        self.best_of = int(best_of) if best_of in BEST_OF_OPTIONS else 3
+        self.rounds_to_win = rounds_to_win_for(self.best_of)
+        self.max_rounds = max_rounds_for(self.best_of)
         self.score = {challenger.id: 0, opponent.id: 0}
         self.picks: dict[int, str] = {}
         self.round = 0
@@ -1669,7 +1703,8 @@ class Duel:
         desc = (
             f"{self.cog._duelist_label(self.a)} challenges "
             f"{self.cog._duelist_label(self.b)}.\n\n"
-            "Best of three. Spells are chosen in secret and revealed together."
+            f"**Best of {self.best_of}** (first to {self.rounds_to_win}). "
+            "Spells are chosen in secret and revealed together."
         )
         if self.rival_line:
             desc += f"\n\n⚔️ {self.rival_line}"
@@ -1683,8 +1718,11 @@ class Duel:
 
     def board_embed(self, footer: str = None) -> discord.Embed:
         a_s, b_s = self.score[self.a.id], self.score[self.b.id]
-        lines = [f"{self.cog._duelist_label(self.a)} **{a_s}** — "
-                 f"**{b_s}** {self.cog._duelist_label(self.b)}"]
+        lines = [
+            f"Best of {self.best_of} · first to {self.rounds_to_win}",
+            f"{self.cog._duelist_label(self.a)} **{a_s}** — "
+            f"**{b_s}** {self.cog._duelist_label(self.b)}",
+        ]
         if self.rival_line:
             lines.append(f"⚔️ {self.rival_line}")
         if self.history:
@@ -1848,7 +1886,7 @@ class Duel:
         async with self.lock:
             self.round += 1
             self.picks = {}
-            if self.round > MAX_ROUNDS:
+            if self.round > self.max_rounds:
                 self.cog.release_match(self)
                 snap = self._snapshot(view=None, footer="Too evenly matched — declared a draw.")
             else:
@@ -1929,14 +1967,14 @@ class Duel:
                     self.cog.note_round_win(self.b.id, disp_b)
                 self.history.append(reveal)
 
-                if self.score[self.a.id] >= ROUNDS_TO_WIN:
+                if self.score[self.a.id] >= self.rounds_to_win:
                     finish = (self.a, self.b, False)
-                elif self.score[self.b.id] >= ROUNDS_TO_WIN:
+                elif self.score[self.b.id] >= self.rounds_to_win:
                     finish = (self.b, self.a, False)
                 else:
                     self.round += 1
                     self.picks = {}
-                    if self.round > MAX_ROUNDS:
+                    if self.round > self.max_rounds:
                         self.cog.release_match(self)
                         publish = self._snapshot(
                             view=None, footer="Too evenly matched — declared a draw.")
@@ -2033,7 +2071,7 @@ class OpenCastBoardView(discord.ui.View):
     """Public prompt — same idea as broom race's Open my race board."""
 
     def __init__(self, duel: Duel):
-        super().__init__(timeout=ROUND_TIMEOUT * MAX_ROUNDS + 60)
+        super().__init__(timeout=ROUND_TIMEOUT * duel.max_rounds + 60)
         self.duel = duel
 
     @discord.ui.button(
