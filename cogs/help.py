@@ -61,7 +61,7 @@ HELP = {
             ("market scroll", "Buy a Hex Scroll (30 pts)."),
             ("market broomtoken", "Buy a Speed or Altitude broom upgrade token (50 pts)."),
             ("market title", "Buy an exclusive Marketplace title (50 pts)."),
-            ("market room", "Buy the Room of Requirement (100 pts). Pings Headmasters."),
+            ("market room", "Buy the Room of Requirement (500 pts). Pings Headmasters."),
             ("hexscroll", "Cast a Hex Scroll on someone (30 min, random curse)."),
         ],
     },

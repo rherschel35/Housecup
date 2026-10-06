@@ -67,6 +67,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from cogs.velmora_channels import (
+    OPEN_LOUNGE_CHANNEL_IDS,
     SHARED_GAMES_CHANNEL_ID,
     STUDY_HALL_CHANNEL_ID,
 )
@@ -76,6 +77,12 @@ from cogs.world_engine import today
 PRACTICE_SUMMON_CHANNEL_IDS = frozenset({
     STUDY_HALL_CHANNEL_ID,
     SHARED_GAMES_CHANNEL_ID,
+})
+
+# Multi-game lounges: no ambient / Attack / practice-summon threats.
+NO_THREAT_SPAWN_CHANNEL_IDS = frozenset({
+    *PRACTICE_SUMMON_CHANNEL_IDS,
+    *OPEN_LOUNGE_CHANNEL_IDS,
 })
 
 # Always included in ambient spawns + Attack waves (alongside staff channels).
@@ -905,12 +912,12 @@ class Dementors(commands.Cog):
     # ------------------------------------------------------- event: spawns
 
     def _configured_channel_ids(self) -> list[int]:
-        """Staff-set channels plus hard-coded extras. Practice rooms stay out."""
+        """Staff-set channels plus hard-coded extras. No-spawn rooms stay out."""
         seen: set[int] = set()
         out: list[int] = []
         for raw in list(self.state.get("channel_ids", [])) + list(EXTRA_THREAT_CHANNEL_IDS):
             cid = self._as_channel_id(raw)
-            if cid is None or cid in PRACTICE_SUMMON_CHANNEL_IDS or cid in seen:
+            if cid is None or cid in NO_THREAT_SPAWN_CHANNEL_IDS or cid in seen:
                 continue
             seen.add(cid)
             out.append(cid)
@@ -1247,14 +1254,13 @@ class Dementors(commands.Cog):
                 seen.add(cid)
                 unique.append(cid)
         ids = unique
-        practice = [cid for cid in ids if cid in PRACTICE_SUMMON_CHANNEL_IDS]
-        if practice:
-            mentions = ", ".join(f"<#{cid}>" for cid in practice)
+        blocked = [cid for cid in ids if cid in NO_THREAT_SPAWN_CHANNEL_IDS]
+        if blocked:
+            mentions = ", ".join(f"<#{cid}>" for cid in blocked)
             await interaction.response.send_message(
                 f"{mentions} "
-                f"{'is' if len(practice) == 1 else 'are'} practice-only — use "
-                "`/staff dementor summon` there. Pick other channels for ambient spawns "
-                "and Attack waves.",
+                f"{'is' if len(blocked) == 1 else 'are'} off-limits for Wild Threat "
+                "spawns (study hall / games lounge / open lounges). Pick other channels.",
                 ephemeral=True,
             )
             return
@@ -1271,12 +1277,14 @@ class Dementors(commands.Cog):
         )
         await interaction.response.send_message(
             f"Wild Threats may now appear in {mentions}.{extra_note} "
-            f"{practice_mentions} stay summon-only.",
+            f"{practice_mentions} stay summon-only; open lounges stay spawn-free.",
             ephemeral=True,
         )
 
     def _summon_channel_ok(self, channel_id: int) -> bool:
-        """Configured event channels, extras, or practice rooms."""
+        """Configured event channels, extras, or practice summon rooms."""
+        if channel_id in OPEN_LOUNGE_CHANNEL_IDS:
+            return False
         if channel_id in PRACTICE_SUMMON_CHANNEL_IDS:
             return True
         return channel_id in self._configured_channel_ids()
@@ -1539,10 +1547,10 @@ class Dementors(commands.Cog):
         minutes: int,
     ) -> tuple[bool, str, tuple | None]:
         """Start a practice swarm. Returns (ok, user_message, start_tuple_or_None)."""
-        if channel_id in PRACTICE_SUMMON_CHANNEL_IDS:
+        if channel_id in NO_THREAT_SPAWN_CHANNEL_IDS:
             return (
                 False,
-                "Study hall and the games lounge stay summon-only. "
+                "Study hall, the games lounge, and open lounges stay spawn-free. "
                 "Run house practice in a house channel instead.",
                 None,
             )

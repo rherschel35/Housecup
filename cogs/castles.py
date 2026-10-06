@@ -1505,7 +1505,7 @@ class CastleActionsView(discord.ui.View):
 
     @discord.ui.button(label="Reinforce", style=discord.ButtonStyle.primary)
     async def reinforce(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.channel_id not in CASTLES_CHANNEL_IDS:
+        if not self.cog._in_channel(interaction):
             await interaction.response.send_message("Wrong channel.", ephemeral=True)
             return
         ok, msg = self.cog.do_reinforce(interaction.user.id, self.key)
@@ -1527,7 +1527,7 @@ class CastleActionsView(discord.ui.View):
 
     @discord.ui.button(label="Siege", style=discord.ButtonStyle.danger)
     async def siege(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.channel_id not in CASTLES_CHANNEL_IDS:
+        if not self.cog._in_channel(interaction):
             await interaction.response.send_message("Wrong channel.", ephemeral=True)
             return
         ok, why = self.cog.can_start_siege(interaction.user.id, self.key)
@@ -1545,7 +1545,7 @@ class CastleActionsView(discord.ui.View):
 
     @discord.ui.button(label="Abandon", style=discord.ButtonStyle.secondary)
     async def abandon(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.channel_id not in CASTLES_CHANNEL_IDS:
+        if not self.cog._in_channel(interaction):
             await interaction.response.send_message("Wrong channel.", ephemeral=True)
             return
         if not self.cog.owns_castle(interaction.user.id, self.key):
