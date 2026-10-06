@@ -5,7 +5,7 @@ a few times a day - and a headmaster can always summon one on the spot.
     /cast
         - anyone, opens spell buttons against whatever's here
         - CAST_AUTO_USER_ID auto-picks the right spell (no buttons)
-    /staff dementor channels          - set the 4 channels they can appear in
+    /staff dementor channels          - set the channels they can appear in
     /staff dementor summon [channel] [creature] - make one appear right now
         (study hall + shared games lounge are practice summons;
          Attack waves never go there)
@@ -30,6 +30,8 @@ gets 25 seconds alone to /cast at it. After that window, anyone can try.
 Scheduled sightings and staff summons stay open to everyone from the start.
 
     /staff dementor eventstart [minutes] [name]  - start "Attack on Velmora"
+    /staff dementor practice [channel] [minutes] - house practice swarm
+        (one channel only; no house points or rewards)
     /staff dementor eventend                     - end it early
     /staff dementor eventstatus                  - how it's going
 
@@ -44,6 +46,9 @@ Each scorer gets floor((their kills ÷ total swarm kills) × pool). The house
 with the most fighters who registered a kill gets a turnout bonus; MVP
 (top rep) still gets +5. One big scoreboard reveal at the end in every
 channel that fought.
+
+House practice floods a single house channel the same way, but awards
+nothing at the end — just drills for the real Attack.
 
 Event casts and wave posts release the shared lock before talking to
 Discord, so a busy Attack doesn't freeze every other /cast behind one
@@ -71,6 +76,11 @@ from cogs.world_engine import today
 PRACTICE_SUMMON_CHANNEL_IDS = frozenset({
     STUDY_HALL_CHANNEL_ID,
     SHARED_GAMES_CHANNEL_ID,
+})
+
+# Always included in ambient spawns + Attack waves (alongside staff channels).
+EXTRA_THREAT_CHANNEL_IDS = frozenset({
+    1552403823769952266,
 })
 
 log = logging.getLogger("velmora.dementors")
@@ -462,7 +472,7 @@ class Dementors(commands.Cog):
         same as it always has. When finder_id is set (explore/forage stir),
         that student gets FINDER_EXCLUSIVE_SECONDS alone to /cast. Returns
         the channel it landed in, or None."""
-        pool = self.state.get("channel_ids", [])
+        pool = self._configured_channel_ids()
         if channel_id is None:
             if not pool:
                 return None
@@ -521,7 +531,7 @@ class Dementors(commands.Cog):
     async def _wander(self, active: dict) -> None:
         """Relocate a wandering creature to a different configured channel."""
         c = CREATURES[active["creature"]]
-        pool = [cid for cid in self.state.get("channel_ids", []) if cid != active["channel_id"]]
+        pool = [cid for cid in self._configured_channel_ids() if cid != active["channel_id"]]
         if not pool:
             return
         new_id = self.rng.choice(pool)
@@ -565,7 +575,7 @@ class Dementors(commands.Cog):
                 return
             if self.state.get("spawns_today", 0) >= SPAWNS_PER_DAY:
                 return
-            if not self.state.get("channel_ids"):
+            if not self._configured_channel_ids():
                 return
             if self.rng.random() >= SPAWN_CHANCE:
                 return
@@ -836,7 +846,10 @@ class Dementors(commands.Cog):
                 patronus=f"{_article(animal)} silver {animal}", animal=animal, member=interaction.user.mention,
             )
             embed = discord.Embed(title="✨ The Dementor is banished", description=line, color=0xC4CCD6)
-            embed.set_footer(text=f"+{creature['points']} rep - ⚔️ {event['name']}")
+            if event.get("practice"):
+                embed.set_footer(text=f"Practice · no points · ⚔️ {event['name']}")
+            else:
+                embed.set_footer(text=f"+{creature['points']} rep - ⚔️ {event['name']}")
             file = self._dementor_defeat_art(embed, interaction.user.id)
             return {"embed": embed, "file": file}
 
@@ -868,7 +881,10 @@ class Dementors(commands.Cog):
             line = self.rng.choice(creature["victory"]).format(member=interaction.user.mention)
 
         embed = discord.Embed(title=f"✨ The {creature['name']} is defeated", description=line, color=creature["color"])
-        embed.set_footer(text=f"+{creature['points']} rep each - ⚔️ {event['name']}")
+        if event.get("practice"):
+            embed.set_footer(text=f"Practice · no points · ⚔️ {event['name']}")
+        else:
+            embed.set_footer(text=f"+{creature['points']} rep each - ⚔️ {event['name']}")
         file = self._attach_art(embed, creature_id, field="defeat_image")
         return {"embed": embed, "file": file}
 
@@ -887,15 +903,29 @@ class Dementors(commands.Cog):
 
     # ------------------------------------------------------- event: spawns
 
-    def _event_channel_ids(self) -> list[int]:
-        """Channels Attack waves may flood. Practice rooms stay summon-only."""
-        out = []
-        for raw in self.state.get("channel_ids", []):
+    def _configured_channel_ids(self) -> list[int]:
+        """Staff-set channels plus hard-coded extras. Practice rooms stay out."""
+        seen: set[int] = set()
+        out: list[int] = []
+        for raw in list(self.state.get("channel_ids", [])) + list(EXTRA_THREAT_CHANNEL_IDS):
             cid = self._as_channel_id(raw)
-            if cid is None or cid in PRACTICE_SUMMON_CHANNEL_IDS:
+            if cid is None or cid in PRACTICE_SUMMON_CHANNEL_IDS or cid in seen:
                 continue
+            seen.add(cid)
             out.append(cid)
         return out
+
+    def _event_channel_ids(self, event: dict | None = None) -> list[int]:
+        """Channels the current Attack (or practice) wave may flood."""
+        event = event if event is not None else self.state.get("event")
+        if event and event.get("channel_ids"):
+            out: list[int] = []
+            for raw in event["channel_ids"]:
+                cid = self._as_channel_id(raw)
+                if cid is not None:
+                    out.append(cid)
+            return out
+        return self._configured_channel_ids()
 
     def _prepare_wave(self, event: dict) -> list[dict]:
         """Roll the next wave under the lock.
@@ -905,10 +935,14 @@ class Dementors(commands.Cog):
         while Discord is still posting the wave).
         """
         payloads = []
-        for cid in self._event_channel_ids():
+        practice = bool(event.get("practice"))
+        for cid in self._event_channel_ids(event):
             creature_id = self._roll_creature()
             embed = self.embed_arrival(creature_id)
-            embed.set_footer(text=f"⚔️ {event['name']}")
+            footer = f"⚔️ {event['name']}"
+            if practice:
+                footer = f"Practice · no points · {footer}"
+            embed.set_footer(text=footer)
             file = self._attach_art(embed, creature_id)
             payloads.append({
                 "channel_id": cid,
@@ -970,6 +1004,7 @@ class Dementors(commands.Cog):
         store = self.bot.get_cog("Store")
         guild = self.bot.get_guild(event["guild_id"]) if event.get("guild_id") else None
         from cogs.store import HOUSES
+        practice = bool(event.get("practice"))
 
         actor = self.bot.user.id if self.bot.user else 0
         reward_top = int(event.get("reward_top") or EVENT_PRESETS[EVENT_DEFAULT_MINUTES]["reward_top"])
@@ -1031,85 +1066,103 @@ class Dementors(commands.Cog):
             )
             house_totals[house] = house_totals.get(house, 0) + delta
 
-        # Kill share among the cut — main individual payout.
-        for uid, pts in kill_share.items():
-            row = row_by_uid[uid]
-            if row["house"]:
-                _award(
-                    row["house"], pts, uid,
-                    f"{event['name']} - kill share (top {kill_cut})",
-                )
-
-        # MVP +5 (top rep).
-        for uid in mvp_uids:
-            row = row_by_uid[uid]
-            if row["house"]:
-                _award(
-                    row["house"], EVENT_MVP_BONUS, uid,
-                    f"{event['name']} - MVP",
-                )
-
-        # Turnout bonus — most houses with a registered kill.
-        for house in turnout_houses:
-            _award(
-                house, EVENT_HOUSE_TURNOUT_BONUS, None,
-                f"{event['name']} - house turnout",
-            )
-
-        mult_note = f" · kill pool ×{point_mult}" if point_mult != 1 else ""
-        lines = [
-            f"**{total_kills}** monster(s) put down by **{len(rows)}** wizard(s) "
-            f"({minutes}-minute swarm{mult_note})."
-        ]
-
-        share_lines = []
-        for place, r in enumerate(by_kills[:kill_cut], start=1):
-            pts = kill_share.get(r["uid"], 0)
-            pct = (100.0 * r["kills"] / total_kills) if total_kills else 0.0
-            bits = []
-            if r["uid"] in mvp_uids:
-                bits.append(f"+{EVENT_MVP_BONUS} MVP")
-            bonus_note = f" ({', '.join(bits)})" if bits else ""
-            crown = "👑 " if r["uid"] in mvp_uids else ""
-            house_note = (
-                f" - House {HOUSES[r['house']]['name']}" if r["house"]
-                else " - no house, no points"
-            )
-            share_lines.append(
-                f"{crown}**#{place}** <@{r['uid']}>: {r['kills']} kill(s) "
-                f"({pct:.0f}% of swarm) → **+{pts}**{house_note}{bonus_note}"
-            )
-        if share_lines:
-            lines.append("")
-            lines.append(
-                f"Top **{kill_cut}** by kills share **{kill_pool}** pts "
-                f"(kills ÷ total swarm kills × {kill_pool}):"
-            )
-            lines.extend(share_lines)
-        elif rows:
-            lines.append("Nobody scored a kill — no points awarded.")
-
-        # MVP outside the kill cut (rare) still gets noted.
-        for uid in mvp_uids:
-            if uid not in kill_share:
+        if not practice:
+            # Kill share among the cut — main individual payout.
+            for uid, pts in kill_share.items():
                 row = row_by_uid[uid]
+                if row["house"]:
+                    _award(
+                        row["house"], pts, uid,
+                        f"{event['name']} - kill share (top {kill_cut})",
+                    )
+
+            # MVP +5 (top rep).
+            for uid in mvp_uids:
+                row = row_by_uid[uid]
+                if row["house"]:
+                    _award(
+                        row["house"], EVENT_MVP_BONUS, uid,
+                        f"{event['name']} - MVP",
+                    )
+
+            # Turnout bonus — most houses with a registered kill.
+            for house in turnout_houses:
+                _award(
+                    house, EVENT_HOUSE_TURNOUT_BONUS, None,
+                    f"{event['name']} - house turnout",
+                )
+
+        if practice:
+            lines = [
+                f"**Practice swarm** — **{total_kills}** monster(s) put down by "
+                f"**{len(rows)}** wizard(s). **No points awarded.**",
+            ]
+            if by_kills:
+                lines.append("")
+                for place, r in enumerate(by_kills[:10], start=1):
+                    crown = "👑 " if r["uid"] in mvp_uids else ""
+                    house_note = (
+                        f" - House {HOUSES[r['house']]['name']}" if r["house"] else ""
+                    )
+                    lines.append(
+                        f"{crown}**#{place}** <@{r['uid']}>: {r['kills']} kill(s), "
+                        f"{r['rep']} rep{house_note}"
+                    )
+        else:
+            mult_note = f" · kill pool ×{point_mult}" if point_mult != 1 else ""
+            lines = [
+                f"**{total_kills}** monster(s) put down by **{len(rows)}** wizard(s) "
+                f"({minutes}-minute swarm{mult_note})."
+            ]
+
+            share_lines = []
+            for place, r in enumerate(by_kills[:kill_cut], start=1):
+                pts = kill_share.get(r["uid"], 0)
+                pct = (100.0 * r["kills"] / total_kills) if total_kills else 0.0
+                bits = []
+                if r["uid"] in mvp_uids:
+                    bits.append(f"+{EVENT_MVP_BONUS} MVP")
+                bonus_note = f" ({', '.join(bits)})" if bits else ""
+                crown = "👑 " if r["uid"] in mvp_uids else ""
                 house_note = (
-                    f" - House {HOUSES[row['house']]['name']}" if row["house"]
+                    f" - House {HOUSES[r['house']]['name']}" if r["house"]
                     else " - no house, no points"
                 )
+                share_lines.append(
+                    f"{crown}**#{place}** <@{r['uid']}>: {r['kills']} kill(s) "
+                    f"({pct:.0f}% of swarm) → **+{pts}**{house_note}{bonus_note}"
+                )
+            if share_lines:
                 lines.append("")
                 lines.append(
-                    f"👑 MVP <@{uid}>: **{row['rep']}** rep "
-                    f"(+{EVENT_MVP_BONUS}){house_note}"
+                    f"Top **{kill_cut}** by kills share **{kill_pool}** pts "
+                    f"(kills ÷ total swarm kills × {kill_pool}):"
                 )
+                lines.extend(share_lines)
+            elif rows:
+                lines.append("Nobody scored a kill — no points awarded.")
 
-        if turnout_houses and best_turnout:
-            names = ", ".join(HOUSES[h]["name"] for h in sorted(turnout_houses))
-            lines.append("")
-            lines.append(
-                f"🏠 Turnout: House {names} "
-                f"({best_turnout} fighter(s) with a kill) +{EVENT_HOUSE_TURNOUT_BONUS}"
-            )
+            # MVP outside the kill cut (rare) still gets noted.
+            for uid in mvp_uids:
+                if uid not in kill_share:
+                    row = row_by_uid[uid]
+                    house_note = (
+                        f" - House {HOUSES[row['house']]['name']}" if row["house"]
+                        else " - no house, no points"
+                    )
+                    lines.append("")
+                    lines.append(
+                        f"👑 MVP <@{uid}>: **{row['rep']}** rep "
+                        f"(+{EVENT_MVP_BONUS}){house_note}"
+                    )
+
+            if turnout_houses and best_turnout:
+                names = ", ".join(HOUSES[h]["name"] for h in sorted(turnout_houses))
+                lines.append("")
+                lines.append(
+                    f"🏠 Turnout: House {names} "
+                    f"({best_turnout} fighter(s) with a kill) +{EVENT_HOUSE_TURNOUT_BONUS}"
+                )
 
         if house_totals:
             lines.append("")
@@ -1118,12 +1171,20 @@ class Dementors(commands.Cog):
                 for h, p in sorted(house_totals.items(), key=lambda kv: -kv[1])
             ))
 
+        title = (
+            f"🏳️ Practice ended — {event['name']}"
+            if practice else f"🏳️ {event['name']} has ended"
+        )
         embed = discord.Embed(
-            title=f"🏳️ {event['name']} has ended",
-            description="\n".join(lines) if rows else "Nobody landed a hit. The grounds are quiet again.",
+            title=title,
+            description="\n".join(lines) if rows else (
+                "Nobody landed a hit. Good drill anyway — no points either way."
+                if practice else
+                "Nobody landed a hit. The grounds are quiet again."
+            ),
             color=EVENT_COLOR,
         )
-        for cid in self._event_channel_ids():
+        for cid in self._event_channel_ids(event):
             channel = self.bot.get_channel(cid)
             if channel is None:
                 continue
@@ -1164,40 +1225,60 @@ class Dementors(commands.Cog):
         await interaction.response.send_message("That's for staff.", ephemeral=True)
         return False
 
-    @group.command(name="channels", description="(staff) Set the 4 channels a threat can appear in.")
-    @app_commands.describe(a="First channel", b="Second channel", c="Third channel", d="Fourth channel")
+    @group.command(name="channels", description="(staff) Set the channels a threat can appear in.")
+    @app_commands.describe(
+        a="First channel", b="Second channel", c="Third channel", d="Fourth channel",
+        e="Optional fifth channel",
+    )
     async def channels(self, interaction: discord.Interaction, a: discord.TextChannel,
-                        b: discord.TextChannel, c: discord.TextChannel, d: discord.TextChannel):
+                        b: discord.TextChannel, c: discord.TextChannel, d: discord.TextChannel,
+                        e: discord.TextChannel = None):
         if not await self._staff(interaction):
             return
         ids = [a.id, b.id, c.id, d.id]
+        if e is not None:
+            ids.append(e.id)
+        # Keep uniqueness while preserving order.
+        seen: set[int] = set()
+        unique: list[int] = []
+        for cid in ids:
+            if cid not in seen:
+                seen.add(cid)
+                unique.append(cid)
+        ids = unique
         practice = [cid for cid in ids if cid in PRACTICE_SUMMON_CHANNEL_IDS]
         if practice:
             mentions = ", ".join(f"<#{cid}>" for cid in practice)
             await interaction.response.send_message(
                 f"{mentions} "
                 f"{'is' if len(practice) == 1 else 'are'} practice-only — use "
-                "`/staff dementor summon` there. Pick four other channels for ambient spawns "
+                "`/staff dementor summon` there. Pick other channels for ambient spawns "
                 "and Attack waves.",
                 ephemeral=True,
             )
             return
         self.state["channel_ids"] = ids
         self.save()
+        mentions = ", ".join(f"<#{cid}>" for cid in ids)
+        extras = [cid for cid in sorted(EXTRA_THREAT_CHANNEL_IDS) if cid not in ids]
+        extra_note = (
+            f" Always-on: {', '.join(f'<#{cid}>' for cid in extras)}."
+            if extras else ""
+        )
         practice_mentions = ", ".join(
             f"<#{cid}>" for cid in sorted(PRACTICE_SUMMON_CHANNEL_IDS)
         )
         await interaction.response.send_message(
-            f"Wild Threats may now appear in {a.mention}, {b.mention}, {c.mention}, {d.mention}. "
+            f"Wild Threats may now appear in {mentions}.{extra_note} "
             f"{practice_mentions} stay summon-only.",
             ephemeral=True,
         )
 
     def _summon_channel_ok(self, channel_id: int) -> bool:
-        """Configured event channels, or practice rooms (study hall / games lounge)."""
+        """Configured event channels, extras, or practice rooms."""
         if channel_id in PRACTICE_SUMMON_CHANNEL_IDS:
             return True
-        return channel_id in self.state.get("channel_ids", [])
+        return channel_id in self._configured_channel_ids()
 
     @group.command(name="summon", description="(staff) Make one appear right now.")
     @app_commands.describe(
@@ -1235,7 +1316,7 @@ class Dementors(commands.Cog):
                     f"<#{cid}>" for cid in sorted(PRACTICE_SUMMON_CHANNEL_IDS)
                 )
                 await interaction.response.send_message(
-                    "Pick one of the four `/staff dementor channels`, or "
+                    "Pick one of the `/staff dementor channels` (or the always-on Attack rooms), or "
                     f"{practice} for practice.",
                     ephemeral=True,
                 )
@@ -1255,12 +1336,14 @@ class Dementors(commands.Cog):
         if not await self._staff(interaction):
             return
         self._roll_day()
-        pool = self.state.get("channel_ids", [])
+        pool = self._configured_channel_ids()
+        staff_set = self.state.get("channel_ids", [])
         practice = ", ".join(
             f"<#{cid}>" for cid in sorted(PRACTICE_SUMMON_CHANNEL_IDS)
         )
         lines = [
-            f"Event channels: {', '.join(f'<#{c}>' for c in pool) if pool else 'none set'}",
+            f"Event channels: {', '.join(f'<#{c}>' for c in pool) if pool else 'none set'}"
+            + (f" (staff set {len(staff_set)}; +always-on extras)" if pool else ""),
             f"Practice summon: {practice} (never used by Attack waves)",
             f"Spawned today: {self.state.get('spawns_today', 0)}/{SPAWNS_PER_DAY}",
         ]
@@ -1379,6 +1462,99 @@ class Dementors(commands.Cog):
 
         await self._deliver_wave(started_at, payloads)
 
+    @group.command(
+        name="practice",
+        description="(staff) House practice swarm in one channel — no points or rewards.",
+    )
+    @app_commands.describe(
+        channel="House channel to flood (default: this channel)",
+        minutes=f"How long it runs, in minutes (default {EVENT_DEFAULT_MINUTES})",
+    )
+    async def practice(
+        self,
+        interaction: discord.Interaction,
+        channel: discord.TextChannel = None,
+        minutes: int = EVENT_DEFAULT_MINUTES,
+    ):
+        if not await self._staff(interaction):
+            return
+        target = channel or interaction.channel
+        if not isinstance(target, discord.TextChannel):
+            await interaction.response.send_message(
+                "Pick a text channel for the practice swarm.", ephemeral=True,
+            )
+            return
+        if target.id in PRACTICE_SUMMON_CHANNEL_IDS:
+            await interaction.response.send_message(
+                "Study hall and the games lounge stay summon-only. "
+                "Run house practice in a house channel instead.",
+                ephemeral=True,
+            )
+            return
+
+        err = None
+        start = None
+        async with self.lock:
+            if self.state.get("event"):
+                running = self.state["event"]
+                kind = "practice swarm" if running.get("practice") else "Attack"
+                err = f"**{running['name']}** ({kind}) is already running — `/staff dementor eventend` first."
+            elif not (1 <= minutes <= EVENT_MAX_MINUTES):
+                err = f"Pick a length between 1 and {EVENT_MAX_MINUTES} minutes."
+            else:
+                clean_name = "House Practice Swarm"
+                now = time.time()
+                active = self.state.get("active")
+                if active and active.get("channel_id") == target.id:
+                    self.state["active"] = None
+                elif active and active.get("channel_id") not in PRACTICE_SUMMON_CHANNEL_IDS:
+                    # Don't wipe a live ambient threat elsewhere; practice is local.
+                    pass
+                event = {
+                    "name": clean_name,
+                    "started_at": now,
+                    "ends_at": now + minutes * 60,
+                    "guild_id": interaction.guild_id,
+                    "channels": {},
+                    "tally": {},
+                    "practice": True,
+                    "channel_ids": [target.id],
+                }
+                self.state["event"] = event
+                self.save()
+                intro = discord.Embed(
+                    title=f"🛡️ {clean_name}",
+                    description=(
+                        "House drill — same waves as Attack on Velmora, but **nothing "
+                        "awards points or rewards**. Learn the creatures, practice `/cast`, "
+                        f"then clear out.\n\nWaves keep coming for the next {minutes} minute(s)."
+                    ),
+                    color=EVENT_COLOR,
+                )
+                payloads = self._prepare_wave(event)
+                start = (event["started_at"], payloads, clean_name, minutes, intro, [target.id])
+
+        if err:
+            await interaction.response.send_message(err, ephemeral=True)
+            return
+
+        started_at, payloads, clean_name, minutes, intro, pool = start
+        await interaction.response.send_message(
+            f"**{clean_name}** begins in {target.mention} for {minutes} minute(s) — practice only.",
+            ephemeral=True,
+        )
+
+        for cid in pool:
+            ch = await self._get_channel(cid)
+            if ch is None:
+                continue
+            try:
+                await ch.send(embed=intro)
+            except discord.HTTPException:
+                continue
+
+        await self._deliver_wave(started_at, payloads)
+
     @group.command(name="eventend", description="(staff) End the running event early and tally it up.")
     async def eventend(self, interaction: discord.Interaction):
         if not await self._staff(interaction):
@@ -1388,7 +1564,8 @@ class Dementors(commands.Cog):
         if not event:
             await interaction.response.send_message("Nothing is running right now.", ephemeral=True)
             return
-        await interaction.response.send_message(f"**{event['name']}** ended early.", ephemeral=True)
+        ended = "Practice ended." if event.get("practice") else f"**{event['name']}** ended early."
+        await interaction.response.send_message(ended, ephemeral=True)
         await self._finalize_event(event)
 
     @group.command(name="eventstatus", description="(staff) How the current event is going.")
@@ -1405,11 +1582,20 @@ class Dementors(commands.Cog):
         point_mult = int(event.get("point_mult") or 1)
         length = int(event.get("minutes") or EVENT_DEFAULT_MINUTES)
         tally = sorted(event.get("tally", {}).items(), key=lambda kv: -kv[1].get("rep", 0))
+        practice = bool(event.get("practice"))
+        where = self._event_channel_ids(event)
         lines = [
-            f"**{event['name']}** — {mins}m {secs}s left "
-            f"({length}-minute · top {reward_top} by kills share "
-            f"{EVENT_KILL_POOL * point_mult} pts"
-            f"{' · double pool' if point_mult > 1 else ''}).",
+            f"**{event['name']}**"
+            + (" (practice · no points)" if practice else "")
+            + (
+                f" — {mins}m {secs}s left "
+                f"({length}-minute · top {reward_top} by kills share "
+                f"{EVENT_KILL_POOL * point_mult} pts"
+                f"{' · double pool' if point_mult > 1 else ''})."
+                if not practice else
+                f" - {mins}m {secs}s left."
+            ),
+            f"Channels: {', '.join(f'<#{c}>' for c in where) if where else 'none'}.",
             f"{len(event.get('channels', {}))} monster(s) out right now.",
         ]
         if tally:

@@ -280,7 +280,7 @@ HELP = {
         "title": "Staff — wild threats",
         "staff": True,
         "entries": [
-            ("staffworld dementor channels", "Set the 4 channels a wild threat can appear in."),
+            ("staffworld dementor channels", "Set the channels a wild threat can appear in (optional 5th)."),
             ("staffworld dementor summon", "Make one appear right now (study hall OK for practice; Attack waves skip it)."),
             ("staffops beastadmin spawn", "Make a beast appear right now."),
             ("staffops beastadmin channel", "Set which channel beasts appear in."),
@@ -291,6 +291,7 @@ HELP = {
             ("staffops adornadmin status", "How gear is spread around the server."),
             ("staffworld dementor status", "What's configured and what's active."),
             ("staffworld dementor eventstart", "Start Attack on Velmora — 5-min (top 7 share 100) or 10-min (top 5 share 200)."),
+            ("staffworld dementor practice", "House practice swarm in one channel — no points or rewards."),
             ("staffworld dementor eventend", "End the running event early and tally it up."),
             ("staffworld dementor eventstatus", "How the current event is going."),
         ],
