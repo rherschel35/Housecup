@@ -496,6 +496,8 @@ class WorldCog(commands.Cog, name="World"):
         place = self.where(s)
         if not place or place not in self.world.places:
             return
+        if message.channel.id in OPEN_LOUNGE_CHANNEL_IDS:
+            return
         if not self._place_channel_ok(message.channel.id, place):
             return
         P = self.world.places[place]
