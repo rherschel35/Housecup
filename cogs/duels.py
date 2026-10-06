@@ -1,5 +1,6 @@
 """
-Wizard duels. Best of three, spells chosen in secret.
+Wizard duels. Best of three by default. Optional best-of 5/7/9 series:
+each set is first to 2, and the series winner banks 3/4/5 wins.
 
     /duel @member              - challenge someone (1v1)
     /duelrecord [member]       - rank, wins, streak, rivals, trio/grand, points
@@ -63,9 +64,26 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 DUELS_PATH = STATE_DIR / "duels.json"
 
-ROUNDS_TO_WIN = 2          # best of three
-MAX_ROUNDS = 9             # ties replay; this stops an endless run of them
+ROUNDS_TO_WIN = 2          # each set is first to 2 (a normal duel)
+MAX_ROUNDS = 9             # tie cap within one set
+# /duel best_of: 3 = one set (1 win); 5/7/9 = series of sets → 3/4/5 wins
+BEST_OF_OPTIONS = (3, 5, 7, 9)
 ACCEPT_TIMEOUT = 120
+
+
+def series_to_win_for(best_of: int) -> int:
+    """How many first-to-2 sets you need. Bo3 = 1 set; Bo5/7/9 = 3/4/5."""
+    n = int(best_of)
+    if n <= 3:
+        return 1
+    return n // 2 + 1
+
+
+def max_rounds_for(best_of: int) -> int:
+    """Tie-round budget across the whole match (sets × per-set cap)."""
+    return MAX_ROUNDS * series_to_win_for(best_of) * 2
+
+
 ROUND_TIMEOUT = 60
 GRAND_LOCK_TIMEOUT = ACCEPT_TIMEOUT  # 2 min to lock both sequences, same as accept
 REWARD_POINTS = 1
@@ -801,15 +819,20 @@ class Duels(commands.Cog):
                      actor_id=self.bot.user.id if self.bot.user else 0,
                      target_id=target_id, reason=reason)
 
-    def settle(self, winner, loser, now: float = None) -> dict:
+    def settle(self, winner, loser, now: float = None, *, match_wins: int = 1) -> dict:
         """Record the result, award points, and work out every reward it
-        triggers. Returns what happened so the announcement can say so."""
+        triggers. Returns what happened so the announcement can say so.
+
+        ``match_wins`` is how many record wins the series is worth (1 for a
+        normal duel; 3/4/5 for best-of 5/7/9).
+        """
         now = now if now is not None else time.time()
+        match_wins = max(1, int(match_wins))
         wid, lid = str(winner.id), str(loser.id)
         self._roll_week(now)
 
-        self.record_of(winner.id)["w"] += 1
-        self.record_of(loser.id)["l"] += 1
+        self.record_of(winner.id)["w"] += match_wins
+        self.record_of(loser.id)["l"] += match_wins
         notes: list[str] = []
 
         store = self.bot.get_cog("Store")
@@ -818,7 +841,7 @@ class Duels(commands.Cog):
         same_house = bool(w_house and l_house and w_house == l_house)
         night = self.duel_night_on(now)
 
-        # rivalry (counted before scoring so the 5th duel already pays)
+        # rivalry (one meeting per series / duel, not per set)
         pk = pair_key(winner.id, loser.id)
         self.state["pairs"][pk] = self.state["pairs"].get(pk, 0) + 1
         meetings = self.state["pairs"][pk]
@@ -834,39 +857,49 @@ class Duels(commands.Cog):
                     f"{meetings} times. They are now **{title}**."
                 )
 
-        # ------------------------------------------------ house points
+        # ------------------------------------------------ house points (per set-win, capped)
         outcome = {"awarded": 0, "reason": None, "house": w_house, "notes": notes,
-                   "night": night, "rival": rivals}
+                   "night": night, "rival": rivals, "match_wins": match_wins}
         if not store or not w_house:
             outcome["reason"] = "no-house"
         elif same_house:
             outcome["reason"] = "same-house"
         else:
-            if night:
-                # Duel Night: every cross-house win pays, no daily cap, don't burn daytime slots.
-                wins_paid = 2 if rivals else 1
-                slots = wins_paid
-            else:
-                slots = REWARDED_PER_DAY - self.rewarded_today(winner.id, now)
-                wins_paid = 0
-            if slots <= 0:
-                outcome["reason"] = "daily-cap"
-            else:
+            total_pts = 0
+            paid_units = 0
+            for _ in range(match_wins):
+                if night:
+                    wins_paid = 2 if rivals else 1
+                    slots = wins_paid
+                else:
+                    slots = REWARDED_PER_DAY - self.rewarded_today(winner.id, now)
+                    wins_paid = 0
+                if slots <= 0:
+                    if paid_units == 0:
+                        outcome["reason"] = "daily-cap"
+                    break
                 if not night:
                     wins_paid = 1 + (1 if rivals and slots >= 2 else 0)
                 base = wins_paid * REWARD_POINTS
                 pts = base * (DUEL_NIGHT_MULTIPLIER if night else 1)
-                why = f"Duel win over {loser.display_name}"
-                if wins_paid > 1:
-                    why += " (rival)"
-                if night:
-                    why += " (Duel Night)"
-                self._award(store, w_house, pts, winner.id, why)
+                total_pts += pts
+                paid_units += wins_paid
                 if not night:
                     self.state["rewarded"].setdefault(wid, []).extend([now] * wins_paid)
                 else:
                     self._credit_duel_night(winner.id, w_house, pts)
-                outcome["awarded"] = pts
+            if total_pts:
+                why = f"Duel win over {loser.display_name}"
+                if match_wins > 1:
+                    why += f" (best-of series ×{match_wins})"
+                if rivals and paid_units > match_wins:
+                    why += " (rival)"
+                if night:
+                    why += " (Duel Night)"
+                self._award(store, w_house, total_pts, winner.id, why)
+                outcome["awarded"] = total_pts
+            elif outcome.get("reason") is None:
+                outcome["reason"] = "daily-cap"
 
         # ------------------------------------------------ Triple Tithe castle perk
         castles = self.bot.get_cog("Castles")
@@ -907,7 +940,7 @@ class Duels(commands.Cog):
         # wins count toward killing-streak bonuses.
         self.state["streaks"][lid] = 0
         if not same_house:
-            streak = self.state["streaks"].get(wid, 0) + 1
+            streak = self.state["streaks"].get(wid, 0) + match_wins
             self.state["streaks"][wid] = streak
             if streak >= BOUNTY_AT and wid not in self.state["bounties"]:
                 self.state["bounties"][wid] = {"since": now, "streak": streak}
@@ -918,7 +951,7 @@ class Duels(commands.Cog):
                 if streak % STREAK_EVERY == 0:
                     notes.append(f"🔥 **{winner.display_name}** is on a {streak}-win streak. "
                                  "The bounty still stands.")
-            elif streak == STREAK_ANNOUNCE:
+            elif streak >= STREAK_ANNOUNCE and streak - match_wins < STREAK_ANNOUNCE:
                 notes.append(f"🔥 **{winner.display_name}** is on a {streak}-win streak.")
 
         # ------------------------------------------------ Circle reputation
@@ -976,7 +1009,7 @@ class Duels(commands.Cog):
         # ------------------------------------------------ this week's tally
         week = self.state["week"]["wins"]
         entry = week.get(wid, [0, now])
-        week[wid] = [entry[0] + 1, now]   # [wins, when they reached that count]
+        week[wid] = [entry[0] + match_wins, now]   # [wins, when they reached that count]
 
         self.save()
         return outcome
@@ -1110,8 +1143,22 @@ class Duels(commands.Cog):
     # ------------------------------------------------------------ commands
 
     @app_commands.command(name="duel", description="Challenge someone to a wizard's duel.")
-    @app_commands.describe(opponent="Who you're challenging")
-    async def duel(self, interaction: discord.Interaction, opponent: discord.Member):
+    @app_commands.describe(
+        opponent="Who you're challenging",
+        best_of="Series length: 3 = one duel (default). 5/7/9 = play sets of first-to-2 until someone banks 3/4/5 wins.",
+    )
+    @app_commands.choices(best_of=[
+        app_commands.Choice(name="Best of 3 (1 win)", value=3),
+        app_commands.Choice(name="Best of 5 (first to 3 · 3 wins)", value=5),
+        app_commands.Choice(name="Best of 7 (first to 4 · 4 wins)", value=7),
+        app_commands.Choice(name="Best of 9 (first to 5 · 5 wins)", value=9),
+    ])
+    async def duel(
+        self,
+        interaction: discord.Interaction,
+        opponent: discord.Member,
+        best_of: app_commands.Choice[int] = None,
+    ):
         me = interaction.user
         ok, arena = self._in_duel_channel(interaction)
         if not ok:
@@ -1136,7 +1183,10 @@ class Duels(commands.Cog):
             )
             return
 
-        duel = Duel(self, interaction.channel, me, opponent)
+        length = int(best_of.value) if best_of is not None else 3
+        if length not in BEST_OF_OPTIONS:
+            length = 3
+        duel = Duel(self, interaction.channel, me, opponent, best_of=length)
         self.mark_busy(duel, me, opponent)
         await interaction.response.send_message(
             content=opponent.mention,
@@ -1671,15 +1721,23 @@ class Duel:
     """One duel, held in memory. Duels last a couple of minutes, so they
     aren't saved - a redeploy mid-duel simply ends it."""
 
-    def __init__(self, cog: Duels, channel, challenger, opponent):
+    def __init__(self, cog: Duels, channel, challenger, opponent, *, best_of: int = 3):
         self.cog = cog
         self.channel = channel
         self.a = challenger
         self.b = opponent
         self.message = None
-        self.score = {challenger.id: 0, opponent.id: 0}
+        self.best_of = int(best_of) if best_of in BEST_OF_OPTIONS else 3
+        # Series of first-to-2 sets. Bo3 = one set (1 win); Bo5/7/9 = first to 3/4/5 sets.
+        self.series_to_win = series_to_win_for(self.best_of)
+        self.match_wins = self.series_to_win  # record wins for series champion
+        self.max_rounds = max_rounds_for(self.best_of)
+        self.set_score = {challenger.id: 0, opponent.id: 0}
+        self.score = {challenger.id: 0, opponent.id: 0}  # round score within current set
+        self.set_no = 1
         self.picks: dict[int, str] = {}
-        self.round = 0
+        self.round = 0  # round within the current set
+        self.total_rounds = 0  # across the whole series (tie / timeout budget)
         self.history: list[str] = []
         self.state = "pending"     # pending -> active -> done
         self.lock = asyncio.Lock()
@@ -1696,10 +1754,20 @@ class Duel:
     # -------------------------------------------------------------- display
 
     def challenge_embed(self) -> discord.Embed:
+        if self.series_to_win <= 1:
+            length = (
+                "**Best of three** (first to 2). Counts as **1 win**."
+            )
+        else:
+            length = (
+                f"**Best of {self.best_of}** — first to **{self.series_to_win}** "
+                f"duel wins (each duel is first to 2). Series winner banks "
+                f"**{self.match_wins} wins**."
+            )
         desc = (
             f"{self.cog._duelist_label(self.a)} challenges "
             f"{self.cog._duelist_label(self.b)}.\n\n"
-            "Best of three. Spells are chosen in secret and revealed together."
+            f"{length} Spells are chosen in secret and revealed together."
         )
         if self.rival_line:
             desc += f"\n\n⚔️ {self.rival_line}"
@@ -1712,9 +1780,21 @@ class Duel:
         return embed
 
     def board_embed(self, footer: str = None) -> discord.Embed:
-        a_s, b_s = self.score[self.a.id], self.score[self.b.id]
-        lines = [f"{self.cog._duelist_label(self.a)} **{a_s}** — "
-                 f"**{b_s}** {self.cog._duelist_label(self.b)}"]
+        a_r, b_r = self.score[self.a.id], self.score[self.b.id]
+        a_s, b_s = self.set_score[self.a.id], self.set_score[self.b.id]
+        if self.series_to_win <= 1:
+            lines = [
+                f"{self.cog._duelist_label(self.a)} **{a_r}** — "
+                f"**{b_r}** {self.cog._duelist_label(self.b)}",
+            ]
+        else:
+            lines = [
+                f"Best of {self.best_of} · first to {self.series_to_win} "
+                f"(each set first to {ROUNDS_TO_WIN})",
+                f"Series: {self.cog._duelist_label(self.a)} **{a_s}** — "
+                f"**{b_s}** {self.cog._duelist_label(self.b)}",
+                f"This set: **{a_r}** — **{b_r}**",
+            ]
         if self.rival_line:
             lines.append(f"⚔️ {self.rival_line}")
         if self.history:
@@ -1723,8 +1803,14 @@ class Duel:
         if self.state == "active":
             waiting = [m.display_name for m in (self.a, self.b) if m.id not in self.picks]
             lines.append("")
-            lines.append(f"**Round {self.round}** — "
-                         + ("waiting on " + " and ".join(waiting) if waiting else "revealing…"))
+            if self.series_to_win > 1:
+                round_label = f"**Set {self.set_no} · Round {self.round}**"
+            else:
+                round_label = f"**Round {self.round}**"
+            lines.append(
+                f"{round_label} — "
+                + ("waiting on " + " and ".join(waiting) if waiting else "revealing…")
+            )
         embed = discord.Embed(title="The duel", description="\n".join(lines), color=0xB8434F)
         embed.set_footer(text=footer or (
             f"Both duelists: Open my cast board (again if dismissed) • {ROUND_TIMEOUT}s per round"
@@ -1877,8 +1963,9 @@ class Duel:
         arm_round = None
         async with self.lock:
             self.round += 1
+            self.total_rounds += 1
             self.picks = {}
-            if self.round > MAX_ROUNDS:
+            if self.total_rounds > self.max_rounds:
                 self.cog.release_match(self)
                 snap = self._snapshot(view=None, footer="Too evenly matched — declared a draw.")
             else:
@@ -1949,7 +2036,10 @@ class Duel:
                 result, line = apply_deadlock_keep(
                     result, line, self.a.id, self.b.id, self.cog.bot,
                 )
-                reveal = (f"R{self.round}: {SPELLS[disp_a]['emoji']} {SPELLS[disp_a]['name']} vs "
+                reveal = (f"S{self.set_no}R{self.round}: {SPELLS[disp_a]['emoji']} {SPELLS[disp_a]['name']} vs "
+                          f"{SPELLS[disp_b]['emoji']} {SPELLS[disp_b]['name']} — {line}"
+                          if self.series_to_win > 1 else
+                          f"R{self.round}: {SPELLS[disp_a]['emoji']} {SPELLS[disp_a]['name']} vs "
                           f"{SPELLS[disp_b]['emoji']} {SPELLS[disp_b]['name']} — {line}")
                 if result == 1:
                     self.score[self.a.id] += 1
@@ -1959,14 +2049,41 @@ class Duel:
                     self.cog.note_round_win(self.b.id, disp_b)
                 self.history.append(reveal)
 
+                set_winner = None
                 if self.score[self.a.id] >= ROUNDS_TO_WIN:
-                    finish = (self.a, self.b, False)
+                    set_winner = self.a
                 elif self.score[self.b.id] >= ROUNDS_TO_WIN:
-                    finish = (self.b, self.a, False)
+                    set_winner = self.b
+
+                if set_winner is not None:
+                    self.set_score[set_winner.id] += 1
+                    set_loser = self.b if set_winner.id == self.a.id else self.a
+                    if self.series_to_win > 1:
+                        self.history.append(
+                            f"✅ **{set_winner.display_name}** takes set {self.set_no} "
+                            f"({self.set_score[self.a.id]}–{self.set_score[self.b.id]})"
+                        )
+                    if self.set_score[set_winner.id] >= self.series_to_win:
+                        finish = (set_winner, set_loser, False)
+                    else:
+                        # Next set: reset round score, keep going.
+                        self.set_no += 1
+                        self.score = {self.a.id: 0, self.b.id: 0}
+                        self.round = 1
+                        self.total_rounds += 1
+                        self.picks = {}
+                        if self.total_rounds > self.max_rounds:
+                            self.cog.release_match(self)
+                            publish = self._snapshot(
+                                view=None, footer="Too evenly matched — declared a draw.")
+                        else:
+                            publish = self._snapshot(view=OpenCastBoardView(self))
+                            arm_round = self.round
                 else:
                     self.round += 1
+                    self.total_rounds += 1
                     self.picks = {}
-                    if self.round > MAX_ROUNDS:
+                    if self.total_rounds > self.max_rounds:
                         self.cog.release_match(self)
                         publish = self._snapshot(
                             view=None, footer="Too evenly matched — declared a draw.")
@@ -1988,7 +2105,7 @@ class Duel:
             self._timer.cancel()
             self._timer = None
         self.cog.release_match(self)
-        outcome = self.cog.settle(winner, loser)
+        outcome = self.cog.settle(winner, loser, match_wins=self.match_wins)
 
         from cogs.store import HOUSES
         if outcome.get("flourish"):
@@ -2004,7 +2121,12 @@ class Duel:
             tail = f"{winner.display_name} has taken today's {REWARDED_PER_DAY} duel points already"
         else:
             tail = "No house to credit"
-        verb = "wins by forfeit" if forfeit else "wins the duel"
+        if forfeit:
+            verb = "wins by forfeit"
+        elif self.match_wins > 1:
+            verb = f"wins the series (+{self.match_wins} wins)"
+        else:
+            verb = "wins the duel"
         async with self.lock:
             snap = self._snapshot(view=None, footer=f"{winner.display_name} {verb} • {tail}")
         await self._publish(*snap)
@@ -2063,7 +2185,7 @@ class OpenCastBoardView(discord.ui.View):
     """Public prompt — same idea as broom race's Open my race board."""
 
     def __init__(self, duel: Duel):
-        super().__init__(timeout=ROUND_TIMEOUT * MAX_ROUNDS + 60)
+        super().__init__(timeout=ROUND_TIMEOUT * duel.max_rounds + 60)
         self.duel = duel
 
     @discord.ui.button(
