@@ -227,7 +227,7 @@
         "grand duel",
         "trio"
       ],
-      "answer": "`/duel` is best of three \u2014 press **Open my cast board** an' yer spell buttons sit under that private board (same idea as broom races), so ye don't scroll the channel huntin' for Cast. Hex, Ward, Disarm, Bind, Mirror; each beats two an' loses to two. There's also `/trio scramble`, `/trio housematch`, an' `/grand` for the big leagues. Stuck on \"already in a duel\"? Cast `/duelend` to clear the lock.",
+      "answer": "`/duel` is first to 2 (best of three) by default — that banks **1 win**. Pick **best of 5, 7, or 9** an' ye play sets of first-to-2 until someone hits 3 / 4 / 5 — the series winner banks that many wins without startin' over. Press **Open my cast board** an' yer spell buttons sit under that private board (same idea as broom races). Hex, Ward, Disarm, Bind, Mirror; each beats two an' loses to two. There's also `/trio scramble`, `/trio housematch`, an' `/grand` for the big leagues. Stuck on \"already in a duel\"? Cast `/duelend` to clear the lock.",
       "link": "https://everything-velmora.netlify.app/duels"
     },
     {
