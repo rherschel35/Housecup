@@ -24,7 +24,7 @@ HELP = {
         "title": "Play",
         "staff": False,
         "entries": [
-            ("duel", "Challenge someone. Best of 3 = 1 win; best of 5/7/9 = series of first-to-2 sets for 3/4/5 wins."),
+            ("duel", "Challenge someone. Best of 3 = 1 win; best of 5/7/9 = series of first-to-2 sets (set wins and losses both count on your record)."),
             ("trio scramble", "Open a casual 3v3 trio duel — any houses, join either side."),
             ("trio housematch", "Open a house-vs-house 3v3 trio duel (house role gated)."),
             ("grand", "Challenge someone to a Grand Duel (both need 50+ 1v1 wins)."),
