@@ -819,20 +819,36 @@ class Duels(commands.Cog):
                      actor_id=self.bot.user.id if self.bot.user else 0,
                      target_id=target_id, reason=reason)
 
-    def settle(self, winner, loser, now: float = None, *, match_wins: int = 1) -> dict:
+    def settle(self, winner, loser, now: float = None, *, match_wins: int = 1,
+               winner_sets: int | None = None, loser_sets: int | None = None) -> dict:
         """Record the result, award points, and work out every reward it
         triggers. Returns what happened so the announcement can say so.
 
-        ``match_wins`` is how many record wins the series is worth (1 for a
-        normal duel; 3/4/5 for best-of 5/7/9).
+        ``match_wins`` is how many house-point / streak / weekly units the
+        series is worth (1 for a normal duel; 3/4/5 for best-of 5/7/9).
+
+        ``winner_sets`` / ``loser_sets`` are the set score for W/L record.
+        When omitted (normal duel), the winner gets ``match_wins`` wins and
+        the loser ``match_wins`` losses. For a series ending 4–1, pass those
+        so both players' set wins *and* set losses land on the record.
         """
         now = now if now is not None else time.time()
         match_wins = max(1, int(match_wins))
+        if winner_sets is None:
+            winner_sets = match_wins
+        if loser_sets is None:
+            loser_sets = 0
+        winner_sets = max(0, int(winner_sets))
+        loser_sets = max(0, int(loser_sets))
         wid, lid = str(winner.id), str(loser.id)
         self._roll_week(now)
 
-        self.record_of(winner.id)["w"] += match_wins
-        self.record_of(loser.id)["l"] += match_wins
+        w_rec = self.record_of(winner.id)
+        l_rec = self.record_of(loser.id)
+        w_rec["w"] += winner_sets
+        w_rec["l"] += loser_sets
+        l_rec["w"] += loser_sets
+        l_rec["l"] += winner_sets
         notes: list[str] = []
 
         store = self.bot.get_cog("Store")
@@ -858,8 +874,11 @@ class Duels(commands.Cog):
                 )
 
         # ------------------------------------------------ house points (per set-win, capped)
-        outcome = {"awarded": 0, "reason": None, "house": w_house, "notes": notes,
-                   "night": night, "rival": rivals, "match_wins": match_wins}
+        outcome = {
+            "awarded": 0, "reason": None, "house": w_house, "notes": notes,
+            "night": night, "rival": rivals, "match_wins": match_wins,
+            "winner_sets": winner_sets, "loser_sets": loser_sets,
+        }
         if not store or not w_house:
             outcome["reason"] = "no-house"
         elif same_house:
@@ -2105,7 +2124,19 @@ class Duel:
             self._timer.cancel()
             self._timer = None
         self.cog.release_match(self)
-        outcome = self.cog.settle(winner, loser, match_wins=self.match_wins)
+        winner_sets = int(self.set_score.get(winner.id, 0) or 0)
+        loser_sets = int(self.set_score.get(loser.id, 0) or 0)
+        # Normal first-to-2: one set played → 1–0. Series: use the real set tally
+        # so a 4–1 best-of-7 banks +4W/+1L for the champ and +1W/+4L for the other.
+        if self.series_to_win <= 1:
+            winner_sets = max(1, winner_sets)
+            loser_sets = 0
+        outcome = self.cog.settle(
+            winner, loser,
+            match_wins=self.match_wins,
+            winner_sets=winner_sets,
+            loser_sets=loser_sets,
+        )
 
         from cogs.store import HOUSES
         if outcome.get("flourish"):
@@ -2124,7 +2155,20 @@ class Duel:
         if forfeit:
             verb = "wins by forfeit"
         elif self.match_wins > 1:
-            verb = f"wins the series (+{self.match_wins} wins)"
+            w_sets = outcome.get("winner_sets", self.match_wins)
+            l_sets = outcome.get("loser_sets", 0)
+            if l_sets:
+                verb = (
+                    f"wins the series (+{w_sets} wins, +{l_sets} loss"
+                    f"{'' if l_sets == 1 else 'es'}; "
+                    f"{loser.display_name} +{l_sets} win"
+                    f"{'' if l_sets == 1 else 's'}, +{w_sets} losses)"
+                )
+            else:
+                verb = (
+                    f"wins the series (+{w_sets} wins; "
+                    f"{loser.display_name} +{w_sets} losses)"
+                )
         else:
             verb = "wins the duel"
         async with self.lock:
