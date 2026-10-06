@@ -290,7 +290,7 @@ HELP = {
             ("staffops adornadmin channel", "Where earned gear is announced."),
             ("staffops adornadmin status", "How gear is spread around the server."),
             ("staffworld dementor status", "What's configured and what's active."),
-            ("staffworld dementor eventstart", "Start 'Attack on Velmora' - monsters flood every channel."),
+            ("staffworld dementor eventstart", "Start Attack on Velmora — 5-min (top 7 share 100) or 10-min (top 5 share 200)."),
             ("staffworld dementor eventend", "End the running event early and tally it up."),
             ("staffworld dementor eventstatus", "How the current event is going."),
         ],
