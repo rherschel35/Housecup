@@ -40,7 +40,8 @@ for the new wave. Staff pick a **5-minute** or **10-minute** swarm:
   - 5 minutes: top **7** by rep cash out (1× points)
   - 10 minutes: top **5** by rep cash out (**2×** points)
 
-Kill leaders #1 and #2 each earn a fixed house bonus; the house with the
+Kill share of a **70-point** pool is split by each fighter's % of total
+kills (so #1 naturally earns more than #2, and so on). The house with the
 most fighters who registered a kill gets a turnout bonus; MVP (top rep)
 still gets +5. One big scoreboard reveal at the end in every channel that
 fought.
@@ -95,7 +96,7 @@ THREAT_ALERT_COLOR = 0xC0392B  # every "X has appeared" alert, regardless of cre
 EVENT_WAVE_SECONDS = 23
 EVENT_DEFAULT_MINUTES = 5
 EVENT_MVP_BONUS = 5
-EVENT_KILL_PLACE_BONUS = 10  # #1 and #2 by kills each get this (same amount)
+EVENT_KILL_POOL = 70  # split by each fighter's share of total kills
 EVENT_HOUSE_TURNOUT_BONUS = 10  # house with the most fighters who registered a kill
 # length minutes → how many top rep scorers cash out, and point multiplier
 EVENT_PRESETS = {
@@ -103,6 +104,33 @@ EVENT_PRESETS = {
     10: {"reward_top": 5, "point_mult": 2, "label": "10-minute"},
 }
 EVENT_COLOR = 0x8A2F2F
+
+
+def split_kill_pool(killers: list[dict], pool: int) -> dict[int, int]:
+    """Split ``pool`` points by kill share. Larger kill counts earn more.
+
+    Uses largest-remainder rounding so awards are ints that sum to ``pool``
+    (fighters who round to 0 get nothing).
+    """
+    total = sum(int(r.get("kills") or 0) for r in killers)
+    if pool <= 0 or total <= 0:
+        return {}
+    parts = []
+    for r in killers:
+        kills = int(r.get("kills") or 0)
+        if kills <= 0:
+            continue
+        exact = pool * kills / total
+        base = int(exact)
+        parts.append((int(r["uid"]), base, exact - base, kills))
+    awarded = sum(p[1] for p in parts)
+    remain = pool - awarded
+    # Prefer higher fractional leftover, then more kills, then lower uid.
+    parts.sort(key=lambda p: (-p[2], -p[3], p[0]))
+    out = {uid: base for uid, base, _frac, _k in parts}
+    for i in range(max(0, remain)):
+        out[parts[i][0]] += 1
+    return {uid: pts for uid, pts in out.items() if pts > 0}
 
 ATTACK_INTRO = [
     "Something has broken through the wards. Fight back - every monster you put down counts "
@@ -968,12 +996,14 @@ class Dementors(commands.Cog):
         mvp_uids = {r["uid"] for r in rows if r["rep"] == top_rep and r["rep"] > 0}
         rewarded = [r for r in rows if r["rep"] > 0][:reward_top]
 
-        # Kill leaders #1 and #2 (same fixed bonus each).
         by_kills = sorted(
             [r for r in rows if r["kills"] > 0],
             key=lambda r: (-r["kills"], -r["rep"], r["uid"]),
         )
-        kill_place_uids = {r["uid"] for r in by_kills[:2]}
+        # 70-pt pool × share of total kills (10-min also doubles this pool).
+        kill_pool = EVENT_KILL_POOL * point_mult
+        kill_share = split_kill_pool(by_kills, kill_pool)
+        row_by_uid = {r["uid"]: r for r in rows}
 
         # House with the most distinct fighters who registered a kill.
         turnout: dict[str, set[int]] = {}
@@ -1007,21 +1037,22 @@ class Dementors(commands.Cog):
                 f"{event['name']} - top {reward_top} ({minutes}m ×{point_mult})",
             )
 
-        # MVP +5 (top rep), even if somehow not in the cut — still stacks.
+        # MVP +5 (top rep).
         for uid in mvp_uids:
-            row = next(r for r in rows if r["uid"] == uid)
+            row = row_by_uid[uid]
             if row["house"]:
                 _award(
                     row["house"], EVENT_MVP_BONUS, uid,
                     f"{event['name']} - MVP",
                 )
 
-        # Kill place #1 and #2 — fixed bonus each.
-        for place, r in enumerate(by_kills[:2], start=1):
-            if r["house"]:
+        # Kill-share pool — more kills → more of the 70 (or 140 on 10-min).
+        for uid, pts in kill_share.items():
+            row = row_by_uid[uid]
+            if row["house"]:
                 _award(
-                    r["house"], EVENT_KILL_PLACE_BONUS, r["uid"],
-                    f"{event['name']} - kills #{place}",
+                    row["house"], pts, uid,
+                    f"{event['name']} - kill share",
                 )
 
         # Turnout bonus — most houses with a registered kill.
@@ -1044,9 +1075,9 @@ class Dementors(commands.Cog):
                 bits = []
                 if r["uid"] in mvp_uids:
                     bits.append(f"+{EVENT_MVP_BONUS} MVP")
-                if r["uid"] in kill_place_uids:
-                    place = 1 if r["uid"] == by_kills[0]["uid"] else 2
-                    bits.append(f"+{EVENT_KILL_PLACE_BONUS} kills #{place}")
+                share_pts = kill_share.get(r["uid"], 0)
+                if share_pts:
+                    bits.append(f"+{share_pts} kill share")
                 bonus_note = f" ({', '.join(bits)})" if bits else ""
                 crown = "👑 " if r["uid"] in mvp_uids else ""
                 house_note = (
@@ -1062,28 +1093,35 @@ class Dementors(commands.Cog):
         elif rows:
             lines.append("Nobody with a house scored in the top cut — no rep payout.")
 
-        # Call out kill leaders / turnout if they weren't already obvious.
-        extras = []
-        for r in by_kills[:2]:
-            if r["uid"] not in {x["uid"] for x in rewarded}:
-                place = 1 if r["uid"] == by_kills[0]["uid"] else 2
-                house_note = (
-                    f" - House {HOUSES[r['house']]['name']}" if r["house"]
-                    else " - no house, no points"
-                )
-                extras.append(
-                    f"⚔️ Kills #{place}: <@{r['uid']}> ({r['kills']} kill(s))"
-                    f"{house_note} (+{EVENT_KILL_PLACE_BONUS})"
-                )
+        # Kill-share board (ordered by kills) for anyone who got a slice.
+        share_lines = []
+        for r in by_kills:
+            pts = kill_share.get(r["uid"], 0)
+            if not pts:
+                continue
+            pct = (100.0 * r["kills"] / total_kills) if total_kills else 0.0
+            house_note = (
+                f" - House {HOUSES[r['house']]['name']}" if r["house"]
+                else " - no house, no points"
+            )
+            share_lines.append(
+                f"<@{r['uid']}>: {r['kills']} kill(s) ({pct:.0f}%) → **+{pts}**{house_note}"
+            )
+        if share_lines:
+            lines.append("")
+            lines.append(f"Kill share of **{kill_pool}** pts:")
+            # Keep the recap readable — show everyone who got ≥1, capped at 12.
+            lines.extend(share_lines[:12])
+            if len(share_lines) > 12:
+                lines.append(f"…and {len(share_lines) - 12} more")
+
         if turnout_houses and best_turnout:
             names = ", ".join(HOUSES[h]["name"] for h in sorted(turnout_houses))
-            extras.append(
+            lines.append("")
+            lines.append(
                 f"🏠 Turnout: House {names} "
                 f"({best_turnout} fighter(s) with a kill) +{EVENT_HOUSE_TURNOUT_BONUS}"
             )
-        if extras:
-            lines.append("")
-            lines.extend(extras)
 
         if house_totals:
             lines.append("")
@@ -1321,7 +1359,8 @@ class Dementors(commands.Cog):
                             self.rng.choice(ATTACK_INTRO)
                             + f"\n\n**{preset['label']}** swarm — waves for the next "
                             f"**{minutes}** minutes. {mult_line} "
-                            f"Kills #1 and #2: **+{EVENT_KILL_PLACE_BONUS}** each · "
+                            f"**{EVENT_KILL_POOL}** kill-share pts "
+                            f"(×{preset['point_mult']} on this length) split by % of kills · "
                             f"House turnout: **+{EVENT_HOUSE_TURNOUT_BONUS}** · "
                             f"MVP: **+{EVENT_MVP_BONUS}**."
                         ),
