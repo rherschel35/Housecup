@@ -12,7 +12,8 @@ STUDY_HALL_CHANNEL_ID = 1555035151208153209  # new-student study hall
 # Shared Potions/Duels room — also one of the multi-game open lounges.
 DUELS_POTIONS_CHANNEL_ID = 1555554825616236726
 
-# Multi-game lounges — everything except Wild Threat spawns and exploring.
+# Multi-game lounges — duels, potions, Descent, Quidditch/broom, chess/checkers.
+# Not: Wild Threat spawns, exploring, castle PvP, 3Raid, or Forrest.
 OPEN_LOUNGE_CHANNEL_IDS = frozenset({
     1557137090058395768,
     DUELS_POTIONS_CHANNEL_ID,

@@ -25,11 +25,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from cogs.descent import DESCENT_CHANNEL_IDS
-from cogs.velmora_channels import (
-    CASTLES_CHANNEL_IDS,
-    OPEN_LOUNGE_CHANNEL_IDS,
-    channel_mentions,
-)
+from cogs.velmora_channels import CASTLES_CHANNEL_IDS, channel_mentions
 
 log = logging.getLogger("velmora.castles")
 
@@ -507,23 +503,17 @@ class Castles(commands.Cog):
     # ================================================================ channel
 
     def _in_channel(self, interaction: discord.Interaction) -> bool:
-        cid = interaction.channel_id
-        return cid in CASTLES_CHANNEL_IDS or cid in OPEN_LOUNGE_CHANNEL_IDS
+        return interaction.channel_id in CASTLES_CHANNEL_IDS
 
     def _army_channel_ok(self, interaction: discord.Interaction) -> bool:
-        """ /army is allowed in castles, Descent rooms, and open lounges. """
+        """ /army is allowed in the castles channel and all Descent rooms. """
         cid = interaction.channel_id
-        return (
-            cid in CASTLES_CHANNEL_IDS
-            or cid in DESCENT_CHANNEL_IDS
-            or cid in OPEN_LOUNGE_CHANNEL_IDS
-        )
+        return cid in CASTLES_CHANNEL_IDS or cid in DESCENT_CHANNEL_IDS
 
     async def _deny_channel(self, interaction: discord.Interaction) -> bool:
         if self._in_channel(interaction):
             return False
-        allowed = CASTLES_CHANNEL_IDS | OPEN_LOUNGE_CHANNEL_IDS
-        msg = f"Castle commands only work in {channel_mentions(allowed)}."
+        msg = f"Castle commands only work in {channel_mentions(CASTLES_CHANNEL_IDS)}."
         if interaction.response.is_done():
             await interaction.followup.send(msg, ephemeral=True)
         else:
@@ -533,7 +523,7 @@ class Castles(commands.Cog):
     async def _deny_army_channel(self, interaction: discord.Interaction) -> bool:
         if self._army_channel_ok(interaction):
             return False
-        allowed = CASTLES_CHANNEL_IDS | DESCENT_CHANNEL_IDS | OPEN_LOUNGE_CHANNEL_IDS
+        allowed = CASTLES_CHANNEL_IDS | DESCENT_CHANNEL_IDS
         msg = f"/army only works in {channel_mentions(allowed)}."
         if interaction.response.is_done():
             await interaction.followup.send(msg, ephemeral=True)
