@@ -5,7 +5,7 @@ Wizard duels. Best of three, spells chosen in secret.
     /duelrecord [member]       - rank, wins, streak, rivals, trio/grand, points
     /duelend [member]          - clear a stuck duel lock (self, or staff for others)
     /houseduels                - each house's overall win/loss duelling record
-    /staff duels night start|end  - House Duel Night: double points, no daily cap
+    /staff duels night start|end  - House Duel Night (30 min or 1 hour)
     /trio scramble             - open 3v3 signup (any houses)
     /trio housematch h1 h2     - house-gated 3v3 signup
     /grand @member             - Grand Duel (both need 50+ 1v1 wins)
@@ -379,7 +379,11 @@ GIFT_POINTS = 3
 WEEKLY_POINTS = 5            # Duelist of the Week's house bonus
 CHAMPION_ROLE_NAME = os.getenv("DUEL_CHAMPION_ROLE_NAME", "Champion of the Circle")
 DUEL_NIGHT_MULTIPLIER = 2
-DUEL_NIGHT_MAX_HOURS = 6     # a forgotten duel night switches itself off
+# Staff pick 30 or 60 minutes when starting; auto-ends at ends_at.
+DUEL_NIGHT_PRESETS = {
+    30: "30 minutes",
+    60: "1 hour",
+}
 DUEL_NIGHT_MVP_BONUS = 5     # like Wild Threat Attack MVP bonus
 DUEL_NIGHT_HOUSE_BONUS = 10  # winning house bonus at end of night
 DUEL_NIGHT_COLOR = 0xB8434F
@@ -745,9 +749,11 @@ class Duels(commands.Cog):
         if not night:
             return False
         now = now if now is not None else time.time()
-        if now - night.get("at", 0) > DUEL_NIGHT_MAX_HOURS * 3600:
-            return False
-        return True
+        ends = float(night.get("ends_at") or 0)
+        if ends > 0:
+            return now < ends
+        # Legacy nights (pre-length presets): treat as already expired.
+        return False
 
     def pop_expired_duel_night(self, now: float = None) -> dict | None:
         """If Duel Night timed out, clear it and return the finished night for tallying."""
@@ -755,7 +761,8 @@ class Duels(commands.Cog):
         if not night:
             return None
         now = now if now is not None else time.time()
-        if now - night.get("at", 0) <= DUEL_NIGHT_MAX_HOURS * 3600:
+        ends = float(night.get("ends_at") or 0)
+        if ends <= 0 or now < ends:
             return None
         self.state["duel_night"] = None
         self.save()
@@ -1271,15 +1278,35 @@ class Duels(commands.Cog):
         embed.set_footer(text="Ranked by total wins • same-house duels count too")
         await interaction.response.send_message(embed=embed)
 
-    async def duelnight(self, interaction: discord.Interaction, action: app_commands.Choice[str]):
+    async def duelnight(
+        self,
+        interaction: discord.Interaction,
+        action: app_commands.Choice[str],
+        length: app_commands.Choice[int] | None = None,
+    ):
         store = self.bot.get_cog("Store")
         if not (store and store.is_staff(interaction.user)):
             await interaction.response.send_message("That's for staff.", ephemeral=True)
             return
         if action.value == "start":
+            if self.state.get("duel_night") and self.duel_night_on():
+                await interaction.response.send_message(
+                    "A Duel Night is already running. End it first.", ephemeral=True
+                )
+                return
+            if length is None or int(length.value) not in DUEL_NIGHT_PRESETS:
+                await interaction.response.send_message(
+                    "Pick a length: **30 minutes** or **1 hour**.", ephemeral=True
+                )
+                return
+            minutes = int(length.value)
+            label = DUEL_NIGHT_PRESETS[minutes]
+            now = time.time()
             self.state["duel_night"] = {
                 "by": interaction.user.id,
-                "at": time.time(),
+                "at": now,
+                "ends_at": now + minutes * 60,
+                "minutes": minutes,
                 "tally": {},
                 "channel_id": interaction.channel_id,
                 "guild_id": interaction.guild_id,
@@ -1288,12 +1315,13 @@ class Duels(commands.Cog):
             await interaction.response.send_message(embed=discord.Embed(
                 title="⚔️ House Duel Night",
                 description=(
-                    f"Every **cross-house** duel win counts **double** for your house tonight — "
-                    f"**no daily win cap**. Same-house duels earn **no** house points.\n\n"
+                    f"**{label}** — every **cross-house** duel win counts **double** "
+                    f"for your house with **no daily win cap**. Same-house duels earn "
+                    f"**no** house points.\n\n"
                     f"When the night ends, the house with the most points gets a "
                     f"**+{DUEL_NIGHT_HOUSE_BONUS}** bonus, and the night's MVP gets "
-                    f"**+{DUEL_NIGHT_MVP_BONUS}** (same idea as a Wild Threat Attack).\n\n"
-                    f"Ends when staff call it, or after {DUEL_NIGHT_MAX_HOURS} hours."
+                    f"**+{DUEL_NIGHT_MVP_BONUS}**.\n\n"
+                    f"Ends in **{label}**, or when staff call it early."
                 ),
                 color=DUEL_NIGHT_COLOR,
             ))
@@ -1367,7 +1395,9 @@ class Duels(commands.Cog):
                 )
                 house_totals[house] = house_totals.get(house, 0) + DUEL_NIGHT_HOUSE_BONUS
 
-        how = "Staff ended the night" if reason == "staff" else f"Time's up ({DUEL_NIGHT_MAX_HOURS}h)"
+        minutes = int(night.get("minutes") or 0)
+        label = DUEL_NIGHT_PRESETS.get(minutes) or (f"{minutes} minutes" if minutes else "time")
+        how = "Staff ended the night" if reason == "staff" else f"Time's up ({label})"
         lines = [f"{how}. Cross-house wins paid double all night — same-house duels never did."]
         if rows:
             lines.append("")
