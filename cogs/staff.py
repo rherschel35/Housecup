@@ -345,18 +345,30 @@ class Staff(commands.Cog):
 
     # ---------------------------------------------------------------- duels
 
-    @duels.command(name="night", description="Start or end House Duel Night — double points, no daily cap.")
-    @app_commands.describe(action="Start or end it")
+    @duels.command(name="night", description="Start or end House Duel Night — 30 minutes or 1 hour.")
+    @app_commands.describe(
+        action="Start or end it",
+        length="Required to start: 30 minutes or 1 hour",
+    )
     @app_commands.choices(action=[
         app_commands.Choice(name="start", value="start"),
         app_commands.Choice(name="end", value="end"),
     ])
-    async def duels_night(self, interaction: discord.Interaction, action: app_commands.Choice[str]):
+    @app_commands.choices(length=[
+        app_commands.Choice(name="30 minutes", value=30),
+        app_commands.Choice(name="1 hour", value=60),
+    ])
+    async def duels_night(
+        self,
+        interaction: discord.Interaction,
+        action: app_commands.Choice[str],
+        length: app_commands.Choice[int] = None,
+    ):
         cog = self._cog("Duels")
         if not cog:
             await interaction.response.send_message("Duels isn't loaded.", ephemeral=True)
             return
-        await cog.duelnight(interaction, action)
+        await cog.duelnight(interaction, action, length)
 
     # ------------------------------------------------------------ challenge
 

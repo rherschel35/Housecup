@@ -24,7 +24,7 @@ HELP = {
         "title": "Play",
         "staff": False,
         "entries": [
-            ("duel", "Challenge someone. Best of three, spells chosen in secret."),
+            ("duel", "Challenge someone. Best of 3 = 1 win; best of 5/7/9 = series of first-to-2 sets for 3/4/5 wins."),
             ("trio scramble", "Open a casual 3v3 trio duel — any houses, join either side."),
             ("trio housematch", "Open a house-vs-house 3v3 trio duel (house role gated)."),
             ("grand", "Challenge someone to a Grand Duel (both need 50+ 1v1 wins)."),
@@ -259,7 +259,7 @@ HELP = {
             ("staffgame hex cast", "Curse a student — chat mangles, or Limp Wand (blocks /wand, /patronus, /broom, /cast for 1 hour)."),
             ("staffgame hex lift", "Lift a hex early."),
             ("staffgame hex list", "Show who's currently hexed."),
-            ("staffgame duels night", "Start or end House Duel Night — double points, no daily cap, end-night house/MVP bonuses."),
+            ("staffgame duels night", "Start or end House Duel Night — pick 30 minutes or 1 hour; double points, no daily cap, end-night house/MVP bonuses."),
         ],
     },
     "staff_world": {
@@ -280,7 +280,7 @@ HELP = {
         "title": "Staff — wild threats",
         "staff": True,
         "entries": [
-            ("staffworld dementor channels", "Set the 4 channels a wild threat can appear in."),
+            ("staffworld dementor channels", "Set the channels a wild threat can appear in (optional 5th)."),
             ("staffworld dementor summon", "Make one appear right now (study hall OK for practice; Attack waves skip it)."),
             ("staffops beastadmin spawn", "Make a beast appear right now."),
             ("staffops beastadmin channel", "Set which channel beasts appear in."),
@@ -290,7 +290,8 @@ HELP = {
             ("staffops adornadmin channel", "Where earned gear is announced."),
             ("staffops adornadmin status", "How gear is spread around the server."),
             ("staffworld dementor status", "What's configured and what's active."),
-            ("staffworld dementor eventstart", "Start 'Attack on Velmora' - monsters flood every channel."),
+            ("staffworld dementor eventstart", "Start Attack on Velmora — 5-min (top 7 share 100) or 10-min (top 5 share 200)."),
+            ("staffworld dementor practice", "House practice swarm in one channel — no points or rewards."),
             ("staffworld dementor eventend", "End the running event early and tally it up."),
             ("staffworld dementor eventstatus", "How the current event is going."),
         ],
