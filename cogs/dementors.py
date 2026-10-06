@@ -37,9 +37,9 @@ For a limited time (5 minutes by default), a fresh wave of monsters floods
 ALL FOUR configured channels every 23 seconds - whatever was still standing
 gets swept aside for the new wave. Kills earn personal "rep" during the
 event instead of house points right away; when the clock runs out (or
-staff end it early), every contributor's rep is converted into points for
-their house all at once, and whoever racked up the most rep gets a bonus
-on top. One big scoreboard reveal at the end, in every channel that fought.
+staff end it early), only the top scorers' rep converts into house points,
+and whoever racked up the most rep gets a bonus on top. One big scoreboard
+reveal at the end, in every channel that fought.
 
 Event casts and wave posts release the shared lock before talking to
 Discord, so a busy Attack doesn't freeze every other /cast behind one
@@ -92,6 +92,8 @@ EVENT_WAVE_SECONDS = 23
 EVENT_DEFAULT_MINUTES = 5
 EVENT_MAX_MINUTES = 60
 EVENT_MVP_BONUS = 5
+# Only the top N by rep cash out to house points (keeps swarms from flooding the Cup).
+EVENT_REWARD_TOP = 6
 EVENT_COLOR = 0x8A2F2F
 
 ATTACK_INTRO = [
@@ -946,28 +948,32 @@ class Dementors(commands.Cog):
 
         top_rep = rows[0][1] if rows else 0
         mvp_uids = {uid for uid, rep, kills, house in rows if rep == top_rep and rep > 0}
+        rewarded = [r for r in rows if r[1] > 0][:EVENT_REWARD_TOP]
 
         house_totals: dict[str, int] = {}
-        for uid, rep, kills, house in rows:
+        for uid, rep, kills, house in rewarded:
             if not (store and house):
                 continue
             bonus = EVENT_MVP_BONUS if uid in mvp_uids else 0
             store.record(
                 house=house, delta=rep + bonus,
                 actor_id=self.bot.user.id if self.bot.user else 0,
-                target_id=uid, reason=f"{event['name']} - final tally",
+                target_id=uid, reason=f"{event['name']} - top {EVENT_REWARD_TOP}",
             )
             house_totals[house] = house_totals.get(house, 0) + rep + bonus
 
         total_kills = sum(r[2] for r in rows)
         lines = [f"**{total_kills}** monster(s) put down by **{len(rows)}** wizard(s)."]
-        if rows:
+        if rewarded:
+            lines.append(f"Top **{len(rewarded)}** earned house points:")
             lines.append("")
-            for uid, rep, kills, house in rows[:10]:
+            for uid, rep, kills, house in rewarded:
                 crown = "👑 " if uid in mvp_uids else ""
                 bonus_note = f" (+{EVENT_MVP_BONUS} MVP bonus)" if uid in mvp_uids else ""
                 house_note = f" - House {HOUSES[house]['name']}" if house else " - no house, no points"
                 lines.append(f"{crown}<@{uid}>: **{rep}** rep, {kills} kill(s){house_note}{bonus_note}")
+        elif rows:
+            lines.append("Nobody with a house scored — no points awarded.")
         if house_totals:
             lines.append("")
             lines.append(" • ".join(
@@ -1234,7 +1240,11 @@ class Dementors(commands.Cog):
         ]
         if tally:
             lines.append("")
-            lines += [f"<@{uid}>: **{e['rep']}** rep, {e['kills']} kill(s)" for uid, e in tally[:10]]
+            lines.append(f"Leaders (top {EVENT_REWARD_TOP} will score):")
+            lines += [
+                f"<@{uid}>: **{e['rep']}** rep, {e['kills']} kill(s)"
+                for uid, e in tally[:EVENT_REWARD_TOP]
+            ]
         else:
             lines.append("Nobody's landed a hit yet.")
         embed = discord.Embed(title="⚔️ Event status", description="\n".join(lines), color=EVENT_COLOR)
