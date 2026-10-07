@@ -1810,26 +1810,42 @@ class Descent(commands.Cog):
             return
         if hp == 0 and attack == 0 and defense == 0:
             await interaction.response.send_message(
-                "Give at least one of `hp`, `attack`, or `defense` (can be negative to remove).",
+                "Give at least one of `hp`, `attack`, or `defense` "
+                "(positive adds, negative removes — or use `/staffgame descent cut`).",
                 ephemeral=True,
             )
             return
 
         rec = self.record(member.id)
         pts = rec["stat_points"]
-        pts["hp"] = max(0, pts.get("hp", 0) + hp)
-        pts["atk"] = max(0, pts.get("atk", 0) + attack)
-        pts["def"] = max(0, pts.get("def", 0) + defense)
-        # Active fight keeps old stats; drop it so the next /descend uses the boost.
+        before = {
+            "hp": int(pts.get("hp", 0) or 0),
+            "atk": int(pts.get("atk", 0) or 0),
+            "def": int(pts.get("def", 0) or 0),
+        }
+        pts["hp"] = max(0, before["hp"] + hp)
+        pts["atk"] = max(0, before["atk"] + attack)
+        pts["def"] = max(0, before["def"] + defense)
+        applied = {
+            "hp": pts["hp"] - before["hp"],
+            "atk": pts["atk"] - before["atk"],
+            "def": pts["def"] - before["def"],
+        }
+        # Active fight keeps old stats; drop it so the next /descend uses the change.
         old = self.fights.pop(member.id, None)
         if old is not None:
             old.cancel_idle()
         self.save()
 
+        def _delta(n: int) -> str:
+            return f"+{n}" if n >= 0 else str(n)
+
         p_hp, p_atk, p_def = player_stats(rec)
+        verb = "Adjusted" if any(v < 0 for v in applied.values()) else "Boosted"
         await interaction.response.send_message(
-            f"Boosted **{member.display_name}**'s Descent stats "
-            f"(+{hp} HP pts, +{attack} ATK pts, +{defense} DEF pts).\n"
+            f"{verb} **{member.display_name}**'s Descent stats "
+            f"({_delta(applied['hp'])} HP pts, {_delta(applied['atk'])} ATK pts, "
+            f"{_delta(applied['def'])} DEF pts).\n"
             f"Now: ❤️ **{p_hp}** · ⚔️ **{p_atk}** · 🛡️ **{p_def}** "
             f"(points: hp={pts['hp']}, atk={pts['atk']}, def={pts['def']}).",
             ephemeral=True,

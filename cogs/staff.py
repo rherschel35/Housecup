@@ -250,12 +250,15 @@ class Staff(commands.Cog):
             return
         await cog.descentunlock(interaction, member)
 
-    @descent.command(name="boost", description="Add Descent HP / Attack / Defense points to a player.")
+    @descent.command(
+        name="boost",
+        description="Add or remove Descent HP / Attack / Defense points (use negatives to cut).",
+    )
     @app_commands.describe(
-        member="Who to boost",
-        hp="Stat points to add to Max HP (12 HP each). Can be negative.",
-        attack="Stat points to add to Attack (2 ATK each). Can be negative.",
-        defense="Stat points to add to Defense (1 DEF each). Can be negative.",
+        member="Who to adjust",
+        hp="Stat points for Max HP (12 HP each). Negative removes.",
+        attack="Stat points for Attack (2 ATK each). Negative removes.",
+        defense="Stat points for Defense (1 DEF each). Negative removes.",
     )
     async def descent_boost(
         self,
@@ -270,6 +273,31 @@ class Staff(commands.Cog):
             await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
             return
         await cog.descentboost(interaction, member, hp, attack, defense)
+
+    @descent.command(
+        name="cut",
+        description="Remove Descent HP / Attack / Defense points from a player.",
+    )
+    @app_commands.describe(
+        member="Who to cut",
+        hp="Stat points to remove from Max HP (12 HP each)",
+        attack="Stat points to remove from Attack (2 ATK each)",
+        defense="Stat points to remove from Defense (1 DEF each)",
+    )
+    async def descent_cut(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        hp: app_commands.Range[int, 0, 10_000] = 0,
+        attack: app_commands.Range[int, 0, 10_000] = 0,
+        defense: app_commands.Range[int, 0, 10_000] = 0,
+    ):
+        cog = self._cog("Descent")
+        if not cog:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+        # Positive cut amounts → negative boost deltas.
+        await cog.descentboost(interaction, member, -int(hp), -int(attack), -int(defense))
 
     # -------------------------------------------------------------- castles
 
