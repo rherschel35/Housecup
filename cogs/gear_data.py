@@ -245,7 +245,10 @@ GEAR = {
         "desc": "A shard of The Arc Spire, still humming with storm-light. It quickens on deeper floors.",
         "earn": "descent_boss_90", "earn_text": "Defeat The Arc Spire (Descent floor 90 boss).",
         "perk": "spireheart",
-        "perk_text": "On Descent floors 45+, 20% chance after a win to gain a free HP, Attack, or Defense pick.",
+        "perk_text": (
+            "On Descent floors 45+, 20% chance after a win to gain a free HP, Attack, "
+            "or Defense pick. While worn, The Arc Spire stands behind you in `/mirror`."
+        ),
         "visual": {"chain": "silver", "pendant": "crystal", "color": "#7EC8E3", "glow": True},
     },
     # --------------------------------------------------------------- bracelets

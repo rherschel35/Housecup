@@ -27,6 +27,9 @@ from cogs import mirror_male1 as male1
 from cogs import mirror_girl_premium as girl_full
 
 FONT_DIR = Path(__file__).resolve().parent.parent / "data" / "fonts"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+MONSTER_ART = REPO_ROOT / "monster_art_assets"
+SPIRE_BACKDROP_PATH = MONSTER_ART / "Floor_90_The_Arc_Spire.png"
 ASSETS = assets_root()
 CRESTS = crests_root()
 
@@ -654,6 +657,33 @@ def _fit(d, text, name, size, weight, maxw):
     return f
 
 
+def _knockout_near_black(im: Image.Image, threshold: int = 18) -> Image.Image:
+    """Make near-black studio pixels transparent in place (returns same image)."""
+    px = im.load()
+    w, h = im.size
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if r < threshold and g < threshold and b < threshold:
+                px[x, y] = (0, 0, 0, 0)
+    return im
+
+
+def _sized_rgba(im: Image.Image, size: int, opacity: float = 1.0) -> Image.Image:
+    """Crop to content, scale so the longer side is `size` picture units, fade alpha."""
+    box = im.getbbox()
+    if box:
+        im = im.crop(box)
+    scale = size * S / max(im.size)
+    im = im.resize((max(1, round(im.width * scale)), max(1, round(im.height * scale))), Image.LANCZOS)
+    if opacity < 1.0:
+        opacity = max(0.0, min(1.0, opacity))
+        r, g, b, a = im.split()
+        a = a.point(lambda p: int(p * opacity))
+        im = Image.merge("RGBA", (r, g, b, a))
+    return im
+
+
 def load_crest(house_key: str | None, size: int, opacity: float = 1.0) -> Image.Image | None:
     """House crest PNG/JPG, black backdrop knocked out, sized to `size` px (picture units).
 
@@ -670,26 +700,21 @@ def load_crest(house_key: str | None, size: int, opacity: float = 1.0) -> Image.
         im = Image.open(path).convert("RGBA")
     except OSError:
         return None
-    # Knock out near-black studio background so the crest sits clean on the card.
-    px = im.load()
-    w, h = im.size
-    for y in range(h):
-        for x in range(w):
-            r, g, b, a = px[x, y]
-            if r < 18 and g < 18 and b < 18:
-                px[x, y] = (0, 0, 0, 0)
-    # Crop to content
-    box = im.getbbox()
-    if box:
-        im = im.crop(box)
-    scale = size * S / max(im.size)
-    im = im.resize((max(1, round(im.width * scale)), max(1, round(im.height * scale))), Image.LANCZOS)
-    if opacity < 1.0:
-        opacity = max(0.0, min(1.0, opacity))
-        r, g, b, a = im.split()
-        a = a.point(lambda p: int(p * opacity))
-        im = Image.merge("RGBA", (r, g, b, a))
-    return im
+    _knockout_near_black(im)
+    return _sized_rgba(im, size, opacity)
+
+
+def load_spire_backdrop(size: int, opacity: float = 0.55) -> Image.Image | None:
+    """Arc Spire art for Spireheart Necklace wearers — sits behind the portrait."""
+    if not SPIRE_BACKDROP_PATH.exists():
+        return None
+    try:
+        im = Image.open(SPIRE_BACKDROP_PATH).convert("RGBA")
+    except OSError:
+        return None
+    # Boss art sits on pure black; knock it out so the house wash shows through.
+    _knockout_near_black(im, threshold=22)
+    return _sized_rgba(im, size, opacity)
 
 
 def render(*, look: dict, user_id: int, name: str, title: str | None = None,
@@ -699,11 +724,13 @@ def render(*, look: dict, user_id: int, name: str, title: str | None = None,
            gear: dict | None = None, gear_icons: list | None = None,
            wand: dict | None = None, beast_emoji: str | None = None,
            stats: list | None = None, motto: str | None = None, stars: int = 1,
-           aura: bool = False, gold_trim: bool = False, wand_sparks: bool = False) -> bytes:
+           aura: bool = False, gold_trim: bool = False, wand_sparks: bool = False,
+           spire_backdrop: bool = False) -> bytes:
     """Full trading card as PNG bytes.
 
     gear_icons: optional list of {slot, emoji, name} for the side panel.
     gear: legacy on-body visuals — ignored (kept so older callers don't break).
+    spire_backdrop: Spireheart Necklace — Arc Spire faded behind the portrait.
     """
     look = clean_look(look, user_id)
     hcol = hexint(house_color) if isinstance(house_color, int) else house_color
@@ -758,15 +785,20 @@ def render(*, look: dict, user_id: int, name: str, title: str | None = None,
     ImageDraw.Draw(win_mask).rounded_rectangle(
         [wx0 * S, wy0 * S, wx1 * S, wy1 * S], radius=12 * S, fill=255)
 
-    # Large faded house crest as watermark BEHIND the character
-    bg_crest = load_crest(house_key, size=int((wy1 - wy0) * 1.45), opacity=0.14)
-    if bg_crest:
-        crest_layer = Image.new("RGBA", card.size, (0, 0, 0, 0))
-        cx = (wx0 + wx1) / 2
-        cy = (wy0 + wy1) / 2
-        paste_center(crest_layer, bg_crest, cx, cy)
-        crest_layer.putalpha(ImageChops.multiply(crest_layer.getchannel("A"), win_mask))
-        card.alpha_composite(crest_layer)
+    # Watermark BEHIND the character: Arc Spire when Spireheart is worn,
+    # otherwise the usual faded house crest.
+    cx = (wx0 + wx1) / 2
+    cy = (wy0 + wy1) / 2
+    bg_mark = None
+    if spire_backdrop:
+        bg_mark = load_spire_backdrop(size=int((wy1 - wy0) * 1.05), opacity=0.62)
+    if bg_mark is None:
+        bg_mark = load_crest(house_key, size=int((wy1 - wy0) * 1.45), opacity=0.14)
+    if bg_mark:
+        mark_layer = Image.new("RGBA", card.size, (0, 0, 0, 0))
+        paste_center(mark_layer, bg_mark, cx, cy)
+        mark_layer.putalpha(ImageChops.multiply(mark_layer.getchannel("A"), win_mask))
+        card.alpha_composite(mark_layer)
 
     # scale portrait to fit window height
     target_h = (wy1 - wy0 - 8) * S
