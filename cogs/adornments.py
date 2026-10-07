@@ -105,7 +105,8 @@ TITLE_SCORE = {
     # Marketplace (shop exclusive)
     "Accio Self-Respect (No Response)": 40,
     "The Sorting Hat Asked Me to Leave": 40,
-    "Emotionally Support Dementor": 40,
+    "Emotional Support Dementor": 40,
+    "Emotionally Support Dementor": 40,  # legacy spelling (migrated)
     # Castle titles
     "Lord of Bannerhall": 78,
     "Warden of Deadlock Keep": 76,
@@ -535,10 +536,18 @@ class Adornments(commands.Cog):
         return 0
 
     def title_of(self, member) -> Optional[str]:
+        from cogs.marketplace import TITLE_RENAMES
         avail = self.titles_available(member)
         chosen = self.peek(member.id).get("title")
         if chosen == "none":
             return None
+        if chosen in TITLE_RENAMES:
+            chosen = TITLE_RENAMES[chosen]
+            # Persist the corrected spelling if they had the old one equipped.
+            r = self.rec(member.id)
+            if r.get("title") in TITLE_RENAMES:
+                r["title"] = chosen
+                self.save()
         if chosen and chosen in avail:
             return chosen
         return avail[0] if avail else None
