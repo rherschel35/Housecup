@@ -587,6 +587,7 @@ class Adornments(commands.Cog):
             aura=self.has_perk(uid, "legend_aura"),
             gold_trim=self.has_perk(uid, "cheer"),
             wand_sparks=any(k == "duelists_signet" for k in worn.values()),
+            spire_backdrop=self.has_perk(uid, "spireheart"),
         )
 
     async def render_for(self, member, look_override: Optional[dict] = None) -> bytes:
