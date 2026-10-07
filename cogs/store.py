@@ -204,6 +204,17 @@ class Store(commands.Cog):
             return False
         return any(r.id == role_id for r in getattr(member, "roles", []))
 
+    def is_president(self, member) -> bool:
+        """House Presidents role — not full staff; used for a few drills only."""
+        return any(
+            (r.name or "").lower() == "presidents"
+            for r in getattr(member, "roles", [])
+        )
+
+    def can_run_house_practice(self, member) -> bool:
+        """Staff, or Presidents (practice swarm only — no other staff tools)."""
+        return self.is_staff(member) or self.is_president(member)
+
     # -------------------------------------------------------------- houses
 
     def member_house(self, member) -> str | None:

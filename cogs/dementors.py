@@ -31,7 +31,7 @@ Scheduled sightings and staff summons stay open to everyone from the start.
 
     /staff dementor eventstart [minutes] [name]  - start "Attack on Velmora"
     /staff dementor practice [channel] [minutes] - house practice swarm
-        (one channel only; no house points or rewards)
+        (one channel only; no house points or rewards; staff or Presidents)
     /staff dementor eventend                     - end it early
     /staff dementor eventstatus                  - how it's going
 
@@ -1487,7 +1487,7 @@ class Dementors(commands.Cog):
 
     @group.command(
         name="practice",
-        description="(staff) House practice swarm in one channel — no points or rewards.",
+        description="(staff / Presidents) House practice swarm — no points or rewards.",
     )
     @app_commands.describe(
         channel="House channel to flood (default: this channel)",
@@ -1508,8 +1508,10 @@ class Dementors(commands.Cog):
 
         try:
             store = self.bot.get_cog("Store")
-            if not (store and store.is_staff(interaction.user)):
-                await interaction.followup.send("That's for staff.", ephemeral=True)
+            if not (store and store.can_run_house_practice(interaction.user)):
+                await interaction.followup.send(
+                    "That's for staff or Presidents.", ephemeral=True,
+                )
                 return
 
             target = channel or interaction.channel
