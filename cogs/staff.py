@@ -271,6 +271,20 @@ class Staff(commands.Cog):
             return
         await cog.descentboost(interaction, member, hp, attack, defense)
 
+    @descent.command(
+        name="backfill",
+        description="Add missing army + boss trophies from cleared depth (never replaces army).",
+    )
+    @app_commands.describe(
+        member="Who to backfill (pre-tracking Descent progress → army/bosses)",
+    )
+    async def descent_backfill(self, interaction: discord.Interaction, member: discord.Member):
+        cog = self._cog("Descent")
+        if not cog:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+        await cog.descentbackfill(interaction, member)
+
     # -------------------------------------------------------------- castles
 
     @castles.command(
