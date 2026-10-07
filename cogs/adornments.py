@@ -15,10 +15,10 @@ Adornments: design your wizard, collect gear, and see it all in the Mirror.
     /nightwatch on|off         - (Nightwatch Pendant) night-beast heads-up on or off
     /staff adornadmin give|take|channel|status
 
-40 pieces over four slots (necklace, bracelet, ring, talisman). 26 are
-crafted from satchel materials; 14 are earned automatically from
-achievements and announced. Perks only come on earned pieces, only work
-while worn, and never touch duels or house points. `/crafts` lists both.
+Gear over four slots (necklace, bracelet, ring, talisman): craft from
+satchel materials, or earn from achievements (announced). Perks only come
+on earned pieces, only work while worn, and never touch duels or house
+points. `/crafts` lists both.
 """
 
 from __future__ import annotations
@@ -277,7 +277,7 @@ class Adornments(commands.Cog):
 
     def _cogs(self):
         g = self.bot.get_cog
-        return g("Beasts"), g("Familiars"), g("Duels"), g("World"), g("Store")
+        return g("Beasts"), g("Familiars"), g("Duels"), g("World"), g("Store"), g("Descent")
 
     @staticmethod
     def findable_secrets(world, place: str, house: Optional[str]) -> set[str]:
@@ -320,7 +320,7 @@ class Adornments(commands.Cog):
 
     def earned_now(self, user_id: int, member=None) -> set[str]:
         """Every earned piece this person qualifies for right now."""
-        beasts, fams, duels, world_cog, store = self._cogs()
+        beasts, fams, duels, world_cog, store, descent = self._cogs()
         got = set()
         if beasts:
             col = set(beasts.collection(user_id))
@@ -365,6 +365,13 @@ class Adornments(commands.Cog):
                 if need and need <= found:
                     got.add("place_secrets")
                     break
+        if descent:
+            prec = descent.state.get("players", {}).get(str(user_id)) or {}
+            if 90 in (prec.get("bosses_bound") or []):
+                got.add("descent_boss_90")
+            elif int(prec.get("highest_cleared") or 0) >= 90:
+                # Back-compat if a clear predated bosses_bound tracking.
+                got.add("descent_boss_90")
         return {k for k in earned() if GEAR[k]["earn"] in got}
 
     def _member(self, user_id: int):
@@ -419,7 +426,7 @@ class Adornments(commands.Cog):
         return new
 
     def _candidate_ids(self) -> set[int]:
-        beasts, fams, duels, world_cog, store = self._cogs()
+        beasts, fams, duels, world_cog, store, descent = self._cogs()
         ids = set()
         if beasts:
             ids |= {int(u) for u in beasts.state.get("collections", {})}
@@ -436,6 +443,8 @@ class Adornments(commands.Cog):
             for record in store.state.get("archive", []):
                 ids |= {int(u) for u in record.get("winning_members", {}) if str(u).isdigit()}
                 ids |= {int(c["id"]) for c in record.get("champions", [])}
+        if descent:
+            ids |= {int(u) for u in descent.state.get("players", {}) if str(u).isdigit()}
         return ids
 
     async def sweep(self, announce: bool = True) -> int:
@@ -468,7 +477,7 @@ class Adornments(commands.Cog):
 
     def titles_available(self, member) -> list[str]:
         uid = member.id
-        beasts, fams, duels, world_cog, store = self._cogs()
+        beasts, fams, duels, world_cog, store, _descent = self._cogs()
         out = []
         if duels:
             from cogs.duels import rank_for as duel_rank
