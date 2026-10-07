@@ -18,10 +18,18 @@ import chess
 from PIL import Image, ImageDraw, ImageFont
 
 SQ = 96
-# Wide margin so outer a–h / 1–8 labels stay large when Discord shrinks the PNG.
-MARGIN = 140
+# Discord mobile shrinks the whole PNG to ~380px wide. Glyph height is ~0.75×
+# font size, so we can go to ~124 before stacked ranks overlap. Put spare
+# pixels into the left/bottom strips only (no empty top/right).
+MARGIN_LEFT = 130
+MARGIN_RIGHT = 16
+MARGIN_TOP = 16
+MARGIN_BOTTOM = 130
+MARGIN = MARGIN_LEFT  # back-compat alias
 BOARD_PX = SQ * 8
-IMG_SIZE = BOARD_PX + MARGIN * 2
+IMG_W = BOARD_PX + MARGIN_LEFT + MARGIN_RIGHT
+IMG_H = BOARD_PX + MARGIN_TOP + MARGIN_BOTTOM
+IMG_SIZE = max(IMG_W, IMG_H)  # legacy name; render uses IMG_W / IMG_H
 
 LIGHT = (240, 217, 181)
 DARK = (181, 136, 99)
@@ -66,8 +74,9 @@ def _load_font(paths: list[Path], size: int) -> ImageFont.FreeTypeFont | ImageFo
     return ImageFont.load_default()
 
 
-_LABEL_FONT = _load_font(_LABEL_CANDIDATES, 112)
-_SQUARE_COORD_FONT = _load_font(_LABEL_CANDIDATES, 64)
+# ~0.75× size ≈ glyph height; 124 stays under one square so ranks don't overlap.
+_LABEL_FONT = _load_font(_LABEL_CANDIDATES, 124)
+_SQUARE_COORD_FONT = _load_font(_LABEL_CANDIDATES, 52)
 
 
 def piece_glyph(piece: chess.Piece) -> str:
@@ -104,7 +113,7 @@ def _sq_xy(square: int, flip: bool) -> tuple[int, int]:
         rank = 7 - rank
     # rank 7 at top when not flipped (white at bottom)
     col, row = file, 7 - rank
-    return MARGIN + col * SQ, MARGIN + row * SQ
+    return MARGIN_LEFT + col * SQ, MARGIN_TOP + row * SQ
 
 
 def _poly(cx: int, cy: int, scale: float, points: list[tuple[float, float]]) -> list[tuple[int, int]]:
@@ -210,7 +219,7 @@ def render_board(
     flip=True puts Black's side at the bottom (use when Black is to move).
     """
     dest_set = set(destinations or ())
-    img = Image.new("RGB", (IMG_SIZE, IMG_SIZE), (48, 42, 36))
+    img = Image.new("RGB", (IMG_W, IMG_H), (48, 42, 36))
     draw = ImageDraw.Draw(img, "RGBA")
 
     files = "abcdefgh"
@@ -233,21 +242,23 @@ def render_board(
             row = rank if flip else 7 - rank
             ink = COORD_ON_LIGHT if (file + rank) % 2 == 0 else COORD_ON_DARK
             if col == 0:
-                draw.text((x + 6, y + 4), ranks[rank], font=_SQUARE_COORD_FONT, fill=ink, anchor="lt")
+                draw.text((x + 5, y + 3), ranks[rank], font=_SQUARE_COORD_FONT, fill=ink,
+                          anchor="lt", stroke_width=1, stroke_fill=ink)
             if row == 7:
-                draw.text((x + SQ - 6, y + SQ - 4), files[file], font=_SQUARE_COORD_FONT,
-                          fill=ink, anchor="rb")
+                draw.text((x + SQ - 5, y + SQ - 3), files[file], font=_SQUARE_COORD_FONT,
+                          fill=ink, anchor="rb", stroke_width=1, stroke_fill=ink)
 
-    # Outer file/rank strip (extra large for desktop / zoomed views)
+    # Outer file/rank strip — size capped ≈ SQ so labels don't overlap.
     for i in range(8):
         file_idx = 7 - i if flip else i
         rank_idx = i if flip else 7 - i
-        fx = MARGIN + i * SQ + SQ // 2
-        fy = MARGIN + i * SQ + SQ // 2
-        draw.text((fx, IMG_SIZE - MARGIN // 2), files[file_idx], font=_LABEL_FONT,
-                  fill=COORD, anchor="mm")
-        draw.text((MARGIN // 2, fy), ranks[rank_idx], font=_LABEL_FONT,
-                  fill=COORD, anchor="mm")
+        fx = MARGIN_LEFT + i * SQ + SQ // 2
+        fy = MARGIN_TOP + i * SQ + SQ // 2
+        # Stroke keeps glyphs crisp after Discord recompresses / downscales.
+        draw.text((fx, IMG_H - MARGIN_BOTTOM // 2), files[file_idx], font=_LABEL_FONT,
+                  fill=COORD, anchor="mm", stroke_width=5, stroke_fill=(20, 16, 12))
+        draw.text((MARGIN_LEFT // 2, fy), ranks[rank_idx], font=_LABEL_FONT,
+                  fill=COORD, anchor="mm", stroke_width=5, stroke_fill=(20, 16, 12))
 
     # destination markers under pieces
     for square in dest_set:
