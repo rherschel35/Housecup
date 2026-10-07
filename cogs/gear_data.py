@@ -1,6 +1,6 @@
 """
-The 40 pieces of gear. 26 are crafted from satchel materials (/craft);
-14 are earned, never crafted, and are handed out automatically when
+The 41 pieces of gear. 26 are crafted from satchel materials (/craft);
+15 are earned, never crafted, and are handed out automatically when
 someone reaches the achievement. Only earned pieces carry a perk, and no
 perk touches duels or house points.
 
@@ -239,6 +239,14 @@ GEAR = {
         "earn": "all_nibblers", "earn_text": "Befriend all five Nifflers.",
         "perk": "double_find", "perk_text": "Sometimes you find two of something instead of one.",
         "visual": {"chain": "gold", "pendant": "eye", "color": "#3FA0E0"},
+    },
+    "spireheart_necklace": {
+        "name": "Spireheart Necklace", "slot": "necklace", "rarity": "legendary",
+        "desc": "A shard of The Arc Spire, still humming with storm-light. It quickens on deeper floors.",
+        "earn": "descent_boss_90", "earn_text": "Defeat The Arc Spire (Descent floor 90 boss).",
+        "perk": "spireheart",
+        "perk_text": "On Descent floors 45+, 20% chance after a win to gain a free HP, Attack, or Defense pick.",
+        "visual": {"chain": "silver", "pendant": "crystal", "color": "#7EC8E3", "glow": True},
     },
     # --------------------------------------------------------------- bracelets
     "house_cup_bracelet": {

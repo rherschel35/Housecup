@@ -280,6 +280,11 @@ BOSS_ITEM = "descent_sigil"
 MONSTER_DROP_CHANCE = 0.40   # any regular win
 FLOOR_CLEAR_GUARANTEED = 3   # material given on a full floor clear
 
+# Spireheart Necklace (floor-90 boss earn): free Descent stat picks while worn.
+SPIREHEART_PERK = "spireheart"
+SPIREHEART_STAT_FLOOR = 45
+SPIREHEART_STAT_CHANCE = 0.20
+
 # Practice clear: chance of a free stat pick scales with how far the
 # practiced floor sits behind your current Descent floor.
 PRACTICE_STATUP_CLOSE = 0.20   # distance ≤ 5
@@ -1399,6 +1404,21 @@ class Descent(commands.Cog):
             world_cog.save()
         return f"{item.get('emoji', '')} **{item['name']}**".strip()
 
+    def try_spireheart_statup(self, member: discord.Member, rec: dict, floor: int) -> str | None:
+        """Worn Spireheart Necklace: 20% free Descent stat pick on floors 45+."""
+        if floor < SPIREHEART_STAT_FLOOR:
+            return None
+        adorn = self.bot.get_cog("Adornments")
+        if not adorn or not adorn.has_perk(member.id, SPIREHEART_PERK):
+            return None
+        if random.random() >= SPIREHEART_STAT_CHANCE:
+            return None
+        rec["pending_statup"] = pending_statup_picks(rec) + 1
+        return (
+            "📿 **Spireheart Necklace** flares — you've earned a free "
+            "HP / Attack / Defense pick!"
+        )
+
     async def _on_win(
         self,
         interaction: discord.Interaction,
@@ -1452,6 +1472,7 @@ class Descent(commands.Cog):
             # Fury bosses (60/70/80/90/100) bank three free picks; everything else one.
             clear_picks = 3 if fight.is_boss and floor in FURY_BOSS_FLOORS else 1
             rec["pending_statup"] = clear_picks
+            spire_line = self.try_spireheart_statup(member, rec, floor)
             self.save()
 
             potions = self.bot.get_cog("Potions")
@@ -1482,6 +1503,18 @@ class Descent(commands.Cog):
                     self.save()
                 desc += (f"\n🐲 **{fight.name}** now answers to you. See it with `/bestiary`, "
                         f"call it with `/summon`.")
+                if floor == 90:
+                    adorn = self.bot.get_cog("Adornments")
+                    if adorn:
+                        try:
+                            awarded = await adorn.check_member(member)
+                            if "spireheart_necklace" in awarded:
+                                desc += (
+                                    "\n📿 You claimed the **Spireheart Necklace** — wear it for "
+                                    "a 20% free stat pick on floors 45+."
+                                )
+                        except Exception:
+                            log.exception("Spireheart award failed for %s", member.id)
             if floor >= MAX_FLOOR:
                 desc += "\n\n👑 **The Descent is complete.** There is nothing further down."
                 self.stop_auto(member.id)
@@ -1490,6 +1523,8 @@ class Descent(commands.Cog):
                          f"— pick where each one goes.")
             else:
                 desc += "\n\nYou've earned a stat point for clearing the floor - pick where it goes."
+            if spire_line:
+                desc += f"\n{spire_line}"
             if self.is_auto(member.id) and floor < MAX_FLOOR:
                 desc += "\n⚡ Auto paused for your stat pick — next monster follows when you're done."
             embed = discord.Embed(title=f"{fight.emoji} Victory!", description=desc, color=0x2ECC71)
@@ -1497,20 +1532,26 @@ class Descent(commands.Cog):
             return
 
         rec["monster_index"] = cleared_index + 1
+        mid_stat = False
+        if cleared_index == STATUP_AT_MONSTER:
+            rec["pending_statup"] = pending_statup_picks(rec) + 1
+            mid_stat = True
+        spire_line = self.try_spireheart_statup(member, rec, fight.floor)
         self.save()
 
         desc = f"**{fight.name}** falls. On to monster {rec['monster_index']}/{MONSTERS_PER_FLOOR}."
         if drop_text:
             desc += f"\n📦 It dropped {drop_text}."
+        if mid_stat:
+            desc += "\n\nYou've earned a stat point - pick where it goes."
+        if spire_line:
+            desc += f"\n{spire_line}"
         embed = discord.Embed(
             title=f"{fight.emoji} Victory!",
             description=desc,
             color=0x2ECC71,
         )
-        if cleared_index == STATUP_AT_MONSTER:
-            rec["pending_statup"] = 1
-            self.save()
-            embed.description += "\n\nYou've earned a stat point - pick where it goes."
+        if pending_statup_picks(rec) > 0:
             if self.is_auto(member.id):
                 embed.description += "\n⚡ Auto paused for your stat pick — next monster follows when you're done."
             await self._publish_board(interaction, fight, embed, StatUpView(self))
@@ -1545,6 +1586,11 @@ class Descent(commands.Cog):
             desc += "\n\nThis grind sharpened you - pick a stat to raise."
         else:
             desc += f"\n\nNo free stat this time ({pct}% chance on this floor)."
+
+        spire_line = self.try_spireheart_statup(member, rec, fight.floor)
+        if spire_line:
+            desc += f"\n{spire_line}"
+            pending = pending_statup_picks(rec)
 
         self.save()
         embed = discord.Embed(title=f"{fight.emoji} Practice victory!", description=desc, color=0x2ECC71)
