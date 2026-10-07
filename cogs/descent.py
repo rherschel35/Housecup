@@ -8,6 +8,8 @@ The Descent - a 100-floor solo dungeon crawl.
                            idle fights also auto-forfeit after 3 minutes
     /descentstatus        - your floor, stats, AP, and lockout status
     /staff descent unlock - clear the 3-loss lockout without wiping progress
+    /staffgame descent backfill - add missing army + bosses from cleared depth
+      (additive — never replaces an existing army)
 
 Ten zones of ten floors each, one primary element per zone plus a second
 element mixed in (about 30% of non-boss monsters), so a floor is never a
@@ -453,6 +455,80 @@ def army_floor_counts(army: list) -> dict[int, int]:
         fl = int(unit.get("floor") or 0)
         counts[fl] = counts.get(fl, 0) + 1
     return counts
+
+
+def cleared_depth(rec: dict) -> int:
+    """Best known cleared floor: highest_cleared, else one below current floor."""
+    highest = int(rec.get("highest_cleared") or 0)
+    floor_now = int(rec.get("floor") or 1)
+    return max(highest, max(0, floor_now - 1))
+
+
+def append_army_unit(
+    rec: dict,
+    *,
+    name: str,
+    emoji: str,
+    element: str,
+    kind: str,
+    floor: int,
+    is_boss: bool,
+    m_hp: int,
+    m_atk: int,
+    m_def: int,
+    backfill: bool = False,
+) -> dict:
+    """Append one army unit. Never clears existing troops."""
+    rec.setdefault("army", [])
+    seq = int(rec.get("army_seq", 0) or 0) + 1
+    rec["army_seq"] = seq
+    unit = {
+        "id": seq,
+        "name": name,
+        "emoji": emoji,
+        "element": element,
+        "kind": kind,
+        "floor": int(floor),
+        "boss": bool(is_boss),
+        "practice": False,
+        "hp": int(m_hp),
+        "atk": int(m_atk),
+        "def": int(m_def),
+        "at": int(time.time()),
+    }
+    if backfill:
+        unit["backfill"] = True
+    rec["army"].append(unit)
+    return unit
+
+
+def progress_backfill_plan(rec: dict) -> dict:
+    """Compute additive boss + army credit from cleared depth (does not mutate).
+
+    For each floor 1..depth, tops army count up to MONSTERS_PER_FLOOR (one
+    clear's worth). Existing units are kept — only the deficit is filled.
+    Boss trophies: every 10th floor ≤ depth missing from bosses_bound.
+    """
+    depth = min(MAX_FLOOR, cleared_depth(rec))
+    army = list(rec.get("army") or [])
+    counts = army_floor_counts(army)
+    bound = {int(f) for f in (rec.get("bosses_bound") or [])}
+
+    bosses_to_add = [fl for fl in range(10, depth + 1, 10) if fl not in bound]
+    floors_needed: dict[int, int] = {}
+    for fl in range(1, depth + 1):
+        have = counts.get(fl, 0)
+        need = max(0, MONSTERS_PER_FLOOR - have)
+        if need:
+            floors_needed[fl] = need
+    return {
+        "depth": depth,
+        "bosses_to_add": bosses_to_add,
+        "floors_needed": floors_needed,
+        "units_to_add": sum(floors_needed.values()),
+        "army_before": len(army),
+        "bosses_before": len(bound),
+    }
 
 
 def bar(current: int, maximum: int, width: int = 12) -> str:
@@ -2023,6 +2099,106 @@ class Descent(commands.Cog):
             f"(+{hp} HP pts, +{attack} ATK pts, +{defense} DEF pts).\n"
             f"Now: ❤️ **{p_hp}** · ⚔️ **{p_atk}** · 🛡️ **{p_def}** "
             f"(points: hp={pts['hp']}, atk={pts['atk']}, def={pts['def']}).",
+            ephemeral=True,
+        )
+
+    def apply_progress_backfill(self, user_id: int) -> dict:
+        """Add missing boss trophies + one-clear army credit. Never wipes army."""
+        rec = self.record(user_id)
+        plan = progress_backfill_plan(rec)
+        depth = plan["depth"]
+        if depth < 1:
+            return {**plan, "bosses_added": 0, "units_added": 0, "army_after": plan["army_before"]}
+
+        bosses_added = 0
+        bound = rec.setdefault("bosses_bound", [])
+        for fl in plan["bosses_to_add"]:
+            if fl not in bound:
+                bound.append(fl)
+                bosses_added += 1
+
+        units_added = 0
+        counts = army_floor_counts(rec.get("army") or [])
+        for fl, need in plan["floors_needed"].items():
+            have = counts.get(fl, 0)
+            for i in range(need):
+                monster_index = have + i + 1
+                name, emoji, element, kind, _weak, is_boss, m_hp, m_atk, m_def = (
+                    self._make_monster(fl, monster_index)
+                )
+                append_army_unit(
+                    rec,
+                    name=name,
+                    emoji=emoji,
+                    element=element,
+                    kind=kind,
+                    floor=fl,
+                    is_boss=is_boss,
+                    m_hp=m_hp,
+                    m_atk=m_atk,
+                    m_def=m_def,
+                    backfill=True,
+                )
+                units_added += 1
+            counts[fl] = have + need
+
+        # Keep highest_cleared at least as deep as the backfill credit.
+        rec["highest_cleared"] = max(int(rec.get("highest_cleared") or 0), depth)
+        self.save()
+        return {
+            **plan,
+            "bosses_added": bosses_added,
+            "units_added": units_added,
+            "army_after": len(rec.get("army") or []),
+            "bosses_after": len(rec.get("bosses_bound") or []),
+        }
+
+    async def descentbackfill(self, interaction: discord.Interaction, member: discord.Member):
+        """Staff: add pre-tracking army/boss credit from cleared depth (additive)."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        rec = self.record(member.id)
+        plan = progress_backfill_plan(rec)
+        if plan["depth"] < 1:
+            await interaction.followup.send(
+                f"**{member.display_name}** has no cleared Descent depth to backfill "
+                f"(highest cleared / floor progress is empty).",
+                ephemeral=True,
+            )
+            return
+
+        result = self.apply_progress_backfill(member.id)
+
+        # Spireheart etc. if boss 90 was just granted.
+        adorn_note = ""
+        adorn = self.bot.get_cog("Adornments")
+        if adorn and result.get("bosses_added"):
+            try:
+                awarded = await adorn.check_member(member)
+                if awarded:
+                    from cogs.gear_data import GEAR
+                    names = ", ".join(
+                        f"**{GEAR[k]['name']}**" for k in awarded if k in GEAR
+                    )
+                    if names:
+                        adorn_note = f"\n🎁 Gear check: {names}"
+            except Exception:
+                log.exception("Adornments check after Descent backfill failed for %s", member.id)
+
+        await interaction.followup.send(
+            f"📜 Backfilled **{member.display_name}** from cleared depth "
+            f"**{result['depth']}** — **added** to their army (nothing removed).\n"
+            f"• Boss trophies added: **{result['bosses_added']}** "
+            f"(now {result['bosses_after']})\n"
+            f"• Army units added: **{result['units_added']}** "
+            f"(was {result['army_before']} → now {result['army_after']})\n"
+            f"Each cleared floor is topped up to **{MONSTERS_PER_FLOOR}** binds "
+            f"(one clear's worth); floors already at that count were left alone."
+            f"{adorn_note}",
             ephemeral=True,
         )
 

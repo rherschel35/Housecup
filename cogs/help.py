@@ -248,6 +248,7 @@ HELP = {
             ("staffgame descent boost", "Add Descent HP / Attack / Defense points to a player."),
             ("staffgame descent unlock", "Clear the 3-loss Descent lockout without wiping progress."),
             ("staffgame descent reset", "Wipe someone's Descent progress back to floor 1."),
+            ("staffgame descent backfill", "Add missing army + boss trophies from cleared depth (keeps existing army)."),
             ("staffgame castles unlock", "Clear all castle lock timers and allow sieges any day."),
             ("staffgame castles schedule", "Restore normal Wed/Sat siege days after a staff unlock."),
             ("staffgame castles pvplive", "Turn 200/day army binds on (season live) or off (pre-season uncapped)."),
