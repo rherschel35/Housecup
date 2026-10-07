@@ -23,6 +23,9 @@ order:
       When the lockout clears you restart that floor at monster #1.
     - Every 10th floor (10, 20, ... 100) ends in a boss: tougher, weak to
       two elements instead of one, and worth a floor-clear bonus.
+    - Floors 90–100: every monster strike is a Fury (6 hits; floor-100 boss
+      is 10), every foe has 8k+ HP (Vault Eternal is 20k), and each fight
+      starts as a Shadow Remnant until you attack and peel the veil.
 
 Combat runs on an AP (action point) economy, not just "pick a spell every
 round": you start each fight with your current max AP (and full HP),
@@ -77,6 +80,8 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "descent_state.json"
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "monster_art_assets"
+WILD_THREAT_ASSETS = Path(__file__).resolve().parent.parent / "wild_threat_art_assets"
+SHADOW_IMAGE = "Shadow_Wolf.png"
 
 # The Descent only runs in these channels - keeps the fight embeds and
 # spam out of every other channel in the server. Study hall included for
@@ -285,12 +290,22 @@ FURY_START_FLOOR = 51          # regular monsters: alternating Fury from here
 FURY_REGULAR_HITS = (2, 4)     # inclusive randint range for regular Fury
 FURY_BOSS_HITS = (3, 6)        # inclusive randint range for Fury-boss swings
 
+# Floors 90–100: shadow-veiled monsters, every swing is a full Fury.
+ENDGAME_FLOOR_START = 90
+ENDGAME_MIN_HP = 8001
+ENDGAME_F100_BOSS_HP = 20000
+ENDGAME_FURY_HITS = 6
+ENDGAME_F100_BOSS_FURY = 10
+SHADOW_NAME = "Shadow Remnant"
+SHADOW_EMOJI = "🌑"
+
 # ----------------------------------------------------------- difficulty
 #
 # Floors 1–50 use doubled growth vs the original curve. Floors 51–100 keep
 # that same linear formula evaluated at the floor, then apply a late-game
 # ramp so depth feels punishing without a hard wall. Boss multipliers are
-# applied after the curve (unchanged).
+# applied after the curve (unchanged). Floors 90–100 then enforce a hard
+# HP floor (and the floor-100 boss is pinned to 20k).
 
 def monster_stats(floor: int, is_boss: bool) -> tuple[int, int, int]:
     # Doubled growth baseline (floors 1–50, and the pre-ramp term for 51+)
@@ -306,7 +321,13 @@ def monster_stats(floor: int, is_boss: bool) -> tuple[int, int, int]:
         hp *= 2.0
         atk *= 1.3
         df *= 1.2
-    return round(hp), round(atk), round(df)
+    hp, atk, df = round(hp), round(atk), round(df)
+    if floor >= ENDGAME_FLOOR_START:
+        if is_boss and floor == 100:
+            hp = ENDGAME_F100_BOSS_HP
+        else:
+            hp = max(ENDGAME_MIN_HP, hp)
+    return hp, atk, df
 
 
 BASE_HP, BASE_ATK, BASE_DEF = 55, 8, 3
@@ -380,8 +401,8 @@ def recruit_from_fight(rec: dict, fight: "Fight") -> dict:
     rec["army_seq"] = seq
     unit = {
         "id": seq,
-        "name": fight.name,
-        "emoji": fight.emoji,
+        "name": getattr(fight, "true_name", None) or fight.name,
+        "emoji": getattr(fight, "true_emoji", None) or fight.emoji,
         "element": fight.element,
         "kind": fight.kind,
         "floor": fight.floor,
@@ -461,10 +482,17 @@ def pending_statup_picks(rec: dict) -> int:
 
 def fury_hit_count(fight: "Fight") -> int:
     """How many separate hit rolls the monster makes this counterattack.
-    Floors 1–50: always a single hit. Regular monsters on 51+: alternate
+
+    Floors 90–100: every swing is a full Fury (6 hits; floor-100 boss = 10).
+    Floors 1–50: always a single hit. Regular monsters on 51–89: alternate
     Fury (2–4) and single, starting with Fury on the first swing. Fury
-    bosses (60/70/80/90/100): every swing is Fury (3–6). Earlier bosses
-    are unchanged (single hits)."""
+    bosses (60/70/80): every swing is Fury (3–6). Earlier bosses
+    are unchanged (single hits).
+    """
+    if fight.floor >= ENDGAME_FLOOR_START:
+        if fight.is_boss and fight.floor == 100:
+            return ENDGAME_F100_BOSS_FURY
+        return ENDGAME_FURY_HITS
     if fight.is_boss and fight.floor in FURY_BOSS_FLOORS:
         return random.randint(*FURY_BOSS_HITS)
     if not fight.is_boss and fight.floor >= FURY_START_FLOOR:
@@ -489,8 +517,17 @@ class Fight:
         self.floor = floor
         self.monster_index = monster_index
         self.is_boss = is_boss
-        self.name = name
-        self.emoji = emoji
+        # Endgame (90–100): shown as a shadow until the player attacks.
+        self.true_name = name
+        self.true_emoji = emoji
+        self.shadowed = floor >= ENDGAME_FLOOR_START
+        self.revealed = not self.shadowed
+        if self.shadowed:
+            self.name = SHADOW_NAME
+            self.emoji = SHADOW_EMOJI
+        else:
+            self.name = name
+            self.emoji = emoji
         self.element = element
         self.kind = kind
         self.weak = weak
@@ -520,6 +557,15 @@ class Fight:
         self.auto = False  # chain into the next monster after a win
         self._idle_task: Optional[asyncio.Task] = None
         self._idle_gen = 0
+
+    def reveal_identity(self) -> str | None:
+        """Peel the shadow veil after the first attack. Returns a log line or None."""
+        if not self.shadowed or self.revealed:
+            return None
+        self.revealed = True
+        self.name = self.true_name
+        self.emoji = self.true_emoji
+        return f"🌑 The shadow peels back — it's **{self.true_name}**!"
 
     def cancel_idle(self) -> None:
         self._idle_gen += 1
@@ -937,7 +983,12 @@ class Descent(commands.Cog):
         return name, emoji, element, kind, weak, is_boss, m_hp, m_atk, m_def
 
     async def _monster_file(self, fight: "Fight") -> discord.File:
-        filename = BOSS_IMAGE[fight.floor] if fight.is_boss else MONSTER_IMAGE[fight.name]
+        # Endgame veiled fights use a generic shadow portrait until the player attacks.
+        if getattr(fight, "shadowed", False) and not getattr(fight, "revealed", True):
+            path = WILD_THREAT_ASSETS / SHADOW_IMAGE
+            return discord.File(path, filename="monster.png")
+        name_key = getattr(fight, "true_name", None) or fight.name
+        filename = BOSS_IMAGE[fight.floor] if fight.is_boss else MONSTER_IMAGE[name_key]
         path = ASSETS_DIR / filename
         return discord.File(path, filename="monster.png")
 
@@ -1185,9 +1236,15 @@ class Descent(commands.Cog):
             dmg_dealt = mitigate(fight.p_atk, mult, fight.m_def)
             lines.append(f"{ELEMENT_EMOJI[element]} You cast **{SPELL_NAME[element]}** for **{dmg_dealt}**"
                         + (f" ({note})" if note else "") + f" (-{CAST_AP_COST} AP)")
+            reveal = fight.reveal_identity()
+            if reveal:
+                lines.append(reveal)
         elif action == "strike":
             dmg_dealt = mitigate(fight.p_atk, STRIKE_MULT, fight.m_def)
             lines.append(f"🗡️ You strike for **{dmg_dealt}** (no AP used)")
+            reveal = fight.reveal_identity()
+            if reveal:
+                lines.append(reveal)
         elif action == "heal":
             if fight.ap < HEAL_AP_COST:
                 await interaction.followup.send("Not enough AP to heal.", ephemeral=True)
@@ -1220,6 +1277,7 @@ class Descent(commands.Cog):
                 )
                 return
             dmg_dealt = max(fight.m_hp, 1)
+            fight.reveal_identity()
             lines.append(
                 f"⚡ You end it in one motion — **{fight.name}** never gets a turn."
             )
@@ -1231,6 +1289,7 @@ class Descent(commands.Cog):
         fight.log.extend(lines)
 
         if fight.m_hp <= 0:
+            fight.reveal_identity()  # army / win text always use the true identity
             await self._on_win(interaction, fight, from_oneshot=(action == "oneshot"))
             return
 
