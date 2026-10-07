@@ -31,7 +31,8 @@ Scheduled sightings and staff summons stay open to everyone from the start.
 
     /staff dementor eventstart [minutes] [name]  - start "Attack on Velmora"
     /staff dementor practice [channel] [minutes] - house practice swarm
-        (one channel only; no house points or rewards; staff or Presidents)
+        (one channel only — house rooms or study hall; no points/rewards;
+         staff or Presidents)
     /staff dementor eventend                     - end it early
     /staff dementor eventstatus                  - how it's going
 
