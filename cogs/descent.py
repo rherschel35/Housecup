@@ -24,8 +24,10 @@ order:
     - Every 10th floor (10, 20, ... 100) ends in a boss: tougher, weak to
       two elements instead of one, and worth a floor-clear bonus.
     - Floors 90–100: every monster strike is a Fury (6 hits; floor-100 boss
-      is 10), every foe has 8k+ HP (Vault Eternal is 20k), and each fight
-      starts as a Shadow Remnant until you attack and peel the veil.
+      is 10), every foe has 8k+ HP (95–100 pin to 13k; Vault Eternal is 20k),
+      and each fight starts as a Shadow Remnant until you attack and peel
+      the veil. Floors 95+: monsters deal 3× damage (Vault Eternal 5×) and
+      fully heal once at ≤20% HP (Vault Eternal twice).
 
 Combat runs on an AP (action point) economy, not just "pick a spell every
 round": you start each fight with your current max AP (and full HP),
@@ -299,13 +301,22 @@ ENDGAME_F100_BOSS_FURY = 10
 SHADOW_NAME = "Shadow Remnant"
 SHADOW_EMOJI = "🌑"
 
+# Floors 95–100: hard HP pin, outgoing damage spike, and second-wind heals.
+RAGE_FLOOR_START = 95
+RAGE_PIN_HP = 13000
+RAGE_DMG_MULT = 3.0
+VAULT_ETERNAL_DMG_MULT = 5.0
+SECOND_WIND_PCT = 0.20
+RAGE_SECOND_WIND_HEALS = 1
+VAULT_ETERNAL_SECOND_WIND_HEALS = 2
+
 # ----------------------------------------------------------- difficulty
 #
 # Floors 1–50 use doubled growth vs the original curve. Floors 51–100 keep
 # that same linear formula evaluated at the floor, then apply a late-game
 # ramp so depth feels punishing without a hard wall. Boss multipliers are
 # applied after the curve (unchanged). Floors 90–100 then enforce a hard
-# HP floor (and the floor-100 boss is pinned to 20k).
+# HP floor (95–100 pin to 13k; the floor-100 boss stays at 20k).
 
 def monster_stats(floor: int, is_boss: bool) -> tuple[int, int, int]:
     # Doubled growth baseline (floors 1–50, and the pre-ramp term for 51+)
@@ -322,11 +333,12 @@ def monster_stats(floor: int, is_boss: bool) -> tuple[int, int, int]:
         atk *= 1.3
         df *= 1.2
     hp, atk, df = round(hp), round(atk), round(df)
-    if floor >= ENDGAME_FLOOR_START:
-        if is_boss and floor == 100:
-            hp = ENDGAME_F100_BOSS_HP
-        else:
-            hp = max(ENDGAME_MIN_HP, hp)
+    if is_boss and floor == 100:
+        hp = ENDGAME_F100_BOSS_HP
+    elif floor >= RAGE_FLOOR_START:
+        hp = RAGE_PIN_HP
+    elif floor >= ENDGAME_FLOOR_START:
+        hp = max(ENDGAME_MIN_HP, hp)
     return hp, atk, df
 
 
@@ -552,6 +564,16 @@ class Fight:
         self.reveal_weakness = False
         self.boss_dmg_mult = 1.0
         self.revive_available = False
+        # Floors 95+: outgoing damage spike + second-wind full heals at ≤20% HP.
+        if floor >= RAGE_FLOOR_START and is_boss and floor == 100:
+            self.monster_dmg_mult = VAULT_ETERNAL_DMG_MULT
+            self.second_wind_left = VAULT_ETERNAL_SECOND_WIND_HEALS
+        elif floor >= RAGE_FLOOR_START:
+            self.monster_dmg_mult = RAGE_DMG_MULT
+            self.second_wind_left = RAGE_SECOND_WIND_HEALS
+        else:
+            self.monster_dmg_mult = 1.0
+            self.second_wind_left = 0
         self.message: Optional[discord.Message] = None
         self.oneshot_message: Optional[discord.Message] = None
         self.auto = False  # chain into the next monster after a win
@@ -566,6 +588,25 @@ class Fight:
         self.name = self.true_name
         self.emoji = self.true_emoji
         return f"🌑 The shadow peels back — it's **{self.true_name}**!"
+
+    def try_second_wind(self) -> str | None:
+        """Full heal when brought to ≤20% HP, if any second-wind charges remain.
+
+        Lethal overkill (HP hits 0) still wins the fight — this only fires while
+        the monster is still standing at or under the threshold.
+        """
+        if self.second_wind_left <= 0 or self.m_hp <= 0:
+            return None
+        if self.m_hp > self.m_hp_max * SECOND_WIND_PCT:
+            return None
+        self.second_wind_left -= 1
+        self.m_hp = self.m_hp_max
+        left = self.second_wind_left
+        charges = f"{left} left" if left else "spent"
+        return (
+            f"{self.emoji} {self.name} draws a **second wind** — HP restored to "
+            f"**{self.m_hp_max}** ({charges})!"
+        )
 
     def cancel_idle(self) -> None:
         self._idle_gen += 1
@@ -1288,12 +1329,17 @@ class Descent(commands.Cog):
             fight.m_hp -= dmg_dealt
         fight.log.extend(lines)
 
+        second_wind = fight.try_second_wind()
+        if second_wind:
+            fight.log.append(second_wind)
+
         if fight.m_hp <= 0:
             fight.reveal_identity()  # army / win text always use the true identity
             await self._on_win(interaction, fight, from_oneshot=(action == "oneshot"))
             return
 
         counter_mult *= fight.boss_dmg_mult if fight.is_boss else 1.0
+        counter_mult *= getattr(fight, "monster_dmg_mult", 1.0)
         hits = fury_hit_count(fight)
         hit_rolls: list[int] = []
         for _ in range(hits):
