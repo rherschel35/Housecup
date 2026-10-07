@@ -15,7 +15,7 @@ Adornments: design your wizard, collect gear, and see it all in the Mirror.
     /nightwatch on|off         - (Nightwatch Pendant) night-beast heads-up on or off
     /staff adornadmin give|take|channel|status
 
-40 pieces over four slots (necklace, bracelet, ring, talisman). 26 are
+41 pieces over four slots (necklace, bracelet, ring, talisman). 26 are
 crafted from satchel materials; 15 are earned automatically from
 achievements and announced. Perks only come on earned pieces, only work
 while worn, and never touch duels or house points. `/crafts` lists both.
