@@ -91,11 +91,11 @@ EXTRA_THREAT_CHANNEL_IDS = frozenset({
     1552403823769952266,
 })
 
-# Open lounges stay spawn-free even for house practice. Study hall / games
-# lounge (PRACTICE_SUMMON_CHANNEL_IDS) may host practice swarms on purpose.
-PRACTICE_BLOCKED_CHANNEL_IDS = frozenset({
-    *OPEN_LOUNGE_CHANNEL_IDS,
-})
+# House practice = same no-points swarm as house channels. Study hall may host
+# it for new players; games lounge + open lounges stay spawn-free.
+PRACTICE_BLOCKED_CHANNEL_IDS = frozenset(
+    cid for cid in NO_THREAT_SPAWN_CHANNEL_IDS if cid != STUDY_HALL_CHANNEL_ID
+)
 
 log = logging.getLogger("velmora.dementors")
 
