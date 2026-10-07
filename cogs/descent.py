@@ -1619,8 +1619,8 @@ class Descent(commands.Cog):
             and not self.spireheart_worn(member)
         ):
             desc += (
-                "\n📿 You own **Spireheart Necklace** — `/wear necklace:Spireheart Necklace` "
-                "(or pick it in `/jewelbox`) for a **20%** free-stat chance on floors 45+."
+                "\n📿 You own **Spireheart Necklace** — `/wear` it (must be equipped) "
+                "for a **20%** free-stat chance on floors 45+."
             )
         elif pending_before == 0 and not practice_hit:
             desc += f"\n\nNo free stat this time ({pct}% practice chance on this floor)."
