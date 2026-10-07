@@ -88,6 +88,7 @@ NO_THREAT_SPAWN_CHANNEL_IDS = frozenset({
 # Always included in ambient spawns + Attack waves (alongside staff channels).
 EXTRA_THREAT_CHANNEL_IDS = frozenset({
     1552403823769952266,
+    1555035151208153209,
 })
 
 log = logging.getLogger("velmora.dementors")
