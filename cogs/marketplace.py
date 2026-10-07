@@ -54,8 +54,13 @@ ROOM_PRICE = 500
 SHOP_TITLES = [
     "Accio Self-Respect (No Response)",
     "The Sorting Hat Asked Me to Leave",
-    "Emotionally Support Dementor",
+    "Emotional Support Dementor",
 ]
+
+# Old shop-title spellings → current (migrate owned lists on load).
+TITLE_RENAMES = {
+    "Emotionally Support Dementor": "Emotional Support Dementor",
+}
 
 TRADEABLE = frozenset(BUY_PRICE.keys())  # common + uncommon place ingredients
 # Never bought or sold, even if rarity would otherwise allow it.
@@ -105,6 +110,25 @@ class Marketplace(commands.Cog):
         state.setdefault("sell_day", {})      # uid -> {date, earned}
         state.setdefault("rooms", [])         # purchase log for staff
         state.setdefault("broom_tokens", {})  # uid -> {speed: n, altitude: n}
+        # Rewrite retired shop-title spellings so buyers keep their purchase.
+        changed = False
+        for uid, owned in list(state["titles"].items()):
+            if not isinstance(owned, list):
+                continue
+            new_owned: list[str] = []
+            seen: set[str] = set()
+            for t in owned:
+                t2 = TITLE_RENAMES.get(t, t)
+                if t2 in seen:
+                    changed = changed or (t2 != t)
+                    continue
+                seen.add(t2)
+                if t2 != t:
+                    changed = True
+                new_owned.append(t2)
+            state["titles"][uid] = new_owned
+        if changed:
+            log.info("Migrated renamed Marketplace titles in %s", STATE_PATH)
         return state
 
     def save(self):
