@@ -187,7 +187,7 @@ HELP = {
         "title": "Your wizard & gear",
         "staff": False,
         "note": ("Design your look in `/wizard` — Masculine, Feminine, or Feminine (full body). "
-                 "41 gear pieces to craft or earn; earned pieces have perks while worn (never for duels or points)."),
+                 "Gear to craft or earn; earned pieces have perks while worn (never for duels or points)."),
         "entries": [
             ("wizard", "Design how your wizard looks (including Feminine full-body)."),
             ("mirror", "Your wizard trading card (or anyone's): look, gear, title and stats."),

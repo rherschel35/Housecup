@@ -1,6 +1,6 @@
 """
-The 41 pieces of gear. 26 are crafted from satchel materials (/craft);
-15 are earned, never crafted, and are handed out automatically when
+The gear catalogue. Most pieces are crafted from satchel materials (/craft);
+earned pieces are never crafted and are handed out automatically when
 someone reaches the achievement. Only earned pieces carry a perk, and no
 perk touches duels or house points.
 
