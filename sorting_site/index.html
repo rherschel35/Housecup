@@ -626,11 +626,8 @@
   var state = { name: "", index: 0, scores: {}, current: null };
   Object.keys(HOUSES).forEach(function (k) { state.scores[k] = 0; });
 
-  // All five houses are open. Caldrin and AsterWilde are gently favored: each
-  // answer for them counts a little extra, and they win any tie. Someone who
-  // clearly leans toward another house still lands there.
-  var HOUSE_WEIGHT = { caldrin: 1.2, asterwilde: 1.2 };
-  var FAVORED = ["caldrin", "asterwilde"];
+  // All five houses are open and even — no house weight or tie favor.
+  // Ties break at random among every house that tied.
 
   var SHEET_URL = "https://script.google.com/macros/s/AKfycbyqBL0qvyx_wc-hYCN26JKZYcoX1OBx-O0KZkYdWKQQc_z_o-nzUj23rZsyRE6AdWo-pw/exec";
 
@@ -719,10 +716,8 @@
       else if (hits[k] === best && best > 0) winners.push(k);
     });
     if (best === 0) return false;
-    var favoredWinners = winners.filter(function (k) { return FAVORED.indexOf(k) !== -1; });
-    var pool = favoredWinners.length ? favoredWinners : winners;
-    var house = pool[Math.floor(Math.random() * pool.length)];
-    state.scores[house] += HOUSE_WEIGHT[house] || 1;
+    var house = winners[Math.floor(Math.random() * winners.length)];
+    state.scores[house] += 1;
     return true;
   }
 
@@ -751,7 +746,7 @@
       // Soft fallback so odd wording still nudges the sort instead of stalling.
       var keys = Object.keys(HOUSES);
       var house = keys[Math.floor(Math.random() * keys.length)];
-      state.scores[house] += (HOUSE_WEIGHT[house] || 1) * 0.35;
+      state.scores[house] += 0.35;
     }
     nextBtn.disabled = true;
     var advance = function () {
@@ -777,9 +772,7 @@
       if (state.scores[k] > max) { max = state.scores[k]; winners = [k]; }
       else if (state.scores[k] === max) { winners.push(k); }
     });
-    var favoredWinners = winners.filter(function (k) { return FAVORED.indexOf(k) !== -1; });
-    var pool = favoredWinners.length ? favoredWinners : winners;
-    var house = pool[Math.floor(Math.random() * pool.length)];
+    var house = winners[Math.floor(Math.random() * winners.length)];
     state.current = house;
     showResults(house);
     saveResult(state.name, state.scores, house);
