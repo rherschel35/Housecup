@@ -1404,20 +1404,38 @@ class Descent(commands.Cog):
             world_cog.save()
         return f"{item.get('emoji', '')} **{item['name']}**".strip()
 
-    def try_spireheart_statup(self, member: discord.Member, rec: dict, floor: int) -> str | None:
-        """Worn Spireheart Necklace: 20% free Descent stat pick on floors 45+."""
+    def spireheart_worn(self, member: discord.Member) -> bool:
+        adorn = self.bot.get_cog("Adornments")
+        return bool(adorn and adorn.has_perk(member.id, SPIREHEART_PERK))
+
+    def owns_spireheart(self, member: discord.Member) -> bool:
+        adorn = self.bot.get_cog("Adornments")
+        if not adorn:
+            return False
+        return "spireheart_necklace" in (adorn.peek(member.id).get("owned") or {})
+
+    def try_spireheart_statup(
+        self, member: discord.Member, rec: dict, floor: int, *, announce_miss: bool = False,
+    ) -> str | None:
+        """Worn Spireheart Necklace: 20% free Descent stat pick on floors 45+.
+
+        When ``announce_miss`` is set (practice fights), always return a line so
+        players can see the necklace rolled — silent misses looked like the perk
+        was broken next to the separate practice-grind %.
+        """
         if floor < SPIREHEART_STAT_FLOOR:
             return None
-        adorn = self.bot.get_cog("Adornments")
-        if not adorn or not adorn.has_perk(member.id, SPIREHEART_PERK):
+        if not self.spireheart_worn(member):
             return None
-        if random.random() >= SPIREHEART_STAT_CHANCE:
-            return None
-        rec["pending_statup"] = pending_statup_picks(rec) + 1
-        return (
-            "📿 **Spireheart Necklace** flares — you've earned a free "
-            "HP / Attack / Defense pick!"
-        )
+        if random.random() < SPIREHEART_STAT_CHANCE:
+            rec["pending_statup"] = pending_statup_picks(rec) + 1
+            return (
+                "📿 **Spireheart Necklace** flares — you've earned a free "
+                "HP / Attack / Defense pick!"
+            )
+        if announce_miss:
+            return "📿 Spireheart Necklace stays quiet (**20%** chance)."
+        return None
 
     async def _on_win(
         self,
@@ -1573,25 +1591,41 @@ class Descent(commands.Cog):
 
         chance = practice_statup_chance(rec["floor"], fight.floor)
         pct = max(1, int(round(chance * 100)))
-        pending = pending_statup_picks(rec)
-        if pending > 0:
+        pending_before = pending_statup_picks(rec)
+        practice_hit = False
+        if pending_before > 0:
             # Should be rare (practice is gated on spend), but keep the picker
             # attached so a stuck pick can still be cleared from a win message.
-            desc += (f"\n\nYou still have **{pending}** unspent stat pick"
-                     f"{'s' if pending != 1 else ''} — spend "
-                     f"{'them' if pending != 1 else 'it'} before practice can sharpen you again.")
+            desc += (f"\n\nYou still have **{pending_before}** unspent stat pick"
+                     f"{'s' if pending_before != 1 else ''} — spend "
+                     f"{'them' if pending_before != 1 else 'it'} before practice can sharpen you again.")
         elif random.random() < chance:
-            rec["pending_statup"] = 1
-            pending = 1
+            rec["pending_statup"] = pending_statup_picks(rec) + 1
+            practice_hit = True
             desc += "\n\nThis grind sharpened you - pick a stat to raise."
-        else:
-            desc += f"\n\nNo free stat this time ({pct}% chance on this floor)."
 
-        spire_line = self.try_spireheart_statup(member, rec, fight.floor)
+        # Spireheart is a separate 20% roll on floors 45+ while worn — always
+        # announce hit or miss so it isn't confused with the practice-grind %.
+        spire_line = self.try_spireheart_statup(
+            member, rec, fight.floor, announce_miss=True,
+        )
         if spire_line:
             desc += f"\n{spire_line}"
-            pending = pending_statup_picks(rec)
+        elif (
+            pending_before == 0
+            and not practice_hit
+            and fight.floor >= SPIREHEART_STAT_FLOOR
+            and self.owns_spireheart(member)
+            and not self.spireheart_worn(member)
+        ):
+            desc += (
+                "\n📿 You own **Spireheart Necklace** — `/wear necklace:Spireheart Necklace` "
+                "(or pick it in `/jewelbox`) for a **20%** free-stat chance on floors 45+."
+            )
+        elif pending_before == 0 and not practice_hit:
+            desc += f"\n\nNo free stat this time ({pct}% practice chance on this floor)."
 
+        pending = pending_statup_picks(rec)
         self.save()
         embed = discord.Embed(title=f"{fight.emoji} Practice victory!", description=desc, color=0x2ECC71)
         if pending > 0:
