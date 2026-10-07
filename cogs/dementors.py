@@ -88,7 +88,12 @@ NO_THREAT_SPAWN_CHANNEL_IDS = frozenset({
 # Always included in ambient spawns + Attack waves (alongside staff channels).
 EXTRA_THREAT_CHANNEL_IDS = frozenset({
     1552403823769952266,
-    1555035151208153209,
+})
+
+# Open lounges stay spawn-free even for house practice. Study hall / games
+# lounge (PRACTICE_SUMMON_CHANNEL_IDS) may host practice swarms on purpose.
+PRACTICE_BLOCKED_CHANNEL_IDS = frozenset({
+    *OPEN_LOUNGE_CHANNEL_IDS,
 })
 
 log = logging.getLogger("velmora.dementors")
@@ -1550,11 +1555,11 @@ class Dementors(commands.Cog):
         minutes: int,
     ) -> tuple[bool, str, tuple | None]:
         """Start a practice swarm. Returns (ok, user_message, start_tuple_or_None)."""
-        if channel_id in NO_THREAT_SPAWN_CHANNEL_IDS:
+        if channel_id in PRACTICE_BLOCKED_CHANNEL_IDS:
             return (
                 False,
-                "Study hall, the games lounge, and open lounges stay spawn-free. "
-                "Run house practice in a house channel instead.",
+                "Open lounges stay spawn-free. Run house practice in a house "
+                "channel or study hall instead.",
                 None,
             )
         if not (1 <= minutes <= EVENT_MAX_MINUTES):
