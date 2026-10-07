@@ -1592,38 +1592,44 @@ class Descent(commands.Cog):
         chance = practice_statup_chance(rec["floor"], fight.floor)
         pct = max(1, int(round(chance * 100)))
         pending_before = pending_statup_picks(rec)
-        practice_hit = False
+        spire_active = (
+            fight.floor >= SPIREHEART_STAT_FLOOR and self.spireheart_worn(member)
+        )
+
         if pending_before > 0:
             # Should be rare (practice is gated on spend), but keep the picker
             # attached so a stuck pick can still be cleared from a win message.
             desc += (f"\n\nYou still have **{pending_before}** unspent stat pick"
                      f"{'s' if pending_before != 1 else ''} — spend "
                      f"{'them' if pending_before != 1 else 'it'} before practice can sharpen you again.")
-        elif random.random() < chance:
-            rec["pending_statup"] = pending_statup_picks(rec) + 1
-            practice_hit = True
-            desc += "\n\nThis grind sharpened you - pick a stat to raise."
-
-        # Spireheart is a separate 20% roll on floors 45+ while worn — always
-        # announce hit or miss so it isn't confused with the practice-grind %.
-        spire_line = self.try_spireheart_statup(
-            member, rec, fight.floor, announce_miss=True,
-        )
-        if spire_line:
-            desc += f"\n{spire_line}"
-        elif (
-            pending_before == 0
-            and not practice_hit
-            and fight.floor >= SPIREHEART_STAT_FLOOR
-            and self.owns_spireheart(member)
-            and not self.spireheart_worn(member)
-        ):
-            desc += (
-                "\n📿 You own **Spireheart Necklace** — `/wear` it (must be equipped) "
-                "for a **20%** free-stat chance on floors 45+."
+        elif spire_active:
+            # Spireheart is the headline 20% while worn on 45+ — always say
+            # hit or miss. Practice-grind % stays a quiet bonus on top.
+            spire_line = self.try_spireheart_statup(
+                member, rec, fight.floor, announce_miss=True,
             )
-        elif pending_before == 0 and not practice_hit:
-            desc += f"\n\nNo free stat this time ({pct}% practice chance on this floor)."
+            if spire_line:
+                desc += f"\n{spire_line}"
+            if random.random() < chance:
+                rec["pending_statup"] = pending_statup_picks(rec) + 1
+                desc += "\nPractice grind also paid off — another pick!"
+        else:
+            practice_hit = False
+            if random.random() < chance:
+                rec["pending_statup"] = pending_statup_picks(rec) + 1
+                practice_hit = True
+                desc += "\n\nThis grind sharpened you - pick a stat to raise."
+            elif (
+                fight.floor >= SPIREHEART_STAT_FLOOR
+                and self.owns_spireheart(member)
+                and not self.spireheart_worn(member)
+            ):
+                desc += (
+                    "\n📿 You own **Spireheart Necklace** — `/wear` it "
+                    "for a **20%** free-stat chance on floors 45+."
+                )
+            else:
+                desc += f"\n\nNo free stat this time ({pct}% practice chance on this floor)."
 
         pending = pending_statup_picks(rec)
         self.save()
