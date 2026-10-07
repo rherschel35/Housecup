@@ -16,7 +16,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 SQ = 96
 # Wide margin so outer a–h / 1–8 labels stay large when Discord shrinks the PNG.
-MARGIN = 110
+MARGIN = 140
 BOARD_PX = SQ * 8
 IMG_SIZE = BOARD_PX + MARGIN * 2
 
@@ -56,8 +56,8 @@ def _load_font(paths: list[Path], size: int) -> ImageFont.FreeTypeFont | ImageFo
     return ImageFont.load_default()
 
 
-_LABEL_FONT = _load_font(_LABEL_CANDIDATES, 88)
-_SQUARE_COORD_FONT = _load_font(_LABEL_CANDIDATES, 56)
+_LABEL_FONT = _load_font(_LABEL_CANDIDATES, 112)
+_SQUARE_COORD_FONT = _load_font(_LABEL_CANDIDATES, 64)
 _CROWN_FONT = _load_font(_LABEL_CANDIDATES, 28)
 
 
