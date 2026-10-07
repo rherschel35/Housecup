@@ -387,7 +387,9 @@ class Adornments(commands.Cog):
             return False
         r["owned"][key] = time.time()
         slot = GEAR[key]["slot"]
-        if not r["worn"].get(slot):
+        # Spireheart (and other legendary earns): put it on so the perk is live
+        # immediately. Anything else only auto-wears into an empty slot.
+        if key == "spireheart_necklace" or not r["worn"].get(slot):
             r["worn"][slot] = key
         return True
 
