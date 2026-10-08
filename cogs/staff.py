@@ -386,19 +386,19 @@ class Staff(commands.Cog):
 
     @duels.command(
         name="nightschedule",
-        description="Schedule up to 3 weekly Duel Nights — each with its own Chicago time.",
+        description="Schedule 1–3 weekly Duel Nights — each with its own Chicago time.",
     )
     @app_commands.describe(
-        day_a="First night weekday",
+        day_a="First night weekday (required)",
         hour_a="Hour for first night (America/Chicago, 0-23)",
+        length="30 minutes or 1 hour for every scheduled night",
         minute_a="Minute for first night (0-59)",
-        day_b="Second night weekday",
-        hour_b="Hour for second night (America/Chicago, 0-23)",
+        day_b="Optional second night weekday",
+        hour_b="Hour for second night (required if day_b is set)",
         minute_b="Minute for second night (0-59)",
-        day_c="Third night weekday",
-        hour_c="Hour for third night (America/Chicago, 0-23)",
+        day_c="Optional third night weekday",
+        hour_c="Hour for third night (required if day_c is set)",
         minute_c="Minute for third night (0-59)",
-        length="How long each night runs",
         channel="Where to post warn / start / results",
     )
     @app_commands.choices(
@@ -439,14 +439,14 @@ class Staff(commands.Cog):
         interaction: discord.Interaction,
         day_a: app_commands.Choice[int],
         hour_a: app_commands.Range[int, 0, 23],
-        day_b: app_commands.Choice[int],
-        hour_b: app_commands.Range[int, 0, 23],
-        day_c: app_commands.Choice[int],
-        hour_c: app_commands.Range[int, 0, 23],
+        length: app_commands.Choice[int],
         minute_a: app_commands.Range[int, 0, 59] = 0,
+        day_b: app_commands.Choice[int] = None,
+        hour_b: app_commands.Range[int, 0, 23] = None,
         minute_b: app_commands.Range[int, 0, 59] = 0,
+        day_c: app_commands.Choice[int] = None,
+        hour_c: app_commands.Range[int, 0, 23] = None,
         minute_c: app_commands.Range[int, 0, 59] = 0,
-        length: app_commands.Choice[int] = None,
         channel: discord.TextChannel = None,
     ):
         cog = self._cog("Duels")
@@ -455,8 +455,10 @@ class Staff(commands.Cog):
             return
         await cog.nightschedule(
             interaction,
-            day_a, hour_a, day_b, hour_b, day_c, hour_c,
-            minute_a, minute_b, minute_c, length, channel,
+            day_a, hour_a, minute_a,
+            day_b, hour_b, minute_b,
+            day_c, hour_c, minute_c,
+            length, channel,
         )
 
     @duels.command(name="nightscheduleoff", description="Turn off the weekly Duel Night schedule.")
