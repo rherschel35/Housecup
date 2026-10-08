@@ -7,6 +7,7 @@ each set is first to 2, and the series winner banks 3/4/5 wins.
     /duelend [member]          - clear a stuck duel lock (self, or staff for others)
     /houseduels                - each house's overall win/loss duelling record
     /staff duels night start|end  - House Duel Night (30 min or 1 hour)
+    /staff duels nightschedule    - up to 3 weekly nights, each with its own time
     /trio scramble             - open 3v3 signup (any houses)
     /trio housematch h1 h2     - house-gated 3v3 signup
     /grand @member             - Grand Duel (both need 50+ 1v1 wins)
@@ -42,6 +43,7 @@ sides click fast.
 """
 
 import asyncio
+import datetime as dt
 import json
 import logging
 import os
@@ -405,6 +407,22 @@ DUEL_NIGHT_PRESETS = {
 DUEL_NIGHT_MVP_BONUS = 5     # like Wild Threat Attack MVP bonus
 DUEL_NIGHT_HOUSE_BONUS = 10  # winning house bonus at end of night
 DUEL_NIGHT_COLOR = 0xB8434F
+DUEL_NIGHT_WARN_MINUTES = 5
+DUEL_NIGHT_SCHEDULE_MAX = 3
+# Same role names as Attack warn/start unless overridden.
+_DEFAULT_NIGHT_PING_NAMES = ("Champions", "Witches", "Wizards")
+WEEKDAY_CHOICES = [
+    app_commands.Choice(name="Monday", value=0),
+    app_commands.Choice(name="Tuesday", value=1),
+    app_commands.Choice(name="Wednesday", value=2),
+    app_commands.Choice(name="Thursday", value=3),
+    app_commands.Choice(name="Friday", value=4),
+    app_commands.Choice(name="Saturday", value=5),
+    app_commands.Choice(name="Sunday", value=6),
+]
+WEEKDAY_LABELS = (
+    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+)
 
 FLOURISHES = [
     "The Circle hums as {name} lowers their wand.",
@@ -418,8 +436,20 @@ try:
     from zoneinfo import ZoneInfo
     TZ = ZoneInfo("America/Chicago")
 except Exception:  # pragma: no cover
-    import datetime as _dt
-    TZ = _dt.timezone.utc
+    TZ = dt.timezone.utc
+
+
+def _chicago_now(ts: float | None = None) -> dt.datetime:
+    return dt.datetime.fromtimestamp(ts if ts is not None else time.time(), TZ)
+
+
+def _night_ping_role_names() -> list[str]:
+    raw = os.getenv("DUEL_NIGHT_PING_ROLE_NAMES", "").strip()
+    if not raw:
+        raw = os.getenv("ATTACK_PING_ROLE_NAMES", "").strip()
+    if raw:
+        return [p.strip() for p in raw.split(",") if p.strip()]
+    return list(_DEFAULT_NIGHT_PING_NAMES)
 
 
 def rank_for(wins: int) -> str:
@@ -498,9 +528,50 @@ class Duels(commands.Cog):
 
     async def cog_load(self):
         self.weekly.start()
+        self.night_schedule_tick.start()
 
     async def cog_unload(self):
         self.weekly.cancel()
+        self.night_schedule_tick.cancel()
+
+    @staticmethod
+    def _blank_night_schedule() -> dict:
+        return {
+            "enabled": False,
+            "slots": [],  # [{weekday, hour, minute}, ...]
+            "minutes": 60,  # 30 or 60
+            "channel_id": None,
+            "role_ids": [],
+            "last_warn_key": None,
+            "last_start_key": None,
+        }
+
+    def _night_schedule(self) -> dict:
+        sched = self.state.setdefault("duel_night_schedule", self._blank_night_schedule())
+        for key, value in self._blank_night_schedule().items():
+            sched.setdefault(key, value)
+        return sched
+
+    @staticmethod
+    def _normalize_night_slots(raw_slots: list) -> list[dict]:
+        out: list[dict] = []
+        seen: set[int] = set()
+        for raw in raw_slots:
+            try:
+                day = int(raw["weekday"])
+                hour = int(raw["hour"])
+                minute = int(raw.get("minute", 0))
+            except (KeyError, TypeError, ValueError):
+                continue
+            if not (0 <= day <= 6 and 0 <= hour <= 23 and 0 <= minute <= 59):
+                continue
+            if day in seen:
+                continue
+            seen.add(day)
+            out.append({"weekday": day, "hour": hour, "minute": minute})
+            if len(out) >= DUEL_NIGHT_SCHEDULE_MAX:
+                break
+        return out
 
     def mark_busy(self, match, *members) -> None:
         for m in members:
@@ -571,6 +642,7 @@ class Duels(commands.Cog):
         state.setdefault("week", {"key": week_key(), "wins": {}})
         state.setdefault("champion", None)      # {"user_id", "week"}
         state.setdefault("duel_night", None)    # {"by", "at", "tally": {uid: {wins, pts, house}}}
+        state.setdefault("duel_night_schedule", self._blank_night_schedule())
         if not state.get("rewards_backfilled"):
             self._backfill(state)
         # Quietly mark already-earned signature titles as announced so a redeploy
@@ -1347,6 +1419,49 @@ class Duels(commands.Cog):
         embed.set_footer(text="Ranked by total wins • same-house duels count too")
         await interaction.response.send_message(embed=embed)
 
+    def _duel_night_intro_embed(self, minutes: int) -> discord.Embed:
+        label = DUEL_NIGHT_PRESETS.get(minutes) or f"{minutes} minutes"
+        return discord.Embed(
+            title="⚔️ House Duel Night",
+            description=(
+                f"**{label}** — every **cross-house** duel win counts **double** "
+                f"for your house with **no daily win cap**. Same-house duels earn "
+                f"**no** house points.\n\n"
+                f"When the night ends, the house with the most points gets a "
+                f"**+{DUEL_NIGHT_HOUSE_BONUS}** bonus, and the night's MVP gets "
+                f"**+{DUEL_NIGHT_MVP_BONUS}**.\n\n"
+                f"Ends in **{label}**, or when staff call it early."
+            ),
+            color=DUEL_NIGHT_COLOR,
+        )
+
+    def _begin_duel_night(
+        self,
+        *,
+        minutes: int,
+        by: int,
+        channel_id: int | None,
+        guild_id: int | None,
+    ) -> tuple[bool, str, dict | None]:
+        if self.state.get("duel_night") and self.duel_night_on():
+            return False, "A Duel Night is already running. End it first.", None
+        if minutes not in DUEL_NIGHT_PRESETS:
+            return False, "Pick a length: **30 minutes** or **1 hour**.", None
+        now = time.time()
+        night = {
+            "by": by,
+            "at": now,
+            "ends_at": now + minutes * 60,
+            "minutes": minutes,
+            "tally": {},
+            "channel_id": channel_id,
+            "guild_id": guild_id,
+        }
+        self.state["duel_night"] = night
+        self.save()
+        label = DUEL_NIGHT_PRESETS[minutes]
+        return True, f"House Duel Night is on for **{label}**.", night
+
     async def duelnight(
         self,
         interaction: discord.Interaction,
@@ -1358,42 +1473,23 @@ class Duels(commands.Cog):
             await interaction.response.send_message("That's for staff.", ephemeral=True)
             return
         if action.value == "start":
-            if self.state.get("duel_night") and self.duel_night_on():
-                await interaction.response.send_message(
-                    "A Duel Night is already running. End it first.", ephemeral=True
-                )
-                return
             if length is None or int(length.value) not in DUEL_NIGHT_PRESETS:
                 await interaction.response.send_message(
                     "Pick a length: **30 minutes** or **1 hour**.", ephemeral=True
                 )
                 return
-            minutes = int(length.value)
-            label = DUEL_NIGHT_PRESETS[minutes]
-            now = time.time()
-            self.state["duel_night"] = {
-                "by": interaction.user.id,
-                "at": now,
-                "ends_at": now + minutes * 60,
-                "minutes": minutes,
-                "tally": {},
-                "channel_id": interaction.channel_id,
-                "guild_id": interaction.guild_id,
-            }
-            self.save()
-            await interaction.response.send_message(embed=discord.Embed(
-                title="⚔️ House Duel Night",
-                description=(
-                    f"**{label}** — every **cross-house** duel win counts **double** "
-                    f"for your house with **no daily win cap**. Same-house duels earn "
-                    f"**no** house points.\n\n"
-                    f"When the night ends, the house with the most points gets a "
-                    f"**+{DUEL_NIGHT_HOUSE_BONUS}** bonus, and the night's MVP gets "
-                    f"**+{DUEL_NIGHT_MVP_BONUS}**.\n\n"
-                    f"Ends in **{label}**, or when staff call it early."
-                ),
-                color=DUEL_NIGHT_COLOR,
-            ))
+            ok, msg, _night = self._begin_duel_night(
+                minutes=int(length.value),
+                by=interaction.user.id,
+                channel_id=interaction.channel_id,
+                guild_id=interaction.guild_id,
+            )
+            if not ok:
+                await interaction.response.send_message(msg, ephemeral=True)
+                return
+            await interaction.response.send_message(
+                embed=self._duel_night_intro_embed(int(length.value)),
+            )
         else:
             night = self.state.get("duel_night")
             if not night:
@@ -1405,6 +1501,305 @@ class Duels(commands.Cog):
             await interaction.response.defer(ephemeral=False)
             embed = await self._finalize_duel_night(night, reason="staff")
             await interaction.followup.send(embed=embed)
+
+    def _resolve_night_ping_roles(self, guild: discord.Guild | None) -> list[discord.Role]:
+        if guild is None:
+            return []
+        sched = self._night_schedule()
+        roles: list[discord.Role] = []
+        seen: set[int] = set()
+        for rid in sched.get("role_ids") or []:
+            try:
+                role = guild.get_role(int(rid))
+            except (TypeError, ValueError):
+                continue
+            if role and role.id not in seen:
+                roles.append(role)
+                seen.add(role.id)
+        if roles:
+            return roles
+        wanted = {n.lower() for n in _night_ping_role_names()}
+        for role in guild.roles:
+            if role.name.lower() in wanted and role.id not in seen:
+                roles.append(role)
+                seen.add(role.id)
+        return roles
+
+    def _night_announce_channel_id(self) -> int | None:
+        sched = self._night_schedule()
+        cid = sched.get("channel_id")
+        if cid:
+            try:
+                return int(cid)
+            except (TypeError, ValueError):
+                pass
+        raw = os.getenv("DUEL_CHANNEL_ID", "")
+        return int(raw) if raw.isdigit() else None
+
+    async def _post_night_notice(
+        self,
+        *,
+        guild: discord.Guild | None,
+        embed: discord.Embed,
+        ping: bool,
+        channel_id: int | None = None,
+    ) -> None:
+        cid = channel_id or self._night_announce_channel_id()
+        if not cid:
+            return
+        channel = self.bot.get_channel(cid)
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(cid)
+            except discord.HTTPException:
+                return
+        content = None
+        if ping:
+            roles = self._resolve_night_ping_roles(guild or getattr(channel, "guild", None))
+            if roles:
+                content = " ".join(r.mention for r in roles)
+        allowed = discord.AllowedMentions(roles=True, users=False, everyone=False)
+        try:
+            await channel.send(
+                content=content,
+                embed=embed,
+                allowed_mentions=allowed if content else discord.AllowedMentions.none(),
+            )
+        except discord.HTTPException:
+            log.exception("Could not post Duel Night notice in %s", cid)
+
+    def _next_night_slot(self, now: dt.datetime | None = None) -> tuple[dt.datetime, str] | None:
+        sched = self._night_schedule()
+        if not sched.get("enabled"):
+            return None
+        slots = self._normalize_night_slots(sched.get("slots") or [])
+        if not slots:
+            return None
+        by_day = {int(s["weekday"]): s for s in slots}
+        now = now or _chicago_now()
+        best: dt.datetime | None = None
+        for add in range(0, 8):
+            day = (now + dt.timedelta(days=add)).date()
+            spec = by_day.get(day.weekday())
+            if not spec:
+                continue
+            candidate = dt.datetime(
+                day.year, day.month, day.day,
+                int(spec["hour"]), int(spec["minute"]),
+                tzinfo=TZ,
+            )
+            if add == 0 and candidate + dt.timedelta(seconds=120) < now:
+                continue
+            if best is None or candidate < best:
+                best = candidate
+        if best is None:
+            return None
+        return best, best.strftime("%Y-%m-%dT%H:%M")
+
+    @tasks.loop(seconds=30)
+    async def night_schedule_tick(self):
+        sched = self._night_schedule()
+        if not sched.get("enabled"):
+            return
+        slot = self._next_night_slot()
+        if slot is None:
+            return
+        target, key = slot
+        now = _chicago_now()
+        warn_at = target - dt.timedelta(minutes=DUEL_NIGHT_WARN_MINUTES)
+        minutes = int(sched.get("minutes") or 60)
+        if minutes not in DUEL_NIGHT_PRESETS:
+            minutes = 60
+        label = DUEL_NIGHT_PRESETS[minutes]
+        channel_id = self._night_announce_channel_id()
+        guild = self.bot.guilds[0] if self.bot.guilds else None
+
+        if warn_at <= now < target and sched.get("last_warn_key") != key:
+            embed = discord.Embed(
+                title="⚔️ House Duel Night — 5 minutes",
+                description=(
+                    f"Duel Night opens <t:{int(target.timestamp())}:t> "
+                    f"(<t:{int(target.timestamp())}:R>) for **{label}**. "
+                    f"Cross-house wins pay double — get ready."
+                ),
+                color=DUEL_NIGHT_COLOR,
+            )
+            await self._post_night_notice(
+                guild=guild, embed=embed, ping=True, channel_id=channel_id,
+            )
+            sched["last_warn_key"] = key
+            self.save()
+            log.info("Posted Duel Night warn for slot %s", key)
+
+        if target <= now < target + dt.timedelta(seconds=120) and sched.get("last_start_key") != key:
+            by = self.bot.user.id if self.bot.user else 0
+            ok, msg, _night = self._begin_duel_night(
+                minutes=minutes,
+                by=by,
+                channel_id=channel_id,
+                guild_id=guild.id if guild else None,
+            )
+            sched["last_start_key"] = key
+            self.save()
+            if ok:
+                await self._post_night_notice(
+                    guild=guild,
+                    embed=self._duel_night_intro_embed(minutes),
+                    ping=True,
+                    channel_id=channel_id,
+                )
+                log.info("Scheduled Duel Night started for slot %s", key)
+            else:
+                log.warning("Scheduled Duel Night did not start for %s: %s", key, msg)
+
+    @night_schedule_tick.before_loop
+    async def before_night_schedule_tick(self):
+        await self.bot.wait_until_ready()
+
+    async def nightschedule(
+        self,
+        interaction: discord.Interaction,
+        day_a: app_commands.Choice[int],
+        hour_a: int,
+        day_b: app_commands.Choice[int],
+        hour_b: int,
+        day_c: app_commands.Choice[int],
+        hour_c: int,
+        minute_a: int = 0,
+        minute_b: int = 0,
+        minute_c: int = 0,
+        length: app_commands.Choice[int] | None = None,
+        channel: discord.TextChannel | None = None,
+    ):
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        slots = self._normalize_night_slots([
+            {"weekday": day_a.value, "hour": hour_a, "minute": minute_a},
+            {"weekday": day_b.value, "hour": hour_b, "minute": minute_b},
+            {"weekday": day_c.value, "hour": hour_c, "minute": minute_c},
+        ])
+        if not slots:
+            await interaction.response.send_message(
+                "Need at least one valid weekday + time.", ephemeral=True,
+            )
+            return
+        minutes = int(length.value) if length and int(length.value) in DUEL_NIGHT_PRESETS else 60
+        sched = self._night_schedule()
+        sched["enabled"] = True
+        sched["slots"] = slots
+        sched["minutes"] = minutes
+        if channel is not None:
+            sched["channel_id"] = channel.id
+        elif not sched.get("channel_id"):
+            # Default to the channel where staff set the schedule.
+            sched["channel_id"] = interaction.channel_id
+        sched["last_warn_key"] = None
+        sched["last_start_key"] = None
+        self.save()
+        slot_lines = ", ".join(
+            f"**{WEEKDAY_LABELS[s['weekday']]}** {s['hour']:02d}:{s['minute']:02d}"
+            for s in slots
+        )
+        next_slot = self._next_night_slot()
+        next_note = (
+            f" Next: <t:{int(next_slot[0].timestamp())}:F>."
+            if next_slot else ""
+        )
+        cid = self._night_announce_channel_id()
+        where = f" Announces in <#{cid}>." if cid else " Set a channel with this command's `channel` option."
+        roles = self._resolve_night_ping_roles(interaction.guild)
+        role_note = (
+            " Pings: " + ", ".join(r.mention for r in roles) + "."
+            if roles else
+            " (No Champions/Witches/Wizards roles — "
+            "`/staff duels nightscheduleroles`.)"
+        )
+        await interaction.response.send_message(
+            f"Duel Night schedule on (America/Chicago): {slot_lines}. "
+            f"**{DUEL_NIGHT_PRESETS[minutes]}** each · 5-minute warn."
+            f"{where}{next_note}{role_note}",
+            ephemeral=True,
+        )
+
+    async def nightscheduleoff(self, interaction: discord.Interaction):
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        sched = self._night_schedule()
+        sched["enabled"] = False
+        self.save()
+        await interaction.response.send_message(
+            "Weekly Duel Night schedule is off. Manual `/staff duels night` still works.",
+            ephemeral=True,
+        )
+
+    async def nightscheduleroles(
+        self,
+        interaction: discord.Interaction,
+        champions: discord.Role,
+        witches: discord.Role,
+        wizards: discord.Role,
+    ):
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        sched = self._night_schedule()
+        ids: list[int] = []
+        for role in (champions, witches, wizards):
+            if role.id not in ids:
+                ids.append(role.id)
+        sched["role_ids"] = ids
+        self.save()
+        await interaction.response.send_message(
+            "Duel Night pings will mention "
+            + ", ".join(r.mention for r in (champions, witches, wizards))
+            + " on the 5-minute warning and again when the night starts.",
+            ephemeral=True,
+        )
+
+    async def nightschedulestatus(self, interaction: discord.Interaction):
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        sched = self._night_schedule()
+        if not sched.get("enabled"):
+            await interaction.response.send_message(
+                "Weekly Duel Night schedule is **off**.", ephemeral=True,
+            )
+            return
+        slots = self._normalize_night_slots(sched.get("slots") or [])
+        slot_block = "\n".join(
+            f"· **{WEEKDAY_LABELS[s['weekday']]}** at "
+            f"**{s['hour']:02d}:{s['minute']:02d}**"
+            for s in slots
+        ) if slots else "· (no slots)"
+        minutes = int(sched.get("minutes") or 60)
+        label = DUEL_NIGHT_PRESETS.get(minutes, f"{minutes} minutes")
+        next_slot = self._next_night_slot()
+        next_note = (
+            f"\nNext: <t:{int(next_slot[0].timestamp())}:F> "
+            f"(<t:{int(next_slot[0].timestamp())}:R>)."
+            if next_slot else "\nNext: not scheduled."
+        )
+        cid = self._night_announce_channel_id()
+        where = f"\nAnnounces in <#{cid}>." if cid else "\nAnnounce channel: not set."
+        roles = self._resolve_night_ping_roles(interaction.guild)
+        role_note = (
+            "\nPings: " + ", ".join(r.mention for r in roles)
+            if roles else
+            "\nPings: (none set)"
+        )
+        await interaction.response.send_message(
+            f"**On** — America/Chicago · **{label}** each:\n{slot_block}\n"
+            f"Warn {DUEL_NIGHT_WARN_MINUTES} min early."
+            f"{where}{next_note}{role_note}",
+            ephemeral=True,
+        )
 
     async def _finalize_duel_night(self, night: dict, *, reason: str = "staff") -> discord.Embed:
         """End-of-night scoreboard + MVP / winning-house bonuses (swarm Attack style)."""

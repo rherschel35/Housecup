@@ -384,6 +384,119 @@ class Staff(commands.Cog):
             return
         await cog.duelnight(interaction, action, length)
 
+    @duels.command(
+        name="nightschedule",
+        description="Schedule up to 3 weekly Duel Nights — each with its own Chicago time.",
+    )
+    @app_commands.describe(
+        day_a="First night weekday",
+        hour_a="Hour for first night (America/Chicago, 0-23)",
+        minute_a="Minute for first night (0-59)",
+        day_b="Second night weekday",
+        hour_b="Hour for second night (America/Chicago, 0-23)",
+        minute_b="Minute for second night (0-59)",
+        day_c="Third night weekday",
+        hour_c="Hour for third night (America/Chicago, 0-23)",
+        minute_c="Minute for third night (0-59)",
+        length="How long each night runs",
+        channel="Where to post warn / start / results",
+    )
+    @app_commands.choices(
+        day_a=[
+            app_commands.Choice(name="Monday", value=0),
+            app_commands.Choice(name="Tuesday", value=1),
+            app_commands.Choice(name="Wednesday", value=2),
+            app_commands.Choice(name="Thursday", value=3),
+            app_commands.Choice(name="Friday", value=4),
+            app_commands.Choice(name="Saturday", value=5),
+            app_commands.Choice(name="Sunday", value=6),
+        ],
+        day_b=[
+            app_commands.Choice(name="Monday", value=0),
+            app_commands.Choice(name="Tuesday", value=1),
+            app_commands.Choice(name="Wednesday", value=2),
+            app_commands.Choice(name="Thursday", value=3),
+            app_commands.Choice(name="Friday", value=4),
+            app_commands.Choice(name="Saturday", value=5),
+            app_commands.Choice(name="Sunday", value=6),
+        ],
+        day_c=[
+            app_commands.Choice(name="Monday", value=0),
+            app_commands.Choice(name="Tuesday", value=1),
+            app_commands.Choice(name="Wednesday", value=2),
+            app_commands.Choice(name="Thursday", value=3),
+            app_commands.Choice(name="Friday", value=4),
+            app_commands.Choice(name="Saturday", value=5),
+            app_commands.Choice(name="Sunday", value=6),
+        ],
+        length=[
+            app_commands.Choice(name="30 minutes", value=30),
+            app_commands.Choice(name="1 hour", value=60),
+        ],
+    )
+    async def duels_nightschedule(
+        self,
+        interaction: discord.Interaction,
+        day_a: app_commands.Choice[int],
+        hour_a: app_commands.Range[int, 0, 23],
+        day_b: app_commands.Choice[int],
+        hour_b: app_commands.Range[int, 0, 23],
+        day_c: app_commands.Choice[int],
+        hour_c: app_commands.Range[int, 0, 23],
+        minute_a: app_commands.Range[int, 0, 59] = 0,
+        minute_b: app_commands.Range[int, 0, 59] = 0,
+        minute_c: app_commands.Range[int, 0, 59] = 0,
+        length: app_commands.Choice[int] = None,
+        channel: discord.TextChannel = None,
+    ):
+        cog = self._cog("Duels")
+        if not cog:
+            await interaction.response.send_message("Duels isn't loaded.", ephemeral=True)
+            return
+        await cog.nightschedule(
+            interaction,
+            day_a, hour_a, day_b, hour_b, day_c, hour_c,
+            minute_a, minute_b, minute_c, length, channel,
+        )
+
+    @duels.command(name="nightscheduleoff", description="Turn off the weekly Duel Night schedule.")
+    async def duels_nightscheduleoff(self, interaction: discord.Interaction):
+        cog = self._cog("Duels")
+        if not cog:
+            await interaction.response.send_message("Duels isn't loaded.", ephemeral=True)
+            return
+        await cog.nightscheduleoff(interaction)
+
+    @duels.command(
+        name="nightscheduleroles",
+        description="Roles pinged 5 min before and at Duel Night start.",
+    )
+    @app_commands.describe(
+        champions="Champions role",
+        witches="Witches role",
+        wizards="Wizards role",
+    )
+    async def duels_nightscheduleroles(
+        self,
+        interaction: discord.Interaction,
+        champions: discord.Role,
+        witches: discord.Role,
+        wizards: discord.Role,
+    ):
+        cog = self._cog("Duels")
+        if not cog:
+            await interaction.response.send_message("Duels isn't loaded.", ephemeral=True)
+            return
+        await cog.nightscheduleroles(interaction, champions, witches, wizards)
+
+    @duels.command(name="nightschedulestatus", description="Show the weekly Duel Night schedule.")
+    async def duels_nightschedulestatus(self, interaction: discord.Interaction):
+        cog = self._cog("Duels")
+        if not cog:
+            await interaction.response.send_message("Duels isn't loaded.", ephemeral=True)
+            return
+        await cog.nightschedulestatus(interaction)
+
     # ------------------------------------------------------------ challenge
 
     @challenge.command(name="post", description="Post a challenge to the channel right now.")

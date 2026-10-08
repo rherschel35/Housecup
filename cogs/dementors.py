@@ -49,8 +49,8 @@ The house with the most fighters who registered a kill gets a turnout
 bonus; MVP (top rep) still gets +5. One big scoreboard reveal at the end
 in every channel that fought.
 
-Staff can schedule up to **three** 10-minute Attacks a week at the same
-Chicago clock time. Five minutes before each, the bot warns with
+Staff can schedule up to **three** 10-minute Attacks a week, each with its
+own Chicago day + time. Five minutes before each, the bot warns with
 Champions / Witches / Wizards role pings; it pings again when the swarm
 starts, then posts results when it ends.
 
@@ -432,9 +432,8 @@ class Dementors(commands.Cog):
     def _blank_attack_schedule() -> dict:
         return {
             "enabled": False,
-            "weekdays": [],
-            "hour": 20,
-            "minute": 0,
+            # Each slot: {weekday: 0-6, hour: 0-23, minute: 0-59}
+            "slots": [],
             "role_ids": [],
             "last_warn_key": None,
             "last_start_key": None,
@@ -444,7 +443,39 @@ class Dementors(commands.Cog):
         sched = self.state.setdefault("attack_schedule", self._blank_attack_schedule())
         for key, value in self._blank_attack_schedule().items():
             sched.setdefault(key, value)
+        # Migrate legacy shared-time shape (weekdays + one hour/minute).
+        if not sched.get("slots") and sched.get("weekdays"):
+            hour = int(sched.get("hour", 20))
+            minute = int(sched.get("minute", 0))
+            sched["slots"] = [
+                {"weekday": int(d), "hour": hour, "minute": minute}
+                for d in sched.get("weekdays") or []
+                if 0 <= int(d) <= 6
+            ]
+            self.save()
         return sched
+
+    @staticmethod
+    def _normalize_schedule_slots(raw_slots: list) -> list[dict]:
+        """Deduplicate by weekday (first wins); keep up to 3."""
+        out: list[dict] = []
+        seen: set[int] = set()
+        for raw in raw_slots:
+            try:
+                day = int(raw["weekday"])
+                hour = int(raw["hour"])
+                minute = int(raw.get("minute", 0))
+            except (KeyError, TypeError, ValueError):
+                continue
+            if not (0 <= day <= 6 and 0 <= hour <= 23 and 0 <= minute <= 59):
+                continue
+            if day in seen:
+                continue
+            seen.add(day)
+            out.append({"weekday": day, "hour": hour, "minute": minute})
+            if len(out) >= ATTACK_SCHEDULE_MAX_DAYS:
+                break
+        return out
 
     async def cog_load(self):
         import asyncio
@@ -1489,19 +1520,21 @@ class Dementors(commands.Cog):
         sched = self._attack_schedule()
         if not sched.get("enabled"):
             return None
-        weekdays = sorted({int(d) for d in sched.get("weekdays") or [] if 0 <= int(d) <= 6})
-        if not weekdays:
+        slots = self._normalize_schedule_slots(sched.get("slots") or [])
+        if not slots:
             return None
-        hour = int(sched.get("hour", 20))
-        minute = int(sched.get("minute", 0))
+        by_day = {int(s["weekday"]): s for s in slots}
         now = now or _chicago_now()
         best: dt.datetime | None = None
         for add in range(0, 8):
             day = (now + dt.timedelta(days=add)).date()
-            if day.weekday() not in weekdays:
+            spec = by_day.get(day.weekday())
+            if not spec:
                 continue
             candidate = dt.datetime(
-                day.year, day.month, day.day, hour, minute, tzinfo=CHICAGO,
+                day.year, day.month, day.day,
+                int(spec["hour"]), int(spec["minute"]),
+                tzinfo=CHICAGO,
             )
             if add == 0 and candidate + dt.timedelta(seconds=120) < now:
                 continue
@@ -1758,46 +1791,60 @@ class Dementors(commands.Cog):
 
     @group.command(
         name="eventschedule",
-        description="(staff) Schedule up to 3 weekly 10-min Attacks at one Chicago time.",
+        description="(staff) Schedule up to 3 weekly 10-min Attacks — each with its own Chicago time.",
     )
     @app_commands.describe(
-        day_a="First weekday",
-        day_b="Second weekday",
-        day_c="Third weekday",
-        hour="Hour in America/Chicago (0-23)",
-        minute="Minute (0-59)",
+        day_a="First Attack weekday",
+        hour_a="Hour for first Attack (America/Chicago, 0-23)",
+        minute_a="Minute for first Attack (0-59)",
+        day_b="Second Attack weekday",
+        hour_b="Hour for second Attack (America/Chicago, 0-23)",
+        minute_b="Minute for second Attack (0-59)",
+        day_c="Third Attack weekday",
+        hour_c="Hour for third Attack (America/Chicago, 0-23)",
+        minute_c="Minute for third Attack (0-59)",
     )
     @app_commands.choices(day_a=WEEKDAY_CHOICES, day_b=WEEKDAY_CHOICES, day_c=WEEKDAY_CHOICES)
     async def eventschedule(
         self,
         interaction: discord.Interaction,
         day_a: app_commands.Choice[int],
+        hour_a: app_commands.Range[int, 0, 23],
         day_b: app_commands.Choice[int],
+        hour_b: app_commands.Range[int, 0, 23],
         day_c: app_commands.Choice[int],
-        hour: app_commands.Range[int, 0, 23],
-        minute: app_commands.Range[int, 0, 59] = 0,
+        hour_c: app_commands.Range[int, 0, 23],
+        minute_a: app_commands.Range[int, 0, 59] = 0,
+        minute_b: app_commands.Range[int, 0, 59] = 0,
+        minute_c: app_commands.Range[int, 0, 59] = 0,
     ):
         if not await self._staff(interaction):
             return
-        days = []
-        seen: set[int] = set()
-        for choice in (day_a, day_b, day_c):
-            d = int(choice.value)
-            if d not in seen:
-                seen.add(d)
-                days.append(d)
-        if len(days) > ATTACK_SCHEDULE_MAX_DAYS:
-            days = days[:ATTACK_SCHEDULE_MAX_DAYS]
+        slots = self._normalize_schedule_slots([
+            {"weekday": day_a.value, "hour": hour_a, "minute": minute_a},
+            {"weekday": day_b.value, "hour": hour_b, "minute": minute_b},
+            {"weekday": day_c.value, "hour": hour_c, "minute": minute_c},
+        ])
+        if not slots:
+            await interaction.response.send_message(
+                "Need at least one valid weekday + time.", ephemeral=True,
+            )
+            return
         sched = self._attack_schedule()
         sched["enabled"] = True
-        sched["weekdays"] = days
-        sched["hour"] = int(hour)
-        sched["minute"] = int(minute)
+        sched["slots"] = slots
+        # Drop legacy shared-time keys if present.
+        sched.pop("weekdays", None)
+        sched.pop("hour", None)
+        sched.pop("minute", None)
         # Reset fire keys so the next matching slot can warn/start cleanly.
         sched["last_warn_key"] = None
         sched["last_start_key"] = None
         self.save()
-        day_names = ", ".join(WEEKDAY_LABELS[d] for d in days)
+        slot_lines = ", ".join(
+            f"**{WEEKDAY_LABELS[s['weekday']]}** {s['hour']:02d}:{s['minute']:02d}"
+            for s in slots
+        )
         next_slot = self._next_attack_slot()
         next_note = (
             f" Next: <t:{int(next_slot[0].timestamp())}:F>."
@@ -1811,9 +1858,8 @@ class Dementors(commands.Cog):
             "set them with `/staff dementor eventscheduleroles`.)"
         )
         await interaction.response.send_message(
-            f"Attack schedule on: **{day_names}** at "
-            f"**{int(hour):02d}:{int(minute):02d}** America/Chicago "
-            f"(5-minute warn, then 10-min swarm · top 10 share 300)."
+            f"Attack schedule on (America/Chicago): {slot_lines}. "
+            f"5-minute warn, then 10-min swarm · top 10 share 300."
             f"{next_note}{role_note}",
             ephemeral=True,
         )
@@ -1879,10 +1925,15 @@ class Dementors(commands.Cog):
                 "Weekly Attack schedule is **off**.", ephemeral=True,
             )
             return
-        days = [int(d) for d in sched.get("weekdays") or []]
-        day_names = ", ".join(WEEKDAY_LABELS[d] for d in days) if days else "(none)"
-        hour = int(sched.get("hour", 20))
-        minute = int(sched.get("minute", 0))
+        slots = self._normalize_schedule_slots(sched.get("slots") or [])
+        if slots:
+            slot_block = "\n".join(
+                f"· **{WEEKDAY_LABELS[s['weekday']]}** at "
+                f"**{s['hour']:02d}:{s['minute']:02d}**"
+                for s in slots
+            )
+        else:
+            slot_block = "· (no slots)"
         next_slot = self._next_attack_slot()
         next_note = (
             f"\nNext: <t:{int(next_slot[0].timestamp())}:F> "
@@ -1897,7 +1948,7 @@ class Dementors(commands.Cog):
             "or `/staff dementor eventscheduleroles`)"
         )
         await interaction.response.send_message(
-            f"**On** — {day_names} at **{hour:02d}:{minute:02d}** America/Chicago.\n"
+            f"**On** — America/Chicago:\n{slot_block}\n"
             f"Warn {EVENT_WARN_MINUTES} min early · 10-minute swarm · top 10 share 300."
             f"{next_note}{role_note}",
             ephemeral=True,
