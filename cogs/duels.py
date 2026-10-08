@@ -56,6 +56,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from cogs.velmora_channels import (
+    EVENT_ANNOUNCE_CHANNEL_ID,
     channel_mentions,
     duel_home_channels,
 )
@@ -1528,16 +1529,12 @@ class Duels(commands.Cog):
                 seen.add(role.id)
         return roles
 
-    def _night_announce_channel_id(self) -> int | None:
-        sched = self._night_schedule()
-        cid = sched.get("channel_id")
-        if cid:
-            try:
-                return int(cid)
-            except (TypeError, ValueError):
-                pass
-        raw = os.getenv("DUEL_CHANNEL_ID", "")
-        return int(raw) if raw.isdigit() else None
+    def _night_announce_channel_id(self) -> int:
+        """Shared board for Duel Night warn / start / results."""
+        raw = os.getenv("EVENT_ANNOUNCE_CHANNEL_ID", "").strip()
+        if raw.isdigit():
+            return int(raw)
+        return EVENT_ANNOUNCE_CHANNEL_ID
 
     async def _post_night_notice(
         self,
@@ -1710,11 +1707,14 @@ class Duels(commands.Cog):
         sched["enabled"] = True
         sched["slots"] = slots
         sched["minutes"] = minutes
-        if channel is not None:
-            sched["channel_id"] = channel.id
-        elif not sched.get("channel_id"):
-            # Default to the channel where staff set the schedule.
-            sched["channel_id"] = interaction.channel_id
+        # Always board in the shared event announce channel (channel option kept
+        # for compatibility but no longer redirects warns/starts elsewhere).
+        sched["channel_id"] = self._night_announce_channel_id()
+        if channel is not None and channel.id != sched["channel_id"]:
+            log.info(
+                "Ignoring nightschedule channel=%s; announces use %s",
+                channel.id, sched["channel_id"],
+            )
         sched["last_warn_key"] = None
         sched["last_start_key"] = None
         self.save()
@@ -1728,7 +1728,7 @@ class Duels(commands.Cog):
             if next_slot else ""
         )
         cid = self._night_announce_channel_id()
-        where = f" Announces in <#{cid}>." if cid else " Set a channel with this command's `channel` option."
+        where = f" Announces in <#{cid}>."
         roles = self._resolve_night_ping_roles(interaction.guild)
         role_note = (
             " Pings: " + ", ".join(r.mention for r in roles) + "."
@@ -1924,11 +1924,8 @@ class Duels(commands.Cog):
             color=DUEL_NIGHT_COLOR,
         )
 
-        # Auto-expire (and staff end if channel still available) posts to the arena.
-        channel_id = night.get("channel_id")
-        if not channel_id:
-            raw = os.getenv("DUEL_CHANNEL_ID", "")
-            channel_id = int(raw) if raw.isdigit() else None
+        # Auto-expire posts to the shared event announce board.
+        channel_id = night.get("channel_id") or self._night_announce_channel_id()
         if reason != "staff" and channel_id:
             channel = self.bot.get_channel(channel_id)
             if channel is not None:

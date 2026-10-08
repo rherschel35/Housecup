@@ -51,8 +51,9 @@ in every channel that fought.
 
 Staff can schedule **1–3** Attacks a week, each with its own Chicago day,
 time, and **5- or 10-minute** length. Five minutes before each, the bot
-warns with Champions / WIZARDS AND WITCHES role pings; it pings again when
-the swarm starts, then posts results when it ends.
+warns in the shared event announce channel with Champions / WIZARDS AND
+WITCHES role pings; it pings again there when the swarm starts. Monster
+waves still flood the threat channels; results post when the swarm ends.
 
 House practice floods a single house channel the same way, but awards
 nothing at the end — just drills for the real Attack.
@@ -81,6 +82,7 @@ except Exception:  # pragma: no cover - Windows without tzdata
     CHICAGO = dt.timezone.utc
 
 from cogs.velmora_channels import (
+    EVENT_ANNOUNCE_CHANNEL_ID,
     OPEN_LOUNGE_CHANNEL_IDS,
     SHARED_GAMES_CHANNEL_ID,
     STUDY_HALL_CHANNEL_ID,
@@ -1442,6 +1444,12 @@ class Dementors(commands.Cog):
             return ""
         return " ".join(r.mention for r in roles)
 
+    def _attack_announce_channel_id(self) -> int:
+        raw = os.getenv("EVENT_ANNOUNCE_CHANNEL_ID", "").strip()
+        if raw.isdigit():
+            return int(raw)
+        return EVENT_ANNOUNCE_CHANNEL_ID
+
     async def _broadcast_attack_notice(
         self,
         *,
@@ -1449,20 +1457,27 @@ class Dementors(commands.Cog):
         embed: discord.Embed,
         ping: bool,
     ) -> None:
+        """Post warn/start board copy in the shared event announce channel."""
         content = self._attack_ping_content(guild) if ping else None
         allowed = discord.AllowedMentions(roles=True, users=False, everyone=False)
-        for cid in self._event_channel_ids():
-            channel = await self._get_channel(cid)
-            if channel is None:
-                continue
-            try:
-                await channel.send(
-                    content=content or None,
-                    embed=embed,
-                    allowed_mentions=allowed if content else discord.AllowedMentions.none(),
-                )
-            except discord.HTTPException:
-                continue
+        channel = await self._get_channel(self._attack_announce_channel_id())
+        if channel is None:
+            log.warning(
+                "Attack announce channel %s not reachable",
+                self._attack_announce_channel_id(),
+            )
+            return
+        try:
+            await channel.send(
+                content=content or None,
+                embed=embed,
+                allowed_mentions=allowed if content else discord.AllowedMentions.none(),
+            )
+        except discord.HTTPException:
+            log.exception(
+                "Could not post Attack notice in %s",
+                self._attack_announce_channel_id(),
+            )
 
     async def _begin_attack(
         self,
@@ -1547,18 +1562,17 @@ class Dementors(commands.Cog):
             guild = getattr(ch0, "guild", None) if ch0 else None
             if guild is None and self.bot.guilds:
                 guild = self.bot.guilds[0]
-        content = self._attack_ping_content(guild) if ping else None
-        allowed = discord.AllowedMentions(roles=True, users=False, everyone=False)
+        # Role pings + board intro go to the shared announce channel; fight
+        # rooms only get the intro (no @mentions) before waves land.
+        if ping:
+            await self._broadcast_attack_notice(guild=guild, embed=intro, ping=True)
+        none_mentions = discord.AllowedMentions.none()
         for cid in pool:
             channel = await self._get_channel(cid)
             if channel is None:
                 continue
             try:
-                await channel.send(
-                    content=content or None,
-                    embed=intro,
-                    allowed_mentions=allowed if content else discord.AllowedMentions.none(),
-                )
+                await channel.send(embed=intro, allowed_mentions=none_mentions)
             except discord.HTTPException:
                 continue
         await self._deliver_wave(started_at, payloads)
