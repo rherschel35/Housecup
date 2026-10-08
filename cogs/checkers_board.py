@@ -12,11 +12,13 @@ import io
 from pathlib import Path
 from typing import Iterable, Optional
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
+
+from cogs.board_labels import draw_coord, load_coord_font
 
 SQ = 96
-# Discord mobile shrinks the whole PNG to ~380px wide. Glyph height is ~0.75×
-# font size, so we can go to ~124 before stacked ranks overlap. Put spare
+# Discord mobile shrinks the whole PNG to ~380px wide. Outer a–h / 1–8 are
+# drawn as bitmaps (not host fonts) so they can't collapse to ~10px. Put spare
 # pixels into the left/bottom strips only (no empty top/right).
 MARGIN_LEFT = 130
 MARGIN_RIGHT = 16
@@ -28,6 +30,8 @@ BOARD_PX = SQ * 8
 IMG_W = BOARD_PX + MARGIN_LEFT + MARGIN_RIGHT
 IMG_H = BOARD_PX + MARGIN_TOP + MARGIN_BOTTOM
 IMG_SIZE = max(IMG_W, IMG_H)  # legacy name; render uses IMG_W / IMG_H
+# 7 rows × 14px ≈ one square — max size before stacked ranks overlap.
+_OUTER_COORD_PIXEL = 14
 
 LIGHT = (240, 217, 181)
 DARK = (181, 136, 99)
@@ -47,28 +51,8 @@ BLACK_OUTLINE = (220, 215, 205)
 BLACK_HIGHLIGHT = (90, 86, 82)
 CROWN = (232, 196, 80)
 
-_LABEL_CANDIDATES = [
-    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
-    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
-    Path("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
-    Path("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"),
-]
-
-
-def _load_font(paths: list[Path], size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    for path in paths:
-        if path.is_file():
-            try:
-                return ImageFont.truetype(str(path), size)
-            except OSError:
-                continue
-    return ImageFont.load_default()
-
-
-# ~0.75× size ≈ glyph height; 124 stays under one square so ranks don't overlap.
-_LABEL_FONT = _load_font(_LABEL_CANDIDATES, 124)
-_SQUARE_COORD_FONT = _load_font(_LABEL_CANDIDATES, 52)
-_CROWN_FONT = _load_font(_LABEL_CANDIDATES, 28)
+_SQUARE_COORD_FONT = load_coord_font(52)
+_CROWN_FONT = load_coord_font(28)
 
 
 def square_name(sq: tuple[int, int]) -> str:
@@ -157,11 +141,11 @@ def render_board(
     for i in range(8):
         fx = MARGIN_LEFT + i * SQ + SQ // 2
         fy = MARGIN_TOP + i * SQ + SQ // 2
-        # Stroke keeps glyphs crisp after Discord recompresses / downscales.
-        draw.text((fx, IMG_H - MARGIN_BOTTOM // 2), files[i], font=_LABEL_FONT,
-                  fill=COORD, anchor="mm", stroke_width=5, stroke_fill=(20, 16, 12))
-        draw.text((MARGIN_LEFT // 2, fy), ranks[7 - i], font=_LABEL_FONT,
-                  fill=COORD, anchor="mm", stroke_width=5, stroke_fill=(20, 16, 12))
+        # Bitmap glyphs — never depend on host TrueType for the outer strip.
+        draw_coord(draw, (fx, IMG_H - MARGIN_BOTTOM // 2), files[i],
+                   pixel=_OUTER_COORD_PIXEL, fill=COORD)
+        draw_coord(draw, (MARGIN_LEFT // 2, fy), ranks[7 - i],
+                   pixel=_OUTER_COORD_PIXEL, fill=COORD)
 
     for sq in dest_set:
         x, y = _sq_xy(sq)
