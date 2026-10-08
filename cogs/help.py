@@ -24,7 +24,7 @@ HELP = {
         "title": "Play",
         "staff": False,
         "entries": [
-            ("duel", "Challenge someone. Best of 3 = 1 win; best of 5/7/9 = series of first-to-2 sets (set wins and losses both count on your record)."),
+            ("duel", "Challenge someone. Best of 3 = 1 win; best of 5/7/9/51 = series of first-to-2 sets banking 3/4/5/26 wins (set W/L both count). Duel Night pays the full bank at double points."),
             ("trio scramble", "Open a casual 3v3 trio duel — any houses, join either side."),
             ("trio housematch", "Open a house-vs-house 3v3 trio duel (house role gated)."),
             ("grand", "Challenge someone to a Grand Duel (both need 50+ 1v1 wins)."),
@@ -262,7 +262,7 @@ HELP = {
             ("staffgame hex cast", "Curse a student — chat mangles, or Limp Wand (blocks /wand, /patronus, /broom, /cast for 1 hour)."),
             ("staffgame hex lift", "Lift a hex early."),
             ("staffgame hex list", "Show who's currently hexed."),
-            ("staffgame duels night", "Start or end House Duel Night — pick 30 minutes or 1 hour; double points, no daily cap, end-night house/MVP bonuses."),
+            ("staffgame duels night", "Start or end House Duel Night — pick 30 minutes or 1 hour; double points, no daily cap; best-of series bank in full; end-night house/MVP bonuses."),
             ("staffgame duels nightschedule", "Schedule 1–3 weekly Duel Nights (30 min or 1 hr) — each with its own Chicago day + time."),
             ("staffgame duels nightscheduleoff", "Turn off the weekly Duel Night schedule."),
             ("staffgame duels nightscheduleroles", "Set Champions + WIZARDS AND WITCHES for Duel Night warn + start pings."),

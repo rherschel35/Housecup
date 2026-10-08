@@ -1,6 +1,6 @@
 """
-Wizard duels. Best of three by default. Optional best-of 5/7/9 series:
-each set is first to 2, and the series winner banks 3/4/5 wins.
+Wizard duels. Best of three by default. Optional best-of 5/7/9/51 series:
+each set is first to 2, and the series winner banks 3/4/5/26 wins.
 
     /duel @member              - challenge someone (1v1)
     /duelrecord [member]       - rank, wins, streak, rivals, trio/grand, points
@@ -69,13 +69,13 @@ DUELS_PATH = STATE_DIR / "duels.json"
 
 ROUNDS_TO_WIN = 2          # each set is first to 2 (a normal duel)
 MAX_ROUNDS = 9             # tie cap within one set
-# /duel best_of: 3 = one set (1 win); 5/7/9 = series of sets → 3/4/5 wins
-BEST_OF_OPTIONS = (3, 5, 7, 9)
+# /duel best_of: 3 = one set (1 win); 5/7/9/51 = series of sets → 3/4/5/26 wins
+BEST_OF_OPTIONS = (3, 5, 7, 9, 51)
 ACCEPT_TIMEOUT = 120
 
 
 def series_to_win_for(best_of: int) -> int:
-    """How many first-to-2 sets you need. Bo3 = 1 set; Bo5/7/9 = 3/4/5."""
+    """How many first-to-2 sets you need. Bo3 = 1 set; Bo5/7/9/51 = 3/4/5/26."""
     n = int(best_of)
     if n <= 3:
         return 1
@@ -862,15 +862,31 @@ class Duels(commands.Cog):
         self.save()
         return night
 
-    def _credit_duel_night(self, winner_id: int, house: str, pts: int) -> None:
+    def _credit_duel_night(
+        self,
+        winner_id: int,
+        house: str,
+        pts: int,
+        *,
+        wins: int = 1,
+    ) -> None:
+        """Add banked duel wins + points to the live Duel Night scoreboard.
+
+        ``wins`` is how many record/series wins this result is worth (1 for a
+        normal duel; 3/4/5/26 for best-of 5/7/9/51). Points should already
+        include the night multiplier (and rival bonus, if any).
+        """
         night = self.state.get("duel_night")
         if not night or pts <= 0 or not house:
+            return
+        win_n = max(0, int(wins))
+        if win_n <= 0:
             return
         entry = night.setdefault("tally", {}).setdefault(
             str(winner_id), {"wins": 0, "pts": 0, "house": house}
         )
-        entry["wins"] = int(entry.get("wins", 0)) + 1
-        entry["pts"] = int(entry.get("pts", 0)) + pts
+        entry["wins"] = int(entry.get("wins", 0)) + win_n
+        entry["pts"] = int(entry.get("pts", 0)) + int(pts)
         entry["house"] = house
 
     def note_round_win(self, user_id: int, spell: str) -> None:
@@ -901,7 +917,7 @@ class Duels(commands.Cog):
         triggers. Returns what happened so the announcement can say so.
 
         ``match_wins`` is how many house-point / streak / weekly units the
-        series is worth (1 for a normal duel; 3/4/5 for best-of 5/7/9).
+        series is worth (1 for a normal duel; 3/4/5/26 for best-of 5/7/9/51).
 
         ``winner_sets`` / ``loser_sets`` are the set score for W/L record.
         When omitted (normal duel), the winner gets ``match_wins`` wins and
@@ -949,7 +965,7 @@ class Duels(commands.Cog):
                     f"{meetings} times. They are now **{title}**."
                 )
 
-        # ------------------------------------------------ house points (per set-win, capped)
+        # ------------------------------------------------ house points (per banked win, capped)
         outcome = {
             "awarded": 0, "reason": None, "house": w_house, "notes": notes,
             "night": night, "rival": rivals, "match_wins": match_wins,
@@ -959,38 +975,44 @@ class Duels(commands.Cog):
             outcome["reason"] = "no-house"
         elif same_house:
             outcome["reason"] = "same-house"
+        elif night:
+            # Duel Night: no daily cap. Every banked series win pays double
+            # (rival meetings still double again). Scoreboard tallies the
+            # full best-of bank in one credit so MVP / house totals match.
+            per_bank = 2 if rivals else 1
+            paid_units = match_wins * per_bank
+            total_pts = paid_units * REWARD_POINTS * DUEL_NIGHT_MULTIPLIER
+            self._credit_duel_night(
+                winner.id, w_house, total_pts, wins=match_wins,
+            )
+            why = f"Duel win over {loser.display_name}"
+            if match_wins > 1:
+                why += f" (best-of series ×{match_wins})"
+            if rivals:
+                why += " (rival)"
+            why += " (Duel Night)"
+            self._award(store, w_house, total_pts, winner.id, why)
+            outcome["awarded"] = total_pts
         else:
             total_pts = 0
             paid_units = 0
             for _ in range(match_wins):
-                if night:
-                    wins_paid = 2 if rivals else 1
-                    slots = wins_paid
-                else:
-                    slots = REWARDED_PER_DAY - self.rewarded_today(winner.id, now)
-                    wins_paid = 0
+                slots = REWARDED_PER_DAY - self.rewarded_today(winner.id, now)
                 if slots <= 0:
                     if paid_units == 0:
                         outcome["reason"] = "daily-cap"
                     break
-                if not night:
-                    wins_paid = 1 + (1 if rivals and slots >= 2 else 0)
-                base = wins_paid * REWARD_POINTS
-                pts = base * (DUEL_NIGHT_MULTIPLIER if night else 1)
+                wins_paid = 1 + (1 if rivals and slots >= 2 else 0)
+                pts = wins_paid * REWARD_POINTS
                 total_pts += pts
                 paid_units += wins_paid
-                if not night:
-                    self.state["rewarded"].setdefault(wid, []).extend([now] * wins_paid)
-                else:
-                    self._credit_duel_night(winner.id, w_house, pts)
+                self.state["rewarded"].setdefault(wid, []).extend([now] * wins_paid)
             if total_pts:
                 why = f"Duel win over {loser.display_name}"
                 if match_wins > 1:
                     why += f" (best-of series ×{match_wins})"
                 if rivals and paid_units > match_wins:
                     why += " (rival)"
-                if night:
-                    why += " (Duel Night)"
                 self._award(store, w_house, total_pts, winner.id, why)
                 outcome["awarded"] = total_pts
             elif outcome.get("reason") is None:
@@ -1240,13 +1262,14 @@ class Duels(commands.Cog):
     @app_commands.command(name="duel", description="Challenge someone to a wizard's duel.")
     @app_commands.describe(
         opponent="Who you're challenging",
-        best_of="Series length: 3 = one duel (default). 5/7/9 = play sets of first-to-2 until someone banks 3/4/5 wins.",
+        best_of="Series length: 3 = one duel (default). 5/7/9/51 = play sets of first-to-2 until someone banks 3/4/5/26 wins.",
     )
     @app_commands.choices(best_of=[
         app_commands.Choice(name="Best of 3 (1 win)", value=3),
         app_commands.Choice(name="Best of 5 (first to 3 · 3 wins)", value=5),
         app_commands.Choice(name="Best of 7 (first to 4 · 4 wins)", value=7),
         app_commands.Choice(name="Best of 9 (first to 5 · 5 wins)", value=9),
+        app_commands.Choice(name="Best of 51 — extreme (first to 26 · 26 wins)", value=51),
     ])
     async def duel(
         self,
@@ -1431,6 +1454,9 @@ class Duels(commands.Cog):
                 f"**{label}** — every **cross-house** duel win counts **double** "
                 f"for your house with **no daily win cap**. Same-house duels earn "
                 f"**no** house points.\n\n"
+                f"**Best-of** series count in full: win a best of 5/7/9/51 and the "
+                f"night scoreboard banks **3 / 4 / 5 / 26** wins (and double points "
+                f"for each).\n\n"
                 f"When the night ends, the house with the most points gets a "
                 f"**+{DUEL_NIGHT_HOUSE_BONUS}** bonus, and the night's MVP gets "
                 f"**+{DUEL_NIGHT_MVP_BONUS}**.\n\n"
@@ -1883,10 +1909,13 @@ class Duels(commands.Cog):
         minutes = int(night.get("minutes") or 0)
         label = DUEL_NIGHT_PRESETS.get(minutes) or (f"{minutes} minutes" if minutes else "time")
         how = "Staff ended the night" if reason == "staff" else f"Time's up ({label})"
-        lines = [f"{how}. Cross-house wins paid double all night — same-house duels never did."]
+        lines = [
+            f"{how}. Cross-house wins paid double all night — same-house duels never did. "
+            f"Best-of series banked in full (3/4/5/26 for best of 5/7/9/51)."
+        ]
         if rows:
             lines.append("")
-            lines.append(f"**{sum(r['wins'] for r in rows)}** paid win(s) by **{len(rows)}** duelist(s).")
+            lines.append(f"**{sum(r['wins'] for r in rows)}** banked win(s) by **{len(rows)}** duelist(s).")
             lines.append("")
             for r in rows[:10]:
                 crown = "👑 " if r["uid"] in mvp_uids else ""
