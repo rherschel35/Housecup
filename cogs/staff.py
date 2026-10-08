@@ -399,7 +399,7 @@ class Staff(commands.Cog):
         day_c="Optional third night weekday",
         hour_c="Hour for third night (required if day_c is set)",
         minute_c="Minute for third night (0-59)",
-        channel="Where to post warn / start / results",
+        channel="Ignored — warn / start / results always post to the event announce channel",
     )
     @app_commands.choices(
         day_a=[
