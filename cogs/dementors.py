@@ -41,12 +41,18 @@ channels every 23 seconds - whatever was still standing gets swept aside
 for the new wave. Staff pick a **5-minute** or **10-minute** swarm:
 
   - 5 minutes: top **7** by kills share a **100**-point pool
-  - 10 minutes: top **5** by kills share a **200**-point pool (double)
+  - 10 minutes: top **10** by kills share a **300**-point pool
 
-Each scorer gets floor((their kills ÷ total swarm kills) × pool). The house
-with the most fighters who registered a kill gets a turnout bonus; MVP
-(top rep) still gets +5. One big scoreboard reveal at the end in every
-channel that fought.
+Each scorer gets floor((their kills ÷ total swarm kills) × pool). The end
+board lists **everyone** who scored a kill (share only pays the top cut).
+The house with the most fighters who registered a kill gets a turnout
+bonus; MVP (top rep) still gets +5. One big scoreboard reveal at the end
+in every channel that fought.
+
+Staff can schedule up to **three** 10-minute Attacks a week at the same
+Chicago clock time. Five minutes before each, the bot warns with
+Champions / Witches / Wizards role pings; it pings again when the swarm
+starts, then posts results when it ends.
 
 House practice floods a single house channel the same way, but awards
 nothing at the end — just drills for the real Attack.
@@ -56,6 +62,7 @@ Discord, so a busy Attack doesn't freeze every other /cast behind one
 slow image upload.
 """
 
+import datetime as dt
 import json
 import logging
 import os
@@ -66,6 +73,12 @@ from pathlib import Path
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
+
+try:
+    from zoneinfo import ZoneInfo
+    CHICAGO = ZoneInfo("America/Chicago")
+except Exception:  # pragma: no cover - Windows without tzdata
+    CHICAGO = dt.timezone.utc
 
 from cogs.velmora_channels import (
     OPEN_LOUNGE_CHANNEL_IDS,
@@ -120,14 +133,55 @@ EVENT_WAVE_SECONDS = 23
 EVENT_DEFAULT_MINUTES = 5
 EVENT_MAX_MINUTES = 60  # house practice can run custom lengths; Attack uses presets
 EVENT_MVP_BONUS = 5
-EVENT_KILL_POOL = 100  # shared by the kill cut: floor((kills / swarm total) × pool)
+EVENT_KILL_POOL = 100  # legacy base; presets set kill_pool explicitly
 EVENT_HOUSE_TURNOUT_BONUS = 10  # house with the most fighters who registered a kill
-# length minutes → kill-share cut size, and pool multiplier
+# length minutes → kill-share cut size and absolute pool
 EVENT_PRESETS = {
-    5: {"reward_top": 7, "point_mult": 1, "label": "5-minute"},
-    10: {"reward_top": 5, "point_mult": 2, "label": "10-minute"},
+    5: {"reward_top": 7, "kill_pool": 100, "label": "5-minute"},
+    10: {"reward_top": 10, "kill_pool": 300, "label": "10-minute"},
 }
 EVENT_COLOR = 0x8A2F2F
+EVENT_WARN_MINUTES = 5
+ATTACK_SCHEDULE_MAX_DAYS = 3
+# Role names pinged on warn + start (case-insensitive). Override with env:
+# ATTACK_PING_ROLE_NAMES=Champions,Witches,Wizards
+_DEFAULT_PING_NAMES = ("Champions", "Witches", "Wizards")
+WEEKDAY_CHOICES = [
+    app_commands.Choice(name="Monday", value=0),
+    app_commands.Choice(name="Tuesday", value=1),
+    app_commands.Choice(name="Wednesday", value=2),
+    app_commands.Choice(name="Thursday", value=3),
+    app_commands.Choice(name="Friday", value=4),
+    app_commands.Choice(name="Saturday", value=5),
+    app_commands.Choice(name="Sunday", value=6),
+]
+WEEKDAY_LABELS = (
+    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+)
+
+
+def _preset_kill_pool(preset: dict) -> int:
+    if "kill_pool" in preset:
+        return int(preset["kill_pool"])
+    # Older in-memory shape used point_mult × EVENT_KILL_POOL.
+    return int(EVENT_KILL_POOL * int(preset.get("point_mult") or 1))
+
+
+def _event_kill_pool(event: dict) -> int:
+    if event.get("kill_pool") is not None:
+        return int(event["kill_pool"])
+    return int(EVENT_KILL_POOL * int(event.get("point_mult") or 1))
+
+
+def _chicago_now(ts: float | None = None) -> dt.datetime:
+    return dt.datetime.fromtimestamp(ts if ts is not None else time.time(), CHICAGO)
+
+
+def _attack_ping_role_names() -> list[str]:
+    raw = os.getenv("ATTACK_PING_ROLE_NAMES", "").strip()
+    if raw:
+        return [p.strip() for p in raw.split(",") if p.strip()]
+    return list(_DEFAULT_PING_NAMES)
 
 
 def kill_share_awards(
@@ -372,16 +426,37 @@ class Dementors(commands.Cog):
         self.state.setdefault("day_key", "")
         self.state.setdefault("spawns_today", 0)
         self.state.setdefault("event", None)
+        self.state.setdefault("attack_schedule", self._blank_attack_schedule())
+
+    @staticmethod
+    def _blank_attack_schedule() -> dict:
+        return {
+            "enabled": False,
+            "weekdays": [],
+            "hour": 20,
+            "minute": 0,
+            "role_ids": [],
+            "last_warn_key": None,
+            "last_start_key": None,
+        }
+
+    def _attack_schedule(self) -> dict:
+        sched = self.state.setdefault("attack_schedule", self._blank_attack_schedule())
+        for key, value in self._blank_attack_schedule().items():
+            sched.setdefault(key, value)
+        return sched
 
     async def cog_load(self):
         import asyncio
         self.lock = asyncio.Lock()
         self.tick.start()
         self.event_tick.start()
+        self.attack_schedule_tick.start()
 
     async def cog_unload(self):
         self.tick.cancel()
         self.event_tick.cancel()
+        self.attack_schedule_tick.cancel()
 
     def _load(self) -> dict:
         try:
@@ -1023,7 +1098,6 @@ class Dementors(commands.Cog):
 
         actor = self.bot.user.id if self.bot.user else 0
         reward_top = int(event.get("reward_top") or EVENT_PRESETS[EVENT_DEFAULT_MINUTES]["reward_top"])
-        point_mult = int(event.get("point_mult") or 1)
         minutes = int(event.get("minutes") or EVENT_DEFAULT_MINUTES)
 
         rows = []
@@ -1047,10 +1121,9 @@ class Dementors(commands.Cog):
             key=lambda r: (-r["kills"], -r["rep"], r["uid"]),
         )
         total_kills = sum(r["kills"] for r in rows)
-        # Who cashes kill-share: top 7 on 5-min, top 5 on 10-min.
+        # Who cashes kill-share: top 7 on 5-min, top 10 on 10-min.
         kill_cut = reward_top
-        # Pool: 100 (×2 on 10-minute). floor((kills / total_swarm_kills) × pool).
-        kill_pool = EVENT_KILL_POOL * point_mult
+        kill_pool = _event_kill_pool(event)
         kill_share = kill_share_awards(
             by_kills,
             pool=kill_pool,
@@ -1114,7 +1187,8 @@ class Dementors(commands.Cog):
             ]
             if by_kills:
                 lines.append("")
-                for place, r in enumerate(by_kills[:10], start=1):
+                lines.append("Everyone with a kill:")
+                for place, r in enumerate(by_kills, start=1):
                     crown = "👑 " if r["uid"] in mvp_uids else ""
                     house_note = (
                         f" - House {HOUSES[r['house']]['name']}" if r["house"] else ""
@@ -1124,14 +1198,13 @@ class Dementors(commands.Cog):
                         f"{r['rep']} rep{house_note}"
                     )
         else:
-            mult_note = f" · kill pool ×{point_mult}" if point_mult != 1 else ""
             lines = [
-                f"**{total_kills}** monster(s) put down by **{len(rows)}** wizard(s) "
-                f"({minutes}-minute swarm{mult_note})."
+                f"**{total_kills}** monster(s) put down by **{len(by_kills)}** wizard(s) "
+                f"with a kill ({minutes}-minute swarm · **{kill_pool}**-pt pool)."
             ]
 
-            share_lines = []
-            for place, r in enumerate(by_kills[:kill_cut], start=1):
+            board_lines = []
+            for place, r in enumerate(by_kills, start=1):
                 pts = kill_share.get(r["uid"], 0)
                 pct = (100.0 * r["kills"] / total_kills) if total_kills else 0.0
                 bits = []
@@ -1143,17 +1216,24 @@ class Dementors(commands.Cog):
                     f" - House {HOUSES[r['house']]['name']}" if r["house"]
                     else " - no house, no points"
                 )
-                share_lines.append(
-                    f"{crown}**#{place}** <@{r['uid']}>: {r['kills']} kill(s) "
-                    f"({pct:.0f}% of swarm) → **+{pts}**{house_note}{bonus_note}"
-                )
-            if share_lines:
+                if place <= kill_cut:
+                    board_lines.append(
+                        f"{crown}**#{place}** <@{r['uid']}>: {r['kills']} kill(s) "
+                        f"({pct:.0f}% of swarm) → **+{pts}**{house_note}{bonus_note}"
+                    )
+                else:
+                    board_lines.append(
+                        f"**#{place}** <@{r['uid']}>: {r['kills']} kill(s) "
+                        f"({pct:.0f}% of swarm){house_note}"
+                    )
+            if board_lines:
                 lines.append("")
                 lines.append(
                     f"Top **{kill_cut}** by kills share **{kill_pool}** pts "
-                    f"(kills ÷ total swarm kills × {kill_pool}):"
+                    f"(kills ÷ total swarm kills × {kill_pool}). "
+                    f"Full kill board:"
                 )
-                lines.extend(share_lines)
+                lines.extend(board_lines)
             elif rows:
                 lines.append("Nobody scored a kill — no points awarded.")
 
@@ -1190,23 +1270,25 @@ class Dementors(commands.Cog):
             f"🏳️ Practice ended — {event['name']}"
             if practice else f"🏳️ {event['name']} has ended"
         )
-        embed = discord.Embed(
-            title=title,
-            description="\n".join(lines) if rows else (
-                "Nobody landed a hit. Good drill anyway — no points either way."
-                if practice else
-                "Nobody landed a hit. The grounds are quiet again."
-            ),
-            color=EVENT_COLOR,
-        )
+        chunks = self._embed_desc_chunks(lines) if rows else [(
+            "Nobody landed a hit. Good drill anyway — no points either way."
+            if practice else
+            "Nobody landed a hit. The grounds are quiet again."
+        )]
         for cid in self._event_channel_ids(event):
             channel = self.bot.get_channel(cid)
             if channel is None:
                 continue
-            try:
-                await channel.send(embed=embed)
-            except discord.HTTPException:
-                continue
+            for i, chunk in enumerate(chunks):
+                embed = discord.Embed(
+                    title=title if i == 0 else f"{title} (cont.)",
+                    description=chunk,
+                    color=EVENT_COLOR,
+                )
+                try:
+                    await channel.send(embed=embed)
+                except discord.HTTPException:
+                    break
 
     @tasks.loop(seconds=EVENT_WAVE_SECONDS)
     async def event_tick(self):
@@ -1229,6 +1311,255 @@ class Dementors(commands.Cog):
 
     @event_tick.before_loop
     async def before_event_tick(self):
+        await self.bot.wait_until_ready()
+
+    @staticmethod
+    def _embed_desc_chunks(lines: list[str], *, limit: int = 3900) -> list[str]:
+        """Split scoreboard lines so each Discord embed description fits."""
+        if not lines:
+            return [""]
+        chunks: list[str] = []
+        cur: list[str] = []
+        size = 0
+        for line in lines:
+            add = len(line) + (1 if cur else 0)
+            if cur and size + add > limit:
+                chunks.append("\n".join(cur))
+                cur = [line]
+                size = len(line)
+            else:
+                cur.append(line)
+                size += add
+        if cur:
+            chunks.append("\n".join(cur))
+        return chunks
+
+    def _resolve_attack_ping_roles(self, guild: discord.Guild | None) -> list[discord.Role]:
+        if guild is None:
+            return []
+        sched = self._attack_schedule()
+        roles: list[discord.Role] = []
+        seen: set[int] = set()
+        for rid in sched.get("role_ids") or []:
+            try:
+                role = guild.get_role(int(rid))
+            except (TypeError, ValueError):
+                continue
+            if role and role.id not in seen:
+                roles.append(role)
+                seen.add(role.id)
+        if roles:
+            return roles
+        wanted = {n.lower() for n in _attack_ping_role_names()}
+        for role in guild.roles:
+            if role.name.lower() in wanted and role.id not in seen:
+                roles.append(role)
+                seen.add(role.id)
+        return roles
+
+    def _attack_ping_content(self, guild: discord.Guild | None) -> str:
+        roles = self._resolve_attack_ping_roles(guild)
+        if not roles:
+            return ""
+        return " ".join(r.mention for r in roles)
+
+    async def _broadcast_attack_notice(
+        self,
+        *,
+        guild: discord.Guild | None,
+        embed: discord.Embed,
+        ping: bool,
+    ) -> None:
+        content = self._attack_ping_content(guild) if ping else None
+        allowed = discord.AllowedMentions(roles=True, users=False, everyone=False)
+        for cid in self._event_channel_ids():
+            channel = await self._get_channel(cid)
+            if channel is None:
+                continue
+            try:
+                await channel.send(
+                    content=content or None,
+                    embed=embed,
+                    allowed_mentions=allowed if content else discord.AllowedMentions.none(),
+                )
+            except discord.HTTPException:
+                continue
+
+    async def _begin_attack(
+        self,
+        *,
+        minutes: int,
+        name: str,
+        guild_id: int | None,
+    ) -> tuple[bool, str, tuple | None]:
+        """Start a live Attack. Returns (ok, staff_message, start_tuple_or_None)."""
+        preset = EVENT_PRESETS.get(minutes)
+        if not preset:
+            return False, "Pick a 5- or 10-minute Attack.", None
+        if self.lock is None:
+            return False, "Wild Threats is still starting up — try again in a few seconds.", None
+
+        async with self.lock:
+            if self.state.get("event"):
+                running = self.state["event"]
+                kind = "practice swarm" if running.get("practice") else "Attack"
+                return (
+                    False,
+                    f"**{running['name']}** ({kind}) is already running — "
+                    "`/staff dementor eventend` first.",
+                    None,
+                )
+            pool = self._event_channel_ids()
+            if not pool:
+                return False, "No channels configured yet - run `/staff dementor channels` first.", None
+
+            clean_name = (name or "").strip() or "Attack on Velmora"
+            now = time.time()
+            active = self.state.get("active")
+            if not (
+                active
+                and active.get("channel_id") in PRACTICE_SUMMON_CHANNEL_IDS
+            ):
+                self.state["active"] = None
+            pool_pts = _preset_kill_pool(preset)
+            mult_line = (
+                f"Top **{preset['reward_top']}** by kills share **{pool_pts}** pts "
+                f"(kills ÷ total swarm kills × {pool_pts})."
+            )
+            event = {
+                "name": clean_name,
+                "started_at": now,
+                "ends_at": now + minutes * 60,
+                "minutes": minutes,
+                "reward_top": preset["reward_top"],
+                "kill_pool": pool_pts,
+                "guild_id": guild_id,
+                "channels": {},
+                "tally": {},
+            }
+            self.state["event"] = event
+            self.save()
+            intro = discord.Embed(
+                title=f"⚔️ {clean_name}",
+                description=(
+                    self.rng.choice(ATTACK_INTRO)
+                    + f"\n\n**{preset['label']}** swarm — waves for the next "
+                    f"**{minutes}** minutes. {mult_line} "
+                    f"House turnout: **+{EVENT_HOUSE_TURNOUT_BONUS}** · "
+                    f"MVP: **+{EVENT_MVP_BONUS}**."
+                ),
+                color=EVENT_COLOR,
+            )
+            payloads = self._prepare_wave(event)
+            start = (event["started_at"], payloads, clean_name, minutes, intro, pool, preset)
+
+        return (
+            True,
+            f"**{clean_name}** begins now — **{preset['label']}** "
+            f"(top {preset['reward_top']} share {pool_pts} kill pts).",
+            start,
+        )
+
+    async def _announce_attack_wave(self, start: tuple, *, ping: bool = False) -> None:
+        started_at, payloads, _clean_name, _minutes, intro, pool, _preset = start
+        guild = None
+        if pool:
+            ch0 = self.bot.get_channel(pool[0])
+            guild = getattr(ch0, "guild", None) if ch0 else None
+            if guild is None and self.bot.guilds:
+                guild = self.bot.guilds[0]
+        content = self._attack_ping_content(guild) if ping else None
+        allowed = discord.AllowedMentions(roles=True, users=False, everyone=False)
+        for cid in pool:
+            channel = await self._get_channel(cid)
+            if channel is None:
+                continue
+            try:
+                await channel.send(
+                    content=content or None,
+                    embed=intro,
+                    allowed_mentions=allowed if content else discord.AllowedMentions.none(),
+                )
+            except discord.HTTPException:
+                continue
+        await self._deliver_wave(started_at, payloads)
+
+    def _next_attack_slot(self, now: dt.datetime | None = None) -> tuple[dt.datetime, str] | None:
+        """Next Chicago slot (warn/start target) from the saved weekly schedule."""
+        sched = self._attack_schedule()
+        if not sched.get("enabled"):
+            return None
+        weekdays = sorted({int(d) for d in sched.get("weekdays") or [] if 0 <= int(d) <= 6})
+        if not weekdays:
+            return None
+        hour = int(sched.get("hour", 20))
+        minute = int(sched.get("minute", 0))
+        now = now or _chicago_now()
+        best: dt.datetime | None = None
+        for add in range(0, 8):
+            day = (now + dt.timedelta(days=add)).date()
+            if day.weekday() not in weekdays:
+                continue
+            candidate = dt.datetime(
+                day.year, day.month, day.day, hour, minute, tzinfo=CHICAGO,
+            )
+            if add == 0 and candidate + dt.timedelta(seconds=120) < now:
+                continue
+            if best is None or candidate < best:
+                best = candidate
+        if best is None:
+            return None
+        key = best.strftime("%Y-%m-%dT%H:%M")
+        return best, key
+
+    @tasks.loop(seconds=30)
+    async def attack_schedule_tick(self):
+        sched = self._attack_schedule()
+        if not sched.get("enabled"):
+            return
+        slot = self._next_attack_slot()
+        if slot is None:
+            return
+        target, key = slot
+        now = _chicago_now()
+        warn_at = target - dt.timedelta(minutes=EVENT_WARN_MINUTES)
+
+        # Five-minute warning.
+        if warn_at <= now < target and sched.get("last_warn_key") != key:
+            guild = self.bot.guilds[0] if self.bot.guilds else None
+            embed = discord.Embed(
+                title="⚔️ Attack on Velmora — 5 minutes",
+                description=(
+                    f"A **10-minute** swarm hits <t:{int(target.timestamp())}:t> "
+                    f"(<t:{int(target.timestamp())}:R>). "
+                    f"Top **10** by kills share **300** pts. Get ready."
+                ),
+                color=EVENT_COLOR,
+            )
+            await self._broadcast_attack_notice(guild=guild, embed=embed, ping=True)
+            sched["last_warn_key"] = key
+            self.save()
+            log.info("Posted Attack warn for slot %s", key)
+
+        # Start window: on time through +2 minutes (bot was briefly down).
+        if target <= now < target + dt.timedelta(seconds=120) and sched.get("last_start_key") != key:
+            guild = self.bot.guilds[0] if self.bot.guilds else None
+            guild_id = guild.id if guild else None
+            ok, msg, start = await self._begin_attack(
+                minutes=10,
+                name="Attack on Velmora",
+                guild_id=guild_id,
+            )
+            sched["last_start_key"] = key
+            self.save()
+            if ok and start:
+                await self._announce_attack_wave(start, ping=True)
+                log.info("Scheduled Attack started for slot %s", key)
+            else:
+                log.warning("Scheduled Attack did not start for %s: %s", key, msg)
+
+    @attack_schedule_tick.before_loop
+    async def before_attack_schedule_tick(self):
         await self.bot.wait_until_ready()
 
     # ------------------------------------------------------------ staff
@@ -1386,12 +1717,12 @@ class Dementors(commands.Cog):
 
     @group.command(name="eventstart", description="(staff) Start Attack on Velmora — pick 5 or 10 minutes.")
     @app_commands.describe(
-        length="5-minute (top 7 share 100) or 10-minute (top 5 share 200)",
+        length="5-minute (top 7 share 100) or 10-minute (top 10 share 300)",
         name="What to call it",
     )
     @app_commands.choices(length=[
         app_commands.Choice(name="5 minutes — top 7 share 100 kill pts", value=5),
-        app_commands.Choice(name="10 minutes — top 5 share 200 kill pts", value=10),
+        app_commands.Choice(name="10 minutes — top 10 share 300 kill pts", value=10),
     ])
     async def eventstart(
         self,
@@ -1402,86 +1733,19 @@ class Dementors(commands.Cog):
         if not await self._staff(interaction):
             return
         minutes = int(length.value)
-        preset = EVENT_PRESETS[minutes]
 
         # Ack Discord before waiting on the shared lock / posting waves.
         await interaction.response.defer(ephemeral=True)
 
         try:
-            err = None
-            start = None  # (started_at, payloads, clean_name, minutes, intro, pool, preset)
-            async with self.lock:
-                if self.state.get("event"):
-                    err = f"**{self.state['event']['name']}** is already running."
-                else:
-                    pool = self._event_channel_ids()
-                    if not pool:
-                        err = "No channels configured yet - run `/staff dementor channels` first."
-                    else:
-                        clean_name = name.strip() or "Attack on Velmora"
-                        now = time.time()
-                        # Clear encounter only if it's in an event channel; leave
-                        # a practice-room summon alone.
-                        active = self.state.get("active")
-                        if not (
-                            active
-                            and active.get("channel_id") in PRACTICE_SUMMON_CHANNEL_IDS
-                        ):
-                            self.state["active"] = None
-                        pool_pts = EVENT_KILL_POOL * preset["point_mult"]
-                        mult_line = (
-                            f"Top **{preset['reward_top']}** by kills share **{pool_pts}** pts "
-                            f"(kills ÷ total swarm kills × {pool_pts})"
-                            + (" — double pool." if preset["point_mult"] > 1 else ".")
-                        )
-                        event = {
-                            "name": clean_name,
-                            "started_at": now,
-                            "ends_at": now + minutes * 60,
-                            "minutes": minutes,
-                            "reward_top": preset["reward_top"],
-                            "point_mult": preset["point_mult"],
-                            "guild_id": interaction.guild_id,
-                            "channels": {},
-                            "tally": {},
-                        }
-                        self.state["event"] = event
-                        self.save()
-                        intro = discord.Embed(
-                            title=f"⚔️ {clean_name}",
-                            description=(
-                                self.rng.choice(ATTACK_INTRO)
-                                + f"\n\n**{preset['label']}** swarm — waves for the next "
-                                f"**{minutes}** minutes. {mult_line} "
-                                f"House turnout: **+{EVENT_HOUSE_TURNOUT_BONUS}** · "
-                                f"MVP: **+{EVENT_MVP_BONUS}**."
-                            ),
-                            color=EVENT_COLOR,
-                        )
-                        payloads = self._prepare_wave(event)
-                        start = (event["started_at"], payloads, clean_name, minutes, intro, pool, preset)
-
-            if err:
-                await interaction.followup.send(err, ephemeral=True)
-                return
-
-            started_at, payloads, clean_name, minutes, intro, pool, preset = start
-            await interaction.followup.send(
-                f"**{clean_name}** begins now — **{preset['label']}** "
-                f"(top {preset['reward_top']} share {EVENT_KILL_POOL * preset['point_mult']} kill pts).",
-                ephemeral=True,
+            ok, msg, start = await self._begin_attack(
+                minutes=minutes,
+                name=name,
+                guild_id=interaction.guild_id,
             )
-
-            for cid in pool:
-                channel = await self._get_channel(cid)
-                if channel is None:
-                    continue
-                try:
-                    await channel.send(embed=intro)
-                except discord.HTTPException:
-                    continue
-
-            await self._deliver_wave(started_at, payloads)
+            await interaction.followup.send(msg, ephemeral=True)
+            if ok and start:
+                await self._announce_attack_wave(start, ping=False)
         except Exception:
             log.exception("Attack on Velmora failed to start")
             try:
@@ -1491,6 +1755,153 @@ class Dementors(commands.Cog):
                 )
             except discord.HTTPException:
                 pass
+
+    @group.command(
+        name="eventschedule",
+        description="(staff) Schedule up to 3 weekly 10-min Attacks at one Chicago time.",
+    )
+    @app_commands.describe(
+        day_a="First weekday",
+        day_b="Second weekday",
+        day_c="Third weekday",
+        hour="Hour in America/Chicago (0-23)",
+        minute="Minute (0-59)",
+    )
+    @app_commands.choices(day_a=WEEKDAY_CHOICES, day_b=WEEKDAY_CHOICES, day_c=WEEKDAY_CHOICES)
+    async def eventschedule(
+        self,
+        interaction: discord.Interaction,
+        day_a: app_commands.Choice[int],
+        day_b: app_commands.Choice[int],
+        day_c: app_commands.Choice[int],
+        hour: app_commands.Range[int, 0, 23],
+        minute: app_commands.Range[int, 0, 59] = 0,
+    ):
+        if not await self._staff(interaction):
+            return
+        days = []
+        seen: set[int] = set()
+        for choice in (day_a, day_b, day_c):
+            d = int(choice.value)
+            if d not in seen:
+                seen.add(d)
+                days.append(d)
+        if len(days) > ATTACK_SCHEDULE_MAX_DAYS:
+            days = days[:ATTACK_SCHEDULE_MAX_DAYS]
+        sched = self._attack_schedule()
+        sched["enabled"] = True
+        sched["weekdays"] = days
+        sched["hour"] = int(hour)
+        sched["minute"] = int(minute)
+        # Reset fire keys so the next matching slot can warn/start cleanly.
+        sched["last_warn_key"] = None
+        sched["last_start_key"] = None
+        self.save()
+        day_names = ", ".join(WEEKDAY_LABELS[d] for d in days)
+        next_slot = self._next_attack_slot()
+        next_note = (
+            f" Next: <t:{int(next_slot[0].timestamp())}:F>."
+            if next_slot else ""
+        )
+        roles = self._resolve_attack_ping_roles(interaction.guild)
+        role_note = (
+            " Pings: " + ", ".join(r.mention for r in roles) + "."
+            if roles else
+            " (No Champions/Witches/Wizards roles found — "
+            "set them with `/staff dementor eventscheduleroles`.)"
+        )
+        await interaction.response.send_message(
+            f"Attack schedule on: **{day_names}** at "
+            f"**{int(hour):02d}:{int(minute):02d}** America/Chicago "
+            f"(5-minute warn, then 10-min swarm · top 10 share 300)."
+            f"{next_note}{role_note}",
+            ephemeral=True,
+        )
+
+    @group.command(
+        name="eventscheduleoff",
+        description="(staff) Turn off the weekly Attack schedule.",
+    )
+    async def eventscheduleoff(self, interaction: discord.Interaction):
+        if not await self._staff(interaction):
+            return
+        sched = self._attack_schedule()
+        sched["enabled"] = False
+        self.save()
+        await interaction.response.send_message(
+            "Weekly Attack schedule is off. Manual `/staff dementor eventstart` still works.",
+            ephemeral=True,
+        )
+
+    @group.command(
+        name="eventscheduleroles",
+        description="(staff) Roles pinged 5 min before and at Attack start.",
+    )
+    @app_commands.describe(
+        champions="Champions role",
+        witches="Witches role",
+        wizards="Wizards role",
+    )
+    async def eventscheduleroles(
+        self,
+        interaction: discord.Interaction,
+        champions: discord.Role,
+        witches: discord.Role,
+        wizards: discord.Role,
+    ):
+        if not await self._staff(interaction):
+            return
+        sched = self._attack_schedule()
+        # Preserve order; drop duplicates.
+        ids: list[int] = []
+        for role in (champions, witches, wizards):
+            if role.id not in ids:
+                ids.append(role.id)
+        sched["role_ids"] = ids
+        self.save()
+        await interaction.response.send_message(
+            "Attack pings will mention "
+            + ", ".join(r.mention for r in (champions, witches, wizards))
+            + " on the 5-minute warning and again when the swarm starts.",
+            ephemeral=True,
+        )
+
+    @group.command(
+        name="eventschedulestatus",
+        description="(staff) Show the weekly Attack schedule.",
+    )
+    async def eventschedulestatus(self, interaction: discord.Interaction):
+        if not await self._staff(interaction):
+            return
+        sched = self._attack_schedule()
+        if not sched.get("enabled"):
+            await interaction.response.send_message(
+                "Weekly Attack schedule is **off**.", ephemeral=True,
+            )
+            return
+        days = [int(d) for d in sched.get("weekdays") or []]
+        day_names = ", ".join(WEEKDAY_LABELS[d] for d in days) if days else "(none)"
+        hour = int(sched.get("hour", 20))
+        minute = int(sched.get("minute", 0))
+        next_slot = self._next_attack_slot()
+        next_note = (
+            f"\nNext: <t:{int(next_slot[0].timestamp())}:F> "
+            f"(<t:{int(next_slot[0].timestamp())}:R>)."
+            if next_slot else "\nNext: not scheduled."
+        )
+        roles = self._resolve_attack_ping_roles(interaction.guild)
+        role_note = (
+            "\nPings: " + ", ".join(r.mention for r in roles)
+            if roles else
+            "\nPings: (no roles set — name-match Champions/Witches/Wizards, "
+            "or `/staff dementor eventscheduleroles`)"
+        )
+        await interaction.response.send_message(
+            f"**On** — {day_names} at **{hour:02d}:{minute:02d}** America/Chicago.\n"
+            f"Warn {EVENT_WARN_MINUTES} min early · 10-minute swarm · top 10 share 300."
+            f"{next_note}{role_note}",
+            ephemeral=True,
+        )
 
     @group.command(
         name="practice",
@@ -1656,7 +2067,7 @@ class Dementors(commands.Cog):
         remaining = max(0, int(event["ends_at"] - time.time()))
         mins, secs = divmod(remaining, 60)
         reward_top = int(event.get("reward_top") or EVENT_PRESETS[EVENT_DEFAULT_MINUTES]["reward_top"])
-        point_mult = int(event.get("point_mult") or 1)
+        kill_pool = _event_kill_pool(event)
         length = int(event.get("minutes") or EVENT_DEFAULT_MINUTES)
         tally = sorted(event.get("tally", {}).items(), key=lambda kv: -kv[1].get("rep", 0))
         practice = bool(event.get("practice"))
@@ -1667,8 +2078,7 @@ class Dementors(commands.Cog):
             + (
                 f" — {mins}m {secs}s left "
                 f"({length}-minute · top {reward_top} by kills share "
-                f"{EVENT_KILL_POOL * point_mult} pts"
-                f"{' · double pool' if point_mult > 1 else ''})."
+                f"{kill_pool} pts)."
                 if not practice else
                 f" - {mins}m {secs}s left."
             ),
@@ -1676,13 +2086,19 @@ class Dementors(commands.Cog):
             f"{len(event.get('channels', {}))} monster(s) out right now.",
         ]
         if tally:
-            # Sort status by kills for the share cut.
-            by_kills = sorted(tally, key=lambda kv: -kv[1].get("kills", 0))
+            # Sort status by kills; show everyone with a kill.
+            by_kills = sorted(
+                [(uid, e) for uid, e in tally if int(e.get("kills", 0) or 0) > 0],
+                key=lambda kv: -kv[1].get("kills", 0),
+            )
             lines.append("")
-            lines.append(f"Kill leaders (top {reward_top} will score):")
+            lines.append(
+                f"Kill board (top {reward_top} share {kill_pool} at the end):"
+                if not practice else "Kill board:"
+            )
             lines += [
                 f"<@{uid}>: **{e['kills']}** kill(s), {e['rep']} rep"
-                for uid, e in by_kills[:reward_top]
+                for uid, e in by_kills
             ]
         else:
             lines.append("Nobody's landed a hit yet.")
