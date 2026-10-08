@@ -47,14 +47,198 @@ CHEER_EMOJIS = ["📣", "🎉", "✨", "💜", "🙌", "🏆", "⭐"]
 CHEER_OPENERS = ["OMG okay so like,", "Ahh wait,", "Okay but like,", "Bestie,", "Okay okay but hear me out,"]
 CHEER_CLOSERS = ["GO VELMORA!!", "VELMORA PRIDE FOREVER", "we are SO velmora", "V-E-L-M-O-R-A!!", "GO GO VELMORA!!"]
 
+# Longer phrases first — applied before single-word swaps.
+PIRATES_PHRASE_MAP = [
+    (r"\bi don't know\b", "I know not"),
+    (r"\bi dont know\b", "I know not"),
+    (r"\bi'm going to\b", "I be settin' sail to"),
+    (r"\bim going to\b", "I be settin' sail to"),
+    (r"\bgoing to\b", "settin' sail to"),
+    (r"\bgotta\b", "got to"),
+    (r"\bhave to\b", "got to"),
+    (r"\bhas to\b", "got to"),
+    (r"\bwant to\b", "be wantin' to"),
+    (r"\bwanna\b", "be wantin' to"),
+    (r"\btrying to\b", "tryin' to"),
+    (r"\btry to\b", "try to"),
+    (r"\bwhat's up\b", "what be the word"),
+    (r"\bwhats up\b", "what be the word"),
+    (r"\bhow are you\b", "how fare ye"),
+    (r"\bhow r u\b", "how fare ye"),
+    (r"\bthank you\b", "thankee kindly"),
+    (r"\bthanks\b", "thankee"),
+    (r"\bgood morning\b", "fine mornin'"),
+    (r"\bgood night\b", "fair winds this night"),
+    (r"\bgood evening\b", "fine evenin'"),
+    (r"\bsee you later\b", "until we cross paths again"),
+    (r"\bsee you\b", "fair winds"),
+    (r"\bbye bye\b", "fair winds"),
+    (r"\bbye\b", "fair winds"),
+    (r"\bi'm sorry\b", "beggin' yer pardon"),
+    (r"\bim sorry\b", "beggin' yer pardon"),
+    (r"\bi am sorry\b", "beggin' yer pardon"),
+    (r"\bsorry\b", "beggin' yer pardon"),
+    (r"\bi love you\b", "I be fond o' ye"),
+    (r"\bi like you\b", "I be keen on ye"),
+    (r"\blet's go\b", "weigh anchor"),
+    (r"\blets go\b", "weigh anchor"),
+    (r"\bcome on\b", "look lively"),
+    (r"\bhurry up\b", "lively now"),
+    (r"\bshut up\b", "stow it"),
+    (r"\bbe quiet\b", "stow it"),
+    (r"\bhelp me\b", "lend me a hand"),
+    (r"\bhelp you\b", "lend ye a hand"),
+    (r"\bi think\b", "methinks"),
+    (r"\bi believe\b", "I reckon"),
+    (r"\bi guess\b", "I reckon"),
+    (r"\bi mean\b", "what I mean be"),
+    (r"\bright now\b", "this very tide"),
+    (r"\bright away\b", "at once"),
+    (r"\ba lot\b", "a heap"),
+    (r"\ba bit\b", "a wee bit"),
+    (r"\bokey dokey\b", "aye aye"),
+    (r"\ball right\b", "aye"),
+    (r"\balright\b", "aye"),
+]
 PIRATES_TONGUE_MAP = {
-    "you": "ye", "your": "yer", "you're": "ye be", "yours": "yer own",
-    "my": "me", "is": "be", "are": "be", "am": "be",
-    "the": "th'", "yes": "aye", "hello": "ahoy", "hi": "ahoy", "hey": "ahoy",
-    "friend": "matey", "friends": "mateys", "stop": "avast", "money": "doubloons",
-    "drink": "grog", "food": "grub", "boat": "ship", "car": "ship",
-    "no": "nay", "okay": "aye aye", "ok": "aye aye",
+    # pronouns / be-verbs
+    "i": "I", "i'm": "I be", "im": "I be", "i've": "I have", "ive": "I have",
+    "i'll": "I shall", "i'd": "I'd",
+    "you": "ye", "you'd": "ye'd", "you'll": "ye'll", "you've": "ye've",
+    "your": "yer", "yours": "yer own", "you're": "ye be", "youre": "ye be",
+    "yourself": "yerself", "yourselves": "yerselves",
+    "my": "me", "mine": "me own", "myself": "meself",
+    "me": "me", "we": "we", "we're": "we be", "were": "were",  # "were" stays (past)
+    "we've": "we have", "we'll": "we shall", "our": "our", "ours": "our own",
+    "they": "they", "they're": "they be", "theyre": "they be",
+    "their": "their", "theirs": "their own", "them": "them",
+    "he": "he", "she's": "she be", "shes": "she be", "he's": "he be", "hes": "he be",
+    "his": "his", "her": "her", "hers": "hers",
+    "it": "it", "it's": "it be", "its": "its",
+    "is": "be", "are": "be", "am": "be", "was": "were", "been": "been",
+    "isn't": "ain't", "aren't": "ain't", "wasn't": "weren't", "weren't": "weren't",
+    "don't": "don't", "doesn't": "don't", "didn't": "didn't",
+    "can't": "can't", "cannot": "can't", "won't": "won't", "wouldn't": "wouldn't",
+    "shouldn't": "shouldn't", "couldn't": "couldn't",
+    "have": "have", "has": "has", "had": "had",
+    "do": "do", "does": "does", "did": "did",
+    "will": "shall", "shall": "shall", "would": "would", "could": "could",
+    "should": "should", "may": "may", "might": "might", "must": "must",
+    # greetings / answers
+    "hello": "ahoy", "hi": "ahoy", "hey": "ahoy", "hiya": "ahoy", "sup": "ahoy",
+    "yes": "aye", "yeah": "aye", "yep": "aye", "yup": "aye", "yea": "aye",
+    "no": "nay", "nope": "nay", "nah": "nay",
+    "okay": "aye aye", "ok": "aye aye", "k": "aye", "kk": "aye aye",
+    "please": "if ye please", "pls": "if ye please", "plz": "if ye please",
+    # people
+    "friend": "matey", "friends": "mateys", "buddy": "matey", "bud": "matey",
+    "dude": "scallywag", "man": "lad", "guy": "lad", "guys": "lads",
+    "girl": "lass", "girls": "lasses", "boy": "lad", "boys": "lads",
+    "bro": "matey", "bruh": "matey", "sis": "lass",
+    "person": "soul", "people": "crew", "everyone": "all hands",
+    "somebody": "some soul", "someone": "some soul", "anybody": "any soul",
+    "anyone": "any soul", "nobody": "nary a soul", "noone": "nary a soul",
+    "kid": "cabin boy", "kids": "cabin boys", "child": "cabin boy",
+    "children": "cabin boys", "baby": "wee one",
+    "boss": "captain", "teacher": "captain", "staff": "officers",
+    "idiot": "landlubber", "fool": "fool", "loser": "bilge rat",
+    "enemy": "sworn foe", "enemies": "sworn foes",
+    # places / things
+    "house": "crew", "home": "quarters", "room": "cabin", "school": "academy",
+    "bathroom": "head", "toilet": "head", "kitchen": "galley",
+    "floor": "deck", "ground": "deck", "wall": "bulkhead", "door": "hatch",
+    "window": "porthole", "stairs": "ladder", "bed": "hammock",
+    "car": "ship", "truck": "ship", "bus": "ship", "boat": "ship",
+    "plane": "sky-ship", "train": "iron ship", "bike": "land skiff",
+    "phone": "speaking horn", "computer": "thinking box", "laptop": "thinking box",
+    "internet": "the wide seas", "online": "aboard", "offline": "ashore",
+    "message": "dispatch", "chat": "galley talk", "server": "crew",
+    "channel": "deck", "discord": "the great tavern",
+    "money": "doubloons", "cash": "doubloons", "dollars": "doubloons",
+    "dollar": "doubloon", "points": "doubloons", "gold": "gold",
+    "drink": "grog", "drinks": "grog", "alcohol": "grog", "beer": "grog",
+    "wine": "grog", "coffee": "bitter grog", "tea": "leaf grog",
+    "water": "fresh water", "soda": "fizzin' grog",
+    "food": "grub", "meal": "grub", "dinner": "grub", "lunch": "grub",
+    "breakfast": "mornin' grub", "snack": "ship's biscuit",
+    "treasure": "booty", "loot": "booty", "prize": "booty",
+    "map": "chart", "book": "tome", "story": "yarn", "joke": "yarn",
+    "song": "shanty", "music": "shanty", "party": "revel",
+    "fight": "scuffle", "battle": "skirmish", "war": "war",
+    "game": "contest", "match": "contest", "win": "claim victory",
+    "won": "claimed victory", "lose": "be bested", "lost": "were bested",
+    "work": "duties", "job": "duties", "homework": "ship's duties",
+    "class": "lesson", "test": "trial", "exam": "trial",
+    "problem": "trouble", "issue": "trouble", "bug": "barnacle",
+    "error": "blunder", "mistake": "blunder",
+    # verbs / adjectives / fillers
+    "stop": "avast", "wait": "hold fast", "hold": "hold fast",
+    "look": "spy", "see": "spy", "watch": "keep watch",
+    "go": "sail", "goes": "sails", "went": "sailed", "gone": "sailed off",
+    "come": "come aboard", "coming": "comin' aboard",
+    "leave": "shove off", "left": "shoved off", "leaving": "shovin' off",
+    "run": "make haste", "running": "makin' haste", "ran": "made haste",
+    "walk": "trudge", "walking": "trudgin'",
+    "talk": "speak", "talking": "speakin'", "speak": "speak",
+    "say": "say", "said": "said", "tell": "tell", "told": "told",
+    "ask": "ask", "asked": "asked", "answer": "answer",
+    "help": "aid", "helping": "aidin'", "helped": "aided",
+    "need": "be needin'", "needs": "be needin'", "needed": "were needin'",
+    "want": "be wantin'", "wants": "be wantin'", "wanted": "were wantin'",
+    "like": "be fond o'", "likes": "be fond o'", "liked": "were fond o'",
+    "love": "be smitten with", "loves": "be smitten with", "loved": "were smitten with",
+    "hate": "be cursed by", "hates": "be cursed by",
+    "know": "know", "knows": "knows", "knew": "knew",
+    "think": "reckon", "thinks": "reckons", "thought": "reckoned",
+    "feel": "feel", "feels": "feels", "felt": "felt",
+    "get": "get", "got": "got", "getting": "gettin'",
+    "give": "hand over", "gives": "hands over", "gave": "handed over",
+    "take": "seize", "takes": "seizes", "took": "seized",
+    "make": "make", "makes": "makes", "made": "made",
+    "find": "find", "finds": "finds", "found": "found",
+    "kill": "send to Davy Jones", "die": "meet Davy Jones", "dead": "gone to Davy Jones",
+    "sleep": "rest yer bones", "sleeping": "restin' yer bones", "slept": "rested yer bones",
+    "wake": "rise", "woke": "rose", "awake": "risen",
+    "eat": "feast on", "eats": "feasts on", "ate": "feasted on", "eating": "feastin' on",
+    "drink": "drink", "drinking": "drinkin'", "drank": "drank",
+    "good": "fine", "great": "mighty fine", "awesome": "legendary",
+    "amazing": "legendary", "cool": "fine", "nice": "fine", "fine": "fine",
+    "bad": "foul", "terrible": "cursed", "awful": "cursed",
+    "ugly": "barnacle-faced", "stupid": "daft", "dumb": "daft", "weird": "strange",
+    "crazy": "mad as a storm", "funny": "a fine yarn", "sad": "downhearted",
+    "happy": "merry", "angry": "cross", "scared": "yellow-bellied",
+    "tired": "weary", "bored": "idle", "busy": "hard at work",
+    "big": "mighty", "small": "wee", "little": "wee", "huge": "vast",
+    "fast": "swift", "slow": "sluggish", "strong": "stout", "weak": "feeble",
+    "new": "fresh", "old": "ancient", "young": "green",
+    "true": "true", "false": "false", "real": "true", "fake": "counterfeit",
+    "very": "mighty", "really": "truly", "so": "so", "too": "too",
+    "just": "just", "only": "only", "also": "also", "even": "even",
+    "here": "here", "there": "yonder", "where": "whereabouts",
+    "when": "when", "why": "why", "how": "how", "what": "what", "who": "who",
+    "which": "which", "this": "this", "that": "that", "these": "these", "those": "those",
+    "now": "now", "then": "then", "today": "this day", "tomorrow": "the morrow",
+    "yesterday": "yestertide", "tonight": "this night", "morning": "mornin'",
+    "night": "night", "evening": "evenin'", "afternoon": "afternoon",
+    "always": "always", "never": "ne'er", "sometimes": "now and again",
+    "maybe": "mayhap", "perhaps": "mayhap", "probably": "like as not",
+    "because": "on account o'", "about": "about", "around": "about",
+    "with": "with", "without": "without", "from": "from", "into": "into",
+    "onto": "onto", "over": "over", "under": "under", "before": "afore",
+    "after": "after", "again": "again", "back": "back", "away": "away",
+    "up": "aloft", "down": "below", "out": "out", "in": "in", "on": "on", "off": "off",
+    "of": "o'", "the": "th'", "a": "a", "an": "an", "and": "an'", "or": "or",
+    "but": "but", "if": "if", "as": "as", "than": "than", "for": "fer",
+    "to": "t'", "at": "at", "by": "by",
 }
+PIRATE_OPENERS = [
+    "Arr, ", "Yarr, ", "Avast — ", "Ahoy — ", "Shiver me timbers — ",
+    "By the powers — ", "Listen well — ", "Hear me now — ",
+]
+PIRATE_CLOSERS = [
+    ", arr!", " arrr!", ", yarrr!", ", matey!", ", ye scallywag!",
+    " — savvy?", ", aye!", " Ho!", ", or walk the plank!",
+]
 COUNTRY_MAP = {
     "you": "y'all", "your": "yer", "you're": "y'all're", "yours": "yer own",
     "gonna": "fixin' to", "going": "fixin'", "friend": "partner", "friends": "partners",
@@ -209,11 +393,56 @@ def fx_caveman(text: str) -> str:
     return f"{prefix}{result}{suffix}".strip()
 
 
+def _pirate_ing(text: str) -> str:
+    """Turn trailing -ing into piratey -in' (skip short / already-swapped bits)."""
+
+    def repl(m: re.Match) -> str:
+        word = m.group(0)
+        lower = word.lower()
+        if lower.endswith("in'") or len(lower) < 5:
+            return word
+        if not lower.endswith("ing"):
+            return word
+        # Keep things like "thing", "ring", "king", "sing" alone.
+        stem = lower[:-3]
+        if stem in {"th", "r", "k", "s", "w", "br", "str", "sw", "cl", "fl", "sl"}:
+            return word
+        base = word[:-3] + ("in'" if word[-3:].islower() else "IN'")
+        return base
+
+    return re.sub(r"[A-Za-z']+", repl, text)
+
+
 def fx_pirates_tongue(text: str) -> str:
-    text = _word_swap(text, PIRATES_TONGUE_MAP)
-    if random.random() < 0.4:
-        text = text.rstrip() + random.choice([" arr!", " arrr.", ", arr."])
-    return text
+    """Full pirate speech: phrases, lexicon, -in' endings, and salty bookends."""
+    if not text or not text.strip():
+        return random.choice(["Arr!", "Yarr!", "Ahoy!", "Avast!"])
+
+    out = text
+    for pattern, replacement in PIRATES_PHRASE_MAP:
+        out = re.sub(pattern, replacement, out, flags=re.IGNORECASE)
+
+    out = _word_swap(out, PIRATES_TONGUE_MAP)
+    out = _pirate_ing(out)
+    out = re.sub(r"\s{2,}", " ", out)
+    out = re.sub(r"\s+([,.!?;:])", r"\1", out).strip()
+    if not out:
+        out = "Arr"
+
+    # Nearly always bookend with pirate flavor so short messages still feel cursed.
+    if random.random() < 0.8 and not re.match(
+        r"^(arr|yarr|avast|ahoy|shiver|by the powers|listen well|hear me)\b",
+        out,
+        flags=re.IGNORECASE,
+    ):
+        out = random.choice(PIRATE_OPENERS) + out
+    if random.random() < 0.9 and not re.search(
+        r"(arr+|yarrr*|savvy\?|matey!|scallywag!|plank!|ho!|aye!)\s*$",
+        out,
+        flags=re.IGNORECASE,
+    ):
+        out = out.rstrip(".!?") + random.choice(PIRATE_CLOSERS)
+    return out
 
 
 EFFECTS = {
@@ -234,8 +463,11 @@ EFFECTS = {
            "with a *purrrr*.", "func": fx_cat},
     "caveman": {"name": "Caveman Curse", "description": "Strips out every filler word - grunts and caveman talk "
                "only.", "func": fx_caveman},
-    "pirates_tongue": {"name": "Pirate Curse", "description": "Curses them to talk like a pirate.",
-                      "func": fx_pirates_tongue},
+    "pirates_tongue": {
+        "name": "Pirate Curse",
+        "description": "Full pirate speech — every line comes out as salty sailor talk.",
+        "func": fx_pirates_tongue,
+    },
     "limp_wand": {
         "name": "Limp Wand",
         "description": "Their wand hangs limp — /wand, /patronus, and /broom won't answer for an hour.",
