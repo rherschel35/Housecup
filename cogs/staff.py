@@ -459,6 +459,41 @@ class Staff(commands.Cog):
             return
         await cog.sellreset(interaction, member)
 
+    @market.command(name="setprice", description="Set the point price for a Marketplace item.")
+    @app_commands.describe(
+        item="What to reprice",
+        points="New price in house points",
+    )
+    @app_commands.choices(item=[
+        app_commands.Choice(name="Buy common ingredient", value="buy_common"),
+        app_commands.Choice(name="Buy uncommon ingredient", value="buy_uncommon"),
+        app_commands.Choice(name="Sell payout per batch", value="sell_payout"),
+        app_commands.Choice(name="Daily sell-points cap", value="sell_daily_cap"),
+        app_commands.Choice(name="Hex Scroll", value="scroll"),
+        app_commands.Choice(name="Shop title", value="title"),
+        app_commands.Choice(name="Room of Requirement", value="room"),
+        app_commands.Choice(name="Broom upgrade token", value="broom_token"),
+    ])
+    async def market_setprice(
+        self,
+        interaction: discord.Interaction,
+        item: app_commands.Choice[str],
+        points: app_commands.Range[int, 0, 100_000],
+    ):
+        cog = self._cog("Marketplace")
+        if not cog:
+            await interaction.response.send_message("Marketplace isn't loaded.", ephemeral=True)
+            return
+        await cog.staff_setprice(interaction, item.value, int(points))
+
+    @market.command(name="prices", description="Show current Marketplace prices (including staff overrides).")
+    async def market_prices(self, interaction: discord.Interaction):
+        cog = self._cog("Marketplace")
+        if not cog:
+            await interaction.response.send_message("Marketplace isn't loaded.", ephemeral=True)
+            return
+        await cog.staff_prices(interaction)
+
     # ---------------------------------------------------------------- usage
 
     @usage.command(name="top", description="Most-used slash commands since tracking started.")
