@@ -529,6 +529,13 @@ class Adornments(commands.Cog):
     def _title_score(t: str) -> int:
         if t in TITLE_SCORE:
             return TITLE_SCORE[t]
+        # Shop titles share a baseline score unless listed above.
+        try:
+            from cogs.marketplace import SHOP_TITLES, TITLE_RENAMES
+            if t in SHOP_TITLES or t in TITLE_RENAMES or t in TITLE_RENAMES.values():
+                return 40
+        except Exception:
+            pass
         if t.startswith("Keeper of"):
             return KEEPER_SCORE
         if t.startswith("the "):
