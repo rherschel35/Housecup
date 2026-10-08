@@ -49,10 +49,10 @@ The house with the most fighters who registered a kill gets a turnout
 bonus; MVP (top rep) still gets +5. One big scoreboard reveal at the end
 in every channel that fought.
 
-Staff can schedule up to **three** 10-minute Attacks a week, each with its
-own Chicago day + time. Five minutes before each, the bot warns with
-Champions / Witches / Wizards role pings; it pings again when the swarm
-starts, then posts results when it ends.
+Staff can schedule **1–3** Attacks a week, each with its own Chicago day,
+time, and **5- or 10-minute** length. Five minutes before each, the bot
+warns with Champions / WIZARDS AND WITCHES role pings; it pings again when
+the swarm starts, then posts results when it ends.
 
 House practice floods a single house channel the same way, but awards
 nothing at the end — just drills for the real Attack.
@@ -144,8 +144,8 @@ EVENT_COLOR = 0x8A2F2F
 EVENT_WARN_MINUTES = 5
 ATTACK_SCHEDULE_MAX_DAYS = 3
 # Role names pinged on warn + start (case-insensitive). Override with env:
-# ATTACK_PING_ROLE_NAMES=Champions,Witches,Wizards
-_DEFAULT_PING_NAMES = ("Champions", "Witches", "Wizards")
+# ATTACK_PING_ROLE_NAMES=Champions,WIZARDS AND WITCHES
+_DEFAULT_PING_NAMES = ("Champions", "WIZARDS AND WITCHES")
 WEEKDAY_CHOICES = [
     app_commands.Choice(name="Monday", value=0),
     app_commands.Choice(name="Tuesday", value=1),
@@ -158,6 +158,10 @@ WEEKDAY_CHOICES = [
 WEEKDAY_LABELS = (
     "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
 )
+ATTACK_LENGTH_CHOICES = [
+    app_commands.Choice(name="5 minutes — top 7 share 100", value=5),
+    app_commands.Choice(name="10 minutes — top 10 share 300", value=10),
+]
 
 
 def _preset_kill_pool(preset: dict) -> int:
@@ -432,9 +436,9 @@ class Dementors(commands.Cog):
     def _blank_attack_schedule() -> dict:
         return {
             "enabled": False,
-            # Each slot: {weekday: 0-6, hour: 0-23, minute: 0-59}
+            # Each slot: {weekday, hour, minute, minutes} — minutes is 5 or 10
             "slots": [],
-            "minutes": 10,  # 5 or 10
+            "minutes": 10,  # legacy fallback when a slot omits minutes
             "role_ids": [],
             "last_warn_key": None,
             "last_start_key": None,
@@ -448,8 +452,16 @@ class Dementors(commands.Cog):
         if not sched.get("slots") and sched.get("weekdays"):
             hour = int(sched.get("hour", 20))
             minute = int(sched.get("minute", 0))
+            legacy_mins = int(sched.get("minutes") or 10)
+            if legacy_mins not in EVENT_PRESETS:
+                legacy_mins = 10
             sched["slots"] = [
-                {"weekday": int(d), "hour": hour, "minute": minute}
+                {
+                    "weekday": int(d),
+                    "hour": hour,
+                    "minute": minute,
+                    "minutes": legacy_mins,
+                }
                 for d in sched.get("weekdays") or []
                 if 0 <= int(d) <= 6
             ]
@@ -457,8 +469,12 @@ class Dementors(commands.Cog):
         return sched
 
     @staticmethod
-    def _normalize_schedule_slots(raw_slots: list) -> list[dict]:
+    def _normalize_schedule_slots(
+        raw_slots: list,
+        default_minutes: int = 10,
+    ) -> list[dict]:
         """Deduplicate by weekday (first wins); keep up to 3. Skips empty slots."""
+        fallback = default_minutes if default_minutes in EVENT_PRESETS else 10
         out: list[dict] = []
         seen: set[int] = set()
         for raw in raw_slots:
@@ -475,14 +491,39 @@ class Dementors(commands.Cog):
             if day in seen:
                 continue
             seen.add(day)
-            out.append({"weekday": day, "hour": hour, "minute": minute})
+            try:
+                mins = int(raw.get("minutes", fallback))
+            except (TypeError, ValueError):
+                mins = fallback
+            if mins not in EVENT_PRESETS:
+                mins = fallback
+            out.append({
+                "weekday": day,
+                "hour": hour,
+                "minute": minute,
+                "minutes": mins,
+            })
             if len(out) >= ATTACK_SCHEDULE_MAX_DAYS:
                 break
         return out
 
-    def _scheduled_attack_minutes(self) -> int:
+    def _slot_attack_minutes(self, slot: dict | None = None) -> int:
+        if slot is not None:
+            try:
+                minutes = int(slot.get("minutes"))
+            except (TypeError, ValueError):
+                minutes = 0
+            if minutes in EVENT_PRESETS:
+                return minutes
         minutes = int(self._attack_schedule().get("minutes") or 10)
         return minutes if minutes in EVENT_PRESETS else 10
+
+    def _scheduled_attack_minutes(self) -> int:
+        """Legacy helper — prefers the next slot's length, else schedule default."""
+        nxt = self._next_attack_slot()
+        if nxt is not None:
+            return self._slot_attack_minutes(nxt[2])
+        return self._slot_attack_minutes(None)
 
     async def cog_load(self):
         import asyncio
@@ -1386,8 +1427,8 @@ class Dementors(commands.Cog):
             if role and role.id not in seen:
                 roles.append(role)
                 seen.add(role.id)
-        if roles:
-            return roles
+        # Always also name-match defaults (Champions + WIZARDS AND WITCHES) so a
+        # partial role_ids list still picks up the combined community role.
         wanted = {n.lower() for n in _attack_ping_role_names()}
         for role in guild.roles:
             if role.name.lower() in wanted and role.id not in seen:
@@ -1522,17 +1563,23 @@ class Dementors(commands.Cog):
                 continue
         await self._deliver_wave(started_at, payloads)
 
-    def _next_attack_slot(self, now: dt.datetime | None = None) -> tuple[dt.datetime, str] | None:
+    def _next_attack_slot(
+        self, now: dt.datetime | None = None,
+    ) -> tuple[dt.datetime, str, dict] | None:
         """Next Chicago slot (warn/start target) from the saved weekly schedule."""
         sched = self._attack_schedule()
         if not sched.get("enabled"):
             return None
-        slots = self._normalize_schedule_slots(sched.get("slots") or [])
+        default_mins = self._slot_attack_minutes(None)
+        slots = self._normalize_schedule_slots(
+            sched.get("slots") or [], default_minutes=default_mins,
+        )
         if not slots:
             return None
         by_day = {int(s["weekday"]): s for s in slots}
         now = now or _chicago_now()
         best: dt.datetime | None = None
+        best_spec: dict | None = None
         for add in range(0, 8):
             day = (now + dt.timedelta(days=add)).date()
             spec = by_day.get(day.weekday())
@@ -1547,10 +1594,11 @@ class Dementors(commands.Cog):
                 continue
             if best is None or candidate < best:
                 best = candidate
-        if best is None:
+                best_spec = spec
+        if best is None or best_spec is None:
             return None
         key = best.strftime("%Y-%m-%dT%H:%M")
-        return best, key
+        return best, key, best_spec
 
     @tasks.loop(seconds=30)
     async def attack_schedule_tick(self):
@@ -1560,11 +1608,11 @@ class Dementors(commands.Cog):
         slot = self._next_attack_slot()
         if slot is None:
             return
-        target, key = slot
+        target, key, spec = slot
         now = _chicago_now()
         warn_at = target - dt.timedelta(minutes=EVENT_WARN_MINUTES)
 
-        minutes = self._scheduled_attack_minutes()
+        minutes = self._slot_attack_minutes(spec)
         preset = EVENT_PRESETS[minutes]
         pool_pts = _preset_kill_pool(preset)
 
@@ -1584,7 +1632,7 @@ class Dementors(commands.Cog):
             await self._broadcast_attack_notice(guild=guild, embed=embed, ping=True)
             sched["last_warn_key"] = key
             self.save()
-            log.info("Posted Attack warn for slot %s", key)
+            log.info("Posted Attack warn for slot %s (%s)", key, preset["label"])
 
         # Start window: on time through +2 minutes (bot was briefly down).
         if target <= now < target + dt.timedelta(seconds=120) and sched.get("last_start_key") != key:
@@ -1599,7 +1647,7 @@ class Dementors(commands.Cog):
             self.save()
             if ok and start:
                 await self._announce_attack_wave(start, ping=True)
-                log.info("Scheduled Attack started for slot %s", key)
+                log.info("Scheduled Attack started for slot %s (%s)", key, preset["label"])
             else:
                 log.warning("Scheduled Attack did not start for %s: %s", key, msg)
 
@@ -1803,84 +1851,115 @@ class Dementors(commands.Cog):
 
     @group.command(
         name="eventschedule",
-        description="(staff) Schedule 1–3 weekly Attacks — each with its own Chicago time.",
+        description="(staff) Schedule 1–3 weekly Attacks — each with its own Chicago time + length.",
     )
     @app_commands.describe(
         day_a="First Attack weekday (required)",
         hour_a="Hour for first Attack (America/Chicago, 0-23)",
-        length="5-minute or 10-minute swarm for every scheduled Attack",
+        length_a="5- or 10-minute swarm for the first Attack",
         minute_a="Minute for first Attack (0-59)",
         day_b="Optional second Attack weekday",
         hour_b="Hour for second Attack (required if day_b is set)",
+        length_b="5- or 10-minute swarm for the second Attack (required if day_b is set)",
         minute_b="Minute for second Attack (0-59)",
         day_c="Optional third Attack weekday",
         hour_c="Hour for third Attack (required if day_c is set)",
+        length_c="5- or 10-minute swarm for the third Attack (required if day_c is set)",
         minute_c="Minute for third Attack (0-59)",
     )
     @app_commands.choices(
         day_a=WEEKDAY_CHOICES,
         day_b=WEEKDAY_CHOICES,
         day_c=WEEKDAY_CHOICES,
-        length=[
-            app_commands.Choice(name="5 minutes — top 7 share 100", value=5),
-            app_commands.Choice(name="10 minutes — top 10 share 300", value=10),
-        ],
+        length_a=ATTACK_LENGTH_CHOICES,
+        length_b=ATTACK_LENGTH_CHOICES,
+        length_c=ATTACK_LENGTH_CHOICES,
     )
     async def eventschedule(
         self,
         interaction: discord.Interaction,
         day_a: app_commands.Choice[int],
         hour_a: app_commands.Range[int, 0, 23],
-        length: app_commands.Choice[int],
+        length_a: app_commands.Choice[int],
         minute_a: app_commands.Range[int, 0, 59] = 0,
         day_b: app_commands.Choice[int] | None = None,
         hour_b: app_commands.Range[int, 0, 23] | None = None,
+        length_b: app_commands.Choice[int] | None = None,
         minute_b: app_commands.Range[int, 0, 59] = 0,
         day_c: app_commands.Choice[int] | None = None,
         hour_c: app_commands.Range[int, 0, 23] | None = None,
+        length_c: app_commands.Choice[int] | None = None,
         minute_c: app_commands.Range[int, 0, 59] = 0,
     ):
         if not await self._staff(interaction):
             return
+        mins_a = int(length_a.value)
+        if mins_a not in EVENT_PRESETS:
+            await interaction.response.send_message(
+                "Pick a 5- or 10-minute Attack for night 1.", ephemeral=True,
+            )
+            return
         raw_slots: list[dict | None] = [
-            {"weekday": day_a.value, "hour": hour_a, "minute": minute_a},
+            {
+                "weekday": day_a.value,
+                "hour": hour_a,
+                "minute": minute_a,
+                "minutes": mins_a,
+            },
         ]
         if day_b is not None:
-            if hour_b is None:
+            if hour_b is None or length_b is None:
                 await interaction.response.send_message(
-                    "Set **hour_b** when you pick a second day.", ephemeral=True,
+                    "Set **hour_b** and **length_b** when you pick a second day.",
+                    ephemeral=True,
+                )
+                return
+            mins_b = int(length_b.value)
+            if mins_b not in EVENT_PRESETS:
+                await interaction.response.send_message(
+                    "Pick a 5- or 10-minute Attack for night 2.", ephemeral=True,
                 )
                 return
             raw_slots.append(
-                {"weekday": day_b.value, "hour": hour_b, "minute": minute_b},
+                {
+                    "weekday": day_b.value,
+                    "hour": hour_b,
+                    "minute": minute_b,
+                    "minutes": mins_b,
+                },
             )
         if day_c is not None:
-            if hour_c is None:
+            if hour_c is None or length_c is None:
                 await interaction.response.send_message(
-                    "Set **hour_c** when you pick a third day.", ephemeral=True,
+                    "Set **hour_c** and **length_c** when you pick a third day.",
+                    ephemeral=True,
+                )
+                return
+            mins_c = int(length_c.value)
+            if mins_c not in EVENT_PRESETS:
+                await interaction.response.send_message(
+                    "Pick a 5- or 10-minute Attack for night 3.", ephemeral=True,
                 )
                 return
             raw_slots.append(
-                {"weekday": day_c.value, "hour": hour_c, "minute": minute_c},
+                {
+                    "weekday": day_c.value,
+                    "hour": hour_c,
+                    "minute": minute_c,
+                    "minutes": mins_c,
+                },
             )
-        slots = self._normalize_schedule_slots(raw_slots)
+        slots = self._normalize_schedule_slots(raw_slots, default_minutes=mins_a)
         if not slots:
             await interaction.response.send_message(
                 "Need at least one valid weekday + time.", ephemeral=True,
             )
             return
-        minutes = int(length.value)
-        if minutes not in EVENT_PRESETS:
-            await interaction.response.send_message(
-                "Pick a 5- or 10-minute Attack.", ephemeral=True,
-            )
-            return
-        preset = EVENT_PRESETS[minutes]
-        pool_pts = _preset_kill_pool(preset)
         sched = self._attack_schedule()
         sched["enabled"] = True
         sched["slots"] = slots
-        sched["minutes"] = minutes
+        # Keep a schedule-level fallback for older readers / migrated slots.
+        sched["minutes"] = mins_a
         # Drop legacy shared-time keys if present.
         sched.pop("weekdays", None)
         sched.pop("hour", None)
@@ -1890,7 +1969,8 @@ class Dementors(commands.Cog):
         sched["last_start_key"] = None
         self.save()
         slot_lines = ", ".join(
-            f"**{WEEKDAY_LABELS[s['weekday']]}** {s['hour']:02d}:{s['minute']:02d}"
+            f"**{WEEKDAY_LABELS[s['weekday']]}** {s['hour']:02d}:{s['minute']:02d} "
+            f"({EVENT_PRESETS[s['minutes']]['label']})"
             for s in slots
         )
         next_slot = self._next_attack_slot()
@@ -1902,13 +1982,12 @@ class Dementors(commands.Cog):
         role_note = (
             " Pings: " + ", ".join(r.mention for r in roles) + "."
             if roles else
-            " (No Champions/Witches/Wizards roles found — "
+            " (No Champions / WIZARDS AND WITCHES roles found — "
             "set them with `/staff dementor eventscheduleroles`.)"
         )
         await interaction.response.send_message(
             f"Attack schedule on (America/Chicago): {slot_lines}. "
-            f"**{len(slots)}**/week · 5-minute warn, then **{preset['label']}** swarm · "
-            f"top {preset['reward_top']} share {pool_pts}."
+            f"**{len(slots)}**/week · 5-minute warn before each."
             f"{next_note}{role_note}",
             ephemeral=True,
         )
@@ -1934,29 +2013,27 @@ class Dementors(commands.Cog):
     )
     @app_commands.describe(
         champions="Champions role",
-        witches="Witches role",
-        wizards="Wizards role",
+        wizards_and_witches="WIZARDS AND WITCHES role (combined community ping)",
     )
     async def eventscheduleroles(
         self,
         interaction: discord.Interaction,
         champions: discord.Role,
-        witches: discord.Role,
-        wizards: discord.Role,
+        wizards_and_witches: discord.Role,
     ):
         if not await self._staff(interaction):
             return
         sched = self._attack_schedule()
         # Preserve order; drop duplicates.
         ids: list[int] = []
-        for role in (champions, witches, wizards):
+        for role in (champions, wizards_and_witches):
             if role.id not in ids:
                 ids.append(role.id)
         sched["role_ids"] = ids
         self.save()
         await interaction.response.send_message(
             "Attack pings will mention "
-            + ", ".join(r.mention for r in (champions, witches, wizards))
+            + ", ".join(r.mention for r in (champions, wizards_and_witches))
             + " on the 5-minute warning and again when the swarm starts.",
             ephemeral=True,
         )
@@ -1974,18 +2051,24 @@ class Dementors(commands.Cog):
                 "Weekly Attack schedule is **off**.", ephemeral=True,
             )
             return
-        slots = self._normalize_schedule_slots(sched.get("slots") or [])
+        default_mins = self._slot_attack_minutes(None)
+        slots = self._normalize_schedule_slots(
+            sched.get("slots") or [], default_minutes=default_mins,
+        )
         if slots:
-            slot_block = "\n".join(
-                f"· **{WEEKDAY_LABELS[s['weekday']]}** at "
-                f"**{s['hour']:02d}:{s['minute']:02d}**"
-                for s in slots
-            )
+            lines = []
+            for s in slots:
+                mins = self._slot_attack_minutes(s)
+                preset = EVENT_PRESETS[mins]
+                pool_pts = _preset_kill_pool(preset)
+                lines.append(
+                    f"· **{WEEKDAY_LABELS[s['weekday']]}** at "
+                    f"**{s['hour']:02d}:{s['minute']:02d}** · "
+                    f"**{preset['label']}** · top {preset['reward_top']} share {pool_pts}"
+                )
+            slot_block = "\n".join(lines)
         else:
             slot_block = "· (no slots)"
-        minutes = self._scheduled_attack_minutes()
-        preset = EVENT_PRESETS[minutes]
-        pool_pts = _preset_kill_pool(preset)
         next_slot = self._next_attack_slot()
         next_note = (
             f"\nNext: <t:{int(next_slot[0].timestamp())}:F> "
@@ -1996,13 +2079,12 @@ class Dementors(commands.Cog):
         role_note = (
             "\nPings: " + ", ".join(r.mention for r in roles)
             if roles else
-            "\nPings: (no roles set — name-match Champions/Witches/Wizards, "
+            "\nPings: (no roles set — name-match Champions / WIZARDS AND WITCHES, "
             "or `/staff dementor eventscheduleroles`)"
         )
         await interaction.response.send_message(
             f"**On** — America/Chicago · **{len(slots)}**/week:\n{slot_block}\n"
-            f"Warn {EVENT_WARN_MINUTES} min early · **{preset['label']}** swarm · "
-            f"top {preset['reward_top']} share {pool_pts}."
+            f"Warn {EVENT_WARN_MINUTES} min early."
             f"{next_note}{role_note}",
             ephemeral=True,
         )
