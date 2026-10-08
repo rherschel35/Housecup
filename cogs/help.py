@@ -384,21 +384,65 @@ class Help(commands.Cog):
             return f"</{path}:{ids[root]}>"
         return f"`/{path}`"
 
-    def build(self, ids: dict[str, int], is_staff: bool, staff_part: bool = False) -> discord.Embed:
-        """One embed: the player sections, or (staff_part=True) the staff
-        sections. They're sent as two messages because Discord caps a
-        message at 6000 characters of embeds, and with clickable command
-        mentions everything together is longer than that."""
+    @staticmethod
+    def _embed_char_count(embed: discord.Embed) -> int:
+        total = len(embed.title or "") + len(embed.description or "")
+        if embed.footer and embed.footer.text:
+            total += len(embed.footer.text)
+        for field in embed.fields:
+            total += len(field.name) + len(field.value)
+        return total
+
+    def _new_help_embed(self, *, staff_part: bool, page: int) -> discord.Embed:
         if staff_part:
-            embed = discord.Embed(title="Velmora — staff",
-                                  description="Only staff can see and use these.", color=0x4B3F99)
-        else:
+            title = "Velmora — staff" if page == 1 else f"Velmora — staff (cont. {page})"
             embed = discord.Embed(
-                title="Velmora",
-                description=("Everything you do here earns points for your house. "
-                             "The house with the most points when the season ends takes the House Cup."),
+                title=title,
+                description="Only staff can see and use these." if page == 1 else None,
+                color=0x4B3F99,
+            )
+        else:
+            title = "Velmora" if page == 1 else f"Velmora (cont. {page})"
+            embed = discord.Embed(
+                title=title,
+                description=(
+                    "Everything you do here earns points for your house. "
+                    "The house with the most points when the season ends takes the House Cup."
+                    if page == 1 else None
+                ),
                 color=0x6C5CE7,
             )
+        return embed
+
+    def build(
+        self,
+        ids: dict[str, int],
+        is_staff: bool,
+        staff_part: bool = False,
+    ) -> list[discord.Embed]:
+        """Build help as one or more embeds.
+
+        Discord caps a message at 6000 characters of embeds (and 25 fields).
+        The catalogue is larger than that now, so sections are packed into
+        pages and sent as separate ephemeral messages.
+        """
+        # Stay under Discord's 6000-char / 25-field ceilings with headroom
+        # for title/footer and mention-length variance.
+        max_chars = 5400
+        max_fields = 24
+        embeds: list[discord.Embed] = []
+        page = 1
+        embed = self._new_help_embed(staff_part=staff_part, page=page)
+
+        def flush() -> None:
+            nonlocal page, embed
+            if not embed.fields and not (embed.description or "").strip():
+                return
+            embed.set_footer(text="Tap a command to use it. Only you can see this.")
+            embeds.append(embed)
+            page += 1
+            embed = self._new_help_embed(staff_part=staff_part, page=page)
+
         for section in HELP.values():
             if section["staff"] != staff_part:
                 continue
@@ -412,23 +456,44 @@ class Help(commands.Cog):
             chunk, name = [], section["title"]
             for line in lines:
                 if chunk and len("\n".join(chunk + [line])) > 1024:
-                    embed.add_field(name=name, value="\n".join(chunk), inline=False)
+                    field_value = "\n".join(chunk)
+                    probe = self._embed_char_count(embed) + len(name) + len(field_value)
+                    if embed.fields and (
+                        len(embed.fields) >= max_fields or probe > max_chars
+                    ):
+                        flush()
+                    embed.add_field(name=name, value=field_value, inline=False)
                     chunk, name = [], f"{section['title']} (cont.)"
                 chunk.append(line)
             if chunk:
-                embed.add_field(name=name, value="\n".join(chunk), inline=False)
+                field_value = "\n".join(chunk)
+                probe = self._embed_char_count(embed) + len(name) + len(field_value)
+                if embed.fields and (
+                    len(embed.fields) >= max_fields or probe > max_chars
+                ):
+                    flush()
+                embed.add_field(name=name, value=field_value, inline=False)
 
-        embed.set_footer(text="Tap a command to use it. Only you can see this.")
-        return embed
+        flush()
+        return embeds or [
+            self._new_help_embed(staff_part=staff_part, page=1),
+        ]
 
     @app_commands.command(name="help", description="Everything this bot can do.")
     async def help(self, interaction: discord.Interaction):
+        # Defer first — fetching command IDs and packing embeds can exceed
+        # Discord's 3-second interaction window.
+        await interaction.response.defer(ephemeral=True)
         store = self.bot.get_cog("Store")
         is_staff = bool(store and store.is_staff(interaction.user))
         ids = await self._command_ids(interaction.guild)
-        await interaction.response.send_message(embed=self.build(ids, is_staff), ephemeral=True)
+        pages = self.build(ids, is_staff)
         if is_staff:
-            await interaction.followup.send(embed=self.build(ids, True, staff_part=True), ephemeral=True)
+            pages += self.build(ids, True, staff_part=True)
+        first, *rest = pages
+        await interaction.followup.send(embed=first, ephemeral=True)
+        for embed in rest:
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
