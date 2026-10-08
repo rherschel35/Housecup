@@ -410,7 +410,7 @@ DUEL_NIGHT_COLOR = 0xB8434F
 DUEL_NIGHT_WARN_MINUTES = 5
 DUEL_NIGHT_SCHEDULE_MAX = 3
 # Same role names as Attack warn/start unless overridden.
-_DEFAULT_NIGHT_PING_NAMES = ("Champions", "Witches", "Wizards")
+_DEFAULT_NIGHT_PING_NAMES = ("Champions", "WIZARDS AND WITCHES")
 WEEKDAY_CHOICES = [
     app_commands.Choice(name="Monday", value=0),
     app_commands.Choice(name="Tuesday", value=1),
@@ -1519,8 +1519,8 @@ class Duels(commands.Cog):
             if role and role.id not in seen:
                 roles.append(role)
                 seen.add(role.id)
-        if roles:
-            return roles
+        # Always also name-match defaults so Champions + WIZARDS AND WITCHES
+        # both ping even when role_ids only listed one of them.
         wanted = {n.lower() for n in _night_ping_role_names()}
         for role in guild.roles:
             if role.name.lower() in wanted and role.id not in seen:
@@ -1733,7 +1733,7 @@ class Duels(commands.Cog):
         role_note = (
             " Pings: " + ", ".join(r.mention for r in roles) + "."
             if roles else
-            " (No Champions/Witches/Wizards roles — "
+            " (No Champions / WIZARDS AND WITCHES roles — "
             "`/staff duels nightscheduleroles`.)"
         )
         await interaction.response.send_message(
@@ -1760,8 +1760,7 @@ class Duels(commands.Cog):
         self,
         interaction: discord.Interaction,
         champions: discord.Role,
-        witches: discord.Role,
-        wizards: discord.Role,
+        wizards_and_witches: discord.Role,
     ):
         store = self.bot.get_cog("Store")
         if not (store and store.is_staff(interaction.user)):
@@ -1769,14 +1768,14 @@ class Duels(commands.Cog):
             return
         sched = self._night_schedule()
         ids: list[int] = []
-        for role in (champions, witches, wizards):
+        for role in (champions, wizards_and_witches):
             if role.id not in ids:
                 ids.append(role.id)
         sched["role_ids"] = ids
         self.save()
         await interaction.response.send_message(
             "Duel Night pings will mention "
-            + ", ".join(r.mention for r in (champions, witches, wizards))
+            + ", ".join(r.mention for r in (champions, wizards_and_witches))
             + " on the 5-minute warning and again when the night starts.",
             ephemeral=True,
         )
