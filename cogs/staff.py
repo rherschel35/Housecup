@@ -475,21 +475,19 @@ class Staff(commands.Cog):
     )
     @app_commands.describe(
         champions="Champions role",
-        witches="Witches role",
-        wizards="Wizards role",
+        wizards_and_witches="WIZARDS AND WITCHES role (combined community ping)",
     )
     async def duels_nightscheduleroles(
         self,
         interaction: discord.Interaction,
         champions: discord.Role,
-        witches: discord.Role,
-        wizards: discord.Role,
+        wizards_and_witches: discord.Role,
     ):
         cog = self._cog("Duels")
         if not cog:
             await interaction.response.send_message("Duels isn't loaded.", ephemeral=True)
             return
-        await cog.nightscheduleroles(interaction, champions, witches, wizards)
+        await cog.nightscheduleroles(interaction, champions, wizards_and_witches)
 
     @duels.command(name="nightschedulestatus", description="Show the weekly Duel Night schedule.")
     async def duels_nightschedulestatus(self, interaction: discord.Interaction):
