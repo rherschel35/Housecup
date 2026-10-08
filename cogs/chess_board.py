@@ -56,7 +56,11 @@ PIECE_NAME = {
     chess.KING: "King",
 }
 
+# Prefer the TTF shipped in data/fonts — production hosts often lack DejaVu, and
+# ImageFont.load_default() without a size is ~10px (looks like empty margins).
+_FONT_DIR = Path(__file__).resolve().parent.parent / "data" / "fonts"
 _LABEL_CANDIDATES = [
+    _FONT_DIR / "Cinzel.ttf",
     Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
     Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
     Path("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
@@ -71,7 +75,10 @@ def _load_font(paths: list[Path], size: int) -> ImageFont.FreeTypeFont | ImageFo
                 return ImageFont.truetype(str(path), size)
             except OSError:
                 continue
-    return ImageFont.load_default()
+    try:
+        return ImageFont.load_default(size)
+    except TypeError:
+        return ImageFont.load_default()
 
 
 # ~0.75× size ≈ glyph height; 124 stays under one square so ranks don't overlap.
