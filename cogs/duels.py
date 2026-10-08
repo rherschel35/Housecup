@@ -2189,7 +2189,7 @@ class Duel:
         self.b = opponent
         self.message = None
         self.best_of = int(best_of) if best_of in BEST_OF_OPTIONS else 3
-        # Series of first-to-2 sets. Bo3 = one set (1 win); Bo5/7/9 = first to 3/4/5 sets.
+        # Series of first-to-2 sets. Bo3 = one set (1 win); Bo5/7/9/51 = first to 3/4/5/26.
         self.series_to_win = series_to_win_for(self.best_of)
         self.match_wins = self.series_to_win  # record wins for series champion
         self.max_rounds = max_rounds_for(self.best_of)
