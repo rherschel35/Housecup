@@ -7,7 +7,7 @@ each set is first to 2, and the series winner banks 3/4/5 wins.
     /duelend [member]          - clear a stuck duel lock (self, or staff for others)
     /houseduels                - each house's overall win/loss duelling record
     /staff duels night start|end  - House Duel Night (30 min or 1 hour)
-    /staff duels nightschedule    - up to 3 weekly nights, each with its own time
+    /staff duels nightschedule    - 1–3 weekly nights (30m/1h), each with its own time
     /trio scramble             - open 3v3 signup (any houses)
     /trio housematch h1 h2     - house-gated 3v3 signup
     /grand @member             - Grand Duel (both need 50+ 1v1 wins)
@@ -554,9 +554,12 @@ class Duels(commands.Cog):
 
     @staticmethod
     def _normalize_night_slots(raw_slots: list) -> list[dict]:
+        """Deduplicate by weekday (first wins); keep up to 3. Skips empty slots."""
         out: list[dict] = []
         seen: set[int] = set()
         for raw in raw_slots:
+            if not raw:
+                continue
             try:
                 day = int(raw["weekday"])
                 hour = int(raw["hour"])
@@ -1661,12 +1664,12 @@ class Duels(commands.Cog):
         interaction: discord.Interaction,
         day_a: app_commands.Choice[int],
         hour_a: int,
-        day_b: app_commands.Choice[int],
-        hour_b: int,
-        day_c: app_commands.Choice[int],
-        hour_c: int,
         minute_a: int = 0,
+        day_b: app_commands.Choice[int] | None = None,
+        hour_b: int | None = None,
         minute_b: int = 0,
+        day_c: app_commands.Choice[int] | None = None,
+        hour_c: int | None = None,
         minute_c: int = 0,
         length: app_commands.Choice[int] | None = None,
         channel: discord.TextChannel | None = None,
@@ -1675,11 +1678,28 @@ class Duels(commands.Cog):
         if not (store and store.is_staff(interaction.user)):
             await interaction.response.send_message("That's for staff.", ephemeral=True)
             return
-        slots = self._normalize_night_slots([
+        raw_slots: list[dict | None] = [
             {"weekday": day_a.value, "hour": hour_a, "minute": minute_a},
-            {"weekday": day_b.value, "hour": hour_b, "minute": minute_b},
-            {"weekday": day_c.value, "hour": hour_c, "minute": minute_c},
-        ])
+        ]
+        if day_b is not None:
+            if hour_b is None:
+                await interaction.response.send_message(
+                    "Set **hour_b** when you pick a second day.", ephemeral=True,
+                )
+                return
+            raw_slots.append(
+                {"weekday": day_b.value, "hour": hour_b, "minute": minute_b},
+            )
+        if day_c is not None:
+            if hour_c is None:
+                await interaction.response.send_message(
+                    "Set **hour_c** when you pick a third day.", ephemeral=True,
+                )
+                return
+            raw_slots.append(
+                {"weekday": day_c.value, "hour": hour_c, "minute": minute_c},
+            )
+        slots = self._normalize_night_slots(raw_slots)
         if not slots:
             await interaction.response.send_message(
                 "Need at least one valid weekday + time.", ephemeral=True,
@@ -1718,7 +1738,7 @@ class Duels(commands.Cog):
         )
         await interaction.response.send_message(
             f"Duel Night schedule on (America/Chicago): {slot_lines}. "
-            f"**{DUEL_NIGHT_PRESETS[minutes]}** each · 5-minute warn."
+            f"**{len(slots)}**/week · **{DUEL_NIGHT_PRESETS[minutes]}** each · 5-minute warn."
             f"{where}{next_note}{role_note}",
             ephemeral=True,
         )
@@ -1779,7 +1799,9 @@ class Duels(commands.Cog):
             for s in slots
         ) if slots else "· (no slots)"
         minutes = int(sched.get("minutes") or 60)
-        label = DUEL_NIGHT_PRESETS.get(minutes, f"{minutes} minutes")
+        if minutes not in DUEL_NIGHT_PRESETS:
+            minutes = 60
+        label = DUEL_NIGHT_PRESETS[minutes]
         next_slot = self._next_night_slot()
         next_note = (
             f"\nNext: <t:{int(next_slot[0].timestamp())}:F> "
@@ -1795,7 +1817,7 @@ class Duels(commands.Cog):
             "\nPings: (none set)"
         )
         await interaction.response.send_message(
-            f"**On** — America/Chicago · **{label}** each:\n{slot_block}\n"
+            f"**On** — America/Chicago · **{len(slots)}**/week · **{label}** each:\n{slot_block}\n"
             f"Warn {DUEL_NIGHT_WARN_MINUTES} min early."
             f"{where}{next_note}{role_note}",
             ephemeral=True,
