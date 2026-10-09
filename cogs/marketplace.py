@@ -377,6 +377,8 @@ class Marketplace(commands.Cog):
         store = self._store()
         if store is None:
             return {"error": "The ledger isn't loaded."}
+        if not store.season_active():
+            return {"error": "No House Cup season is running — the market is closed until the next Cup."}
         house = store.member_house(member)
         if not house:
             return {"error": "You'll need a house before you can spend its points."}
@@ -397,6 +399,8 @@ class Marketplace(commands.Cog):
         store = self._store()
         if store is None:
             return {"error": "The ledger isn't loaded."}
+        if not store.season_active():
+            return {"error": "No House Cup season is running — points resume with the next Cup."}
         house = store.member_house(member)
         if not house:
             return {"error": "You'll need a house before you can earn points for one."}

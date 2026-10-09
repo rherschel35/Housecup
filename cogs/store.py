@@ -89,7 +89,12 @@ def house_display(key: str) -> str:
 def _blank_state() -> dict:
     return {
         "version": 1,
-        "season": {"number": 1, "name": "Season 1", "started_at": time.time()},
+        "season": {
+            "number": 1,
+            "name": "Season 1",
+            "started_at": time.time(),
+            "active": True,
+        },
         "totals": {
             "season": {"houses": {}, "members": {}, "house_members": {}},
             "alltime": {"houses": {}, "members": {}},
@@ -151,11 +156,14 @@ class Store(commands.Cog):
                 state["totals"][scope].setdefault("members", {})
             if "house_members" not in state["totals"]["season"]:
                 state["totals"]["season"]["house_members"] = _rebuild_house_members(state)
+            # Older ledgers always had a live season; default active if missing.
+            state["season"].setdefault("active", True)
             log.info(
-                "Loaded ledger from %s (%d entries, season %s)",
+                "Loaded ledger from %s (%d entries, season %s%s)",
                 STORE_PATH,
                 len(state.get("ledger", [])),
                 state["season"].get("number"),
+                "" if state["season"].get("active", True) else ", inactive",
             )
             return state
         except FileNotFoundError:
@@ -261,8 +269,18 @@ class Store(commands.Cog):
     # -------------------------------------------------------------- ledger
 
     def record(self, *, house: str, delta: int, actor_id: int,
-               target_id: int | None = None, reason: str = "") -> dict:
-        """Write one award or deduction and fold it into both scopes."""
+               target_id: int | None = None, reason: str = "") -> dict | None:
+        """Write one award or deduction and fold it into both scopes.
+
+        Returns None (and writes nothing) when no House Cup season is active,
+        so games can call this freely during a between-seasons gap.
+        """
+        if not self.season_active():
+            log.info(
+                "Skipped points (%+d %s) — no House Cup season active (%s)",
+                delta, house, reason or "no reason",
+            )
+            return None
         entry = {
             "id": uuid.uuid4().hex[:8],
             "at": time.time(),
@@ -351,9 +369,19 @@ class Store(commands.Cog):
     def current_season(self) -> dict:
         return self.state["season"]
 
-    def end_season(self) -> dict:
+    def season_active(self) -> bool:
+        """False between `/season end` (without opening next) and `/season start`."""
+        return bool(self.state.get("season", {}).get("active", True))
+
+    def end_season(self, *, start_next: bool = True) -> dict:
         """Archive the season, crown a winner, and zero the season scores.
-        All-time totals are untouched."""
+        All-time totals are untouched.
+
+        When ``start_next`` is False, no Cup runs until staff call
+        ``start_season`` — useful for a weekend gap before Monday.
+        """
+        if not self.season_active():
+            raise RuntimeError("No House Cup season is running.")
         standings = self.house_totals("season")
         top = standings[0] if standings else (None, 0)
         # A tie at the top means nobody is crowned outright.
@@ -386,13 +414,40 @@ class Store(commands.Cog):
         }
         self.state["archive"].append(record)
         self.state["totals"]["season"] = {"houses": {}, "members": {}, "house_members": {}}
-        self.state["season"] = {
-            "number": record["number"] + 1,
-            "name": f"Season {record['number'] + 1}",
-            "started_at": time.time(),
-        }
+        next_number = record["number"] + 1
+        if start_next:
+            self.state["season"] = {
+                "number": next_number,
+                "name": f"Season {next_number}",
+                "started_at": time.time(),
+                "active": True,
+            }
+        else:
+            # Slot reserved for the next Cup; nothing awards until start_season.
+            self.state["season"] = {
+                "number": next_number,
+                "name": f"Season {next_number}",
+                "started_at": None,
+                "active": False,
+            }
         self.save()
         return record
+
+    def start_season(self, name: str | None = None) -> dict:
+        """Open the next House Cup after a between-seasons gap."""
+        if self.season_active():
+            raise RuntimeError("A House Cup season is already running.")
+        season = self.state["season"]
+        season["active"] = True
+        season["started_at"] = time.time()
+        if name and name.strip():
+            season["name"] = name.strip()
+        elif not season.get("name"):
+            season["name"] = f"Season {season.get('number', 1)}"
+        # Fresh season scores (should already be empty after end_season).
+        self.state["totals"]["season"] = {"houses": {}, "members": {}, "house_members": {}}
+        self.save()
+        return season
 
     def honours(self, user_id: int) -> dict:
         """A member's House Cup record across every finished season."""
