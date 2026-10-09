@@ -7,7 +7,7 @@ Setup and season management. Everything here is staff-only.
     /staff setup setannounce <channel> [day] [hour]
     /staff houses sort <member> <house>
     /staff houses unsort <member>
-    /season rename|end|start|list
+    /season rename|end|start|list|clear
 """
 
 import datetime
@@ -325,6 +325,114 @@ class Admin(commands.Cog):
             ),
             ephemeral=True,
         )
+
+    @season.command(
+        name="clear",
+        description="Clear the open Cup or one finished season from the archive.",
+    )
+    @app_commands.describe(
+        which="Which season to clear (start typing: Intro, Season 1, current…)",
+        confirm="Required — this cannot be undone from Discord.",
+    )
+    @app_commands.choices(
+        confirm=[
+            app_commands.Choice(
+                name="Yes, clear this season (cannot undo)",
+                value="yes",
+            ),
+        ],
+    )
+    async def season_clear(
+        self,
+        interaction: discord.Interaction,
+        which: str,
+        confirm: app_commands.Choice[str],
+    ):
+        store = await self._guard(interaction)
+        if store is None:
+            return
+        if confirm.value != "yes":
+            await interaction.response.send_message("Cancelled.", ephemeral=True)
+            return
+
+        key = (which or "").strip()
+        targets = {t["key"]: t for t in store.clear_targets()}
+        # Allow pasting a bare season number → archived Cup with that number.
+        if key not in targets and key.isdigit():
+            key = f"archive:{int(key)}"
+        # Allow matching archived Cups by name fragment (e.g. "intro").
+        if key not in targets:
+            needle = key.lower()
+            name_hits = [
+                t for t in store.clear_targets()
+                if t["kind"] == "archive" and needle in t["name"].lower()
+            ]
+            if len(name_hits) == 1:
+                key = name_hits[0]["key"]
+            elif len(name_hits) > 1:
+                labels = ", ".join(t["label"] for t in name_hits[:8])
+                await interaction.response.send_message(
+                    f"Several archived seasons match **{which}**: {labels}. "
+                    "Pick one from the list.",
+                    ephemeral=True,
+                )
+                return
+
+        target = targets.get(key)
+        if target is None:
+            await interaction.response.send_message(
+                "That season isn't on the clear list. Use `/season list`, then "
+                "pick from the `/season clear` menu (current open Cup, or an "
+                "archived one like Intro / Season 1).",
+                ephemeral=True,
+            )
+            return
+
+        if target["kind"] == "current":
+            result = store.cancel_open_season()
+            note = (
+                f"Cancelled **{result['name']}** (#{result['number']}). "
+                "No Cup is running — use `/season start` when you're ready. "
+                "Finished seasons in the archive are untouched. All-time totals stay."
+            )
+            if result.get("had_scores"):
+                note += " This season's live scores were wiped."
+        else:
+            try:
+                record = store.clear_archived_season(int(target["number"]))
+            except RuntimeError as exc:
+                await interaction.response.send_message(str(exc), ephemeral=True)
+                return
+            note = (
+                f"Removed archived **{record.get('name', target['name'])}** "
+                f"(#{record.get('number', target['number'])}) from `/housecup` history. "
+                "All-time points are unchanged. Other seasons stay."
+            )
+
+        await interaction.response.send_message(note, ephemeral=True)
+        try:
+            from cogs.event_board import bump_event_board
+            bump_event_board(self.bot)
+        except Exception:
+            pass
+
+    @season_clear.autocomplete("which")
+    async def season_clear_which_autocomplete(
+        self, interaction: discord.Interaction, current: str,
+    ):
+        store = self._store()
+        if store is None:
+            return []
+        needle = (current or "").strip().lower()
+        choices = []
+        for target in store.clear_targets():
+            hay = f"{target['label']} {target['name']} {target['number']}".lower()
+            if needle and needle not in hay:
+                continue
+            choices.append(app_commands.Choice(name=target["label"], value=target["key"]))
+            if len(choices) >= 25:
+                break
+        return choices
 
     # ---------------------------------------------------------- error guard
 
