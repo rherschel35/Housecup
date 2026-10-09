@@ -185,9 +185,14 @@ class Profile(commands.Cog):
         patronus_cog = self.bot.get_cog("Patronus")
         patronus = patronus_cog.patronus_of(member.id) if patronus_cog else None
         if patronus:
+            headline = (
+                patronus_cog.headline_for(patronus)
+                if patronus_cog is not None
+                else f"A silver {patronus['animal'].lower()}"
+            )
             embed.add_field(
                 name="Patronus",
-                value=f"**A silver {patronus['animal'].lower()}**",
+                value=f"**{headline}**",
                 inline=True,
             )
         elif wand:

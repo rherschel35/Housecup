@@ -167,6 +167,38 @@ CUSTOM_PATRONUSES: dict[str, dict] = {
         "art": "Chimera_Saro.jpg",
         "defeat_art": "Chimera_Saro_Defeat.jpg",
     },
+    "581173716206223372": {  # Lumi / Lumière✨ — AsterWilde house president
+        "animal": "Kraken",
+        "label": "A Kraken of Silvery Mist",
+        "form": (
+            "Silvery mist coils into the shape of a colossal kraken, its immense "
+            "body emerging from the haze like an ancient terror rising from the "
+            "abyss. Eight enormous tentacles unfurl into the air, each one "
+            "twisting with deliberate, unsettling grace, their luminous silver "
+            "tips leaving trails of shimmering mist in their wake. Vast, ghostly "
+            "eyes burn through the fog as its shadow spreads across the ground, "
+            "vast enough to swallow everything beneath it. The mist churns around "
+            "its form like a storm-tossed sea, revealing glimpses of its monstrous "
+            "silhouette before concealing it once more."
+        ),
+        "reading": (
+            "You protect by becoming the force no darkness can contain. Where "
+            "others see an impossible obstacle, you find a thousand ways to "
+            "overcome it. You are patient when patience is needed, merciless when "
+            "the moment demands it, and impossible to trap in the confines of "
+            "another's expectations. Your strength lies in your ability to reach "
+            "beyond the obvious, to strike from unexpected depths, and to turn "
+            "even the most chaotic circumstances to your advantage. You do not "
+            "simply stand between danger and those you protect; you become the "
+            "very thing danger learns to fear. Like the kraken that rules the "
+            "deepest waters, you carry an ancient, unyielding power beneath a "
+            "composed surface. And when the people you cherish are threatened, "
+            "the mist parts, the abyss awakens, and the world remembers that "
+            "some forces were never meant to be challenged."
+        ),
+        "art": "Kraken_Lumi.jpg",
+        "defeat_art": "Kraken_Lumi_Defeat.jpg",
+    },
 }
 
 # Real animals only, each with what it guards. The reader must choose from
@@ -294,12 +326,23 @@ class Patronus(commands.Cog):
     def patronus_of(self, user_id: int) -> dict | None:
         custom = self.custom_of(user_id)
         if custom:
-            return {
+            out = {
                 "animal": custom["animal"],
                 "form": custom["form"],
                 "reading": custom["reading"],
             }
+            if custom.get("label"):
+                out["label"] = custom["label"]
+            return out
         return self.patronuses.get(str(user_id))
+
+    @staticmethod
+    def headline_for(patronus: dict) -> str:
+        """Bold lead line — customs may override with a full epithet."""
+        label = (patronus.get("label") or "").strip()
+        if label:
+            return label
+        return f"A silver {patronus['animal'].lower()}"
 
     def art_path_for(self, user_id: int, *, field: str = "art") -> Path | None:
         custom = self.custom_of(user_id)
@@ -361,7 +404,7 @@ class Patronus(commands.Cog):
         embed = discord.Embed(
             title=("Silver light spills from the wand…" if fresh
                    else f"{member.display_name}'s patronus"),
-            description=(f"**A silver {patronus['animal'].lower()}**\n"
+            description=(f"**{self.headline_for(patronus)}**\n"
                          f"*{patronus['form']}*\n\n{patronus['reading']}"),
             color=SILVER,
         )
