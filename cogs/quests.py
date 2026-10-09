@@ -482,6 +482,8 @@ class Quests(commands.Cog):
         if weekday is not None:
             self.settings["weekday"] = weekday.value
         self.save()
+        from cogs.event_board import bump_event_board
+        bump_event_board(self.bot)
 
         day = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
                "Sunday")[self.settings["weekday"]]

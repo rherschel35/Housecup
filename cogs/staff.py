@@ -142,6 +142,35 @@ class Staff(commands.Cog):
             return
         await cog.setannounce(interaction, channel, day, hour)
 
+    @staff_setup.command(
+        name="eventboard",
+        description="Post/keep a living weekly Attack · Duel Night · Challenge schedule in a channel.",
+    )
+    @app_commands.describe(
+        channel="Where the board lives (default: this channel, or the event announce channel)",
+    )
+    async def setup_eventboard(
+        self,
+        interaction: discord.Interaction,
+        channel: discord.TextChannel = None,
+    ):
+        cog = self._cog("EventBoard")
+        if not cog:
+            await interaction.response.send_message("Event board isn't loaded.", ephemeral=True)
+            return
+        await cog.eventboard(interaction, channel)
+
+    @staff_setup.command(
+        name="eventboardoff",
+        description="Stop updating the living weekly event schedule board.",
+    )
+    async def setup_eventboardoff(self, interaction: discord.Interaction):
+        cog = self._cog("EventBoard")
+        if not cog:
+            await interaction.response.send_message("Event board isn't loaded.", ephemeral=True)
+            return
+        await cog.eventboardoff(interaction)
+
     # --------------------------------------------------------------- houses
 
     @houses.command(name="sort", description="Pin a member to a house, ignoring their roles.")
