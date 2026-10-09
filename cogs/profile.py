@@ -29,15 +29,14 @@ from cogs.duels import rank_for as duel_title, REP_GLOW, CHAMPION_ROLE_NAME
 
 
 def duel_ladder(records: dict) -> list[int]:
-    """Everyone who has won a duel, best first: most wins, then fewest
-    losses."""
+    """Everyone who has won a duel, best first by wins."""
     rows = []
     for uid, rec in records.items():
-        w, l = rec.get("w", 0), rec.get("l", 0)
+        w = int(rec.get("w", 0))
         if w == 0:
             continue
-        rows.append((int(uid), w, l))
-    rows.sort(key=lambda r: (-r[1], r[2]))
+        rows.append((int(uid), w))
+    rows.sort(key=lambda r: (-r[1], r[0]))
     return [r[0] for r in rows]
 
 
@@ -105,14 +104,14 @@ class Profile(commands.Cog):
         if duels:
             records = duels.state.get("records", {})
             rec = records.get(str(member.id), {"w": 0, "l": 0})
-            w, l = rec.get("w", 0), rec.get("l", 0)
-            if w + l:
+            w = int(rec.get("w", 0))
+            if w:
                 ladder = duel_ladder(records)
                 place = ladder.index(member.id) + 1 if member.id in ladder else None
                 lines = [f"**{duel_title(w)}**"]
                 if place:
                     lines.append(f"#{place} of {len(ladder)} duellists")
-                lines.append(f"{w}-{l} record")
+                lines.append(f"**{w}** wins")
                 streak = duels.streak_of(member.id)
                 if streak >= 2:
                     lines.append(f"\U0001F525 {streak}-win streak")

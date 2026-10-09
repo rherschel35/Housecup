@@ -5,7 +5,7 @@ each set is first to 2, and the series winner banks 3/4/5/26 wins.
     /duel @member              - challenge someone (1v1)
     /duelrecord [member]       - rank, wins, streak, rivals, trio/grand, points
     /duelend [member]          - clear a stuck duel lock (self, or staff for others)
-    /houseduels                - each house's overall win/loss duelling record
+    /houseduels                - each house's overall duel wins
     /staff duels night start|end  - House Duel Night (30 min or 1 hour)
     /staff duels nightschedule    - 1–3 weekly nights (30m/1h), each with its own time
     /trio scramble             - open 3v3 signup (any houses)
@@ -1357,10 +1357,8 @@ class Duels(commands.Cog):
             title += f" {sig[1]}"
         embed = discord.Embed(title=f"{title} — duelling record", color=0x6C5CE7)
         rec = self.record_of(member.id)
-        losses = rec.get("l", 0)
         embed.add_field(name="Rank", value=rank_for(wins))
         embed.add_field(name="Wins", value=str(wins))
-        embed.add_field(name="Losses", value=str(losses))
         streak = self.streak_of(member.id)
         embed.add_field(name="Streak", value=(f"🔥 {streak}" if streak >= 2 else str(streak))
                         + (" 🎯 bounty" if self.has_bounty(member.id) else ""))
@@ -1385,13 +1383,13 @@ class Duels(commands.Cog):
                             value=f"{SPELLS[sig[0]]['emoji']} {SPELLS[sig[0]]['name']}")
         embed.add_field(
             name="Trio",
-            value=f"{rec.get('trio_w', 0)}W — {rec.get('trio_l', 0)}L"
+            value=f"{rec.get('trio_w', 0)} wins"
                   + (f"\n{', '.join(self.trio_titles_of(member.id))}" if self.trio_titles_of(member.id) else ""),
             inline=True,
         )
         embed.add_field(
             name="Grand",
-            value=f"{rec.get('grand_w', 0)}W — {rec.get('grand_l', 0)}L"
+            value=f"{rec.get('grand_w', 0)} wins"
                   + (f"\n{', '.join(self.grand_titles_of(member.id))}" if self.grand_titles_of(member.id) else ""),
             inline=True,
         )
@@ -1413,13 +1411,13 @@ class Duels(commands.Cog):
         embed.set_footer(text=footer)
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="houseduels", description="Each house's overall duelling record.")
+    @app_commands.command(name="houseduels", description="Each house's overall duel wins.")
     async def houseduels(self, interaction: discord.Interaction):
         from cogs.store import HOUSES
         store = self.bot.get_cog("Store")
         guild = interaction.guild
 
-        totals = {key: {"w": 0, "l": 0} for key in HOUSES}
+        totals = {key: 0 for key in HOUSES}
         for uid, rec in self.state.get("records", {}).items():
             member = guild.get_member(int(uid)) if guild else None
             if member is None:
@@ -1427,21 +1425,20 @@ class Duels(commands.Cog):
             house = store.member_house(member) if store else None
             if house not in totals:
                 continue
-            totals[house]["w"] += rec.get("w", 0)
-            totals[house]["l"] += rec.get("l", 0)
+            totals[house] += int(rec.get("w", 0))
 
-        ranked = sorted(totals.items(), key=lambda kv: (-kv[1]["w"], kv[1]["l"]))
+        ranked = sorted(totals.items(), key=lambda kv: (-kv[1], HOUSES[kv[0]]["name"]))
 
         lines = []
-        for i, (house_key, rec) in enumerate(ranked, start=1):
+        for i, (house_key, wins) in enumerate(ranked, start=1):
             meta = HOUSES[house_key]
-            w, l = rec["w"], rec["l"]
-            lines.append(f"**{i}. {meta['emoji']} {meta['name']}** — {w}-{l}")
+            lines.append(f"**{i}. {meta['emoji']} {meta['name']}** — **{wins}** wins")
 
+        top_wins = ranked[0][1] if ranked else 0
         embed = discord.Embed(
-            title="⚔️ House Duelling Record",
+            title="⚔️ House Duelling Wins",
             description="\n".join(lines) if lines else "No duels have been fought yet.",
-            color=HOUSES[ranked[0][0]]["color"] if ranked and (ranked[0][1]["w"] or ranked[0][1]["l"]) else 0x6C5CE7,
+            color=HOUSES[ranked[0][0]]["color"] if ranked and top_wins else 0x6C5CE7,
         )
         embed.set_footer(text="Ranked by total wins • same-house duels count too")
         await interaction.response.send_message(embed=embed)
@@ -2602,19 +2599,7 @@ class Duel:
             verb = "wins by forfeit"
         elif self.match_wins > 1:
             w_sets = outcome.get("winner_sets", self.match_wins)
-            l_sets = outcome.get("loser_sets", 0)
-            if l_sets:
-                verb = (
-                    f"wins the series (+{w_sets} wins, +{l_sets} loss"
-                    f"{'' if l_sets == 1 else 'es'}; "
-                    f"{loser.display_name} +{l_sets} win"
-                    f"{'' if l_sets == 1 else 's'}, +{w_sets} losses)"
-                )
-            else:
-                verb = (
-                    f"wins the series (+{w_sets} wins; "
-                    f"{loser.display_name} +{w_sets} losses)"
-                )
+            verb = f"wins the series (+{w_sets} wins)"
         else:
             verb = "wins the duel"
         async with self.lock:

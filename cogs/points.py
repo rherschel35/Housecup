@@ -55,6 +55,12 @@ class Points(commands.Cog):
         store = self._store()
         if not await self._guard(interaction, store):
             return
+        if not store.season_active():
+            await interaction.response.send_message(
+                "No House Cup season is running. Staff: `/season start` when the next Cup opens.",
+                ephemeral=True,
+            )
+            return
 
         if points <= 0:
             await interaction.response.send_message(
@@ -118,6 +124,12 @@ class Points(commands.Cog):
                          house: app_commands.Choice[str], points: int, reason: str = ""):
         store = self._store()
         if not await self._guard(interaction, store):
+            return
+        if not store.season_active():
+            await interaction.response.send_message(
+                "No House Cup season is running. Staff: `/season start` when the next Cup opens.",
+                ephemeral=True,
+            )
             return
 
         if points == 0:

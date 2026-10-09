@@ -3,7 +3,7 @@ Living weekly event schedule board.
 
 Staff posts one message with `/staff setup eventboard`. The bot keeps editing
 that same message so the channel always shows the current Attack, Duel Night,
-and Challenge schedule — including the next upcoming time for each.
+and House Cup standings — including the next upcoming time for each event.
 """
 
 from __future__ import annotations
@@ -12,7 +12,6 @@ import datetime as dt
 import json
 import logging
 import os
-import time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -177,40 +176,60 @@ class EventBoard(commands.Cog):
             lines.append(f"Announces in <#{announce}>")
         return "\n".join(lines)
 
-    def _challenge_section(self) -> str:
-        cog = self.bot.get_cog("Quests")
-        if not cog:
-            return "_Challenge schedule unavailable._"
-        from cogs.quests import TIERS, WINNERS_WANTED, _due_after
+    def _standings_section(self) -> str:
+        store = self.bot.get_cog("Store")
+        if not store:
+            return "_House Cup standings unavailable._"
+        from cogs.store import HOUSES, house_display
 
-        settings = cog.settings
-        hour = int(settings.get("hour", 18))
-        weekday = int(settings.get("weekday", 6))
-        ch = settings.get("channel_id")
-        where = f"<#{ch}>" if ch else "_(challenge channel not set)_"
-        lines = [
-            f"**House Cup Challenges** — first {WINNERS_WANTED} correct win points · {where}",
-            f"· **Daily** — every 24 hours · 1 pt · pings @everyone",
-            f"· **Trial** — about every 3 days at **{hour:02d}:00 UTC** · 3 pts",
-            f"· **Weekly Rite** — **{WEEKDAY_LABELS[weekday]}s** at **{hour:02d}:00 UTC** · 5 pts",
-        ]
-        now = time.time()
-        for tier in ("daily", "trial", "rite"):
-            meta = TIERS[tier]
-            active = cog.state.get("active", {}).get(tier)
-            if active and not active.get("closed"):
-                left = WINNERS_WANTED - len(active.get("winners") or [])
-                lines.append(
-                    f"Open now: **{meta['label']}** — {left} place"
-                    f"{'' if left == 1 else 's'} left"
-                )
-                continue
-            last = cog.state.get("last_posted", {}).get(tier)
-            if last:
-                nxt = float(last) + _due_after(tier)
-                if nxt > now:
+        season = store.current_season()
+        if not store.season_active():
+            lines = [
+                "**House Cup** — no season active right now.",
+            ]
+            archive = store.state.get("archive") or []
+            if archive:
+                last = archive[-1]
+                if last.get("winner"):
                     lines.append(
-                        f"Next **{meta['label']}**: <t:{int(nxt)}:R>"
+                        f"Last cup: {house_display(last['winner'])} "
+                        f"(**{last['name']}**)"
+                    )
+                elif last.get("tied"):
+                    tied = " & ".join(HOUSES[k]["name"] for k in last["tied"])
+                    lines.append(f"Last season (**{last['name']}**) tied — {tied}")
+                else:
+                    lines.append(f"Last season: **{last['name']}**")
+            pending = season.get("name") or "the next season"
+            lines.append(f"Next: **{pending}** — staff `/season start` when ready.")
+            return "\n".join(lines)
+
+        rows = store.house_totals("season")
+        top = max((p for _, p in rows), default=0)
+        name = season.get("name") or "This season"
+        lines = [f"**{name}** — live Cup standings"]
+        medals = ("🥇", "🥈", "🥉")
+        for i, (key, points) in enumerate(rows):
+            meta = HOUSES[key]
+            medal = medals[i] if i < 3 and points > 0 else "·"
+            lines.append(
+                f"{medal} {meta['emoji']} **{meta['name']}** — `{points:,}`"
+            )
+        if not top:
+            lines.append("_No points awarded yet._")
+        else:
+            leader = rows[0]
+            tied = [k for k, p in rows if p == leader[1] and p > 0]
+            if len(tied) > 1:
+                lines.append(
+                    "Tied at the top — "
+                    + " & ".join(HOUSES[k]["name"] for k in tied)
+                )
+            elif len(rows) > 1:
+                margin = leader[1] - rows[1][1]
+                if margin:
+                    lines.append(
+                        f"**{HOUSES[leader[0]]['name']}** leads by {margin:,}"
                     )
         return "\n".join(lines)
 
@@ -220,7 +239,7 @@ class EventBoard(commands.Cog):
             title="Velmora — This Week's Events",
             description=(
                 "Living schedule — this message updates itself when staff change "
-                "Attack / Duel Night / Challenge timing.\n"
+                "Attack / Duel Night timing or House Cup standings move.\n"
                 f"Board time: **{now.strftime('%A %H:%M')}** America/Chicago "
                 f"(<t:{int(now.timestamp())}:F>)"
             ),
@@ -229,7 +248,7 @@ class EventBoard(commands.Cog):
         )
         embed.add_field(name="⚔️ Attack", value=self._attack_section()[:1024], inline=False)
         embed.add_field(name="🗡️ Duel Night", value=self._duel_night_section()[:1024], inline=False)
-        embed.add_field(name="📜 Challenges", value=self._challenge_section()[:1024], inline=False)
+        embed.add_field(name="🏆 House Cup", value=self._standings_section()[:1024], inline=False)
         embed.set_footer(text="Always current · staff: /staff setup eventboard")
         return embed
 

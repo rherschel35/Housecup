@@ -7,7 +7,7 @@ Setup and season management. Everything here is staff-only.
     /staff setup setannounce <channel> [day] [hour]
     /staff houses sort <member> <house>
     /staff houses unsort <member>
-    /season rename|end|list
+    /season rename|end|start|list
 """
 
 import datetime
@@ -159,29 +159,68 @@ class Admin(commands.Cog):
 
     season = app_commands.Group(name="season", description="Manage House Cup seasons.")
 
-    @season.command(name="rename", description="Rename the current season.")
+    @season.command(name="rename", description="Rename the current (or next) season.")
     @app_commands.describe(name="What to call it, e.g. 'Autumn Term'")
     async def season_rename(self, interaction: discord.Interaction, name: str):
         store = await self._guard(interaction)
         if store is None:
             return
         store.rename_season(name)
-        await interaction.response.send_message(
-            f"This season is now **{store.current_season()['name']}**.", ephemeral=True
-        )
+        label = store.current_season()["name"]
+        if store.season_active():
+            msg = f"This season is now **{label}**."
+        else:
+            msg = f"The next season will be called **{label}** (not started yet)."
+        await interaction.response.send_message(msg, ephemeral=True)
 
-    @season.command(name="end", description="Crown a champion and start a new season.")
-    @app_commands.describe(confirm="This resets season scores. All-time totals are kept.")
-    @app_commands.choices(confirm=[
-        app_commands.Choice(name="Yes, end the season and crown a champion", value="yes"),
-    ])
-    async def season_end(self, interaction: discord.Interaction,
-                         confirm: app_commands.Choice[str]):
+    @season.command(
+        name="end",
+        description="Crown a champion. Optionally leave no season running until /season start.",
+    )
+    @app_commands.describe(
+        confirm="This resets season scores. All-time totals are kept.",
+        next_season="Open the next Cup now, or leave a gap until /season start.",
+    )
+    @app_commands.choices(
+        confirm=[
+            app_commands.Choice(name="Yes, end the season and crown a champion", value="yes"),
+        ],
+        next_season=[
+            app_commands.Choice(
+                name="Start the next season now",
+                value="start",
+            ),
+            app_commands.Choice(
+                name="No season until /season start (weekend gap)",
+                value="pause",
+            ),
+        ],
+    )
+    async def season_end(
+        self,
+        interaction: discord.Interaction,
+        confirm: app_commands.Choice[str],
+        next_season: app_commands.Choice[str] = None,
+    ):
         store = await self._guard(interaction)
         if store is None:
             return
+        if not store.season_active():
+            await interaction.response.send_message(
+                "No House Cup season is running. Use `/season start` when you're ready.",
+                ephemeral=True,
+            )
+            return
 
-        record = store.end_season()
+        start_next = True
+        if next_season is not None:
+            start_next = next_season.value == "start"
+        try:
+            record = store.end_season(start_next=start_next)
+        except RuntimeError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+
         rows = record["standings"]
 
         if record.get("winner"):
@@ -213,8 +252,47 @@ class Admin(commands.Cog):
                       f"**{champions[0]['points']:,}** points.",
                 inline=False,
             )
-        embed.set_footer(text=f"{store.current_season()['name']} begins now. All-time totals carry over.")
+        if store.season_active():
+            footer = (
+                f"{store.current_season()['name']} begins now. "
+                "All-time totals carry over."
+            )
+        else:
+            footer = (
+                f"No season active — {store.current_season()['name']} waits for "
+                "`/season start`. All-time totals carry over."
+            )
+        embed.set_footer(text=footer)
         await interaction.response.send_message(embed=embed)
+        try:
+            from cogs.event_board import bump_event_board
+            bump_event_board(self.bot)
+        except Exception:
+            pass
+
+    @season.command(
+        name="start",
+        description="Open the next House Cup after a between-seasons gap.",
+    )
+    @app_commands.describe(name="Optional name (defaults to Season N)")
+    async def season_start(self, interaction: discord.Interaction, name: str = None):
+        store = await self._guard(interaction)
+        if store is None:
+            return
+        try:
+            season = store.start_season(name)
+        except RuntimeError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+        await interaction.response.send_message(
+            f"**{season['name']}** is open. House Cup scoring is live again.",
+            ephemeral=True,
+        )
+        try:
+            from cogs.event_board import bump_event_board
+            bump_event_board(self.bot)
+        except Exception:
+            pass
 
     @season.command(name="list", description="Every season so far.")
     async def season_list(self, interaction: discord.Interaction):
@@ -225,14 +303,19 @@ class Admin(commands.Cog):
 
         archive = store.state.get("archive", [])
         current = store.current_season()
-        started = datetime.datetime.fromtimestamp(current["started_at"], datetime.timezone.utc)
 
         lines = []
         for record in archive:
             winner = (house_display(record["winner"]) if record.get("winner")
                       else ("tied" if record.get("tied") else "no champion"))
             lines.append(f"**{record['name']}** — {winner}")
-        lines.append(f"**{current['name']}** — running since {started:%d %b %Y}")
+        if store.season_active() and current.get("started_at"):
+            started = datetime.datetime.fromtimestamp(
+                current["started_at"], datetime.timezone.utc,
+            )
+            lines.append(f"**{current['name']}** — running since {started:%d %b %Y}")
+        else:
+            lines.append(f"**{current['name']}** — not started (between seasons)")
 
         await interaction.response.send_message(
             embed=discord.Embed(
