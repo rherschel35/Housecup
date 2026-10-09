@@ -791,6 +791,9 @@ class Dementors(commands.Cog):
     def _can_auto_cast(self, user_id: int) -> bool:
         if CAST_AUTO_USER_ID is not None and user_id == CAST_AUTO_USER_ID:
             return True
+        potions = self.bot.get_cog("Potions")
+        if potions and potions.has_liquid_luck(user_id):
+            return True
         castles = self.bot.get_cog("Castles")
         return bool(castles and castles.surestroke_auto_cast(user_id))
 

@@ -424,6 +424,8 @@ class Beasts(commands.Cog):
         now = time.time()
         claim_embed = None  # edit sighting after lock if a new claim was set
         missing_reply = None
+        used_luck_approach = False
+        out = None
         async with self.lock:
             s = self.state.get("sighting")
             adorn = self.bot.get_cog("Adornments")
@@ -457,11 +459,21 @@ class Beasts(commands.Cog):
                 await interaction.response.send_message("The satchels are out of reach right now.",
                                                         ephemeral=True)
                 return
+            potions = self.bot.get_cog("Potions")
+            luck = potions.liquid_luck(interaction.user.id) if potions else None
+            free_approach = bool(luck and luck.get("free_approach"))
             async with world.lock:
                 student = world.student(interaction.user)
                 have = student.get("items", {})
                 missing = [i for i in b["wants"] if have.get(i, 0) < 1]
-                if missing:
+                if missing and free_approach and potions.consume_free_approach(interaction.user.id):
+                    # Liquid Luck: befriend without the offering once.
+                    used_luck_approach = True
+                    out = self.befriend(interaction.user, key, now)
+                    self.state["sighting"] = None
+                    self.save()
+                    claim_embed = None
+                elif missing:
                     claim_until = s.get("claim_until")
                     tip = ""
                     if claim_until and now < claim_until:
@@ -485,8 +497,15 @@ class Beasts(commands.Cog):
             return
 
         from cogs.store import HOUSES
-        lines = [f"{b['emoji']} **{interaction.user.display_name}** offers {self.items_line(b['wants'])} "
-                 f"and befriends the **{b['name']}**!", f"*{b['desc']}*"]
+        if used_luck_approach:
+            lines = [
+                f"{b['emoji']} **{interaction.user.display_name}** approaches empty-handed — "
+                f"🥇 Liquid Luck is enough. The **{b['name']}** follows!",
+                f"*{b['desc']}*",
+            ]
+        else:
+            lines = [f"{b['emoji']} **{interaction.user.display_name}** offers {self.items_line(b['wants'])} "
+                     f"and befriends the **{b['name']}**!", f"*{b['desc']}*"]
         if lingered:
             lines.insert(1, "⏳ *It had nearly gone, but the Lingering Charm made it look back.*")
         if out["first"]:

@@ -973,6 +973,15 @@ class Marketplace(commands.Cog):
                 target_id=member.id, effect=effect_key,
                 duration_minutes=SCROLL_DURATION_MIN, cast_by=interaction.user.id,
             )
+        except PermissionError:
+            self.state["scrolls"][key] = self.scroll_count(interaction.user.id) + 1
+            self.save()
+            await interaction.response.send_message(
+                f"🥇 **{member.display_name}** is riding Liquid Luck — the scroll slides right off. "
+                "It wasn't consumed.",
+                ephemeral=True,
+            )
+            return
         except Exception:
             log.exception("Hex scroll apply failed")
             self.state["scrolls"][key] = self.scroll_count(interaction.user.id) + 1

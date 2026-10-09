@@ -70,6 +70,13 @@ def roll(rng: random.Random) -> tuple[int, str, str]:
     return net, verdict, rng.choice(flavours)
 
 
+def best_roll(rng: random.Random) -> tuple[int, str, str]:
+    """Liquid Luck: always the best bean outcome."""
+    best = max(OUTCOMES, key=lambda row: row[1])
+    _, net, verdict, flavours = best
+    return net, verdict, rng.choice(flavours)
+
+
 class Beans(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -123,13 +130,16 @@ class Beans(commands.Cog):
             return {"error": f"That's your {BEANS_PER_DAY} for today. "
                              f"Another bean <t:{int(next_at)}:R>."}
 
-        net, verdict, flavour = roll(rng or self.rng)
+        rng = rng or self.rng
+        potions = self.bot.get_cog("Potions")
+        lucky = bool(potions and potions.has_liquid_luck(member.id))
+        net, verdict, flavour = best_roll(rng) if lucky else roll(rng)
         store.record(
             house=house,
             delta=net,
             actor_id=self.bot.user.id if self.bot.user else 0,
             target_id=member.id,
-            reason=f"Bean: {flavour}",
+            reason=f"Bean: {flavour}" + (" (Liquid Luck)" if lucky else ""),
         )
         eaten.append(now)
         self.state["eaten"][str(member.id)] = eaten
@@ -140,6 +150,7 @@ class Beans(commands.Cog):
             "flavour": flavour,
             "house": house,
             "left_today": BEANS_PER_DAY - len(eaten),
+            "liquid_luck": lucky,
         }
 
     @app_commands.command(name="bean", description="Spend a point on a mystery bean. Three a day.")
@@ -159,9 +170,10 @@ class Beans(commands.Cog):
         else:
             line, color = f"**{net}** for {meta['emoji']} {meta['name']}. Brutal.", 0x9E4A4A
 
+        luck_note = "\n🥇 *Liquid Luck found the best bean.*" if result.get("liquid_luck") else ""
         embed = discord.Embed(
             title=f"{interaction.user.display_name} eats a bean…",
-            description=f"It tastes of **{result['flavour']}**.\n\n*{result['verdict']}* {line}",
+            description=f"It tastes of **{result['flavour']}**.\n\n*{result['verdict']}* {line}{luck_note}",
             color=color,
         )
         left = result["left_today"]

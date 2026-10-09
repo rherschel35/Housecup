@@ -1,24 +1,21 @@
 """
 Potions class - brew from materials found across the Garden, the Woods,
 the Library, the Dungeons, the Observatory, and the Descent, then drink
-what you've made for a temporary edge. No dueling boosts live here by
-design: everything a potion does either helps you with beasts or helps
-you in the Descent.
+what you've made for a temporary edge.
 
-    /brew potion:<name>    - spend two ingredients and try to brew it
+Most potions help with beasts or the Descent. Felix Felicis (Liquid Luck)
+is the exception: a weekly masterwork with a long cauldron sequence and
+broad luck across duels, beans, beasts, swarms, and hexes.
+
+    /brew potion:<name>    - spend ingredients and try to brew it
     /potions               - your Potion Rep, discovered recipes, and satchel of brewed potions
     /drink potion:<name>   - drink a brewed potion to activate it
 
-Brewing is a short 3-round minigame: each round the cauldron does
-something (drawn from a large pool of prompts) and you pick Stir / Add
-Heat / Let it Simmer. Every recipe has a hidden correct action per round
-- guess blind the first time, but once you've gotten all three right,
-that recipe's sequence is yours for good.
-Ingredients are spent the moment you commit, whether the brew works or not.
-
-Potion Rep rises with every successful brew (more for rarer potions) and
-lengthens how long - or how many fights - your potions' effects last.
-Rare and legendary recipes also need a high enough Rep to even attempt.
+Brewing is usually a 3-round minigame (Felix uses 10). Each round the
+cauldron does something and you pick Stir / Add Heat / Let it Simmer.
+Simple Descent buffs last 5 fights; harder ones last 10. One-shots stay
+one-shot. Felix Felicis lasts 4 hours and may be attempted once every
+7 days for free (no ingredients).
 """
 
 from __future__ import annotations
@@ -65,6 +62,13 @@ TIER_COLOR = {"common": 0x7FA66A, "uncommon": 0x4F8FC0, "rare": 0x9B59B6, "legen
 TIER_LABEL = {"common": "Common", "uncommon": "Uncommon", "rare": "Rare", "legendary": "Legendary"}
 
 BASE_WINDOW_SECONDS = 600  # 10 minutes, before Rep scaling - for beast-luck potions
+SIMPLE_FIGHT_CHARGES = 5   # common Descent battle potions
+HARD_FIGHT_CHARGES = 10    # uncommon+ Descent battle potions
+FELIX_RECIPE_ID = "felix_felicis"
+FELIX_DURATION_SECONDS = 4 * 3600
+FELIX_FREE_COOLDOWN = 7 * 24 * 3600
+FELIX_FEEDBACK_COUNT = 3   # of 10 steps reveal right/wrong
+FELIX_PASS_CORRECT = 7     # need this many correct of 10 to bottle it
 
 # ------------------------------------------------------------ the cauldron
 
@@ -210,6 +214,7 @@ def pick_brew_prompts(n: int = 3) -> list[str]:
 #   boss_dmg_mult  - extra incoming-damage multiplier, boss fights only
 #   loot_boost     - bonus material(s) on your next floor clear (one-shot)
 #   revive_once    - survive at 1 HP the first time you'd be defeated (one-shot)
+#   liquid_luck    - timed luck buff (Felix Felicis)
 
 RECIPES = {
     "beastcallers_draught": {
@@ -244,64 +249,73 @@ RECIPES = {
         "name": "Draught of Fury", "emoji": "🔥", "tier": "common",
         "ingredients": ["descent_ember_shard", "emberleaf"],
         "effect": {"type": "atk_mult", "value": 1.15},
+        "fights": SIMPLE_FIGHT_CHARGES,
         "sequence": ["heat", "heat", "stir"],
-        "blurb": "+15% Strike/Cast damage in your next Descent fight(s).",
+        "blurb": f"+15% Strike/Cast damage for {SIMPLE_FIGHT_CHARGES} Descent fights.",
     },
     "frost_ward_draught": {
         "name": "Frost Ward Draught", "emoji": "❄️", "tier": "common",
         "ingredients": ["descent_frost_core", "cracked_crystal"],
         "effect": {"type": "def_mult", "value": 1.20},
+        "fights": SIMPLE_FIGHT_CHARGES,
         "sequence": ["simmer", "stir", "heat"],
-        "blurb": "+20% damage reduction (incoming) in your next Descent fight(s).",
+        "blurb": f"+20% damage reduction (incoming) for {SIMPLE_FIGHT_CHARGES} Descent fights.",
     },
     "storm_focus_draught": {
         "name": "Storm Focus Draught", "emoji": "⚡", "tier": "uncommon",
         "ingredients": ["descent_storm_relic", "moonstone_chip"],
         "effect": {"type": "ap_bonus", "value": 1},
+        "fights": HARD_FIGHT_CHARGES,
         "sequence": ["stir", "heat", "heat"],
-        "blurb": "+1 max AP in your next Descent fight(s).",
+        "blurb": f"+1 max AP for {HARD_FIGHT_CHARGES} Descent fights.",
     },
     "draught_of_vigor": {
         "name": "Draught of Vigor", "emoji": "💚", "tier": "uncommon",
         "ingredients": ["descent_light_dust", "dew_diamond"],
         "effect": {"type": "heal_mult", "value": 1.5},
+        "fights": HARD_FIGHT_CHARGES,
         "sequence": ["simmer", "simmer", "stir"],
-        "blurb": "Heal restores +50% more in your next Descent fight(s).",
+        "blurb": f"Heal restores +50% more for {HARD_FIGHT_CHARGES} Descent fights.",
     },
     "steady_hand_draught": {
         "name": "Steady Hand Draught", "emoji": "🛡️", "tier": "common",
         "ingredients": ["silverleaf", "dewmint"],
         "effect": {"type": "defend_mult", "value": 0.25},
+        "fights": SIMPLE_FIGHT_CHARGES,
         "sequence": ["stir", "stir", "heat"],
-        "blurb": "Defend blocks 75% of the hit (instead of 50%) in your next Descent fight(s).",
+        "blurb": f"Defend blocks 75% of the hit (instead of 50%) for {SIMPLE_FIGHT_CHARGES} Descent fights.",
     },
     "draught_of_second_wind": {
         "name": "Draught of Second Wind", "emoji": "😮‍💨", "tier": "uncommon",
         "ingredients": ["sleeping_acorn", "wandering_seed"],
         "effect": {"type": "rest_no_penalty", "value": True},
+        "fights": HARD_FIGHT_CHARGES,
         "sequence": ["heat", "simmer", "stir"],
-        "blurb": "Rest no longer adds the usual +10% incoming damage, in your next Descent fight(s).",
+        "blurb": f"Rest no longer adds the usual +10% incoming damage, for {HARD_FIGHT_CHARGES} Descent fights.",
     },
     "giants_draught": {
         "name": "Giant's Draught", "emoji": "💪", "tier": "rare",
         "ingredients": ["dragon_scale", "tree_amber"],
         "effect": {"type": "hp_bonus", "value": 25},
+        "fights": HARD_FIGHT_CHARGES,
         "sequence": ["heat", "stir", "simmer"],
-        "blurb": "+25 max HP (and current HP) in your next Descent fight(s).",
+        "blurb": f"+25 max HP (and current HP) for {HARD_FIGHT_CHARGES} Descent fights.",
     },
     "owls_eye_draught": {
         "name": "Owl's Eye Draught", "emoji": "🦉", "tier": "common",
         "ingredients": ["owl_feather", "moonglass_lens"],
         "effect": {"type": "reveal_weakness", "value": True},
+        "fights": SIMPLE_FIGHT_CHARGES,
         "sequence": ["simmer", "heat", "heat"],
-        "blurb": "See the monster's weak element up front in your next Descent fight.",
+        "blurb": f"See the monster's weak element up front for {SIMPLE_FIGHT_CHARGES} Descent fights.",
     },
     "ironhide_draught": {
         "name": "Ironhide Draught", "emoji": "🦾", "tier": "uncommon",
         "ingredients": ["shed_fang", "standing_stone_chip"],
         "effect": {"type": "boss_dmg_mult", "value": 0.85, "boss_only": True},
+        "fights": HARD_FIGHT_CHARGES,
         "sequence": ["stir", "heat", "simmer"],
-        "blurb": "15% less damage from bosses in your next boss fight.",
+        "blurb": f"15% less damage from bosses for {HARD_FIGHT_CHARGES} boss fights.",
     },
     "draught_of_fortune": {
         "name": "Draught of Fortune", "emoji": "🍀", "tier": "rare",
@@ -317,12 +331,36 @@ RECIPES = {
         "sequence": ["heat", "simmer", "heat"],
         "blurb": "Survive at 1 HP the first time you'd be defeated in the Descent (one-shot).",
     },
+    FELIX_RECIPE_ID: {
+        "name": "Felix Felicis", "emoji": "🥇", "tier": "legendary",
+        # 3 common · 3 uncommon · 2 rare · 1 very rare (super rare)
+        "ingredients": [
+            "sunbell", "moth_dust", "star_chart_fragment",
+            "moonbloom_petal", "meteorite_sliver", "hare_whisker",
+            "starseed", "comet_dust_vial",
+            "stardust_ledger_page",
+        ],
+        "effect": {"type": "liquid_luck", "duration": FELIX_DURATION_SECONDS},
+        "sequence": [
+            "stir", "heat", "simmer", "stir", "heat",
+            "simmer", "heat", "stir", "simmer", "stir",
+        ],
+        "partial_feedback": True,
+        "weekly_free": True,
+        "pass_correct": FELIX_PASS_CORRECT,
+        "blurb": (
+            "Liquid Luck for 4 hours: win one duel tie per match, best bean "
+            "outcome, one free beast approach, auto-cast the right swarm spell, "
+            "and hex immunity. Brewable free once every 7 days."
+        ),
+    },
 }
 
 BEAST_EFFECT_TYPES = {"beast_bonus"}
 FIGHT_EFFECT_TYPES = {"atk_mult", "def_mult", "ap_bonus", "heal_mult", "defend_mult",
                       "rest_no_penalty", "hp_bonus", "reveal_weakness", "boss_dmg_mult"}
 ONE_SHOT_TYPES = {"loot_boost", "revive_once"}
+TIMED_EFFECT_TYPES = {"liquid_luck"}
 
 
 def effect_desc(recipe: dict) -> str:
@@ -338,34 +376,43 @@ def effect_desc(recipe: dict) -> str:
         if skew == "nibbler":
             return "Triggers a private encounter guaranteed to be a shiny-stealing Niffler."
         return "Triggers a private beast encounter, just for you."
+    fights = int(recipe.get("fights") or 0)
+    fight_word = f"{fights} Descent fight{'s' if fights != 1 else ''}" if fights else "your next Descent fight(s)"
     if t == "atk_mult":
         pct = int(round((e["value"] - 1) * 100))
-        return f"+{pct}% Strike/Cast damage in your next Descent fight(s)."
+        return f"+{pct}% Strike/Cast damage for {fight_word}."
     if t == "def_mult":
         pct = int(round((e["value"] - 1) * 100))
-        return f"+{pct}% damage reduction (incoming) in your next Descent fight(s)."
+        return f"+{pct}% damage reduction (incoming) for {fight_word}."
     if t == "ap_bonus":
-        return f"+{e['value']} max AP in your next Descent fight(s)."
+        return f"+{e['value']} max AP for {fight_word}."
     if t == "heal_mult":
         pct = int(round((e["value"] - 1) * 100))
-        return f"Heal restores +{pct}% more in your next Descent fight(s)."
+        return f"Heal restores +{pct}% more for {fight_word}."
     if t == "defend_mult":
         # value is residual damage fraction while defending (0.25 → block 75%).
         blocked = int(round((1 - e["value"]) * 100))
-        return f"Defend blocks {blocked}% of the hit (instead of 50%) in your next Descent fight(s)."
+        return f"Defend blocks {blocked}% of the hit (instead of 50%) for {fight_word}."
     if t == "rest_no_penalty":
-        return "Rest no longer adds the usual +10% incoming damage, in your next Descent fight(s)."
+        return f"Rest no longer adds the usual +10% incoming damage, for {fight_word}."
     if t == "hp_bonus":
-        return f"+{e['value']} max HP (and current HP) in your next Descent fight(s)."
+        return f"+{e['value']} max HP (and current HP) for {fight_word}."
     if t == "reveal_weakness":
-        return "See the monster's weak element up front in your next Descent fight."
+        return f"See the monster's weak element up front for {fight_word}."
     if t == "boss_dmg_mult":
         pct = int(round((1 - e["value"]) * 100))
-        return f"{pct}% less damage from bosses in your next boss fight."
+        n = fights or HARD_FIGHT_CHARGES
+        return f"{pct}% less damage from bosses for {n} boss fight{'s' if n != 1 else ''}."
     if t == "loot_boost":
         return f"+{e['value']} bonus material(s) on your next Descent floor clear (one-shot)."
     if t == "revive_once":
         return "Survive at 1 HP the first time you'd be defeated in the Descent (one-shot)."
+    if t == "liquid_luck":
+        hours = int(round(int(e.get("duration") or FELIX_DURATION_SECONDS) / 3600))
+        return (
+            f"Liquid Luck for {hours} hour{'s' if hours != 1 else ''}: win one duel tie per match, "
+            "best beans, one free beast approach, auto-cast the right swarm spell, hex immunity."
+        )
     return recipe.get("blurb") or "A temporary edge."
 
 
@@ -385,19 +432,36 @@ def next_rank(idx: int) -> Optional[tuple[int, str]]:
 
 
 def blank_player() -> dict:
-    return {"rep_xp": 0, "discovered": [], "inventory": {}, "active": []}
+    return {
+        "rep_xp": 0,
+        "discovered": [],
+        "inventory": {},
+        "active": [],
+        "felix_free_at": 0,
+    }
 
 
 class BrewView(discord.ui.View):
-    def __init__(self, cog: "Potions", owner_id: int, recipe_id: str, correct_so_far: int,
-                 round_index: int, prompts: list[str]):
-        super().__init__(timeout=120)
+    def __init__(
+        self,
+        cog: "Potions",
+        owner_id: int,
+        recipe_id: str,
+        correct_so_far: int,
+        round_index: int,
+        prompts: list[str],
+        feedback_rounds: set[int] | None = None,
+    ):
+        recipe = RECIPES.get(recipe_id) or {}
+        rounds = max(3, len(recipe.get("sequence") or []))
+        super().__init__(timeout=120 if rounds <= 3 else 300)
         self.cog = cog
         self.owner_id = owner_id
         self.recipe_id = recipe_id
         self.correct_so_far = correct_so_far
         self.round_index = round_index
         self.prompts = prompts
+        self.feedback_rounds = feedback_rounds
         for action, label in ACTIONS.items():
             self.add_item(BrewButton(action, label))
 
@@ -414,7 +478,13 @@ class BrewButton(discord.ui.Button):
                                                      ephemeral=True)
             return
         await view.cog.brew_round(
-            interaction, view.recipe_id, view.correct_so_far, view.round_index, self.action, view.prompts,
+            interaction,
+            view.recipe_id,
+            view.correct_so_far,
+            view.round_index,
+            self.action,
+            view.prompts,
+            view.feedback_rounds,
         )
 
 
@@ -449,7 +519,20 @@ class Potions(commands.Cog):
     def record(self, user_id: int) -> dict:
         rec = self.state["players"].setdefault(str(user_id), blank_player())
         rec.setdefault("active", [])
+        rec.setdefault("discovered", [])
+        rec.setdefault("inventory", {})
+        rec.setdefault("felix_free_at", 0)
         return rec
+
+    def felix_free_ready(self, user_id: int, now: float | None = None) -> bool:
+        now = now if now is not None else time.time()
+        rec = self.record(user_id)
+        return now >= float(rec.get("felix_free_at") or 0)
+
+    def mark_felix_free_used(self, user_id: int, now: float | None = None) -> None:
+        now = now if now is not None else time.time()
+        self.record(user_id)["felix_free_at"] = now + FELIX_FREE_COOLDOWN
+        self.save()
 
     # -------------------------------------------------------- ingredients
 
@@ -506,14 +589,20 @@ class Potions(commands.Cog):
             return {}
         return world.student(member).get("items", {})
 
-    def _brew_choice_label(self, recipe_id: str, have: dict) -> str:
-        """🟢 when every ingredient is in the satchel; 🔴 otherwise."""
+    def _brew_choice_label(self, recipe_id: str, have: dict, user_id: int | None = None) -> str:
+        """🟢 when every ingredient is in the satchel (or Felix free brew); 🔴 otherwise."""
         r = RECIPES[recipe_id]
-        ready = all(have.get(i, 0) >= 1 for i in r["ingredients"])
+        free = (
+            bool(r.get("weekly_free"))
+            and user_id is not None
+            and self.felix_free_ready(user_id)
+        )
+        ready = free or all(have.get(i, 0) >= 1 for i in r["ingredients"])
         mark = "🟢" if ready else "🔴"
-        return f"{mark} {r['emoji']} {r['name']} ({TIER_LABEL[r['tier']]})"[:100]
+        extra = " · free" if free else ""
+        return f"{mark} {r['emoji']} {r['name']} ({TIER_LABEL[r['tier']]}{extra})"[:100]
 
-    @app_commands.command(name="brew", description="Spend two ingredients and try to brew a potion.")
+    @app_commands.command(name="brew", description="Spend ingredients and try to brew a potion.")
     @app_commands.describe(potion="Which potion (🟢 = you have the ingredients)")
     async def brew(self, interaction: discord.Interaction, potion: str):
         if interaction.channel_id not in POTIONS_CHANNEL_IDS:
@@ -538,28 +627,63 @@ class Potions(commands.Cog):
                 ephemeral=True)
             return
 
-        if not await self._has_ingredients(interaction.user, recipe["ingredients"]):
-            world = self.bot.get_cog("World")
-            have = world.student(interaction.user).get("items", {}) if world else {}
-            await interaction.response.send_message(
-                f"You're short on ingredients for **{recipe['name']}**:\n"
-                f"{self.ingredients_owned_line(recipe['ingredients'], have)}",
-                ephemeral=True)
-            return
+        free_brew = bool(recipe.get("weekly_free")) and self.felix_free_ready(interaction.user.id)
+        if recipe.get("weekly_free") and not free_brew:
+            ready_at = int(float(rec.get("felix_free_at") or 0))
+            # Still allow a paid attempt with full ingredients after the free window is spent.
+            if not await self._has_ingredients(interaction.user, recipe["ingredients"]):
+                await interaction.response.send_message(
+                    f"Your free **{recipe['name']}** brew is on cooldown "
+                    f"(ready <t:{ready_at}:R>). Gather the ingredients to brew it the hard way, "
+                    f"or wait for the free attempt.",
+                    ephemeral=True,
+                )
+                return
+        elif not free_brew:
+            if not await self._has_ingredients(interaction.user, recipe["ingredients"]):
+                world = self.bot.get_cog("World")
+                have = world.student(interaction.user).get("items", {}) if world else {}
+                await interaction.response.send_message(
+                    f"You're short on ingredients for **{recipe['name']}**:\n"
+                    f"{self.ingredients_owned_line(recipe['ingredients'], have)}",
+                    ephemeral=True)
+                return
 
-        if not await self._consume_ingredients(interaction.user, recipe["ingredients"]):
-            await interaction.response.send_message("Something moved in your satchel - try again.", ephemeral=True)
-            return
+        if free_brew:
+            self.mark_felix_free_used(interaction.user.id)
+        else:
+            if not await self._consume_ingredients(interaction.user, recipe["ingredients"]):
+                await interaction.response.send_message(
+                    "Something moved in your satchel - try again.", ephemeral=True,
+                )
+                return
 
-        prompts = pick_brew_prompts(3)
+        sequence = recipe["sequence"]
+        rounds = len(sequence)
+        prompts = pick_brew_prompts(rounds)
+        feedback_rounds = None
+        if recipe.get("partial_feedback"):
+            n_fb = min(FELIX_FEEDBACK_COUNT, rounds)
+            feedback_rounds = set(random.sample(range(rounds), n_fb))
+
+        footer = f"Round 1 of {rounds}"
+        if free_brew:
+            footer += " · free weekly brew"
+        if feedback_rounds is not None:
+            footer += f" · feedback on {len(feedback_rounds)} of {rounds} steps only"
+
         embed = discord.Embed(
             title=f"{recipe['emoji']} Brewing {recipe['name']}",
             description=f"{prompts[0]}\n\nWhat do you do?",
             color=TIER_COLOR[recipe["tier"]],
         )
-        embed.set_footer(text="Round 1 of 3")
+        embed.set_footer(text=footer)
         await interaction.response.send_message(
-            embed=embed, view=BrewView(self, interaction.user.id, recipe_id, 0, 0, prompts))
+            embed=embed,
+            view=BrewView(
+                self, interaction.user.id, recipe_id, 0, 0, prompts, feedback_rounds,
+            ),
+        )
 
     @brew.autocomplete("potion")
     async def brew_potion_autocomplete(self, interaction: discord.Interaction, current: str):
@@ -567,35 +691,62 @@ class Potions(commands.Cog):
         q = current.lower().strip()
         rows = []
         for key, r in RECIPES.items():
-            label = self._brew_choice_label(key, have)
+            label = self._brew_choice_label(key, have, interaction.user.id)
             hay = f"{label} {key} {r['name']}".lower()
             if q and q not in hay:
                 continue
-            ready = all(have.get(i, 0) >= 1 for i in r["ingredients"])
+            free = bool(r.get("weekly_free")) and self.felix_free_ready(interaction.user.id)
+            ready = free or all(have.get(i, 0) >= 1 for i in r["ingredients"])
             rows.append((0 if ready else 1, key, label))
         # Brewable (green) first, then recipe book order.
         order = {k: i for i, k in enumerate(RECIPES)}
         rows.sort(key=lambda t: (t[0], order[t[1]]))
         return [app_commands.Choice(name=label, value=key) for _, key, label in rows[:25]]
 
-    async def brew_round(self, interaction: discord.Interaction, recipe_id: str, correct_so_far: int,
-                         round_index: int, action: str, prompts: list[str]):
+    async def brew_round(
+        self,
+        interaction: discord.Interaction,
+        recipe_id: str,
+        correct_so_far: int,
+        round_index: int,
+        action: str,
+        prompts: list[str],
+        feedback_rounds: set[int] | None = None,
+    ):
         recipe = RECIPES[recipe_id]
-        was_correct = recipe["sequence"][round_index] == action
+        sequence = recipe["sequence"]
+        rounds = len(sequence)
+        was_correct = sequence[round_index] == action
         correct_so_far += 1 if was_correct else 0
-        feedback = ("✅ The color settles - good call." if was_correct
-                   else "⚠️ It spits and darkens - that wasn't it.")
 
-        if round_index + 1 < 3:
+        show_feedback = feedback_rounds is None or round_index in feedback_rounds
+        if show_feedback:
+            feedback = ("✅ The color settles - good call." if was_correct
+                        else "⚠️ It spits and darkens - that wasn't it.")
+        else:
+            feedback = "🌫️ The brew shifts. You can't tell if that helped."
+
+        if round_index + 1 < rounds:
             embed = discord.Embed(
                 title=f"{recipe['emoji']} Brewing {recipe['name']}",
                 description=f"{feedback}\n\n{prompts[round_index + 1]}\n\nWhat do you do?",
                 color=TIER_COLOR[recipe["tier"]],
             )
-            embed.set_footer(text=f"Round {round_index + 2} of 3")
+            footer = f"Round {round_index + 2} of {rounds}"
+            if feedback_rounds is not None:
+                footer += f" · feedback on {len(feedback_rounds)} of {rounds} steps only"
+            embed.set_footer(text=footer)
             await interaction.response.edit_message(
                 embed=embed,
-                view=BrewView(self, interaction.user.id, recipe_id, correct_so_far, round_index + 1, prompts),
+                view=BrewView(
+                    self,
+                    interaction.user.id,
+                    recipe_id,
+                    correct_so_far,
+                    round_index + 1,
+                    prompts,
+                    feedback_rounds,
+                ),
             )
             return
 
@@ -604,17 +755,27 @@ class Potions(commands.Cog):
     async def _finish_brew(self, interaction: discord.Interaction, recipe_id: str, correct: int, last_feedback: str):
         recipe = RECIPES[recipe_id]
         rec = self.record(interaction.user.id)
+        rounds = len(recipe["sequence"])
+        need = int(recipe.get("pass_correct") or max(2, rounds - 1))
 
-        if correct < 2:
+        if correct < need:
+            lost = (
+                "The free attempt is spent — try again next week, or gather the ingredients."
+                if recipe.get("weekly_free")
+                else "The ingredients are gone."
+            )
             embed = discord.Embed(
                 title=f"{recipe['emoji']} The cauldron curdles",
-                description=f"{last_feedback}\n\nThe brew is ruined - no potion this time. The ingredients are gone.",
+                description=(
+                    f"{last_feedback}\n\nThe brew is ruined - no potion this time "
+                    f"({correct}/{rounds} right; need {need}). {lost}"
+                ),
                 color=0xC0392B,
             )
             await interaction.response.edit_message(embed=embed, view=None)
             return
 
-        perfect = correct == 3
+        perfect = correct >= rounds
         xp = TIER_XP[recipe["tier"]]
         if perfect:
             xp = round(xp * 1.5)
@@ -627,7 +788,8 @@ class Potions(commands.Cog):
         self.save()
 
         lines = [last_feedback, "", f"**{'Perfect brew!' if perfect else 'Passable brew.'}** "
-                f"You've got a {recipe['emoji']} **{recipe['name']}** in your satchel now.",
+                f"You've got a {recipe['emoji']} **{recipe['name']}** in your satchel now "
+                f"({correct}/{rounds}).",
                 f"+{xp} Potion Rep."]
         if perfect and newly_discovered:
             lines.append(f"You've cracked the recipe - the correct sequence for **{recipe['name']}** is yours for good.")
@@ -666,11 +828,36 @@ class Potions(commands.Cog):
         if rec["inventory"][recipe_id] <= 0:
             del rec["inventory"][recipe_id]
 
-        _idx, _name, mult = rank_info(rec["rep_xp"])
+        if effect["type"] in TIMED_EFFECT_TYPES:
+            # Replace any prior Liquid Luck so you can't stack windows.
+            rec["active"] = [e for e in rec["active"] if e.get("effect") != effect["type"]]
+            duration = int(effect.get("duration") or FELIX_DURATION_SECONDS)
+            expires = time.time() + duration
+            entry = {
+                "effect": effect["type"],
+                "expires_at": expires,
+                "free_approach": True,
+            }
+            rec["active"].append(entry)
+            self.save()
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    title=f"{recipe['emoji']} You drink the {recipe['name']}",
+                    description=(
+                        f"{effect_desc(recipe)}\n"
+                        f"Active until <t:{int(expires)}:F> (<t:{int(expires)}:R>)."
+                    ),
+                    color=TIER_COLOR[recipe["tier"]],
+                ))
+            return
+
         if effect["type"] in ONE_SHOT_TYPES:
             charges = 1
+        elif recipe.get("fights"):
+            charges = int(recipe["fights"])
         else:
-            charges = max(1, round(mult))
+            # Legacy fallback: common = 5, harder = 10.
+            charges = SIMPLE_FIGHT_CHARGES if recipe["tier"] == "common" else HARD_FIGHT_CHARGES
 
         entry = {"effect": effect["type"], "value": effect["value"], "charges": charges}
         if effect.get("boss_only"):
@@ -770,9 +957,18 @@ class Potions(commands.Cog):
         idx, name, mult = rank_info(rec["rep_xp"])
         nxt = next_rank(idx)
 
-        desc = [f"**{name}** • {rec['rep_xp']} Rep", f"Buff duration/charges ×{mult:g}"]
+        desc = [
+            f"**{name}** • {rec['rep_xp']} Rep",
+            f"Simple Descent buffs last **{SIMPLE_FIGHT_CHARGES}** fights; harder ones **{HARD_FIGHT_CHARGES}**.",
+        ]
         if nxt:
             desc.append(f"{nxt[0] - rec['rep_xp']} Rep to **{nxt[1]}**")
+        if self.felix_free_ready(interaction.user.id):
+            desc.append("🥇 Free **Felix Felicis** brew ready.")
+        else:
+            ready_at = int(float(rec.get("felix_free_at") or 0))
+            if ready_at:
+                desc.append(f"🥇 Free Felix brew <t:{ready_at}:R>.")
 
         embed = discord.Embed(title=f"{interaction.user.display_name}'s Potions", description="\n".join(desc),
                               color=0x6C5CE7)
@@ -780,6 +976,15 @@ class Potions(commands.Cog):
         inv_lines = [f"{RECIPES[k]['emoji']} {RECIPES[k]['name']} ×{n}" for k, n in rec["inventory"].items() if n > 0]
         embed.add_field(name="🧪 Satchel", value="\n".join(inv_lines) if inv_lines else "*Nothing brewed yet.*",
                         inline=False)
+
+        luck = self.liquid_luck(interaction.user.id)
+        if luck:
+            embed.add_field(
+                name="🥇 Liquid Luck",
+                value=f"Active until <t:{int(luck['expires_at'])}:R>"
+                      + (" · free approach ready" if luck.get("free_approach") else " · free approach used"),
+                inline=False,
+            )
 
         world = self.bot.get_cog("World")
         have = world.student(interaction.user).get("items", {}) if world else {}
@@ -819,15 +1024,51 @@ class Potions(commands.Cog):
 
     # ------------------------------------------------------- Descent hooks
 
+    def _prune_timed(self, rec: dict) -> bool:
+        """Drop expired timed buffs. Returns True if anything changed."""
+        now = time.time()
+        before = len(rec["active"])
+        rec["active"] = [
+            e for e in rec["active"]
+            if e.get("expires_at") is None or float(e["expires_at"]) > now
+        ]
+        return len(rec["active"]) != before
+
+    def liquid_luck(self, user_id: int) -> Optional[dict]:
+        """Active Felix Felicis buff, or None."""
+        rec = self.record(user_id)
+        if self._prune_timed(rec):
+            self.save()
+        for entry in rec["active"]:
+            if entry.get("effect") == "liquid_luck":
+                return entry
+        return None
+
+    def has_liquid_luck(self, user_id: int) -> bool:
+        return self.liquid_luck(user_id) is not None
+
+    def consume_free_approach(self, user_id: int) -> bool:
+        """Spend the one free beast approach from Liquid Luck. True if spent."""
+        luck = self.liquid_luck(user_id)
+        if not luck or not luck.get("free_approach"):
+            return False
+        luck["free_approach"] = False
+        self.save()
+        return True
+
     def consume_for_fight(self, user_id: int, is_boss: bool) -> dict:
         """Called once when a real (non-practice) Descent fight starts.
         Pops and returns the combined modifiers from active potions,
         decrementing charges - boss-only effects are left untouched
         (and unspent) on non-boss fights."""
         rec = self.record(user_id)
+        self._prune_timed(rec)
         mods: dict = {}
         remaining = []
         for entry in rec["active"]:
+            if entry["effect"] in TIMED_EFFECT_TYPES:
+                remaining.append(entry)
+                continue
             if entry["effect"] not in FIGHT_EFFECT_TYPES:
                 remaining.append(entry)
                 continue
