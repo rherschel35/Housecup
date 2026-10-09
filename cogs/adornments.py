@@ -619,6 +619,14 @@ class Adornments(commands.Cog):
         png = await self.render_for(member, look_override)
         return discord.File(io.BytesIO(png), filename=name)
 
+    @staticmethod
+    def mirror_embed(filename: str = "mirror.png") -> discord.Embed:
+        """Embed wrapper so Discord treats the preview as a bot embed image
+        (raw file attachments stay blurred/pending on mobile much longer)."""
+        embed = discord.Embed(color=GOLD)
+        embed.set_image(url=f"attachment://{filename}")
+        return embed
+
     def profile_line(self, user_id: int) -> str:
         owned = len(self.peek(user_id).get("owned", {}))
         if not owned:
@@ -656,8 +664,24 @@ class Adornments(commands.Cog):
         look = self.look_of(interaction.user.id)
         await interaction.response.defer(ephemeral=True)
         view = WizardView(self, interaction.user, look)
-        file = await self.mirror_file(interaction.user, look_override=look)
-        await interaction.followup.send(content=view.header(), file=file, view=view, ephemeral=True)
+        filename = f"mirror-{view.nonce}.png"
+        try:
+            file = await self.mirror_file(
+                interaction.user, name=filename, look_override=look
+            )
+        except Exception:
+            log.exception("Wizard preview failed on open")
+            await interaction.followup.send(
+                "The Mirror fogged over. Try again in a moment.", ephemeral=True
+            )
+            return
+        await interaction.followup.send(
+            content=view.header(),
+            embed=self.mirror_embed(filename),
+            file=file,
+            view=view,
+            ephemeral=True,
+        )
 
     # ================================================================ /jewelbox
 
@@ -1313,8 +1337,18 @@ class WizardView(discord.ui.View):
         self.build()
         await interaction.response.defer()
         try:
-            file = await self.cog.mirror_file(self.user, look_override=self.look)
-            await interaction.edit_original_response(content=self.header(), attachments=[file], view=self)
+            # Unique name each redraw so Discord's CDN/client doesn't keep a
+            # stale blurred placeholder from the previous attachment.
+            filename = f"mirror-{self.nonce}-{int(time.time() * 1000) % 10**9}.png"
+            file = await self.cog.mirror_file(
+                self.user, name=filename, look_override=self.look
+            )
+            await interaction.edit_original_response(
+                content=self.header(),
+                embed=self.cog.mirror_embed(filename),
+                attachments=[file],
+                view=self,
+            )
         except Exception:
             log.exception("Wizard preview failed")
 
