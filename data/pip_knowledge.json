@@ -413,7 +413,7 @@
         "rite",
         "challengestatus"
       ],
-      "answer": "Challenges post for everyone \u2014 first three correct answers win points. Daily is every 24 hours (pings @everyone); Trial an' Rite on their schedule. `/challengestatus` shows what's open.",
+      "answer": "Challenges post for everyone \u2014 first three correct answers win points. Daily, Trial, an' Rite all ping @everyone when they go up. `/challengestatus` shows what's open.",
       "link": "https://everything-velmora.netlify.app/houses"
     },
     {
