@@ -138,9 +138,35 @@ def _bar(points: int, top: int) -> str:
 
 
 def build_standings_embed(store, scope: str = "season") -> discord.Embed:
+    season = store.current_season()
+    if scope == "season" and not store.season_active():
+        archive = store.state.get("archive") or []
+        last = archive[-1] if archive else None
+        parts = ["**No House Cup season is running.**"]
+        if last:
+            if last.get("winner"):
+                parts.append(
+                    f"Last cup: {house_display(last['winner'])} "
+                    f"(**{last['name']}**)."
+                )
+            elif last.get("tied"):
+                parts.append(
+                    f"**{last['name']}** ended in a tie — "
+                    + " & ".join(HOUSES[k]["name"] for k in last["tied"])
+                    + "."
+                )
+            else:
+                parts.append(f"**{last['name']}** has ended.")
+        pending = season.get("name") or "the next season"
+        parts.append(f"Staff open **{pending}** with `/season start`.")
+        return discord.Embed(
+            title="The House Cup",
+            description="\n".join(parts),
+            color=discord.Color.dark_grey(),
+        )
+
     rows = store.house_totals(scope)
     top = max((p for _, p in rows), default=0)
-    season = store.current_season()
 
     lines = []
     for i, (key, points) in enumerate(rows):
@@ -166,8 +192,12 @@ def build_standings_embed(store, scope: str = "season") -> discord.Embed:
         color=HOUSES[leader[0]]["color"] if leader[0] and top else discord.Color.dark_grey(),
     )
     if scope == "season":
-        started = datetime.datetime.fromtimestamp(season["started_at"], datetime.timezone.utc)
-        embed.set_footer(text=f"{season['name']} • since {started:%d %b %Y}")
+        started_at = season.get("started_at")
+        if started_at:
+            started = datetime.datetime.fromtimestamp(started_at, datetime.timezone.utc)
+            embed.set_footer(text=f"{season['name']} • since {started:%d %b %Y}")
+        else:
+            embed.set_footer(text=f"{season['name']}")
     else:
         embed.set_footer(text="Every point ever awarded, across all seasons.")
     return embed

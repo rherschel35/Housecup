@@ -144,7 +144,7 @@ class Staff(commands.Cog):
 
     @staff_setup.command(
         name="eventboard",
-        description="Post/keep a living weekly Attack · Duel Night · Challenge schedule in a channel.",
+        description="Post/keep a living weekly Attack · Duel Night · House Cup board in a channel.",
     )
     @app_commands.describe(
         channel="Where the board lives (default: this channel, or the official schedule channel)",
