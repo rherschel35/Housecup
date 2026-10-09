@@ -68,7 +68,7 @@ FELIX_RECIPE_ID = "felix_felicis"
 FELIX_DURATION_SECONDS = 4 * 3600
 FELIX_FREE_COOLDOWN = 7 * 24 * 3600
 FELIX_FEEDBACK_COUNT = 3   # of 10 steps reveal right/wrong
-FELIX_PASS_CORRECT = 7     # need this many correct of 10 to bottle it
+FELIX_PASS_CORRECT = 9     # need this many correct of 10 to bottle it
 
 # ------------------------------------------------------------ the cauldron
 
