@@ -67,7 +67,7 @@ HARD_FIGHT_CHARGES = 10    # uncommon+ Descent battle potions
 FELIX_RECIPE_ID = "felix_felicis"
 FELIX_DURATION_SECONDS = 4 * 3600
 FELIX_FREE_COOLDOWN = 7 * 24 * 3600
-FELIX_FEEDBACK_COUNT = 3   # of 10 steps reveal right/wrong
+FELIX_FEEDBACK_COUNT = 1   # of 10 steps reveal right/wrong
 FELIX_PASS_CORRECT = 9     # need this many correct of 10 to bottle it
 
 # ------------------------------------------------------------ the cauldron
