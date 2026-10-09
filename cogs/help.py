@@ -257,6 +257,7 @@ HELP = {
             ("staff sync", "Force-push slash commands (wipes stale guild /feed · /play · flat /familiar)."),
             ("synccmds", "Same as /staff sync — top-level, easier on mobile."),
             ("staffgame raid reset", "Clear a player's 3Raid weekly lockout, or end the active raid."),
+            ("staffgame raid unstick", "Unfreeze a 3Raid board stuck on Resolving… without ending the run."),
             ("staffgame market sellreset", "Clear someone's daily Marketplace sell-points cap."),
             ("staffgame market setprice", "Set the point price for scrolls, titles, Room, ingredients, etc."),
             ("staffgame market prices", "Show current Marketplace prices (including overrides)."),

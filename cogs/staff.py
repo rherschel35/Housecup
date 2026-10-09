@@ -386,6 +386,17 @@ class Staff(commands.Cog):
             return
         await cog.raidreset(interaction, member, end_run)
 
+    @raid.command(
+        name="unstick",
+        description="Unfreeze a 3Raid board stuck on Resolving… (keeps the run).",
+    )
+    async def raid_unstick(self, interaction: discord.Interaction):
+        cog = self._cog("ThreeRaid")
+        if not cog:
+            await interaction.response.send_message("3Raid isn't loaded.", ephemeral=True)
+            return
+        await cog.raidunstick(interaction)
+
     # ---------------------------------------------------------------- duels
 
     @duels.command(name="night", description="Start or end House Duel Night — 30 minutes or 1 hour.")

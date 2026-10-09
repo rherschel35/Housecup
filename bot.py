@@ -38,7 +38,7 @@ FORCE_COMMAND_SYNC = os.getenv("FORCE_COMMAND_SYNC", "").strip() in ("1", "true"
 SYNC_TIMEOUT_SECONDS = int(os.getenv("COMMAND_SYNC_TIMEOUT", "600"))
 # Bump when sync *behavior* changes (e.g. also overwrite guild commands) so
 # the next boot re-PUTs even if the slash tree fingerprint is unchanged.
-COMMAND_SYNC_REVISION = 22
+COMMAND_SYNC_REVISION = 23
 # Chess & checkers load by default. Set ENABLE_BOARD_GAMES=0 to unload them.
 _ENABLE_BOARD_GAMES_RAW = os.getenv("ENABLE_BOARD_GAMES", "1").strip().lower()
 ENABLE_BOARD_GAMES = _ENABLE_BOARD_GAMES_RAW not in ("0", "false", "no", "off", "")
