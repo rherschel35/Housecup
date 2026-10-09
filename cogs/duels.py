@@ -1744,6 +1744,8 @@ class Duels(commands.Cog):
         sched["last_warn_key"] = None
         sched["last_start_key"] = None
         self.save()
+        from cogs.event_board import bump_event_board
+        bump_event_board(self.bot)
         slot_lines = ", ".join(
             f"**{WEEKDAY_LABELS[s['weekday']]}** {s['hour']:02d}:{s['minute']:02d}"
             for s in slots
@@ -1777,6 +1779,8 @@ class Duels(commands.Cog):
         sched = self._night_schedule()
         sched["enabled"] = False
         self.save()
+        from cogs.event_board import bump_event_board
+        bump_event_board(self.bot)
         await interaction.response.send_message(
             "Weekly Duel Night schedule is off. Manual `/staff duels night` still works.",
             ephemeral=True,

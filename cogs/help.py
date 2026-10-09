@@ -335,6 +335,8 @@ HELP = {
             ("staff identity animagusreset", "Release someone's Animagus form so they can be found again."),
             ("staff identity upgradebroom", "Freely raise anyone's broom Speed or Altitude / control (pick the member)."),
             ("staff setup setannounce", "Post the standings weekly."),
+            ("staff setup eventboard", "Post a living weekly Attack / Duel Night / Challenge schedule that stays updated."),
+            ("staff setup eventboardoff", "Stop updating the living weekly event schedule board."),
             ("staff setup pointsconfig", "See how everything's set up."),
             ("staffops antispam on", "Turn on the personal cool-down anti-spam guard."),
             ("staffops antispam off", "Turn the anti-spam guard off."),
