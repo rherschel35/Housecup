@@ -215,6 +215,10 @@ CLOTHES_MALE = {
     "34": "Logo tee",
 }
 
+# Male1 string-keyed tops can sit beside classic numeric outfits.
+# Do NOT merge male1 numeric menus (noses/pupils/beards/cloth colours) into
+# these shared dicts — that overwrote feminine Eyes/Glasses labels with
+# "Nose 1" / "Clean shaven" / scrambled pupil names.
 CLOTHES = {**CLOTHES_FEMALE, **CLOTHES_MALE, **male1.CLOTHES}
 
 CLOTHES_COLORS = {
@@ -226,7 +230,6 @@ CLOTHES_COLORS = {
     "6": "Lavender",
     "7": "Cream",
     "8": "Leaf green",
-    **male1.CLOTHES_COLORS,
 }
 
 # Natural-looking defaults for legacy masculine randomize.
@@ -237,7 +240,6 @@ MALE_EYES = ("4", "2", "1")  # Sharp, Almond, Round
 GLASSES = {
     "none": "No glasses",
     "1": "Glasses 1", "2": "Glasses 2", "3": "Glasses 3", "4": "Glasses 4", "5": "Glasses 5",
-    **male1.BEARDS,
 }
 
 IRIS_TYPES = {
@@ -245,7 +247,6 @@ IRIS_TYPES = {
     "2": "Soft glow",
     "3": "Ringed",
     "4": "Bright",
-    **male1.NOSES,
 }
 
 IRIS_COLORS = {
@@ -268,7 +269,6 @@ IRIS_COLORS = {
     "17": "Violet",
     "18": "Rose",
     "19": "Grey",
-    **male1.PUPILS,
 }
 
 LOOK_FIELDS = {
@@ -329,6 +329,28 @@ DEFAULT_FIELD_LABEL = {
     "eyes": "Eye shape", "iris_type": "Iris style", "iris_color": "Eye colour",
     "brows": "Brows", "mouth": "Expression", "glasses": "Glasses",
 }
+
+# /wizard page layout. Male1 remaps iris_type→nose and glasses→beard, so Nose
+# must not sit on the Eyes page.
+DEFAULT_WIZARD_PAGES = [
+    ("Body", ["gender", "skin", "clothes", "clothes_color"]),
+    ("Hair", ["hair_back", "hair_bangs", "hair_color"]),
+    ("Eyes", ["eyes", "iris_type", "iris_color"]),
+    ("Expression", ["brows", "mouth", "glasses"]),
+]
+MALE1_WIZARD_PAGES = [
+    ("Body", ["gender", "skin", "clothes", "clothes_color"]),
+    ("Hair", ["hair_back", "hair_bangs", "hair_color"]),
+    ("Eyes", ["eyes", "iris_color"]),
+    ("Expression", ["brows", "mouth", "iris_type", "glasses"]),
+]
+
+
+def wizard_pages(look: dict | None = None) -> list[tuple[str, list[str]]]:
+    look = look or {}
+    if look.get("gender") == "male" and _use_male1():
+        return list(MALE1_WIZARD_PAGES)
+    return list(DEFAULT_WIZARD_PAGES)
 
 
 def field_label(field: str, look: dict | None = None) -> str:

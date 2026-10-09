@@ -83,19 +83,20 @@ PUPIL_FILES = {
     "11": "front_11",
     "12": "front_12",
 }
+# Labels match the actual front*.png pupil hues (was a wrong Brown→Dark order).
 PUPILS = {
-    "1": "Brown",
-    "2": "Hazel",
-    "3": "Amber",
-    "4": "Green",
-    "5": "Teal",
-    "6": "Blue",
-    "7": "Grey",
-    "8": "Violet",
-    "9": "Red",
-    "10": "Gold",
-    "11": "Silver",
-    "12": "Dark",
+    "1": "Slate",
+    "2": "Blue",
+    "3": "Green",
+    "4": "Amber",
+    "5": "Brown",
+    "6": "Grey",
+    "7": "Red",
+    "8": "Gold",
+    "9": "Violet",
+    "10": "Rose",
+    "11": "Steel blue",
+    "12": "Hazel",
 }
 
 CLOTHES = {
@@ -213,7 +214,7 @@ def clamp_look(look: dict) -> dict:
         "hair_color": "2",
         "eyes": "3",
         "iris_type": "2",
-        "iris_color": "4",
+        "iris_color": "2",  # Blue — matches front_2.png
         "brows": "3",
         "mouth": "3",
         "clothes": "basic_shirt",
