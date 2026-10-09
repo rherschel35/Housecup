@@ -479,6 +479,78 @@ class Store(commands.Cog):
         self.state["season"]["name"] = name.strip() or self.state["season"]["name"]
         self.save()
 
+    def clear_targets(self) -> list[dict]:
+        """Targets for `/season clear` — current open Cup plus each archived Cup."""
+        out: list[dict] = []
+        current = self.state.get("season") or {}
+        cur_num = int(current.get("number") or 0)
+        cur_name = (current.get("name") or f"Season {cur_num}").strip()
+        if self.season_active():
+            label = f"Current: {cur_name} (#{cur_num}) — cancel open Cup"
+        else:
+            label = f"Pending: {cur_name} (#{cur_num}) — discard reserved slot"
+        out.append({
+            "key": "current",
+            "label": label[:100],
+            "kind": "current",
+            "number": cur_num,
+            "name": cur_name,
+        })
+        for record in self.state.get("archive") or []:
+            num = int(record.get("number") or 0)
+            name = (record.get("name") or f"Season {num}").strip()
+            out.append({
+                "key": f"archive:{num}",
+                "label": f"Archived: {name} (#{num})"[:100],
+                "kind": "archive",
+                "number": num,
+                "name": name,
+            })
+        return out
+
+    def cancel_open_season(self) -> dict:
+        """Cancel the live/pending Cup without crowning or archiving it.
+
+        Season scores wipe; archive and all-time totals are untouched. Leaves a
+        between-seasons gap so staff can `/season start` when ready.
+        """
+        season = self.state["season"]
+        snapshot = dict(season)
+        had_scores = bool(
+            self.state.get("totals", {}).get("season", {}).get("houses")
+            or self.state.get("totals", {}).get("season", {}).get("members")
+        )
+        season["active"] = False
+        season["started_at"] = None
+        if not (season.get("name") or "").strip():
+            season["name"] = f"Season {season.get('number', 1)}"
+        self.state["totals"]["season"] = {
+            "houses": {}, "members": {}, "house_members": {},
+        }
+        self.save()
+        return {
+            "number": season.get("number"),
+            "name": season.get("name"),
+            "was_active": bool(snapshot.get("active")),
+            "had_scores": had_scores,
+        }
+
+    def clear_archived_season(self, number: int) -> dict:
+        """Remove one finished Cup from the archive. All-time totals stay."""
+        archive = self.state.setdefault("archive", [])
+        match = None
+        keep = []
+        for record in archive:
+            if match is None and int(record.get("number") or 0) == int(number):
+                match = record
+                continue
+            keep.append(record)
+        if match is None:
+            raise RuntimeError(f"No archived season #{number} to clear.")
+        self.state["archive"] = keep
+        self.save()
+        return match
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Store(bot))

@@ -243,6 +243,7 @@ HELP = {
             ("countdown cancel", "Call off the countdown."),
             ("season end", "Crown a champion; optionally leave no season active until /season start."),
             ("season start", "Open the next House Cup after a between-seasons gap."),
+            ("season clear", "Cancel the open Cup, or remove one finished season (e.g. Intro / Season 1) from the archive."),
             ("season rename", "Rename the current (or next) season."),
             ("triwizard crown", "Record a Tri-Wizard Tournament winner."),
             ("triwizard remove", "Undo a Tri-Wizard entry made by mistake."),
