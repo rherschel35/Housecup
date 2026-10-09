@@ -1026,7 +1026,7 @@ class Hexes(commands.Cog):
         if fixed:
             until = f"for {fixed} minute(s)"
         elif not duration:
-            until = "until a Headmaster lifts it"
+            until = "until a Headmaster or President lifts it"
         else:
             until = f"for {duration} minute(s)"
         await interaction.followup.send(
