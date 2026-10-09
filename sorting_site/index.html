@@ -626,8 +626,37 @@
   var state = { name: "", index: 0, scores: {}, current: null };
   Object.keys(HOUSES).forEach(function (k) { state.scores[k] = 0; });
 
-  // All five houses are open and even — no house weight or tie favor.
-  // Ties break at random among every house that tied.
+  // Soft favor ladder (slight): Thornmere > AsterWilde > Veyren > Caldrin > Oakmont.
+  // Matching answers for higher houses count a little more; per-question and final
+  // ties prefer the higher house on the ladder. Someone who clearly leans toward
+  // another house still lands there.
+  var HOUSE_WEIGHT = {
+    thornmere: 1.18,
+    asterwilde: 1.12,
+    veyren: 1.08,
+    caldrin: 1.04,
+    oakmont: 1.0
+  };
+  var FAVORED = ["thornmere", "asterwilde", "veyren", "caldrin", "oakmont"];
+
+  function pickFavored(winners) {
+    for (var i = 0; i < FAVORED.length; i++) {
+      if (winners.indexOf(FAVORED[i]) !== -1) return FAVORED[i];
+    }
+    return winners[Math.floor(Math.random() * winners.length)];
+  }
+
+  function pickWeightedHouse() {
+    var keys = Object.keys(HOUSES);
+    var total = 0;
+    keys.forEach(function (k) { total += HOUSE_WEIGHT[k] || 1; });
+    var r = Math.random() * total;
+    for (var i = 0; i < keys.length; i++) {
+      r -= HOUSE_WEIGHT[keys[i]] || 1;
+      if (r <= 0) return keys[i];
+    }
+    return keys[0];
+  }
 
   var SHEET_URL = "https://script.google.com/macros/s/AKfycbyqBL0qvyx_wc-hYCN26JKZYcoX1OBx-O0KZkYdWKQQc_z_o-nzUj23rZsyRE6AdWo-pw/exec";
 
@@ -716,8 +745,8 @@
       else if (hits[k] === best && best > 0) winners.push(k);
     });
     if (best === 0) return false;
-    var house = winners[Math.floor(Math.random() * winners.length)];
-    state.scores[house] += 1;
+    var house = pickFavored(winners);
+    state.scores[house] += HOUSE_WEIGHT[house] || 1;
     return true;
   }
 
@@ -744,9 +773,9 @@
     var matched = applyAnswerHits(hits);
     if (!matched) {
       // Soft fallback so odd wording still nudges the sort instead of stalling.
-      var keys = Object.keys(HOUSES);
-      var house = keys[Math.floor(Math.random() * keys.length)];
-      state.scores[house] += 0.35;
+      // Weighted toward the favor ladder rather than flat-random.
+      var house = pickWeightedHouse();
+      state.scores[house] += 0.35 * (HOUSE_WEIGHT[house] || 1);
     }
     nextBtn.disabled = true;
     var advance = function () {
@@ -772,7 +801,7 @@
       if (state.scores[k] > max) { max = state.scores[k]; winners = [k]; }
       else if (state.scores[k] === max) { winners.push(k); }
     });
-    var house = winners[Math.floor(Math.random() * winners.length)];
+    var house = pickFavored(winners);
     state.current = house;
     showResults(house);
     saveResult(state.name, state.scores, house);
@@ -982,6 +1011,13 @@
     expectHouse(7, "de-escalate and stay calm", "caldrin"); // must NOT hit asterwilde escalate
     expectHouse(21, "being lied to on purpose", "oakmont");
     expectHouse(21, "a careless mistake that cost me", "thornmere");
+    if (pickFavored(["oakmont", "thornmere"]) !== "thornmere") fails.push("favor: thornmere over oakmont");
+    if (pickFavored(["caldrin", "asterwilde"]) !== "asterwilde") fails.push("favor: asterwilde over caldrin");
+    if (pickFavored(["veyren", "oakmont", "caldrin"]) !== "veyren") fails.push("favor: veyren over caldrin/oakmont");
+    if ((HOUSE_WEIGHT.thornmere || 0) <= (HOUSE_WEIGHT.asterwilde || 0)) fails.push("weight: thornmere > asterwilde");
+    if ((HOUSE_WEIGHT.asterwilde || 0) <= (HOUSE_WEIGHT.veyren || 0)) fails.push("weight: asterwilde > veyren");
+    if ((HOUSE_WEIGHT.veyren || 0) <= (HOUSE_WEIGHT.caldrin || 0)) fails.push("weight: veyren > caldrin");
+    if ((HOUSE_WEIGHT.caldrin || 0) <= (HOUSE_WEIGHT.oakmont || 0)) fails.push("weight: caldrin > oakmont");
     if (fails.length) {
       console.error("Sorting self-test FAIL", fails);
       document.title = "SORT TEST FAIL (" + fails.length + ")";
