@@ -3,7 +3,8 @@
 
     /raid          - open (or re-show) the raid lobby in the 3Raid channel
     /raidstatus    - your weekly clear status
-    /staff raid reset  - clear someone's weekly lockout / force-end a run
+    /staff raid reset   - clear someone's weekly lockout / force-end a run
+    /staff raid unstick - unfreeze a board stuck on Resolving…
 
 Flow: lobby → claim Attacker / Specialty / Tank → spend 6 skill points
 (max 2 per spell, min 1 in your primary lane) → hard party Start checks →
@@ -787,6 +788,35 @@ class ThreeRaid(commands.Cog):
             notes.append("Nothing to do — pass member and/or end_run.")
         await interaction.response.send_message(" ".join(notes), ephemeral=True)
 
+    async def raidunstick(self, interaction: discord.Interaction):
+        """Staff: unfreeze a board stuck on Resolving… without ending the run."""
+        store = self.bot.get_cog("Store")
+        if not store or not store.is_staff(interaction.user):
+            await interaction.response.send_message("Staff only.", ephemeral=True)
+            return
+        run = self.run
+        if not run or run.finished or not run.fight:
+            await interaction.response.send_message(
+                "No active raid fight to unstick.", ephemeral=True,
+            )
+            return
+        fight = run.fight
+        await interaction.response.defer(ephemeral=True)
+        if fight.all_acted() and not fight.finished:
+            await self._safe_resolve(run)
+            await interaction.followup.send(
+                "Tried to finish the stuck resolve and refresh the board.",
+                ephemeral=True,
+            )
+            return
+        await self._refresh_fight_message(run)
+        waiting = [f"<@{f.user_id}>" for f in fight.living() if f.user_id not in fight.pending]
+        await interaction.followup.send(
+            "Refreshed the raid board"
+            + (f" — still waiting on {', '.join(waiting)}." if waiting else "."),
+            ephemeral=True,
+        )
+
     # -------------------------------------------------------------- lobby ops
 
     async def claim_role(self, interaction: discord.Interaction, lobby: Lobby, role: str):
@@ -1148,10 +1178,35 @@ class ThreeRaid(commands.Cog):
                     log.exception("Could not refresh raid fight message")
 
         if fight.all_acted():
+            # Detach from the interaction callback so a Discord edit blip
+            # can't leave the board stuck on "Resolving…" with dead buttons.
+            asyncio.create_task(self._safe_resolve(run), name="threeraid-resolve")
+
+    async def _safe_resolve(self, run: RaidRun):
+        """Resolve with lock + guaranteed UI refresh on success or failure."""
+        try:
             async with self._resolve_lock:
-                if fight.finished or not fight.all_acted():
+                fight = run.fight
+                if not fight or fight.finished or self.run is not run:
+                    return
+                if not fight.all_acted():
+                    # Another task already resolved; still re-render in case
+                    # the board was left on "Resolving…".
+                    await self._refresh_fight_message(run)
                     return
                 await self._resolve_round(run)
+        except Exception:
+            log.exception("3Raid round resolve crashed")
+            fight = run.fight
+            if fight and not fight.finished and self.run is run:
+                # Pending was cleared at resolve start — reopen picks and
+                # redraw so the party isn't stuck on disabled buttons.
+                if fight.all_acted():
+                    fight.pending.clear()
+                try:
+                    await self._refresh_fight_message(run)
+                except Exception:
+                    log.exception("3Raid recovery refresh failed")
 
     async def _resolve_round(self, run: RaidRun):
         fight = run.fight
@@ -1161,53 +1216,59 @@ class ThreeRaid(commands.Cog):
         pending = dict(fight.pending)
         fight.pending.clear()
 
-        # Resolve in Attacker / Specialty / Tank role order (ROLE_ORDER).
-        order = []
-        for role in ROLE_ORDER:
-            uid = run.roles[role]
-            if uid in pending:
-                order.append(uid)
+        try:
+            # Resolve in Attacker / Specialty / Tank role order (ROLE_ORDER).
+            order = []
+            for role in ROLE_ORDER:
+                uid = run.roles[role]
+                if uid in pending:
+                    order.append(uid)
 
-        lines: list[str] = []
-        for uid in order:
-            action = pending[uid]
-            fighter = fight.fighters[uid]
-            if not fighter.alive:
-                continue
-            spell_id = action["spell"]
-            target_id = action.get("target")
-            if spell_id == "rest":
-                fighter.ap = fighter.ap_max
-                lines.append(f"😮‍💨 <@{uid}> rests — AP refilled.")
-                continue
-            spell = SPELLS[spell_id]
-            rank = fighter.ranks.get(spell_id, 1)
-            fighter.ap -= spell["ap"]
-            line = await self._apply_spell(fight, fighter, spell_id, rank, target_id)
-            lines.append(line)
+            lines: list[str] = []
+            for uid in order:
+                action = pending[uid]
+                fighter = fight.fighters[uid]
+                if not fighter.alive:
+                    continue
+                spell_id = action["spell"]
+                target_id = action.get("target")
+                if spell_id == "rest":
+                    fighter.ap = fighter.ap_max
+                    lines.append(f"😮‍💨 <@{uid}> rests — AP refilled.")
+                    continue
+                spell = SPELLS[spell_id]
+                rank = fighter.ranks.get(spell_id, 1)
+                fighter.ap -= spell["ap"]
+                line = await self._apply_spell(fight, fighter, spell_id, rank, target_id)
+                lines.append(line)
+                if fight.m_hp <= 0:
+                    break
+
+            fight.log.extend(lines)
+
             if fight.m_hp <= 0:
-                break
+                await self._on_encounter_win(run)
+                return
 
-        fight.log.extend(lines)
+            # Monster action
+            mlines = self._monster_act(fight)
+            fight.log.extend(mlines)
 
-        if fight.m_hp <= 0:
-            await self._on_encounter_win(run)
-            return
+            if not fight.living():
+                await self._on_encounter_loss(run)
+                return
 
-        # Monster action
-        mlines = self._monster_act(fight)
-        fight.log.extend(mlines)
+            # AP regen for living
+            for f in fight.living():
+                f.ap = min(f.ap_max, f.ap + AP_REGEN)
 
-        if not fight.living():
-            await self._on_encounter_loss(run)
-            return
-
-        # AP regen for living
-        for f in fight.living():
-            f.ap = min(f.ap_max, f.ap + AP_REGEN)
-
-        fight.begin_round()
-        await self._refresh_fight_message(run)
+            fight.begin_round()
+        finally:
+            # Always redraw after a resolve attempt. A failed edit used to
+            # leave the public message on "Resolving…" with every Act
+            # button disabled — the freeze you're seeing in testing.
+            if not fight.finished and self.run is run:
+                await self._refresh_fight_message(run)
 
     async def _apply_spell(self, fight: RaidFight, fighter: Fighter, spell_id: str,
                            rank: int, target_id: Optional[int]) -> str:
@@ -1389,14 +1450,27 @@ class ThreeRaid(commands.Cog):
         fight = run.fight
         if not fight or not fight.message:
             return
+        embed = fight.embed(run.encounter_index)
+        view = PublicFightView(self, run)
         file = await self._monster_file(fight.encounter)
         try:
-            kwargs = {"embed": fight.embed(run.encounter_index), "view": PublicFightView(self, run)}
+            kwargs = {"embed": embed, "view": view, "content": fight.message.content or None}
             if file:
                 kwargs["attachments"] = [file]
             await fight.message.edit(**kwargs)
+            return
         except Exception:
-            log.exception("Could not refresh raid fight message")
+            log.exception("Could not refresh raid fight message (with art)")
+        # Fallback: drop the attachment — a bad re-attach used to freeze
+        # the board on "Resolving…" with all Act buttons disabled.
+        try:
+            await fight.message.edit(embed=embed, view=view, attachments=[])
+        except Exception:
+            log.exception("Could not refresh raid fight message (no art)")
+            try:
+                await fight.message.edit(embed=embed, view=view)
+            except Exception:
+                log.exception("Could not refresh raid fight message (bare edit)")
 
     async def _on_encounter_win(self, run: RaidRun):
         fight = run.fight
