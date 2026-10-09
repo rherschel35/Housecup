@@ -80,7 +80,17 @@ def _is_tainara(gender_root: Path) -> bool:
 
 
 def _is_male1(gender_root: Path) -> bool:
-    return (gender_root / "hair_top").is_dir() and (gender_root / "body").is_dir()
+    """Require real sprite PNGs — empty hair_top/body dirs are not a pack."""
+    try:
+        from cogs.mirror_male1 import is_male1_root
+        return is_male1_root(gender_root)
+    except Exception:
+        body = gender_root / "body"
+        hair = gender_root / "hair_top"
+        return (
+            body.is_dir() and hair.is_dir()
+            and any(body.glob("*.png")) and any(hair.glob("*.png"))
+        )
 
 
 def _is_female_full(gender_root: Path) -> bool:
@@ -228,7 +238,14 @@ def _ensure_male1(root: Path) -> bool:
     if _is_male1(male):
         log.info("Male pack is MALE1 at %s", male)
         return True
-    if _is_tainara(male):
+    # Hollow dirs (hair_top/body present, no PNGs) used to short-circuit as ready.
+    if male.exists() and (male / "hair_top").is_dir() and (male / "body").is_dir():
+        log.warning(
+            "Male pack at %s looks like MALE1 folders but has no sprites — reinstalling",
+            male,
+        )
+        shutil.rmtree(male)
+    elif _is_tainara(male):
         log.warning(
             "Male pack at %s is the old soft Tainara set — replacing with MALE1 muscular pack",
             male,

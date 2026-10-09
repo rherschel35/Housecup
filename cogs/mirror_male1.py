@@ -161,7 +161,19 @@ _UNDERWEAR = "boxer"
 
 
 def is_male1_root(root: Path) -> bool:
-    return (root / "hair_top").is_dir() and (root / "body").is_dir()
+    """True only when the muscular pack actually has sprite PNGs.
+
+    Empty hair_top/ + body/ directories used to count as ready, so compose
+    silently returned a transparent canvas (house wash, no wizard).
+    """
+    body = root / "body"
+    hair = root / "hair_top"
+    if not body.is_dir() or not hair.is_dir():
+        return False
+    try:
+        return any(body.glob("*.png")) and any(hair.glob("*.png"))
+    except OSError:
+        return False
 
 
 def options(field: str) -> dict:

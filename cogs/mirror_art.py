@@ -737,6 +737,13 @@ def render(*, look: dict, user_id: int, name: str, title: str | None = None,
     hc = rgb(hcol)
 
     portrait = compose_portrait(look)
+    # Fully transparent portraits mean the pack is missing/hollow — don't leave
+    # players staring at a blank house wash with no explanation.
+    try:
+        alpha = portrait.getchannel("A")
+        portrait_empty = alpha.getbbox() is None
+    except Exception:
+        portrait_empty = False
 
     card = Image.new("RGBA", (CW * S, CH * S), (0, 0, 0, 0))
     d = ImageDraw.Draw(card)
@@ -821,10 +828,22 @@ def render(*, look: dict, user_id: int, name: str, title: str | None = None,
         aura_layer.paste(halo, (max(0, ox - 4), max(0, oy - 4)), halo)
         card.alpha_composite(aura_layer)
 
-    layer = Image.new("RGBA", card.size, (0, 0, 0, 0))
-    layer.alpha_composite(port, (ox, oy))
-    layer.putalpha(ImageChops.multiply(layer.getchannel("A"), win_mask))
-    card.alpha_composite(layer)
+    if portrait_empty:
+        msg = "Portrait unavailable\n(wizard assets missing)"
+        d.multiline_text(
+            (((wx0 + wx1) / 2) * S, ((wy0 + wy1) / 2) * S),
+            msg,
+            font=font("Cinzel.ttf", 22, 700),
+            fill=rgba((255, 244, 220)),
+            anchor="mm",
+            align="center",
+            spacing=8 * S,
+        )
+    else:
+        layer = Image.new("RGBA", card.size, (0, 0, 0, 0))
+        layer.alpha_composite(port, (ox, oy))
+        layer.putalpha(ImageChops.multiply(layer.getchannel("A"), win_mask))
+        card.alpha_composite(layer)
     d.rounded_rectangle([wx0 * S, wy0 * S, wx1 * S, wy1 * S],
                         radius=12 * S, outline=rgba(dark(hc, 0.5)), width=3 * S)
 
