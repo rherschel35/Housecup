@@ -20,7 +20,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from cogs.velmora_channels import EVENT_ANNOUNCE_CHANNEL_ID
+from cogs.velmora_channels import EVENT_BOARD_CHANNEL_ID
 
 log = logging.getLogger("velmora.event_board")
 
@@ -310,12 +310,12 @@ class EventBoard(commands.Cog):
 
         target = channel
         if target is None:
-            # Prefer the channel they're in; else the shared announce board.
+            # Prefer the channel they're in; else the official schedule board.
             if isinstance(interaction.channel, discord.TextChannel):
                 target = interaction.channel
             else:
-                raw = os.getenv("EVENT_ANNOUNCE_CHANNEL_ID", "").strip()
-                cid = int(raw) if raw.isdigit() else EVENT_ANNOUNCE_CHANNEL_ID
+                raw = os.getenv("EVENT_BOARD_CHANNEL_ID", "").strip()
+                cid = int(raw) if raw.isdigit() else EVENT_BOARD_CHANNEL_ID
                 fetched = self.bot.get_channel(cid)
                 if fetched is None:
                     try:

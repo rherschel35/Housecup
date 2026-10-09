@@ -39,6 +39,12 @@ EXTRA_DUEL_CHANNEL_IDS = frozenset({
 # Override with env EVENT_ANNOUNCE_CHANNEL_ID if needed.
 EVENT_ANNOUNCE_CHANNEL_ID = 1542575004313722921
 
+# Living weekly Attack / Duel Night / Challenge schedule board.
+# Override with env EVENT_BOARD_CHANNEL_ID if needed.
+EVENT_BOARD_CHANNEL_ID = 1551945597362241658
+# Scratch room for trying the board before the official post.
+EVENT_BOARD_TEST_CHANNEL_ID = 1552401261184155648
+
 
 def with_open_lounges(*channel_ids: int) -> frozenset[int]:
     """Add the multi-game open lounges to a home-channel set."""

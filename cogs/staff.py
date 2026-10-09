@@ -147,7 +147,7 @@ class Staff(commands.Cog):
         description="Post/keep a living weekly Attack · Duel Night · Challenge schedule in a channel.",
     )
     @app_commands.describe(
-        channel="Where the board lives (default: this channel, or the event announce channel)",
+        channel="Where the board lives (default: this channel, or the official schedule channel)",
     )
     async def setup_eventboard(
         self,
