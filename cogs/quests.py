@@ -6,9 +6,9 @@ first three members to answer correctly earn points for their house.
     /staff challenge config        - set the channel and posting time
     /challengestatus               - what's open at the moment
 
-Three tiers, each on its own schedule:
+Three tiers, each on its own schedule (all ping @everyone when posted):
 
-    Daily   1 point   every 24 hours (pings @everyone) - a lore question
+    Daily   1 point   every 24 hours - a lore question
     Trial   3 points  every 3 days - harder lore, or a scrambled word
     Rite    5 points  weekly - a pattern to work out, or a blank to fill
 
@@ -418,7 +418,7 @@ class Quests(commands.Cog):
         now = datetime.datetime.now(datetime.timezone.utc)
         now_ts = time.time()
 
-        # Daily: strict 24h since last post (any hour), and ping @everyone.
+        # Daily: strict 24h since last post (any hour).
         last_daily = self.state["last_posted"].get("daily", 0)
         if now_ts - last_daily >= _due_after("daily"):
             await self.post_challenge("daily", channel, mention_everyone=True)
@@ -433,7 +433,7 @@ class Quests(commands.Cog):
                 continue
             if tier == "rite" and now.weekday() != self.settings.get("weekday", 6):
                 continue
-            await self.post_challenge(tier, channel)
+            await self.post_challenge(tier, channel, mention_everyone=True)
 
     @scheduler.before_loop
     async def before_scheduler(self):
@@ -463,7 +463,7 @@ class Quests(commands.Cog):
         posted = await self.post_challenge(
             tier.value,
             interaction.channel,
-            mention_everyone=(tier.value == "daily"),
+            mention_everyone=True,
         )
         if not posted:
             await interaction.followup.send(
@@ -486,8 +486,8 @@ class Quests(commands.Cog):
         day = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
                "Sunday")[self.settings["weekday"]]
         await interaction.response.send_message(
-            f"Challenges will post in {channel.mention}. "
-            f"**Daily** every 24 hours (pings @everyone). "
+            f"Challenges will post in {channel.mention} (each pings @everyone). "
+            f"**Daily** every 24 hours. "
             f"**Trial** every 3 days and **Rite** on {day}s at {hour:02d}:00 UTC.",
             ephemeral=True,
         )

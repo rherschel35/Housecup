@@ -207,7 +207,7 @@ HELP = {
         "title": "Challenges",
         "staff": False,
         "note": ("Posted for everyone at once — first three correct answers win points. "
-                 "Daily every 24 hours (pings @everyone); Trial and Rite on their schedule."),
+                 "Daily / Trial / Rite all ping @everyone when they post."),
         "entries": [
             ("challengestatus", "What's open right now, and when the next ones come."),
         ],
