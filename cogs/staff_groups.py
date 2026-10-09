@@ -66,7 +66,7 @@ challenge = app_commands.Group(
     name="challenge", parent=staffgame, description="Challenge staff tools."
 )
 hexes = app_commands.Group(
-    name="hex", parent=staffgame, description="Headmaster hexes."
+    name="hex", parent=staffgame, description="Headmaster / President hexes."
 )
 market = app_commands.Group(
     name="market", parent=staffgame, description="Marketplace staff tools."

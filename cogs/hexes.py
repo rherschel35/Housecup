@@ -1,18 +1,19 @@
 """
-Headmaster hexes - a prank spell a Headmaster can cast on a student so that,
+Headmaster / President hexes — a prank spell cast on a student so that,
 without warning, whatever they type comes out cursed — or their wand goes limp.
 
-    /staff hex cast member:<@user> effect:<pick one> duration:<minutes>
-    /staff hex lift member:<@user>
-    /staff hex list
+    /staffgame hex cast member:<@user> effect:<pick one> duration:<minutes>
+    /staffgame hex lift member:<@user>
+    /staffgame hex list
 
 Most curses mangle chat: the bot deletes the cursed member's message and
 reposts it through a per-channel webhook wearing their name and avatar.
 Limp Wand is different — it leaves chat alone and blocks /wand, /patronus,
 /broom, and /cast for one hour.
 
-Needs the bot to hold Manage Messages (to delete the original) and Manage
-Webhooks (to create/reuse the relay webhook) in this server.
+Headmasters and house Presidents may cast, lift, and list. Needs the bot to
+hold Manage Messages (to delete the original) and Manage Webhooks (to
+create/reuse the relay webhook) in this server.
 """
 
 from __future__ import annotations
@@ -896,7 +897,17 @@ class Hexes(commands.Cog):
         perms = getattr(member, "guild_permissions", None)
         if perms is not None and (perms.administrator or perms.manage_guild):
             return True
-        return any(r.name.lower() == HEADMASTER_ROLE_NAME for r in getattr(member, "roles", []))
+        return any(
+            (r.name or "").lower() == HEADMASTER_ROLE_NAME
+            for r in getattr(member, "roles", [])
+        )
+
+    def _can_hex(self, member: discord.Member) -> bool:
+        """Headmasters / guild managers, or the Presidents role."""
+        store = self.bot.get_cog("Store")
+        if store is not None:
+            return bool(store.can_hex(member))
+        return self._is_headmaster(member)
 
     # ------------------------------------------------------------ casting
 
@@ -960,7 +971,11 @@ class Hexes(commands.Cog):
         if not self.is_wand_limp(interaction.user.id):
             return False
         mins = self.limp_minutes_left(interaction.user.id)
-        when = "until a Headmaster lifts it" if mins is None else f"for about {mins} more minute(s)"
+        when = (
+            "until a Headmaster or President lifts it"
+            if mins is None
+            else f"for about {mins} more minute(s)"
+        )
         msg = (
             "Your wand hangs limp and won't answer. "
             f"`/wand`, `/patronus`, and `/broom` are out {when}."
@@ -973,8 +988,10 @@ class Hexes(commands.Cog):
 
     async def hex(self, interaction: discord.Interaction, member: discord.Member,
                   effect: app_commands.Choice[str], duration: app_commands.Range[int, 0, 10080]):
-        if not self._is_headmaster(interaction.user):
-            await interaction.response.send_message("Only a Headmaster may cast this.", ephemeral=True)
+        if not self._can_hex(interaction.user):
+            await interaction.response.send_message(
+                "Only a Headmaster or President may cast this.", ephemeral=True
+            )
             return
         if member.bot:
             await interaction.response.send_message("You can't hex a bot.", ephemeral=True)
@@ -1017,8 +1034,10 @@ class Hexes(commands.Cog):
             f"{until}.", ephemeral=True)
 
     async def unhex(self, interaction: discord.Interaction, member: discord.Member):
-        if not self._is_headmaster(interaction.user):
-            await interaction.response.send_message("Only a Headmaster may lift this.", ephemeral=True)
+        if not self._can_hex(interaction.user):
+            await interaction.response.send_message(
+                "Only a Headmaster or President may lift this.", ephemeral=True
+            )
             return
         existed = self.state["hexed"].pop(str(member.id), None)
         self.save()
@@ -1028,8 +1047,10 @@ class Hexes(commands.Cog):
             await interaction.response.send_message(f"{member.mention} isn't currently hexed.", ephemeral=True)
 
     async def hexlist(self, interaction: discord.Interaction):
-        if not self._is_headmaster(interaction.user):
-            await interaction.response.send_message("Only a Headmaster may see this.", ephemeral=True)
+        if not self._can_hex(interaction.user):
+            await interaction.response.send_message(
+                "Only a Headmaster or President may see this.", ephemeral=True
+            )
             return
         self._purge_expired()
         entries = self.state["hexed"]

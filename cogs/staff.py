@@ -572,7 +572,7 @@ class Staff(commands.Cog):
 
     # ------------------------------------------------------------------ hex
 
-    @hex_g.command(name="cast", description="(Headmaster) Curse a student with a prank hex.")
+    @hex_g.command(name="cast", description="(Headmaster / President) Curse a student with a prank hex.")
     @app_commands.describe(member="Who to hex", effect="Which curse to cast",
                            duration="How many minutes it lasts (0 = until lifted; Limp Wand is always 60)")
     @app_commands.choices(effect=HEX_CHOICES)
@@ -584,7 +584,7 @@ class Staff(commands.Cog):
             return
         await cog.hex(interaction, member, effect, duration)
 
-    @hex_g.command(name="lift", description="(Headmaster) Lift a hex early.")
+    @hex_g.command(name="lift", description="(Headmaster / President) Lift a hex early.")
     @app_commands.describe(member="Whose hex to lift")
     async def hex_lift(self, interaction: discord.Interaction, member: discord.Member):
         cog = self._cog("Hexes")
@@ -593,7 +593,7 @@ class Staff(commands.Cog):
             return
         await cog.unhex(interaction, member)
 
-    @hex_g.command(name="list", description="(Headmaster) Show who's currently hexed.")
+    @hex_g.command(name="list", description="(Headmaster / President) Show who's currently hexed.")
     async def hex_list(self, interaction: discord.Interaction):
         cog = self._cog("Hexes")
         if not cog:
