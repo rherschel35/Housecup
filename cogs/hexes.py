@@ -904,7 +904,11 @@ class Hexes(commands.Cog):
                   cast_by: int) -> tuple[dict, bool]:
         """Apply a hex by effect key. duration_minutes None/0 = until lifted.
         Limp Wand always lasts its fixed_minutes (60). Returns (spell dict,
-        was_replacing_existing). Raises KeyError if effect unknown."""
+        was_replacing_existing). Raises KeyError if effect unknown.
+        Raises PermissionError when the target has active Liquid Luck."""
+        potions = self.bot.get_cog("Potions")
+        if potions and potions.has_liquid_luck(target_id):
+            raise PermissionError("liquid_luck")
         spell = EFFECTS[effect]
         was_hexed = str(target_id) in self.state["hexed"]
         fixed = spell.get("fixed_minutes")
@@ -919,6 +923,10 @@ class Hexes(commands.Cog):
 
     def active_hex(self, user_id: int) -> dict | None:
         """Return the live hex record for this user, or None if expired/absent."""
+        potions = self.bot.get_cog("Potions")
+        if potions and potions.has_liquid_luck(user_id):
+            # Liquid Luck: immune — existing hexes don't apply while luck lasts.
+            return None
         rec = self.state["hexed"].get(str(user_id))
         if not rec:
             return None
@@ -977,10 +985,17 @@ class Hexes(commands.Cog):
                 "That curse doesn't exist anymore - your Discord app is showing a stale spell list. Force-quit "
                 "and reopen Discord (or wait a bit for it to refresh) and try `/hex` again.", ephemeral=True)
             return
-        spell, was_hexed = self.apply_hex(
-            target_id=member.id, effect=effect.value,
-            duration_minutes=duration or None, cast_by=interaction.user.id,
-        )
+        try:
+            spell, was_hexed = self.apply_hex(
+                target_id=member.id, effect=effect.value,
+                duration_minutes=duration or None, cast_by=interaction.user.id,
+            )
+        except PermissionError:
+            await interaction.response.send_message(
+                f"🥇 **{member.display_name}** is riding Liquid Luck — the hex slides right off.",
+                ephemeral=True,
+            )
+            return
 
         flourish = random.choice(CAST_FLOURISHES)
         await interaction.response.send_message(embed=discord.Embed(

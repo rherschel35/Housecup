@@ -94,9 +94,9 @@ HELP = {
     "potions": {
         "title": "Potions",
         "staff": False,
-        "note": "Brew from satchel ingredients. Some potions help in the Descent; others call private beast encounters.",
+        "note": "Brew from satchel ingredients. Descent buffs last 5 fights (simple) or 10 (harder). Felix Felicis is a free weekly 10-step brew.",
         "entries": [
-            ("brew", "Spend two ingredients and try to brew a potion (🟢 = you have them)."),
+            ("brew", "Spend ingredients and try to brew a potion (🟢 = you have them; Felix free once / 7 days)."),
             ("drink", "Drink a brewed potion from your satchel to activate it."),
             ("potions", "Potion Rep, recipes with effect text, and 🟢/🔴 ingredients you have."),
         ],

@@ -167,6 +167,43 @@ def apply_deadlock_keep(result: int, line: str, a_id: int, b_id: int, bot) -> tu
     return result, line
 
 
+def apply_liquid_luck_tie(
+    result: int,
+    line: str,
+    a_id: int,
+    b_id: int,
+    bot,
+    luck_used: dict,
+) -> tuple[int, str]:
+    """Felix Felicis: each drinker wins one spell tie per match."""
+    if result != 0 or bot is None:
+        return result, line
+    potions = bot.get_cog("Potions")
+    if not potions:
+        return result, line
+    a_ok = potions.has_liquid_luck(a_id) and not luck_used.get(a_id)
+    b_ok = potions.has_liquid_luck(b_id) and not luck_used.get(b_id)
+    if a_ok and not b_ok:
+        luck_used[a_id] = True
+        return 1, f"{line} 🥇 Liquid Luck tips the scales!"
+    if b_ok and not a_ok:
+        luck_used[b_id] = True
+        return 2, f"{line} 🥇 Liquid Luck tips the scales!"
+    return result, line
+
+
+def apply_tie_breakers(
+    result: int,
+    line: str,
+    a_id: int,
+    b_id: int,
+    bot,
+    luck_used: dict,
+) -> tuple[int, str]:
+    result, line = apply_deadlock_keep(result, line, a_id, b_id, bot)
+    return apply_liquid_luck_tie(result, line, a_id, b_id, bot, luck_used)
+
+
 def favor_display_spells(a_id: int, b_id: int, a_spell: str, b_spell: str,
                          rng: random.Random | None = None) -> tuple[str, str]:
     """Maybe rewrite one side's shown spell so resolve() favors FAVORED_USER_ID.
@@ -2212,6 +2249,8 @@ class Duel:
         self.opened: set[int] = set()
         # Fixed for this duel so board edits don't reshuffle the joke.
         self.rival_line = self.cog.rivalry_board_line(challenger, opponent)
+        # Felix Felicis: one won spell-tie per drinker for this whole match.
+        self.luck_tie_used: dict[int, bool] = {}
 
     # -------------------------------------------------------------- display
 
@@ -2495,8 +2534,8 @@ class Duel:
                 a_spell, b_spell = self.picks[self.a.id], self.picks[self.b.id]
                 disp_a, disp_b = favor_display_spells(self.a.id, self.b.id, a_spell, b_spell)
                 result, line = resolve(disp_a, disp_b)
-                result, line = apply_deadlock_keep(
-                    result, line, self.a.id, self.b.id, self.cog.bot,
+                result, line = apply_tie_breakers(
+                    result, line, self.a.id, self.b.id, self.cog.bot, self.luck_tie_used,
                 )
                 reveal = (f"S{self.set_no}R{self.round}: {SPELLS[disp_a]['emoji']} {SPELLS[disp_a]['name']} vs "
                           f"{SPELLS[disp_b]['emoji']} {SPELLS[disp_b]['name']} — {line}"
@@ -2872,6 +2911,7 @@ class TrioMatch:
         self.channel = signup.message.channel if signup.message else None
         self.private_boards: dict[int, discord.Message] = {}
         self.opened: set[int] = set()
+        self.luck_tie_used: dict[int, bool] = {}
 
     def all_players(self):
         return self.team_a + self.team_b
@@ -3091,8 +3131,8 @@ class TrioMatch:
                 continue
             disp_a, disp_b = favor_display_spells(pa.id, pb.id, sa, sb)
             result, line = resolve(disp_a, disp_b)
-            result, line = apply_deadlock_keep(
-                result, line, pa.id, pb.id, self.cog.bot,
+            result, line = apply_tie_breakers(
+                result, line, pa.id, pb.id, self.cog.bot, self.luck_tie_used,
             )
             bits.append(
                 f"{SPELLS[disp_a]['emoji']} {pa.display_name} vs {SPELLS[disp_b]['emoji']} "
@@ -3253,6 +3293,7 @@ class GrandDuel:
         self.private_boards: dict[int, discord.Message] = {}
         self.opened: set[int] = set()
         self.rival_line = self.cog.grand_rivalry_board_line(challenger, opponent)
+        self.luck_tie_used: dict[int, bool] = {}
 
     def challenge_embed(self) -> discord.Embed:
         desc = (
@@ -3496,8 +3537,8 @@ class GrandDuel:
                 disp_a, disp_b = favor_display_spells(self.a.id, self.b.id, sa, sb)
                 line = random.choice(GRAND_THEATRE)
                 result, detail = resolve(disp_a, disp_b)
-                result, detail = apply_deadlock_keep(
-                    result, detail, self.a.id, self.b.id, self.cog.bot,
+                result, detail = apply_tie_breakers(
+                    result, detail, self.a.id, self.b.id, self.cog.bot, self.luck_tie_used,
                 )
                 who = ""
                 if result == 1:
@@ -3618,8 +3659,8 @@ class GrandDuel:
                 line = random.choice(GRAND_THEATRE)
                 disp_a, disp_b = favor_display_spells(self.a.id, self.b.id, sa, sb)
                 result, detail = resolve(disp_a, disp_b)
-                result, detail = apply_deadlock_keep(
-                    result, detail, self.a.id, self.b.id, self.cog.bot,
+                result, detail = apply_tie_breakers(
+                    result, detail, self.a.id, self.b.id, self.cog.bot, self.luck_tie_used,
                 )
                 self.sudden_picks = {}
                 if result == 0:
