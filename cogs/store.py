@@ -223,6 +223,21 @@ class Store(commands.Cog):
         """Staff, or Presidents (practice swarm only — no other staff tools)."""
         return self.is_staff(member) or self.is_president(member)
 
+    def can_hex(self, member) -> bool:
+        """Headmasters (or guild managers) and Presidents may cast / lift hexes."""
+        perms = getattr(member, "guild_permissions", None)
+        if perms is not None and (
+            getattr(perms, "manage_guild", False)
+            or getattr(perms, "administrator", False)
+        ):
+            return True
+        if any(
+            (r.name or "").lower() == "headmasters"
+            for r in getattr(member, "roles", [])
+        ):
+            return True
+        return self.is_president(member)
+
     # -------------------------------------------------------------- houses
 
     def member_house(self, member) -> str | None:
