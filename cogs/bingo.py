@@ -117,12 +117,17 @@ class Bingo(commands.Cog):
         if not round_:
             return
         rid = round_["round_id"]
-        # Re-attach lobby buttons after restart
-        if round_.get("phase") == PHASE_LOBBY:
-            view = LobbyView(self, rid, round_.get("started_by"))
-            self._lobby_views[rid] = view
-            self.bot.add_view(view)
-        elif round_.get("phase") == PHASE_CALLING:
+        phase = round_.get("phase") or PHASE_LOBBY
+        # Re-attach lobby buttons after restart (Join stays available while calling)
+        view = LobbyView(
+            self,
+            rid,
+            round_.get("started_by"),
+            calling=(phase == PHASE_CALLING),
+        )
+        self._lobby_views[rid] = view
+        self.bot.add_view(view)
+        if phase == PHASE_CALLING:
             self._ensure_call_loop(rid)
 
     async def cog_unload(self) -> None:
