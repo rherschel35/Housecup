@@ -298,12 +298,31 @@ class Animagus(commands.Cog):
             self.save()
         return gone
 
+    def _echo_until_from_disk(self, user_id: int) -> float | None:
+        """Read one user's echo deadline from disk (other workers / fresh boot)."""
+        try:
+            with open(ANIMAGUS_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (FileNotFoundError, OSError, json.JSONDecodeError):
+            return None
+        raw = (data.get("echo_until") or {}).get(str(user_id))
+        try:
+            return float(raw) if raw is not None else None
+        except (TypeError, ValueError):
+            return None
+
     def echo_active(self, user_id: int, now: float | None = None) -> Optional[str]:
         """Animal sound while the post-cast echo window is open, else None."""
         now = now if now is not None else time.time()
-        until = self.state["echo_until"].get(str(user_id))
+        uid = str(user_id)
+        until = self.state["echo_until"].get(uid)
         if not until or until <= now:
-            return None
+            disk_until = self._echo_until_from_disk(user_id)
+            if disk_until and disk_until > now:
+                self.state["echo_until"][uid] = disk_until
+                until = disk_until
+            else:
+                return None
         rec = self.form_of(user_id)
         if not rec:
             return None
@@ -484,6 +503,34 @@ class Animagus(commands.Cog):
             )
             return None
 
+    async def _echo_fallback_send(self, message: discord.Message, cursed: str) -> None:
+        """Post the sounded line as the bot when webhook impersonation isn't possible."""
+        try:
+            await message.channel.send(
+                f"**{message.author.display_name}:** {cursed}",
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+        except discord.DiscordException:
+            log.exception(
+                "Animagus echo fallback failed in #%s",
+                getattr(message.channel, "name", message.channel.id),
+            )
+
+    def _chat_hex_blocks_echo(self, user_id: int) -> bool:
+        """True only when a chat-mangling hex owns the relay (not Limp Wand)."""
+        hexes = self.bot.get_cog("Hexes")
+        if hexes is None:
+            return False
+        rec = hexes.active_hex(user_id)
+        if not rec:
+            return False
+        try:
+            from cogs.hexes import EFFECTS
+        except Exception:
+            return True
+        spell = EFFECTS.get(rec.get("effect") or "") or {}
+        return spell.get("func") is not None
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.guild is None or message.author.bot or message.webhook_id is not None:
@@ -491,9 +538,8 @@ class Animagus(commands.Cog):
         antispam = self.bot.get_cog("AntiSpam")
         if antispam is not None and antispam.should_block(message):
             return
-        # Hex mangles take priority — don't fight that relay.
-        hexes = self.bot.get_cog("Hexes")
-        if hexes is not None and hexes.active_hex(message.author.id):
+        # Chat-mangling hexes own the webhook relay. Limp Wand etc. do not.
+        if self._chat_hex_blocks_echo(message.author.id):
             return
         if not message.content or not message.content.strip():
             return
@@ -523,30 +569,31 @@ class Animagus(commands.Cog):
         cursed = cursed[:2000]
         home, thread = self._relay_home(message.channel)
         if home is None:
-            return
-        hook = await self._relay_webhook(home)
-        if hook is None:
-            # No Manage Webhooks here — still append the sound as a bot line
-            # so the minute isn't a silent no-op for those channels.
-            try:
-                await message.channel.send(
-                    f"**{message.author.display_name}:** {cursed}",
-                    allowed_mentions=discord.AllowedMentions.none(),
-                )
-            except discord.DiscordException:
-                log.exception(
-                    "Animagus echo fallback failed in #%s",
-                    getattr(message.channel, "name", message.channel.id),
-                )
+            await self._echo_fallback_send(message, cursed)
             return
 
+        hook = await self._relay_webhook(home)
+        if hook is None:
+            # No Manage Webhooks — still append the sound as a bot line.
+            await self._echo_fallback_send(message, cursed)
+            return
+
+        deleted = False
         try:
             await message.delete()
+            deleted = True
         except discord.DiscordException:
-            log.exception(
-                "Could not delete an animagus-echo message in #%s",
+            log.warning(
+                "Could not delete animagus-echo message in #%s — "
+                "falling back to a bot line with the sound",
                 getattr(message.channel, "name", message.channel.id),
+                exc_info=True,
             )
+
+        if not deleted:
+            # Missing Manage Messages used to abort silently — messages kept
+            # no *howl* at all. Always surface the sound somehow.
+            await self._echo_fallback_send(message, cursed)
             return
 
         try:
@@ -566,13 +613,7 @@ class Animagus(commands.Cog):
                 getattr(message.channel, "name", message.channel.id),
             )
             self._webhooks.pop(home.id, None)
-            try:
-                await message.channel.send(
-                    f"**{message.author.display_name}:** {cursed}",
-                    allowed_mentions=discord.AllowedMentions.none(),
-                )
-            except discord.DiscordException:
-                log.exception("Animagus echo recovery send also failed.")
+            await self._echo_fallback_send(message, cursed)
 
 
 class AnimagusModal(discord.ui.Modal, title="The form finds you"):

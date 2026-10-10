@@ -79,7 +79,6 @@ INITIAL_COGS = (
     "cogs.quests",
     "cogs.wands",
     "cogs.patronus",
-    "cogs.animagus",
     "cogs.brooms",
     "cogs.broom_race",
     "cogs.duels",
@@ -101,7 +100,8 @@ INITIAL_COGS = (
     "cogs.potions",
     "cogs.antispam",  # before hexes so spam is deleted, not mangled
     "cogs.hexes",
-    # animagus echo relay runs after hexes so chat hexes keep priority
+    # Animagus echo after hexes so chat-mangle curses keep the relay.
+    "cogs.animagus",
     "cogs.marketplace",
     *(("cogs.chess", "cogs.checkers") if ENABLE_BOARD_GAMES else ()),
     "cogs.pip_wick",
