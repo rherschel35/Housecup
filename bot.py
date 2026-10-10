@@ -569,7 +569,8 @@ async def on_message(message: discord.Message):
                 minutes = int(parts[1])
             except ValueError:
                 await message.reply(
-                    "Usage: `!swarmpractice` or `!swarmpractice 10`",
+                    "Usage: `!swarmpractice` or `!swarmpractice 120` "
+                    "(minutes, 1–240 — not limited to 5/10).",
                     mention_author=False,
                 )
                 return

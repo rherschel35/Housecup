@@ -7,8 +7,8 @@ a few times a day - and a headmaster can always summon one on the spot.
         - CAST_AUTO_USER_ID auto-picks the right spell (no buttons)
     /staff dementor channels          - set the channels they can appear in
     /staff dementor summon [channel] [creature] - make one appear right now
-        (study hall + shared games lounge are practice summons;
-         Attack waves never go there)
+        (study hall + shared games lounge + swarm practice room are
+         practice summons; Attack waves never go there)
     /staff dementor status            - what's configured and what's active
 
 Every creature has exactly one spell that actually works on it, and the
@@ -31,7 +31,8 @@ Scheduled sightings and staff summons stay open to everyone from the start.
 
     /staff dementor eventstart [minutes] [name]  - start "Attack on Velmora"
     /staff dementor practice [channel] [minutes] - house practice swarm
-        (one channel only — house rooms or study hall; no points/rewards;
+        (one channel — house rooms, study hall, or swarm practice room;
+         minutes 1–240, not locked to Attack's 5/10; no points/rewards;
          staff or Presidents)
     /staff dementor eventend                     - end it early
     /staff dementor eventstatus                  - how it's going
@@ -89,6 +90,7 @@ from cogs.velmora_channels import (
     OPEN_LOUNGE_CHANNEL_IDS,
     SHARED_GAMES_CHANNEL_ID,
     STUDY_HALL_CHANNEL_ID,
+    SWARM_PRACTICE_CHANNEL_ID,
 )
 from cogs.world_engine import today
 
@@ -96,6 +98,7 @@ from cogs.world_engine import today
 PRACTICE_SUMMON_CHANNEL_IDS = frozenset({
     STUDY_HALL_CHANNEL_ID,
     SHARED_GAMES_CHANNEL_ID,
+    SWARM_PRACTICE_CHANNEL_ID,
 })
 
 # Multi-game lounges: no ambient / Attack / practice-summon threats.
@@ -110,7 +113,8 @@ EXTRA_THREAT_CHANNEL_IDS = frozenset({
 })
 
 # Open lounges stay spawn-free even for house practice. Study hall / games
-# lounge (PRACTICE_SUMMON_CHANNEL_IDS) may host practice swarms on purpose.
+# lounge / swarm practice room (PRACTICE_SUMMON_CHANNEL_IDS) may host
+# practice swarms on purpose.
 PRACTICE_BLOCKED_CHANNEL_IDS = frozenset({
     *OPEN_LOUNGE_CHANNEL_IDS,
 })
@@ -136,7 +140,9 @@ THREAT_ALERT_COLOR = 0xC0392B  # every "X has appeared" alert, regardless of cre
 
 EVENT_WAVE_SECONDS = 23
 EVENT_DEFAULT_MINUTES = 5
-EVENT_MAX_MINUTES = 60  # house practice can run custom lengths; Attack uses presets
+# House practice can override length (not locked to Attack's 5/10 presets).
+# Cap high enough for multi-hour drills; Attack still uses EVENT_PRESETS only.
+EVENT_MAX_MINUTES = 240
 EVENT_MVP_BONUS = 5
 # When two+ wizards share both the top kill count and the same top rep.
 EVENT_KILL_REP_TIE_BONUS = 2
@@ -1789,8 +1795,8 @@ class Dementors(commands.Cog):
     @group.command(name="summon", description="(staff) Make one appear right now.")
     @app_commands.describe(
         channel=(
-            "Where (blank = random event channel; study hall and shared games "
-            "lounge are practice-only)"
+            "Where (blank = random event channel; study hall, shared games "
+            "lounge, and swarm practice room are practice-only)"
         ),
         creature="Which one (leave blank for a Dementor)",
     )
@@ -2164,14 +2170,20 @@ class Dementors(commands.Cog):
         description="(staff / Presidents) House practice swarm — no points or rewards.",
     )
     @app_commands.describe(
-        channel="House channel to flood (default: this channel)",
-        minutes=f"How long it runs, in minutes (default {EVENT_DEFAULT_MINUTES})",
+        channel=(
+            "Channel to flood (default: this channel; swarm practice room, "
+            "study hall, house channels OK)"
+        ),
+        minutes=(
+            f"Length in minutes — any value 1–{EVENT_MAX_MINUTES} "
+            f"(not limited to 5/10; default {EVENT_DEFAULT_MINUTES})"
+        ),
     )
     async def practice(
         self,
         interaction: discord.Interaction,
         channel: discord.TextChannel | None = None,
-        minutes: int = EVENT_DEFAULT_MINUTES,
+        minutes: app_commands.Range[int, 1, EVENT_MAX_MINUTES] = EVENT_DEFAULT_MINUTES,
     ):
         # Ack Discord first — anything before this can cause "did not respond".
         try:
