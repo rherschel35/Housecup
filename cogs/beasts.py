@@ -1,6 +1,9 @@
 """
 Beasts of Velmora. 70 creatures, 14 in each place, to find and befriend.
 
+Portraits live in beast_art_assets/{id}.png (sightings) and
+{id}_summon.png (cute /summon poses). Missing art is skipped gracefully.
+
     /approach                 - befriend the beast that's here, if you have what it wants
     /bestiary [member]        - every beast you've befriended, and the ones still out there
     /summon <beast>           - call one of your beasts to do something cute or cool (just for show)
@@ -52,6 +55,7 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "beasts_state.json"
 BEASTS_PATH = DATA_DIR / "beasts.json"
+ASSETS_DIR = Path(__file__).resolve().parent.parent / "beast_art_assets"
 
 DEFAULT_CHANNEL_ID = int(os.getenv("BEAST_CHANNEL_ID", "1552403888890576916") or 0)  # #explore-velmora
 
@@ -276,6 +280,26 @@ class Beasts(commands.Cog):
         pool = sorted(k for k, b in eligible.items() if b["rarity"] == rarity)
         return self.rng.choice(pool)
 
+    def art_path(self, key: str, *, kind: str = "appear") -> Path | None:
+        """Portrait (`{id}.png`) or cute summon pose (`{id}_summon.png`)."""
+        if kind == "summon":
+            path = ASSETS_DIR / f"{key}_summon.png"
+            if path.is_file():
+                return path
+            # Fall back to the appear portrait so summon never goes blank.
+        path = ASSETS_DIR / f"{key}.png"
+        return path if path.is_file() else None
+
+    def attach_art(
+        self, embed: discord.Embed, key: str, *, kind: str = "appear"
+    ) -> discord.File | None:
+        path = self.art_path(key, kind=kind)
+        if path is None:
+            return None
+        filename = "beast_summon.png" if kind == "summon" else "beast.png"
+        embed.set_image(url=f"attachment://{filename}")
+        return discord.File(path, filename=filename)
+
     def sighting_embed(self, key: str, expires: float,
                        claimer_id: int | None = None,
                        claim_until: float | None = None) -> discord.Embed:
@@ -296,6 +320,9 @@ class Beasts(commands.Cog):
                               color=SIGHTING_COLOR)
         embed.set_footer(text=f"{RARITY_LABEL[b['rarity']]} • from {PLACES[b['place']]}"
                               + (" • only seen after dark" if b.get("night") else ""))
+        # Image is attached by the caller via attach_art (spawn / claim refresh).
+        if self.art_path(key):
+            embed.set_image(url="attachment://beast.png")
         return embed
 
     def _claim_blocks(self, sighting: dict, user_id: int, now: float) -> str | None:
@@ -320,8 +347,10 @@ class Beasts(commands.Cog):
             return None
         key = key or self.pick_beast(now)
         expires = now + STAY_MINUTES * 60
+        embed = self.sighting_embed(key, expires)
+        file = self.attach_art(embed, key, kind="appear")
         try:
-            msg = await channel.send(embed=self.sighting_embed(key, expires))
+            msg = await channel.send(embed=embed, file=file) if file else await channel.send(embed=embed)
         except discord.DiscordException:
             log.exception("Could not post a beast sighting")
             self.state["next_at"] = now + self._gap()
@@ -337,13 +366,22 @@ class Beasts(commands.Cog):
             asyncio.ensure_future(adorn.notify_nightwatch(self.beasts[key], channel.id))
         return key
 
-    async def _edit_sighting(self, sighting: dict, embed: discord.Embed):
+    async def _edit_sighting(
+        self,
+        sighting: dict,
+        embed: discord.Embed,
+        *,
+        clear_attachments: bool = False,
+    ):
         channel = self.bot.get_channel(sighting["channel_id"])
         if channel is None:
             return
         try:
             msg = await channel.fetch_message(sighting["message_id"])
-            await msg.edit(embed=embed)
+            if clear_attachments:
+                await msg.edit(embed=embed, attachments=[])
+            else:
+                await msg.edit(embed=embed)
         except discord.DiscordException:
             log.info("Could not update an old beast sighting message")
 
@@ -362,9 +400,14 @@ class Beasts(commands.Cog):
             self.save()
             b = self.beasts.get(s["beast"])
             if b:
-                await self._edit_sighting(s, discord.Embed(
-                    description=f"{b['emoji']} The {b['name']} slipped away. Maybe next time.",
-                    color=0x7A7A7A))
+                await self._edit_sighting(
+                    s,
+                    discord.Embed(
+                        description=f"{b['emoji']} The {b['name']} slipped away. Maybe next time.",
+                        color=0x7A7A7A,
+                    ),
+                    clear_attachments=True,
+                )
             return
         if s and now >= s["expires"] + LINGER_GRACE:
             self.state["sighting"] = None
@@ -521,11 +564,24 @@ class Beasts(commands.Cog):
         if b["rarity"] in ("rare", "legendary") and out["first"]:
             lines.append(f"🌟 **A {RARITY_LABEL[b['rarity']].lower()} beast!** The whole castle is talking about it.")
         lines += out["notes"]
-        await interaction.response.send_message(embed=discord.Embed(
-            description="\n".join(lines), color=RARITY_COLORS[b["rarity"]]))
-        await self._edit_sighting(s, discord.Embed(
-            description=f"{b['emoji']} The {b['name']} went home with **{interaction.user.display_name}**.",
-            color=RARITY_COLORS[b["rarity"]]))
+        befriend_embed = discord.Embed(
+            description="\n".join(lines), color=RARITY_COLORS[b["rarity"]])
+        befriend_file = self.attach_art(befriend_embed, key, kind="appear")
+        if befriend_file:
+            await interaction.response.send_message(embed=befriend_embed, file=befriend_file)
+        else:
+            await interaction.response.send_message(embed=befriend_embed)
+        await self._edit_sighting(
+            s,
+            discord.Embed(
+                description=(
+                    f"{b['emoji']} The {b['name']} went home with "
+                    f"**{interaction.user.display_name}**."
+                ),
+                color=RARITY_COLORS[b["rarity"]],
+            ),
+            clear_attachments=True,
+        )
         if adorn:
             try:
                 await adorn.check_member(interaction.user)
@@ -856,14 +912,19 @@ class Beasts(commands.Cog):
         color = 0xE0A526 if (b_is_boss or b2_is_boss) else RARITY_COLORS[b["rarity"]]
         embed = discord.Embed(title=title[:256], description=moment, color=color)
 
-        # A Descent boss trophy shows its real portrait art - the thing that
-        # makes it feel like a genuine trophy rather than just another entry.
-        image_path = (b.get("image_path") if b_is_boss else None) or \
-                     (b2.get("image_path") if b2_is_boss else None)
+        # Descent boss trophies keep their boss portrait; wild beasts use
+        # cute summon poses from beast_art_assets/ (fall back to appear art).
         file = None
-        if image_path and image_path.exists():
+        if b_is_boss and b.get("image_path") and Path(b["image_path"]).exists():
+            image_path = Path(b["image_path"])
             file = discord.File(image_path, filename=image_path.name)
             embed.set_image(url=f"attachment://{image_path.name}")
+        elif b2_is_boss and b2 and b2.get("image_path") and Path(b2["image_path"]).exists():
+            image_path = Path(b2["image_path"])
+            file = discord.File(image_path, filename=image_path.name)
+            embed.set_image(url=f"attachment://{image_path.name}")
+        elif not b_is_boss:
+            file = self.attach_art(embed, beast, kind="summon")
 
         if file:
             await interaction.response.send_message(embed=embed, file=file)
