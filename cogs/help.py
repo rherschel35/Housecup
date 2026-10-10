@@ -178,7 +178,7 @@ HELP = {
         "staff": False,
         "note": ("A few times a day a beast wanders into the explore channel and says what it wants. "
                  "First to `/approach` gets 60 seconds alone; then anyone can try. "
-                 "70 to find — including Nifflers — some only after dark."),
+                 "71 to find — including Nifflers — some only after dark."),
         "entries": [
             ("approach", "Befriend the beast that's here (first approach gets 60s exclusive)."),
             ("bestiary", "Every beast you've befriended - and the ones still out there."),
