@@ -24,9 +24,14 @@ OPEN_LOUNGE_CHANNEL_IDS = frozenset({
 SHARED_GAMES_CHANNEL_ID = 1556100254082924595
 SHARED_GAMES_CHANNEL_IDS = frozenset({SHARED_GAMES_CHANNEL_ID})
 
-# Dedicated house practice swarm room (Attack waves never flood here).
+# Dedicated house practice swarm rooms (Attack waves never flood these).
 SWARM_PRACTICE_CHANNEL_ID = 1558467851587817472
-SWARM_PRACTICE_CHANNEL_IDS = frozenset({SWARM_PRACTICE_CHANNEL_ID})
+SWARM_PRACTICE_CHANNEL_IDS = frozenset({
+    SWARM_PRACTICE_CHANNEL_ID,
+    1558543500742623375,
+    1558543550247993374,
+    1558543590819631227,
+})
 
 # Castle / army PvP — sieges, map board, battle reports.
 CASTLES_CHANNEL_ID = 1556398769275404441
