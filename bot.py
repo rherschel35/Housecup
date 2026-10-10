@@ -106,6 +106,7 @@ INITIAL_COGS = (
     *(("cogs.chess", "cogs.checkers") if ENABLE_BOARD_GAMES else ()),
     "cogs.pip_wick",
     "cogs.checklist",
+    "cogs.bingo",
     "cogs.event_board",
     "cogs.avada",
     "cogs.broke",
