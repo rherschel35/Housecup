@@ -326,8 +326,8 @@ GEAR = {
     },
     "beastmasters_totem": {
         "name": "Beastmaster's Totem", "slot": "talisman", "rarity": "legendary",
-        "desc": "Carved with all seventy. Only one person at a time ever seems to hold it.",
-        "earn": "beasts_all", "earn_text": "Befriend all 70 beasts.",
+        "desc": "Carved with every beast. Only one person at a time ever seems to hold it.",
+        "earn": "beasts_all", "earn_text": "Befriend all 71 beasts.",
         "perk": "totem", "perk_text": "A befriended beast stands beside you in the Mirror, and /summon can call two at once.",
         "visual": {"shape": "totem", "color": "#5A3A22", "accent": "gold"},
     },

@@ -1,5 +1,5 @@
 """
-Beasts of Velmora. 70 creatures, 14 in each place, to find and befriend.
+Beasts of Velmora. 71 creatures across five places, to find and befriend.
 
 Portraits live in beast_art_assets/{id}.png (sightings) and
 {id}_summon.png (cute /summon poses). Missing art is skipped gracefully.
@@ -97,7 +97,7 @@ RANKS = [
     (20, "Handler"),
     (35, "Beastkeeper"),
     (50, "Warden of Wild Things"),
-    (70, "Beastmaster"),
+    (71, "Beastmaster"),
 ]
 
 

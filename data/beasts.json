@@ -101,6 +101,23 @@
    "{owner}'s Seedpup chases its own roots in a circle until it gets dizzy and flops over."
   ]
  },
+ "field_cow": {
+  "name": "Field Cow",
+  "emoji": "🐄",
+  "place": "garden",
+  "rarity": "common",
+  "wants": [
+   "fairy_ring_cap"
+  ],
+  "night": false,
+  "desc": "A simple meadow cow. Stand near it long enough and you'll notice a soft glow under its coat, like moonlight caught in grass.",
+  "sighting": "It's standing in the meadow looking perfectly ordinary. Then its eyes catch the light — and they aren't ordinary at all.",
+  "summons": [
+   "{owner}'s Field Cow chews a mouthful of nothing in particular, then blinks once, slowly, and the air around it smells like warm hay and starlight.",
+   "The Field Cow rests its head against {owner}'s shoulder. It is heavy. It is gentle. A tiny constellation flickers across its flank and fades.",
+   "{owner}'s Field Cow moos — a soft, round sound — and a single firefly rises from its breath."
+  ]
+ },
  "moonbloom_moth": {
   "name": "Moonbloom Moth",
   "emoji": "🦋",
