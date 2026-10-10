@@ -67,6 +67,12 @@ SACRIFICE_PCT_BANDS = (
 LEGACY_STEP_PCT = 5.0  # old flat ladder was +5% per 500-sacrifice step
 WALL_DEF_MULT = 1.55    # matching wall-type troops
 BOSS_WALL_DEF_MULT = 1.75  # Bannerhall boss wall
+# Assaults are bloody for the march, softer on the walls. Attackers still deal
+# damage = power into an empty-field trade, but garrison damage is scaled by
+# attacker power share so a losing/near-even defense doesn't gut the keep.
+ASSAULT_GARRISON_DAMAGE_FRAC = 0.28
+# Hard cap on defender headcount lost per clash unless the walls are cleared.
+ASSAULT_MAX_DEF_LOSS_FRAC = 0.35
 
 DAILY_RECRUIT_CAP = 200
 ARMY_CAP = 5000  # total monsters (home + garrison + march) — only while PvP is live
@@ -300,11 +306,10 @@ def sim_clash(
     def_pct: float,
     rng: random.Random,
 ) -> dict:
-    """One clash: each side deals damage = power; kills scale with that, not headcount %.
+    """One siege clash. Attackers take full garrison power; walls take a share-scaled
+    slice so a winning defense is not gutted by a near-even or weaker march.
 
-    Old formula applied a ~30%+ loss fraction to defender *count*, so a 1-troop
-    poke (or even an empty march) could wipe a third of a huge garrison.
-    Damage soak uses unit power. Empty attackers deal no damage.
+    Empty attackers deal no damage. Damage soak uses unit power (weakest first).
     """
     att = [dict(u) for u in attackers]
     deff = [dict(u) for u in defenders]
@@ -355,12 +360,29 @@ def sim_clash(
     att_power *= rng.uniform(0.92, 1.08)
     def_power *= rng.uniform(0.92, 1.08)
 
-    # Attackers deal att_power into the garrison; defenders deal def_power into the march.
+    total_power = max(att_power + def_power, 1.0)
+    att_share = att_power / total_power
+
+    # Walls: only a slice of attacker power, further cut by how outmatched they are.
+    # Example: 20% share × 0.28 ≈ 5.6% of att_power hits the garrison.
+    att_damage = att_power * ASSAULT_GARRISON_DAMAGE_FRAC * att_share
+    # March: full garrison power — sieges stay costly for attackers.
+    def_damage = def_power
+
     def_killed, def_rem = _kill_by_damage(
-        deff, att_power, side="defend", wall=wall, atk_pct=atk_pct, def_pct=def_pct
+        deff, att_damage, side="defend", wall=wall, atk_pct=atk_pct, def_pct=def_pct
     )
+    # Cap garrison losses only when the defender is ahead on power. A stronger
+    # march must still be able to chew through (and clear) weaker walls.
+    if def_rem and def_killed and att_power < def_power:
+        max_loss = max(1, int(len(deff) * ASSAULT_MAX_DEF_LOSS_FRAC))
+        if len(def_killed) > max_loss:
+            overflow = def_killed[max_loss:]
+            def_killed = def_killed[:max_loss]
+            def_rem = overflow + def_rem
+
     att_killed, att_rem = _kill_by_damage(
-        att, def_power, side="attack", wall=wall, atk_pct=atk_pct, def_pct=def_pct
+        att, def_damage, side="attack", wall=wall, atk_pct=atk_pct, def_pct=def_pct
     )
     cleared = len(def_rem) == 0
     return {
