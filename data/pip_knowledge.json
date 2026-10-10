@@ -298,7 +298,7 @@
         "hold a castle",
         "castle perk"
       ],
-      "answer": "Castle PvP lives in the castles channel. Descent wins bind monsters into yer army — `/army` shows the roster (castles + Descent channels) an' lets ye sacrifice 500 regulars for ATK or DEF. `/castles` opens the map: reinforce anytime (not mid-assault), siege on Wed & Sat (Chicago), or abandon. One castle per player. Before PvP goes live, binds are uncapped; once live it's 200/day an' 5,000 total. Each keep has a perk (duel ties, Descent half-attack, `/cast` auto-pick, an' more) — full list on the Compendium Castles page.",
+      "answer": "Castle PvP lives in the castles channel. Descent wins bind monsters into yer army — `/army` shows the roster (castles + Descent channels) an' lets ye sacrifice 500 regulars for ATK or DEF. `/castles` opens the map: reinforce anytime (not mid-assault), siege on Wed & Sat (Chicago), or abandon. One castle per player; one active march at a time — ye deploy up to 200+2 bosses once, then every Attack again uses survivors only (no fresh 200) till pull back, wipe, or the 10-minute assault ends; then the castle locks 20 minutes before a new full march. Before PvP goes live, binds are uncapped; once live it's 200/day an' 5,000 total. Each keep has a perk (duel ties, Descent half-attack, `/cast` auto-pick, an' more) — full list on the Compendium Castles page.",
       "link": "https://everything-velmora.netlify.app/castles"
     },
     {
