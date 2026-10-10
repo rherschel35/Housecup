@@ -604,10 +604,10 @@ class Staff(commands.Cog):
 
     # --------------------------------------------------------------- bingo
 
-    @bingo.command(name="start", description="Open a Wizard Bingo round (players get unique cards).")
+    @bingo.command(name="start", description="Open a Wizard Bingo round in the bingo channel.")
     @app_commands.describe(
         name="Optional round name",
-        channel="Where to announce (default: this channel)",
+        channel="Ignored — Bingo always runs in the bingo channel",
     )
     async def bingo_start(
         self,
