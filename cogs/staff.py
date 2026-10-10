@@ -44,6 +44,7 @@ class Staff(commands.Cog):
     duels = sg.duels
     challenge = sg.challenge
     hex_g = sg.hexes
+    bingo = sg.bingo
     market = sg.market
     usage = sg.usage
 
@@ -600,6 +601,57 @@ class Staff(commands.Cog):
             await interaction.response.send_message("Hexes isn't loaded.", ephemeral=True)
             return
         await cog.hexlist(interaction)
+
+    # --------------------------------------------------------------- bingo
+
+    @bingo.command(name="start", description="Open a Wizard Bingo round (players get unique cards).")
+    @app_commands.describe(
+        name="Optional round name",
+        channel="Where to announce (default: this channel)",
+    )
+    async def bingo_start(
+        self,
+        interaction: discord.Interaction,
+        name: str = None,
+        channel: discord.TextChannel = None,
+    ):
+        cog = self._cog("Bingo")
+        if not cog:
+            await interaction.response.send_message("Bingo isn't loaded.", ephemeral=True)
+            return
+        await cog.staff_start(interaction, name=name, channel=channel)
+
+    @bingo.command(name="call", description="Call a Wizard Bingo square.")
+    @app_commands.describe(square="Which square to call (start typing to search)")
+    async def bingo_call(self, interaction: discord.Interaction, square: str):
+        cog = self._cog("Bingo")
+        if not cog:
+            await interaction.response.send_message("Bingo isn't loaded.", ephemeral=True)
+            return
+        await cog.staff_call(interaction, square)
+
+    @bingo_call.autocomplete("square")
+    async def bingo_call_autocomplete(self, interaction: discord.Interaction, current: str):
+        cog = self._cog("Bingo")
+        if not cog:
+            return []
+        return await cog.call_autocomplete(interaction, current)
+
+    @bingo.command(name="end", description="End the open Wizard Bingo round.")
+    async def bingo_end(self, interaction: discord.Interaction):
+        cog = self._cog("Bingo")
+        if not cog:
+            await interaction.response.send_message("Bingo isn't loaded.", ephemeral=True)
+            return
+        await cog.staff_end(interaction)
+
+    @bingo.command(name="winners", description="List BINGO winners for the open round.")
+    async def bingo_winners(self, interaction: discord.Interaction):
+        cog = self._cog("Bingo")
+        if not cog:
+            await interaction.response.send_message("Bingo isn't loaded.", ephemeral=True)
+            return
+        await cog.staff_winners(interaction)
 
     # --------------------------------------------------------------- market
 
