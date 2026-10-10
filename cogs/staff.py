@@ -604,14 +604,24 @@ class Staff(commands.Cog):
 
     # --------------------------------------------------------------- bingo
 
-    @bingo.command(name="start", description="Open a Wizard Bingo round in the bingo channel.")
+    @bingo.command(name="start", description="Open a Wizard Bingo lobby (Join + Start) in the bingo channel.")
     @app_commands.describe(
+        mode="Win condition — Traditional, 4 Corners, Diagonals, or a random pattern",
         name="Optional round name",
         channel="Ignored — Bingo always runs in the bingo channel",
+    )
+    @app_commands.choices(
+        mode=[
+            app_commands.Choice(name="Traditional — any line", value="traditional"),
+            app_commands.Choice(name="4 Corners", value="corners"),
+            app_commands.Choice(name="Diagonals only", value="diagonals"),
+            app_commands.Choice(name="Random pattern", value="random_pattern"),
+        ]
     )
     async def bingo_start(
         self,
         interaction: discord.Interaction,
+        mode: app_commands.Choice[str],
         name: str = None,
         channel: discord.TextChannel = None,
     ):
@@ -619,9 +629,10 @@ class Staff(commands.Cog):
         if not cog:
             await interaction.response.send_message("Bingo isn't loaded.", ephemeral=True)
             return
-        await cog.staff_start(interaction, name=name, channel=channel)
+        mode_val = mode.value if isinstance(mode, app_commands.Choice) else mode
+        await cog.staff_start(interaction, name=name, mode=mode_val, channel=channel)
 
-    @bingo.command(name="call", description="Call a Wizard Bingo square.")
+    @bingo.command(name="call", description="Manually call a square (optional — auto-calls every 20s after Start).")
     @app_commands.describe(square="Which square to call (start typing to search)")
     async def bingo_call(self, interaction: discord.Interaction, square: str):
         cog = self._cog("Bingo")
