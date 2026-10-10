@@ -87,24 +87,28 @@ except Exception:  # pragma: no cover - Windows without tzdata
 
 from cogs.velmora_channels import (
     EVENT_ANNOUNCE_CHANNEL_ID,
-    OPEN_LOUNGE_CHANNEL_IDS,
+    EVERYTHING_LOUNGE_CHANNEL_IDS,
+    RESTRICTED_OPEN_LOUNGE_CHANNEL_IDS,
     SHARED_GAMES_CHANNEL_ID,
     STUDY_HALL_CHANNEL_ID,
     SWARM_PRACTICE_CHANNEL_IDS,
 )
 from cogs.world_engine import today
 
-# Summon/practice rooms — never flooded by Attack waves or ambient spawns.
+# Summon/practice rooms — Attack waves never flood these (except everything
+# lounges, which opt into full threat traffic below).
 PRACTICE_SUMMON_CHANNEL_IDS = frozenset({
     STUDY_HALL_CHANNEL_ID,
     SHARED_GAMES_CHANNEL_ID,
     *SWARM_PRACTICE_CHANNEL_IDS,
+    *EVERYTHING_LOUNGE_CHANNEL_IDS,
 })
 
-# Multi-game lounges: no ambient / Attack / practice-summon threats.
+# Practice rooms + restricted open lounges: no ambient / Attack floods.
+# Everything lounges stay open to threats on purpose.
 NO_THREAT_SPAWN_CHANNEL_IDS = frozenset({
-    *PRACTICE_SUMMON_CHANNEL_IDS,
-    *OPEN_LOUNGE_CHANNEL_IDS,
+    *(PRACTICE_SUMMON_CHANNEL_IDS - EVERYTHING_LOUNGE_CHANNEL_IDS),
+    *RESTRICTED_OPEN_LOUNGE_CHANNEL_IDS,
 })
 
 # Always included in ambient spawns + Attack waves (alongside staff channels).
@@ -112,11 +116,11 @@ EXTRA_THREAT_CHANNEL_IDS = frozenset({
     1552403823769952266,
 })
 
-# Open lounges stay spawn-free even for house practice. Study hall / games
-# lounge / swarm practice room (PRACTICE_SUMMON_CHANNEL_IDS) may host
+# Restricted open lounges stay spawn-free even for house practice.
+# Study hall / games lounge / swarm practice / everything lounges may host
 # practice swarms on purpose.
 PRACTICE_BLOCKED_CHANNEL_IDS = frozenset({
-    *OPEN_LOUNGE_CHANNEL_IDS,
+    *RESTRICTED_OPEN_LOUNGE_CHANNEL_IDS,
 })
 
 log = logging.getLogger("velmora.dementors")
@@ -1786,7 +1790,9 @@ class Dementors(commands.Cog):
 
     def _summon_channel_ok(self, channel_id: int) -> bool:
         """Configured event channels, extras, or practice summon rooms."""
-        if channel_id in OPEN_LOUNGE_CHANNEL_IDS:
+        if channel_id in EVERYTHING_LOUNGE_CHANNEL_IDS:
+            return True
+        if channel_id in RESTRICTED_OPEN_LOUNGE_CHANNEL_IDS:
             return False
         if channel_id in PRACTICE_SUMMON_CHANNEL_IDS:
             return True

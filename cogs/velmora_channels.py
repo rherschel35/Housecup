@@ -5,6 +5,9 @@ allowed alongside their main homes.
 
 Open lounges are multi-game rooms: most games run there, but Wild Threat
 spawns and /explore|/forage stay out on purpose.
+
+Everything lounges are open lounges that also allow explore, Wild Threats,
+practice swarms, Bingo, and Forrest. Still not castle PvP or 3Raid.
 """
 
 STUDY_HALL_CHANNEL_ID = 1555035151208153209  # new-student study hall
@@ -12,13 +15,23 @@ STUDY_HALL_CHANNEL_ID = 1555035151208153209  # new-student study hall
 # Shared Potions/Duels room — also one of the multi-game open lounges.
 DUELS_POTIONS_CHANNEL_ID = 1555554825616236726
 
+# Full multi-game lounge: everything except castle PvP and 3Raid.
+EVERYTHING_LOUNGE_CHANNEL_ID = 1558611215054282822
+EVERYTHING_LOUNGE_CHANNEL_IDS = frozenset({EVERYTHING_LOUNGE_CHANNEL_ID})
+
 # Multi-game lounges — duels, potions, Descent, Quidditch/broom, chess/checkers.
-# Not: Wild Threat spawns, exploring, castle PvP, 3Raid, or Forrest.
+# Not: Wild Threat spawns, exploring, castle PvP, 3Raid, or Forrest
+# (except channels also listed in EVERYTHING_LOUNGE_CHANNEL_IDS).
 OPEN_LOUNGE_CHANNEL_IDS = frozenset({
     1557137090058395768,
     DUELS_POTIONS_CHANNEL_ID,
-    1558611215054282822,
+    *EVERYTHING_LOUNGE_CHANNEL_IDS,
 })
+
+# Open lounges that keep explore / threats / practice swarms out.
+RESTRICTED_OPEN_LOUNGE_CHANNEL_IDS = frozenset(
+    OPEN_LOUNGE_CHANNEL_IDS - EVERYTHING_LOUNGE_CHANNEL_IDS
+)
 
 # Lounge where duels, potions, Quidditch, broom races, and practice
 # Wild Threat summons all run (Attack waves never flood this room).
@@ -38,9 +51,12 @@ SWARM_PRACTICE_CHANNEL_IDS = frozenset({
 CASTLES_CHANNEL_ID = 1556398769275404441
 CASTLES_CHANNEL_IDS = frozenset({CASTLES_CHANNEL_ID})
 
-# Wizard Bingo — cards, calls, and marks only here.
+# Wizard Bingo — primary room, plus everything lounges.
 BINGO_CHANNEL_ID = 1558313269800734740
-BINGO_CHANNEL_IDS = frozenset({BINGO_CHANNEL_ID})
+BINGO_CHANNEL_IDS = frozenset({
+    BINGO_CHANNEL_ID,
+    *EVERYTHING_LOUNGE_CHANNEL_IDS,
+})
 
 # Extra rooms where /duel is allowed (in addition to DUEL_CHANNEL_ID,
 # study hall, the shared Potions/Duels room, and SHARED_GAMES_CHANNEL_ID).

@@ -38,7 +38,11 @@ from cogs.bingo_patterns import (
     pick_random_pattern,
     preview_for_round,
 )
-from cogs.velmora_channels import BINGO_CHANNEL_ID
+from cogs.velmora_channels import (
+    BINGO_CHANNEL_ID,
+    BINGO_CHANNEL_IDS,
+    channel_mentions,
+)
 
 log = logging.getLogger("velmora.bingo")
 
@@ -57,7 +61,15 @@ PHASE_CALLING = "calling"
 
 
 def _channel_hint() -> str:
-    return f"Wizard Bingo only runs in <#{BINGO_CHANNEL_ID}>."
+    return f"Wizard Bingo only runs in {channel_mentions(BINGO_CHANNEL_IDS)}."
+
+
+def _round_channel_id(round_: dict | None) -> int:
+    if round_:
+        cid = round_.get("channel_id")
+        if cid:
+            return int(cid)
+    return BINGO_CHANNEL_ID
 
 
 def _blank() -> dict:
@@ -166,13 +178,36 @@ class Bingo(commands.Cog):
         return self.state.get("active")
 
     def _in_bingo_channel(self, interaction: discord.Interaction) -> bool:
-        return interaction.channel_id == BINGO_CHANNEL_ID
+        return interaction.channel_id in BINGO_CHANNEL_IDS
+
+    def _in_round_channel(self, interaction: discord.Interaction, round_: dict | None = None) -> bool:
+        """True if the interaction is in the active round's channel (or any bingo home if none)."""
+        if not self._in_bingo_channel(interaction):
+            return False
+        round_ = round_ if round_ is not None else self.active()
+        if not round_:
+            return True
+        return interaction.channel_id == _round_channel_id(round_)
 
     async def _require_bingo_channel(self, interaction: discord.Interaction) -> bool:
         if self._in_bingo_channel(interaction):
             return True
         await interaction.response.send_message(_channel_hint(), ephemeral=True)
         return False
+
+    async def _require_round_channel(
+        self, interaction: discord.Interaction, round_: dict | None = None
+    ) -> bool:
+        if not await self._require_bingo_channel(interaction):
+            return False
+        round_ = round_ if round_ is not None else self.active()
+        if round_ and interaction.channel_id != _round_channel_id(round_):
+            await interaction.response.send_message(
+                f"This round is running in <#{_round_channel_id(round_)}>.",
+                ephemeral=True,
+            )
+            return False
+        return True
 
     def _is_host(self, user: discord.abc.User, round_: dict | None = None) -> bool:
         round_ = round_ or self.active()
@@ -196,7 +231,8 @@ class Bingo(commands.Cog):
         round_ = self.active()
         if not round_:
             raise RuntimeError(
-                f"No Wizard Bingo round is open. Staff start one in <#{BINGO_CHANNEL_ID}>."
+                "No Wizard Bingo round is open. Staff start one in "
+                f"{channel_mentions(BINGO_CHANNEL_IDS)}."
             )
         existing = self.card_of(user_id)
         if existing:
@@ -260,14 +296,17 @@ class Bingo(commands.Cog):
             value=joined[:1024],
             inline=False,
         )
-        embed.set_footer(text="Bingo channel only · Host Start begins calling")
+        embed.set_footer(text="Host Start begins calling")
         return embed
+
+    def _round_channel(self, round_: dict | None = None):
+        return self.bot.get_channel(_round_channel_id(round_ or self.active()))
 
     async def _refresh_lobby_message(self, round_: dict) -> None:
         mid = round_.get("lobby_message_id")
         if not mid:
             return
-        ch = self.bot.get_channel(BINGO_CHANNEL_ID)
+        ch = self._round_channel(round_)
         if ch is None or not hasattr(ch, "fetch_message"):
             return
         try:
@@ -348,7 +387,7 @@ class Bingo(commands.Cog):
                     return
                 label = self._pick_next_call(round_)
                 if label is None:
-                    ch = self.bot.get_channel(BINGO_CHANNEL_ID)
+                    ch = self._round_channel(round_)
                     if ch and hasattr(ch, "send"):
                         try:
                             await ch.send(
@@ -397,7 +436,7 @@ class Bingo(commands.Cog):
                 f"{round_.get('name', 'Wizard Bingo')}"
             )
         )
-        ch = self.bot.get_channel(BINGO_CHANNEL_ID)
+        ch = self._round_channel(round_)
         if ch and hasattr(ch, "send"):
             try:
                 await ch.send(embed=embed)
@@ -408,9 +447,9 @@ class Bingo(commands.Cog):
 
     @bingo.command(name="card", description="See your Wizard Bingo card (joins if a round is open).")
     async def bingo_card(self, interaction: discord.Interaction):
-        if not await self._require_bingo_channel(interaction):
-            return
         round_ = self.active()
+        if not await self._require_round_channel(interaction, round_):
+            return
         if round_ is None:
             await interaction.response.send_message(
                 "No Wizard Bingo round is open right now.", ephemeral=True
@@ -442,9 +481,9 @@ class Bingo(commands.Cog):
 
     @bingo.command(name="mark", description="Mark called squares on your bingo card.")
     async def bingo_mark(self, interaction: discord.Interaction):
-        if not await self._require_bingo_channel(interaction):
-            return
         round_ = self.active()
+        if not await self._require_round_channel(interaction, round_):
+            return
         if round_ is None:
             await interaction.response.send_message(
                 "No Wizard Bingo round is open right now.", ephemeral=True
@@ -497,9 +536,9 @@ class Bingo(commands.Cog):
 
     @bingo.command(name="called", description="List squares called this Wizard Bingo round.")
     async def bingo_called(self, interaction: discord.Interaction):
-        if not await self._require_bingo_channel(interaction):
-            return
         round_ = self.active()
+        if not await self._require_round_channel(interaction, round_):
+            return
         if round_ is None:
             await interaction.response.send_message(
                 "No Wizard Bingo round is open right now.", ephemeral=True
@@ -525,9 +564,9 @@ class Bingo(commands.Cog):
 
     @bingo.command(name="status", description="Is a Wizard Bingo round open? How are you doing?")
     async def bingo_status(self, interaction: discord.Interaction):
-        if not await self._require_bingo_channel(interaction):
-            return
         round_ = self.active()
+        if not await self._require_round_channel(interaction, round_):
+            return
         if round_ is None:
             await interaction.response.send_message(
                 "No Wizard Bingo round is open.", ephemeral=True
@@ -561,10 +600,9 @@ class Bingo(commands.Cog):
     # ================================================================ lobby actions
 
     async def join_from_button(self, interaction: discord.Interaction) -> None:
-        if not self._in_bingo_channel(interaction):
-            await interaction.response.send_message(_channel_hint(), ephemeral=True)
-            return
         round_ = self.active()
+        if not await self._require_round_channel(interaction, round_):
+            return
         if not round_:
             await interaction.response.send_message(
                 "No round open right now.", ephemeral=True
@@ -594,10 +632,9 @@ class Bingo(commands.Cog):
         await interaction.followup.send(embed=embed, file=file, ephemeral=True)
 
     async def start_from_button(self, interaction: discord.Interaction) -> None:
-        if not self._in_bingo_channel(interaction):
-            await interaction.response.send_message(_channel_hint(), ephemeral=True)
-            return
         round_ = self.active()
+        if not await self._require_round_channel(interaction, round_):
+            return
         if not round_:
             await interaction.response.send_message(
                 "No round open right now.", ephemeral=True
@@ -649,7 +686,7 @@ class Bingo(commands.Cog):
             ephemeral=True,
         )
         mid = round_.get("lobby_message_id")
-        ch = self.bot.get_channel(BINGO_CHANNEL_ID)
+        ch = self._round_channel(round_)
         if mid and ch and hasattr(ch, "fetch_message"):
             try:
                 msg = await ch.fetch_message(mid)
@@ -677,9 +714,10 @@ class Bingo(commands.Cog):
             return
         if not await self._require_bingo_channel(interaction):
             return
-        if channel is not None and channel.id != BINGO_CHANNEL_ID:
+        if channel is not None and channel.id not in BINGO_CHANNEL_IDS:
             await interaction.response.send_message(
-                f"Wizard Bingo stays in <#{BINGO_CHANNEL_ID}> — don't pick another channel.",
+                f"Wizard Bingo stays in {channel_mentions(BINGO_CHANNEL_IDS)} "
+                "— don't pick another channel.",
                 ephemeral=True,
             )
             return
@@ -709,6 +747,13 @@ class Bingo(commands.Cog):
         if mode == MODE_RANDOM_PATTERN:
             pattern_id = pick_random_pattern()
 
+        if channel is not None:
+            home_id = channel.id
+        elif interaction.channel_id in BINGO_CHANNEL_IDS:
+            home_id = interaction.channel_id
+        else:
+            home_id = BINGO_CHANNEL_ID
+
         round_id = uuid.uuid4().hex[:10]
         label = (name or "").strip() or "Wizard Bingo"
         self._stop_call_loop()
@@ -718,7 +763,7 @@ class Bingo(commands.Cog):
             "mode": mode,
             "pattern_id": pattern_id,
             "phase": PHASE_LOBBY,
-            "channel_id": BINGO_CHANNEL_ID,
+            "channel_id": home_id,
             "started_at": time.time(),
             "started_by": interaction.user.id,
             "players": [],
@@ -733,9 +778,9 @@ class Bingo(commands.Cog):
         self._lobby_views[round_id] = view
         self.bot.add_view(view)
 
-        target = self.bot.get_channel(BINGO_CHANNEL_ID) or interaction.channel
+        target = self.bot.get_channel(home_id) or interaction.channel
         await interaction.response.send_message(
-            f"Lobby opened in <#{BINGO_CHANNEL_ID}> "
+            f"Lobby opened in <#{home_id}> "
             f"({mode_label(mode, pattern_id)}).",
             ephemeral=True,
         )
@@ -755,9 +800,9 @@ class Bingo(commands.Cog):
         if not (store and store.is_staff(interaction.user)):
             await interaction.response.send_message("That's for staff.", ephemeral=True)
             return
-        if not await self._require_bingo_channel(interaction):
-            return
         round_ = self.active()
+        if not await self._require_round_channel(interaction, round_):
+            return
         if not round_:
             await interaction.response.send_message(
                 "No open round. `/staffgame bingo start` first.", ephemeral=True
@@ -804,9 +849,9 @@ class Bingo(commands.Cog):
         if not (store and store.is_staff(interaction.user)):
             await interaction.response.send_message("That's for staff.", ephemeral=True)
             return
-        if not await self._require_bingo_channel(interaction):
-            return
         round_ = self.active()
+        if not await self._require_round_channel(interaction, round_):
+            return
         if not round_:
             await interaction.response.send_message("No open round to end.", ephemeral=True)
             return
@@ -856,9 +901,9 @@ class Bingo(commands.Cog):
         if not (store and store.is_staff(interaction.user)):
             await interaction.response.send_message("That's for staff.", ephemeral=True)
             return
-        if not await self._require_bingo_channel(interaction):
-            return
         round_ = self.active()
+        if not await self._require_round_channel(interaction, round_):
+            return
         if not round_:
             await interaction.response.send_message("No open round.", ephemeral=True)
             return
@@ -983,10 +1028,9 @@ class MarkSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        if not self.cog._in_bingo_channel(interaction):
-            await interaction.response.send_message(_channel_hint(), ephemeral=True)
-            return
         round_ = self.cog.active()
+        if not await self.cog._require_round_channel(interaction, round_):
+            return
         if not round_:
             await interaction.response.send_message(
                 "That round already ended.", ephemeral=True

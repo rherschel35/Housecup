@@ -47,6 +47,7 @@ from cogs.forrest_story_script import (
     pronouns,
     render,
 )
+from cogs.velmora_channels import EVERYTHING_LOUNGE_CHANNEL_IDS
 
 log = logging.getLogger("velmora.forrest")
 
@@ -57,6 +58,7 @@ ASSETS_DIR = Path(__file__).resolve().parent.parent / "story_art_assets"
 
 # Open play: Headmasters role in these channels. Private test: named testers.
 # Override with FORREST_OPEN_CHANNEL_IDS / FORREST_CHANNEL_ID / FORREST_TESTER_IDS.
+# Everything lounges are always included (full multi-game rooms).
 # Role name matches marketplace/hexes (case-insensitive).
 def _parse_id_set(raw: str, defaults: frozenset[int]) -> frozenset[int]:
     ids = frozenset(
@@ -65,9 +67,12 @@ def _parse_id_set(raw: str, defaults: frozenset[int]) -> frozenset[int]:
     return ids or defaults
 
 
-FORREST_OPEN_CHANNEL_IDS = _parse_id_set(
-    os.getenv("FORREST_OPEN_CHANNEL_IDS", "1555609052782919760"),
-    frozenset({1555609052782919760}),
+FORREST_OPEN_CHANNEL_IDS = (
+    _parse_id_set(
+        os.getenv("FORREST_OPEN_CHANNEL_IDS", "1555609052782919760"),
+        frozenset({1555609052782919760}),
+    )
+    | EVERYTHING_LOUNGE_CHANNEL_IDS
 )
 # Legacy private test channel (named testers).
 FORREST_CHANNEL_ID = int(os.getenv("FORREST_CHANNEL_ID", "1555383179802579005") or 0)

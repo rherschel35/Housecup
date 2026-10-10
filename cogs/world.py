@@ -25,7 +25,11 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from cogs.velmora_channels import OPEN_LOUNGE_CHANNEL_IDS, STUDY_HALL_CHANNEL_ID
+from cogs.velmora_channels import (
+    EVERYTHING_LOUNGE_CHANNEL_IDS,
+    RESTRICTED_OPEN_LOUNGE_CHANNEL_IDS,
+    STUDY_HALL_CHANNEL_ID,
+)
 from cogs.world_engine import (HOUSE_NAMES, RARITY_LABEL, RARITY_ORDER, Ctx, Place, World,
                                blank_student, tone_for)
 
@@ -207,25 +211,29 @@ class WorldCog(commands.Cog, name="World"):
         return e
 
     def _place_channel_ok(self, channel_id: int, place: str) -> bool:
-        """Home place channel, or the new-student study hall."""
+        """Home place channel, study hall, or an everything lounge."""
         cid = self.state["channels"].get(place)
         if not cid:
             return True
-        return channel_id == cid or channel_id == STUDY_HALL_CHANNEL_ID
+        return (
+            channel_id == cid
+            or channel_id == STUDY_HALL_CHANNEL_ID
+            or channel_id in EVERYTHING_LOUNGE_CHANNEL_IDS
+        )
 
     async def in_place_channel(self, interaction, place) -> bool:
-        if interaction.channel_id in OPEN_LOUNGE_CHANNEL_IDS:
+        if interaction.channel_id in RESTRICTED_OPEN_LOUNGE_CHANNEL_IDS:
             await interaction.response.send_message(
-                "Exploring isn't available in this lounge — use a place channel "
-                f"or the study hall <#{STUDY_HALL_CHANNEL_ID}>.",
+                "Exploring isn't available in this lounge — use a place channel, "
+                f"the study hall <#{STUDY_HALL_CHANNEL_ID}>, or an everything lounge.",
                 ephemeral=True,
             )
             return False
         cid = self.state["channels"].get(place)
         if cid and not self._place_channel_ok(interaction.channel_id, place):
             await interaction.response.send_message(
-                f"{self.world.places[place].name.capitalize()} is found in <#{cid}> "
-                f"(or the study hall <#{STUDY_HALL_CHANNEL_ID}>).",
+                f"{self.world.places[place].name.capitalize()} is found in <#{cid}>, "
+                f"the study hall <#{STUDY_HALL_CHANNEL_ID}>, or an everything lounge.",
                 ephemeral=True)
             return False
         return True
@@ -496,7 +504,7 @@ class WorldCog(commands.Cog, name="World"):
         place = self.where(s)
         if not place or place not in self.world.places:
             return
-        if message.channel.id in OPEN_LOUNGE_CHANNEL_IDS:
+        if message.channel.id in RESTRICTED_OPEN_LOUNGE_CHANNEL_IDS:
             return
         if not self._place_channel_ok(message.channel.id, place):
             return
