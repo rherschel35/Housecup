@@ -56,7 +56,7 @@ FORCE_ART_FILE = os.getenv("ANIMAGUS_FORCE_ART", "Wolf_Headmaster.png")
 FORMS = {
     "Cat": ("independent; chooses its people and keeps them", "*meow*"),
     "Dog": ("loyal without keeping score; stays when it's hard", "*woof*"),
-    "Wolf": ("loyal to its pack above everything", "*howl*"),
+    "Wolf": ("loyal to its pack above everything", "*awoo*"),
     "Fox": ("clever and self-reliant; slips out of trouble sideways", "*yip*"),
     "Owl": ("patient and wise; sees what others miss in the dark", "*hoot*"),
     "Raven": ("curious and sharp; carries secrets safely", "*caw*"),
