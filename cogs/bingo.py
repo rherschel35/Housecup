@@ -180,15 +180,6 @@ class Bingo(commands.Cog):
     def _in_bingo_channel(self, interaction: discord.Interaction) -> bool:
         return interaction.channel_id in BINGO_CHANNEL_IDS
 
-    def _in_round_channel(self, interaction: discord.Interaction, round_: dict | None = None) -> bool:
-        """True if the interaction is in the active round's channel (or any bingo home if none)."""
-        if not self._in_bingo_channel(interaction):
-            return False
-        round_ = round_ if round_ is not None else self.active()
-        if not round_:
-            return True
-        return interaction.channel_id == _round_channel_id(round_)
-
     async def _require_bingo_channel(self, interaction: discord.Interaction) -> bool:
         if self._in_bingo_channel(interaction):
             return True
