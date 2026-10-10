@@ -28,6 +28,10 @@ SHARED_GAMES_CHANNEL_IDS = frozenset({SHARED_GAMES_CHANNEL_ID})
 CASTLES_CHANNEL_ID = 1556398769275404441
 CASTLES_CHANNEL_IDS = frozenset({CASTLES_CHANNEL_ID})
 
+# Wizard Bingo — cards, calls, and marks only here.
+BINGO_CHANNEL_ID = 1558313269800734740
+BINGO_CHANNEL_IDS = frozenset({BINGO_CHANNEL_ID})
+
 # Extra rooms where /duel is allowed (in addition to DUEL_CHANNEL_ID,
 # study hall, the shared Potions/Duels room, and SHARED_GAMES_CHANNEL_ID).
 EXTRA_DUEL_CHANNEL_IDS = frozenset({

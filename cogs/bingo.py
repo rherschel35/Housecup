@@ -28,6 +28,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from cogs.bingo_board import render_card
+from cogs.velmora_channels import BINGO_CHANNEL_ID
 
 log = logging.getLogger("velmora.bingo")
 
@@ -40,6 +41,10 @@ GOLD = 0xD4A84A
 BINGO_POINTS = 5
 MAX_WINNERS = 5
 ROWS = COLS = 5
+
+
+def _channel_hint() -> str:
+    return f"Wizard Bingo only runs in <#{BINGO_CHANNEL_ID}>."
 
 
 def _blank() -> dict:
@@ -139,6 +144,16 @@ class Bingo(commands.Cog):
     def active(self) -> Optional[dict]:
         return self.state.get("active")
 
+    def _in_bingo_channel(self, interaction: discord.Interaction) -> bool:
+        return interaction.channel_id == BINGO_CHANNEL_ID
+
+    async def _require_bingo_channel(self, interaction: discord.Interaction) -> bool:
+        """True if we're in the bingo room (already replied if not)."""
+        if self._in_bingo_channel(interaction):
+            return True
+        await interaction.response.send_message(_channel_hint(), ephemeral=True)
+        return False
+
     def card_of(self, user_id: int) -> Optional[dict]:
         round_ = self.active()
         if not round_:
@@ -151,7 +166,9 @@ class Bingo(commands.Cog):
     def ensure_card(self, user_id: int) -> dict:
         round_ = self.active()
         if not round_:
-            raise RuntimeError("No Wizard Bingo round is open. Staff start one with `/staffgame bingo start`.")
+            raise RuntimeError(
+                f"No Wizard Bingo round is open. Staff start one in <#{BINGO_CHANNEL_ID}>."
+            )
         existing = self.card_of(user_id)
         if existing:
             return existing
@@ -223,6 +240,8 @@ class Bingo(commands.Cog):
 
     @bingo.command(name="card", description="See your Wizard Bingo card for the open round.")
     async def bingo_card(self, interaction: discord.Interaction):
+        if not await self._require_bingo_channel(interaction):
+            return
         if self.active() is None:
             await interaction.response.send_message(
                 "No Wizard Bingo round is open right now.", ephemeral=True
@@ -250,6 +269,8 @@ class Bingo(commands.Cog):
 
     @bingo.command(name="mark", description="Mark called squares on your bingo card.")
     async def bingo_mark(self, interaction: discord.Interaction):
+        if not await self._require_bingo_channel(interaction):
+            return
         round_ = self.active()
         if round_ is None:
             await interaction.response.send_message(
@@ -295,6 +316,8 @@ class Bingo(commands.Cog):
 
     @bingo.command(name="called", description="List squares called this Wizard Bingo round.")
     async def bingo_called(self, interaction: discord.Interaction):
+        if not await self._require_bingo_channel(interaction):
+            return
         round_ = self.active()
         if round_ is None:
             await interaction.response.send_message(
@@ -321,6 +344,8 @@ class Bingo(commands.Cog):
 
     @bingo.command(name="status", description="Is a Wizard Bingo round open? How are you doing?")
     async def bingo_status(self, interaction: discord.Interaction):
+        if not await self._require_bingo_channel(interaction):
+            return
         round_ = self.active()
         if round_ is None:
             await interaction.response.send_message(
@@ -360,6 +385,14 @@ class Bingo(commands.Cog):
         if not (store and store.is_staff(interaction.user)):
             await interaction.response.send_message("That's for staff.", ephemeral=True)
             return
+        if not await self._require_bingo_channel(interaction):
+            return
+        if channel is not None and channel.id != BINGO_CHANNEL_ID:
+            await interaction.response.send_message(
+                f"Wizard Bingo stays in <#{BINGO_CHANNEL_ID}> — don't pick another channel.",
+                ephemeral=True,
+            )
+            return
         if len(self.pool) < 24:
             await interaction.response.send_message(
                 "Bingo square pool is too small — check `data/bingo_squares.json`.",
@@ -375,11 +408,11 @@ class Bingo(commands.Cog):
 
         round_id = uuid.uuid4().hex[:10]
         label = (name or "").strip() or "Wizard Bingo"
-        target = channel or interaction.channel
+        target = self.bot.get_channel(BINGO_CHANNEL_ID) or interaction.channel
         self.state["active"] = {
             "round_id": round_id,
             "name": label,
-            "channel_id": getattr(target, "id", None),
+            "channel_id": BINGO_CHANNEL_ID,
             "started_at": time.time(),
             "started_by": interaction.user.id,
             "called": [],
@@ -396,12 +429,13 @@ class Bingo(commands.Cog):
                 "• `/bingo card` — get your unique 5×5 card\n"
                 "• Staff calls squares aloud\n"
                 "• `/bingo mark` when one of yours is called\n"
-                f"• First **{MAX_WINNERS}** BINGOs earn **{BINGO_POINTS}** house points each"
+                f"• First **{MAX_WINNERS}** BINGOs earn **{BINGO_POINTS}** house points each\n"
+                f"• Everything Bingo stays in <#{BINGO_CHANNEL_ID}>"
             ),
             color=GOLD,
         )
         await interaction.response.send_message(
-            f"Round started in {getattr(target, 'mention', 'this channel')}.",
+            f"Round started in <#{BINGO_CHANNEL_ID}>.",
             ephemeral=True,
         )
         try:
@@ -414,6 +448,8 @@ class Bingo(commands.Cog):
         store = self.bot.get_cog("Store")
         if not (store and store.is_staff(interaction.user)):
             await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        if not await self._require_bingo_channel(interaction):
             return
         round_ = self.active()
         if not round_:
@@ -456,20 +492,13 @@ class Bingo(commands.Cog):
         )
         embed.set_footer(text=f"{len(called)} called · {round_.get('name', 'Wizard Bingo')}")
         await interaction.response.send_message(embed=embed)
-        # Also post in the round channel if different
-        ch_id = round_.get("channel_id")
-        if ch_id and interaction.channel_id != ch_id:
-            ch = self.bot.get_channel(ch_id)
-            if ch is not None:
-                try:
-                    await ch.send(embed=embed)
-                except discord.DiscordException:
-                    log.exception("Could not post bingo call to round channel")
 
     async def staff_end(self, interaction: discord.Interaction):
         store = self.bot.get_cog("Store")
         if not (store and store.is_staff(interaction.user)):
             await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        if not await self._require_bingo_channel(interaction):
             return
         round_ = self.active()
         if not round_:
@@ -508,6 +537,8 @@ class Bingo(commands.Cog):
         store = self.bot.get_cog("Store")
         if not (store and store.is_staff(interaction.user)):
             await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        if not await self._require_bingo_channel(interaction):
             return
         round_ = self.active()
         if not round_:
@@ -570,6 +601,9 @@ class MarkSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        if not self.cog._in_bingo_channel(interaction):
+            await interaction.response.send_message(_channel_hint(), ephemeral=True)
+            return
         round_ = self.cog.active()
         if not round_:
             await interaction.response.send_message(
