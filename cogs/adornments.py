@@ -1243,13 +1243,9 @@ class Adornments(commands.Cog):
 
 # ==================================================================== /wizard menus
 
-PAGES = [
-    ("Body", ["gender", "skin", "clothes", "clothes_color"]),
-    ("Hair", ["hair_back", "hair_bangs", "hair_color"]),
-    ("Eyes", ["eyes", "iris_type", "iris_color"]),
-    ("Expression", ["brows", "mouth", "glasses"]),
-]
 FIELD_LABEL = art.DEFAULT_FIELD_LABEL
+# Back-compat alias — prefer art.wizard_pages(look) so male1 pages differ.
+PAGES = art.DEFAULT_WIZARD_PAGES
 
 
 class LookSelect(discord.ui.Select):
@@ -1277,6 +1273,9 @@ class LookSelect(discord.ui.Select):
         self.wv.look[self.field] = self.values[0]
         if self.field == "gender":
             art.clamp_hair_to_gender(self.wv.look)
+            # Presentation swap can change page field sets (male1 Eyes≠Nose).
+            pages = art.wizard_pages(self.wv.look)
+            self.wv.page = min(self.wv.page, len(pages) - 1)
         await self.wv.refresh(interaction)
 
 
@@ -1290,19 +1289,25 @@ class WizardView(discord.ui.View):
         self.nonce = f"{user.id}-{int(time.time() * 1000) % 10**9}"
         self.build()
 
+    def pages(self) -> list[tuple[str, list[str]]]:
+        return art.wizard_pages(self.look)
+
     def header(self) -> str:
-        name, _ = PAGES[self.page]
-        return (f"🪞 **Design your wizard** — page {self.page + 1} of {len(PAGES)}: *{name}*\n"
+        pages = self.pages()
+        name, _ = pages[self.page]
+        return (f"🪞 **Design your wizard** — page {self.page + 1} of {len(pages)}: *{name}*\n"
                 "Pick from the menus and the Mirror updates. Changes save as you go.")
 
     def build(self):
         self.clear_items()
-        for field in PAGES[self.page][1]:
+        pages = self.pages()
+        self.page = max(0, min(self.page, len(pages) - 1))
+        for field in pages[self.page][1]:
             self.add_item(LookSelect(self, field))
         prev_b = discord.ui.Button(label="◂ Back", style=discord.ButtonStyle.secondary, row=4,
                                    disabled=self.page == 0, custom_id=f"wiz:{self.nonce}:back")
         next_b = discord.ui.Button(label="Next ▸", style=discord.ButtonStyle.secondary, row=4,
-                                   disabled=self.page == len(PAGES) - 1, custom_id=f"wiz:{self.nonce}:next")
+                                   disabled=self.page == len(pages) - 1, custom_id=f"wiz:{self.nonce}:next")
         rand_b = discord.ui.Button(label="🎲 Surprise me", style=discord.ButtonStyle.primary, row=4,
                                    custom_id=f"wiz:{self.nonce}:random")
         prev_b.callback = self._prev
@@ -1320,7 +1325,8 @@ class WizardView(discord.ui.View):
         await interaction.response.edit_message(content=self.header(), view=self)
 
     async def _next(self, interaction):
-        self.page = min(len(PAGES) - 1, self.page + 1)
+        pages = self.pages()
+        self.page = min(len(pages) - 1, self.page + 1)
         self.build()
         await interaction.response.edit_message(content=self.header(), view=self)
 
