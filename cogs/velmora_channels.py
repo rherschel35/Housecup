@@ -17,6 +17,7 @@ DUELS_POTIONS_CHANNEL_ID = 1555554825616236726
 OPEN_LOUNGE_CHANNEL_IDS = frozenset({
     1557137090058395768,
     DUELS_POTIONS_CHANNEL_ID,
+    1558611215054282822,
 })
 
 # Lounge where duels, potions, Quidditch, broom races, and practice
