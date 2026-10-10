@@ -309,7 +309,7 @@ HELP = {
             ("staffops adornadmin status", "How gear is spread around the server."),
             ("staffworld dementor status", "What's configured and what's active."),
             ("staffworld dementor eventstart", "Start Attack on Velmora — 5-min (top 7 share 100) or 10-min (top 10 share 300)."),
-            ("staffworld dementor practice", "House practice swarm in one channel (incl. swarm practice room) — pick any length up to 240 min; no points or rewards (staff or Presidents)."),
+            ("staffworld dementor practice", "House practice swarm in one channel (incl. swarm practice rooms) — pick any length up to 240 min; no points or rewards (staff or Presidents)."),
             ("staffworld dementor eventend", "End the running event early and tally it up."),
             ("staffworld dementor eventstatus", "How the current event is going."),
             ("staffworld dementor eventschedule", "Schedule 1–3 weekly Attacks — each with its own Chicago day, time, and 5/10 min length."),

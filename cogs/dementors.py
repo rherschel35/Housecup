@@ -90,7 +90,7 @@ from cogs.velmora_channels import (
     OPEN_LOUNGE_CHANNEL_IDS,
     SHARED_GAMES_CHANNEL_ID,
     STUDY_HALL_CHANNEL_ID,
-    SWARM_PRACTICE_CHANNEL_ID,
+    SWARM_PRACTICE_CHANNEL_IDS,
 )
 from cogs.world_engine import today
 
@@ -98,7 +98,7 @@ from cogs.world_engine import today
 PRACTICE_SUMMON_CHANNEL_IDS = frozenset({
     STUDY_HALL_CHANNEL_ID,
     SHARED_GAMES_CHANNEL_ID,
-    SWARM_PRACTICE_CHANNEL_ID,
+    *SWARM_PRACTICE_CHANNEL_IDS,
 })
 
 # Multi-game lounges: no ambient / Attack / practice-summon threats.
