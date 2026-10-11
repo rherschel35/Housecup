@@ -7,8 +7,9 @@ Your Own Room — personal dorm you decorate.
     /room clear        - clear a slot
     /room stash        - list decor you own
 
-Daily finds fill your stash (~25 options per slot — hard to match).
-Frog cards can sit on the shelf (ids from /frog album). Purely cosmetic.
+Five starter decor pieces; the rest unlock when you pull the matching
+Chocolate Frog card (added to your stash). Staff can prize decor.
+Frog cards can also sit on the shelf. Purely cosmetic.
 """
 
 from __future__ import annotations
@@ -44,765 +45,454 @@ SLOT_LABEL = {
     "window": "Window",
 }
 
-# Decor catalog — ~25 options per slot (found via /room find)
+# Decor catalog: 5 starters + 50 unlocked by Chocolate Frog cards.
+# unlock_card=None → available at the start; else must own that frog card once.
 DECOR = {
-    # --- bed (25) ---
     "patchwork_quilt": {
         "name": "Patchwork Quilt",
         "slot": "bed",
         "blurb": "Every square is a different excuse for staying up late.",
         "emoji": "🛏️",
+        "unlock_card": None,
     },
-    "star_mobile": {
-        "name": "Star Mobile",
-        "slot": "bed",
-        "blurb": "Turns slowly. Judges your sleep schedule.",
-        "emoji": "✨",
-    },
-    "cozy_rug": {
-        "name": "Cozy Rug",
-        "slot": "bed",
-        "blurb": "Technically for the floor. Spiritually for the bed.",
-        "emoji": "🧶",
-    },
-    "cloud_duvet": {
-        "name": "Cloud Duvet",
-        "slot": "bed",
-        "blurb": "Sleeps like fog. Weighs like a rumor.",
-        "emoji": "☁️",
-    },
-    "oakmont_coverlet": {
-        "name": "Oakmont Coverlet",
-        "slot": "bed",
-        "blurb": "Purple stitching. Patient warmth.",
-        "emoji": "🐻",
-    },
-    "aster_chaos_blanket": {
-        "name": "AsterWilde Chaos Blanket",
-        "slot": "bed",
-        "blurb": "No two folds agree. Neither do you.",
-        "emoji": "🐿️",
-    },
-    "veyren_wool_throw": {
-        "name": "Veyren Wool Throw",
-        "slot": "bed",
-        "blurb": "Quiet as a deer. Soft as a promise.",
-        "emoji": "🦌",
-    },
-    "caldrin_measured_sheets": {
-        "name": "Caldrin Measured Sheets",
-        "slot": "bed",
-        "blurb": "Hospital corners. Emotional support optional.",
-        "emoji": "📐",
-    },
-    "thornmere_wolf_pelt": {
-        "name": "Thornmere Wolf Pelt",
-        "slot": "bed",
-        "blurb": "Loyalty earned. Naps taken.",
-        "emoji": "🐺",
-    },
-    "hammock_charm": {
-        "name": "Indoor Hammock Charm",
-        "slot": "bed",
-        "blurb": "Bed, but socially ambitious.",
-        "emoji": "🪢",
-    },
-    "midnight_canopy": {
-        "name": "Midnight Canopy",
-        "slot": "bed",
-        "blurb": "Stars painted underneath. Some move.",
-        "emoji": "🌌",
-    },
-    "featherlight_pillows": {
-        "name": "Featherlight Pillows",
-        "slot": "bed",
-        "blurb": "Too many. Still not enough.",
-        "emoji": "🪶",
-    },
-    "hot_water_bottle": {
-        "name": "Enchanted Hot Bottle",
-        "slot": "bed",
-        "blurb": "Stays warm. Holds grudges about cold feet.",
-        "emoji": "🧴",
-    },
-    "snore_muffler": {
-        "name": "Snore Muffler Curtain",
-        "slot": "bed",
-        "blurb": "Your roommate paid for this. Quietly.",
-        "emoji": "🔇",
-    },
-    "dreamcatcher_net": {
-        "name": "Dreamcatcher Net",
-        "slot": "bed",
-        "blurb": "Keeps nightmares. Releases midterms.",
-        "emoji": "🕸️",
-    },
-    "quilt_of_detention": {
-        "name": "Detention Quilt",
-        "slot": "bed",
-        "blurb": "Stitched during hours you will not discuss.",
-        "emoji": "🧵",
-    },
-    "broom_bunk_rail": {
-        "name": "Broom Bunk Rail",
-        "slot": "bed",
-        "blurb": "For when the bed is too ordinary.",
-        "emoji": "🧹",
-    },
-    "nest_bedding": {
-        "name": "Animagus Nest Bedding",
-        "slot": "bed",
-        "blurb": "Smells faintly of your other form.",
-        "emoji": "🪺",
-    },
-    "silk_sleep_mask": {
-        "name": "Silk Sleep Mask",
-        "slot": "bed",
-        "blurb": "Blocks light. Not gossip.",
-        "emoji": "😷",
-    },
-    "weighted_calm_blanket": {
-        "name": "Weighted Calm Blanket",
-        "slot": "bed",
-        "blurb": "Presses anxiety into a manageable square.",
-        "emoji": "🪨",
-    },
-    "ember_bed_warmer": {
-        "name": "Ember Bed Warmer",
-        "slot": "bed",
-        "blurb": "Safe heat. Unsafe temptation to never rise.",
-        "emoji": "🔥",
-    },
-    "frost_sheet_set": {
-        "name": "Frost Sheet Set",
-        "slot": "bed",
-        "blurb": "Cool side of the pillow, forever.",
-        "emoji": "❄️",
-    },
-    "storybook_headboard": {
-        "name": "Storybook Headboard",
-        "slot": "bed",
-        "blurb": "Carved scenes change when you finish a chapter.",
-        "emoji": "📖",
-    },
-    "travel_trunk_bed": {
-        "name": "Travel-Trunk Bed",
-        "slot": "bed",
-        "blurb": "Folds up. Refuses to pack itself.",
-        "emoji": "🧳",
-    },
-    "moonphase_comforter": {
-        "name": "Moonphase Comforter",
-        "slot": "bed",
-        "blurb": "Pattern shifts with the Chicago night sky.",
-        "emoji": "🌙",
-    },
-    # --- wall (25) ---
     "house_banner": {
         "name": "House Banner",
         "slot": "wall",
         "blurb": "Crooked on purpose. Or by talent.",
         "emoji": "🏳️",
-    },
-    "moving_sketch": {
-        "name": "Moving Sketch",
-        "slot": "wall",
-        "blurb": "The subject keeps changing hats.",
-        "emoji": "🖼️",
-    },
-    "wanted_poster_joke": {
-        "name": "Joke Wanted Poster",
-        "slot": "wall",
-        "blurb": "Reward: one biscuit. Last seen: everywhere.",
-        "emoji": "📜",
-    },
-    "velmora_map": {
-        "name": "Annotated Velmora Map",
-        "slot": "wall",
-        "blurb": "Shortcuts in red. Detours in denial.",
-        "emoji": "🗺️",
-    },
-    "family_portrait_blank": {
-        "name": "Blank Family Portrait",
-        "slot": "wall",
-        "blurb": "Faces appear when you miss someone.",
-        "emoji": "🖼️",
-    },
-    "clock_that_lies": {
-        "name": "Clock That Lies",
-        "slot": "wall",
-        "blurb": "Always five minutes more. Always.",
-        "emoji": "🕰️",
-    },
-    "mirror_shard_frame": {
-        "name": "Mirror-Shard Frame",
-        "slot": "wall",
-        "blurb": "Reflects only your best angle. Suspicious.",
-        "emoji": "🪞",
-    },
-    "quidditch_poster": {
-        "name": "Quidditch Finals Poster",
-        "slot": "wall",
-        "blurb": "Creased. Loved. Historically inaccurate.",
-        "emoji": "🏆",
-    },
-    "spell_diagram": {
-        "name": "Framed Spell Diagram",
-        "slot": "wall",
-        "blurb": "Wrong on purpose to catch cheaters.",
-        "emoji": "📐",
-    },
-    "pressed_flower_panel": {
-        "name": "Pressed Flower Panel",
-        "slot": "wall",
-        "blurb": "Blooms again on birthdays.",
-        "emoji": "🌸",
-    },
-    "shadow_box_keys": {
-        "name": "Shadow Box of Keys",
-        "slot": "wall",
-        "blurb": "None open anything you own.",
-        "emoji": "🗝️",
-    },
-    "tapestry_forest": {
-        "name": "Forest Tapestry",
-        "slot": "wall",
-        "blurb": "Wind moves the threads. Leaves fall out.",
-        "emoji": "🌲",
-    },
-    "wall_astrolabe": {
-        "name": "Wall Astrolabe",
-        "slot": "wall",
-        "blurb": "Tracks stars. Judges ambition.",
-        "emoji": "⭐",
-    },
-    "chalkboard_doodle": {
-        "name": "Everlasting Chalkboard",
-        "slot": "wall",
-        "blurb": "Doodles erase themselves at dawn.",
-        "emoji": "✏️",
-    },
-    "house_cup_ribbon": {
-        "name": "Faded Cup Ribbon",
-        "slot": "wall",
-        "blurb": "From a season nobody will shut up about.",
-        "emoji": "🎖️",
-    },
-    "windowless_window": {
-        "name": "Painted False Window",
-        "slot": "wall",
-        "blurb": "Shows wherever you wish you were.",
-        "emoji": "🪟",
-    },
-    "broom_mount": {
-        "name": "Wall-Mounted Broom",
-        "slot": "wall",
-        "blurb": "Decorative. Mostly. Don't sit on it.",
-        "emoji": "🧹",
-    },
-    "patronus_silhouette": {
-        "name": "Patronus Silhouette",
-        "slot": "wall",
-        "blurb": "Silver outline of courage on quiet nights.",
-        "emoji": "🦌",
-    },
-    "duel_score_slate": {
-        "name": "Duel Score Slate",
-        "slot": "wall",
-        "blurb": "Keeps your wins. Forgets your losses. Kind.",
-        "emoji": "⚔️",
-    },
-    "riddle_plaque": {
-        "name": "Riddle Plaque",
-        "slot": "wall",
-        "blurb": "Answer changes weekly. Pride does not.",
-        "emoji": "❓",
-    },
-    "moon_chart": {
-        "name": "Hand-Drawn Moon Chart",
-        "slot": "wall",
-        "blurb": "Smudged where you fell asleep studying.",
-        "emoji": "🌕",
-    },
-    "oak_shelf_rail": {
-        "name": "Floating Shelf Rail",
-        "slot": "wall",
-        "blurb": "Holds three things. Demands five.",
-        "emoji": "📚",
-    },
-    "curtain_of_silence": {
-        "name": "Curtain of Silence",
-        "slot": "wall",
-        "blurb": "Muffles hallway drama by 40%.",
-        "emoji": "🎭",
-    },
-    "crest_embroidery": {
-        "name": "Crest Embroidery Hoop",
-        "slot": "wall",
-        "blurb": "Your house animal, slightly judgmental.",
-        "emoji": "🪡",
-    },
-    "night_sky_mural": {
-        "name": "Night-Sky Mural Charm",
-        "slot": "wall",
-        "blurb": "Constellations rearrange into gossip.",
-        "emoji": "🌠",
-    },
-    # --- desk (25) ---
-    "ink_stained_desk": {
-        "name": "Ink-Stained Desk Set",
-        "slot": "desk",
-        "blurb": "The quill has opinions about your essays.",
-        "emoji": "🖋️",
+        "unlock_card": None,
     },
     "tea_tray": {
         "name": "Perpetual Tea Tray",
         "slot": "desk",
         "blurb": "Still warm. Always. Suspicious.",
         "emoji": "🍵",
-    },
-    "crystal_paperweight": {
-        "name": "Crystal Paperweight",
-        "slot": "desk",
-        "blurb": "Contains a tiny storm. Office-safe.",
-        "emoji": "💎",
-    },
-    "candle_cluster": {
-        "name": "Candle Cluster",
-        "slot": "desk",
-        "blurb": "Never drip on homework. Will drip on pride.",
-        "emoji": "🕯️",
-    },
-    "hourglass_essay": {
-        "name": "Essay Hourglass",
-        "slot": "desk",
-        "blurb": "Runs faster near deadlines.",
-        "emoji": "⌛",
-    },
-    "ink_pot_rainbow": {
-        "name": "Rainbow Ink Pot",
-        "slot": "desk",
-        "blurb": "Color changes with your mood. Rude.",
-        "emoji": "🖋️",
-    },
-    "stack_of_tomes": {
-        "name": "Precarious Tome Stack",
-        "slot": "desk",
-        "blurb": "One sneeze from disaster.",
-        "emoji": "📚",
-    },
-    "owl_perch_mini": {
-        "name": "Desk Owl Perch",
-        "slot": "desk",
-        "blurb": "For correspondence. And judgment.",
-        "emoji": "🦉",
-    },
-    "abacus_of_excuses": {
-        "name": "Abacus of Excuses",
-        "slot": "desk",
-        "blurb": "Calculates how late you actually are.",
-        "emoji": "🧮",
-    },
-    "music_box_study": {
-        "name": "Study Music Box",
-        "slot": "desk",
-        "blurb": "Plays one song. Somehow always right.",
-        "emoji": "🎼",
-    },
-    "potion_sample_rack": {
-        "name": "Sample Vial Rack",
-        "slot": "desk",
-        "blurb": "Labeled. Mislabelled. Both true.",
-        "emoji": "⚗️",
-    },
-    "letter_opener_wand": {
-        "name": "Letter-Opener Wand",
-        "slot": "desk",
-        "blurb": "Not for dueling. You will try anyway.",
-        "emoji": "✉️",
-    },
-    "desk_globe_velmora": {
-        "name": "Velmora Desk Globe",
-        "slot": "desk",
-        "blurb": "Spins to the lake when you're homesick.",
-        "emoji": "🌍",
-    },
-    "blotting_dragon": {
-        "name": "Blotting Dragon",
-        "slot": "desk",
-        "blurb": "Eats spills. Burps glitter.",
-        "emoji": "🐉",
-    },
-    "focus_charm_lamp": {
-        "name": "Focus Charm Lamp",
-        "slot": "desk",
-        "blurb": "Brightens only what you're avoiding.",
-        "emoji": "💡",
-    },
-    "sealed_diary": {
-        "name": "Sealed Desk Diary",
-        "slot": "desk",
-        "blurb": "Opens for honesty. Closes for drama.",
-        "emoji": "📓",
-    },
-    "wax_seal_kit": {
-        "name": "Wax Seal Kit",
-        "slot": "desk",
-        "blurb": "Crest stamps included. Taste debated.",
-        "emoji": "🔏",
-    },
-    "biscuit_tin": {
-        "name": "Endless Biscuit Tin",
-        "slot": "desk",
-        "blurb": "One left. Always one left.",
-        "emoji": "🍪",
-    },
-    "quill_sharpener": {
-        "name": "Auto Quill Sharpener",
-        "slot": "desk",
-        "blurb": "Hums. Occasionally screams.",
-        "emoji": "✏️",
-    },
-    "mini_cauldron": {
-        "name": "Desk Mini-Cauldron",
-        "slot": "desk",
-        "blurb": "For tea. Officially.",
-        "emoji": "🫖",
-    },
-    "scratch_slate": {
-        "name": "Scratch Arithmetic Slate",
-        "slot": "desk",
-        "blurb": "Sums your house points for fun. Painful fun.",
-        "emoji": "🔢",
-    },
-    "ink_phoenix_feather": {
-        "name": "Ink Phoenix Feather",
-        "slot": "desk",
-        "blurb": "Writes apologies first. Then the essay.",
-        "emoji": "🪶",
-    },
-    "paperweight_frog": {
-        "name": "Chocolate Frog Paperweight",
-        "slot": "desk",
-        "blurb": "Does not hop. Mentally hops.",
-        "emoji": "🐸",
-    },
-    "timetable_crystal": {
-        "name": "Timetable Crystal",
-        "slot": "desk",
-        "blurb": "Glows when you're in the wrong class.",
-        "emoji": "🔮",
-    },
-    "drawer_of_confiscation": {
-        "name": "Confiscation Drawer",
-        "slot": "desk",
-        "blurb": "Holds three secrets and a whistle.",
-        "emoji": "🗄️",
-    },
-    # --- shelf (25) ---
-    "shelf_of_oddities": {
-        "name": "Shelf of Oddities",
-        "slot": "shelf",
-        "blurb": "None of these objects agree on a theme.",
-        "emoji": "📦",
+        "unlock_card": None,
     },
     "plant_that_bites": {
         "name": "Plant That Bites",
         "slot": "shelf",
         "blurb": "Friendly. Mostly. Water from a distance.",
         "emoji": "🪴",
+        "unlock_card": None,
+    },
+    "window_charm_rain": {
+        "name": "Rain Charm Pane",
+        "slot": "window",
+        "blurb": "Soft rain against the glass even in drought.",
+        "emoji": "🌧️",
+        "unlock_card": None,
+    },
+    "star_mobile": {
+        "name": "Star Mobile",
+        "slot": "bed",
+        "blurb": "Turns slowly. Judges your sleep schedule.",
+        "emoji": "✨",
+        "unlock_card": "accio",
+    },
+    "cloud_duvet": {
+        "name": "Cloud Duvet",
+        "slot": "bed",
+        "blurb": "Sleeps like fog. Weighs like a rumor.",
+        "emoji": "☁️",
+        "unlock_card": "alohomora",
+    },
+    "moving_sketch": {
+        "name": "Moving Sketch",
+        "slot": "wall",
+        "blurb": "The subject keeps changing hats.",
+        "emoji": "🖼️",
+        "unlock_card": "blackcap_squirrel",
+    },
+    "quidditch_poster": {
+        "name": "Quidditch Finals Poster",
+        "slot": "wall",
+        "blurb": "Creased. Loved. Historically inaccurate.",
+        "emoji": "🏆",
+        "unlock_card": "button_magpie",
+    },
+    "night_sky_mural": {
+        "name": "Night-Sky Mural Charm",
+        "slot": "wall",
+        "blurb": "Constellations rearrange into gossip.",
+        "emoji": "🌠",
+        "unlock_card": "cistern_toad",
+    },
+    "crest_embroidery": {
+        "name": "Crest Embroidery Hoop",
+        "slot": "wall",
+        "blurb": "Your house animal, slightly judgmental.",
+        "emoji": "🪡",
+        "unlock_card": "colloportus",
+    },
+    "duel_score_slate": {
+        "name": "Duel Score Slate",
+        "slot": "wall",
+        "blurb": "Keeps your wins. Forgets your losses. Kind.",
+        "emoji": "⚔️",
+        "unlock_card": "descendo",
+    },
+    "tapestry_forest": {
+        "name": "Forest Tapestry",
+        "slot": "wall",
+        "blurb": "Wind moves the threads. Leaves fall out.",
+        "emoji": "🌲",
+        "unlock_card": "duskpup",
+    },
+    "spell_diagram": {
+        "name": "Framed Spell Diagram",
+        "slot": "wall",
+        "blurb": "Wrong on purpose to catch cheaters.",
+        "emoji": "📐",
+        "unlock_card": "episkey",
+    },
+    "broom_mount": {
+        "name": "Wall-Mounted Broom",
+        "slot": "wall",
+        "blurb": "Decorative. Mostly. Don't sit on it.",
+        "emoji": "🧹",
+        "unlock_card": "field_cow",
+    },
+    "ink_stained_desk": {
+        "name": "Ink-Stained Desk Set",
+        "slot": "desk",
+        "blurb": "The quill has opinions about your essays.",
+        "emoji": "🖋️",
+        "unlock_card": "finite",
+    },
+    "mini_cauldron": {
+        "name": "Desk Mini-Cauldron",
+        "slot": "desk",
+        "blurb": "For tea. Officially.",
+        "emoji": "🫖",
+        "unlock_card": "impedimenta",
+    },
+    "candle_cluster": {
+        "name": "Candle Cluster",
+        "slot": "desk",
+        "blurb": "Never drip on homework. Will drip on pride.",
+        "emoji": "🕯️",
+        "unlock_card": "lumos",
+    },
+    "potion_sample_rack": {
+        "name": "Sample Vial Rack",
+        "slot": "desk",
+        "blurb": "Labeled. Mislabelled. Both true.",
+        "emoji": "⚗️",
+        "unlock_card": "orbitcat",
+    },
+    "desk_globe_velmora": {
+        "name": "Velmora Desk Globe",
+        "slot": "desk",
+        "blurb": "Spins to the lake when you're homesick.",
+        "emoji": "🌍",
+        "unlock_card": "reparo",
+    },
+    "paperweight_frog": {
+        "name": "Chocolate Frog Paperweight",
+        "slot": "desk",
+        "blurb": "Does not hop. Mentally hops.",
+        "emoji": "🐸",
+        "unlock_card": "riddikulus",
+    },
+    "timetable_crystal": {
+        "name": "Timetable Crystal",
+        "slot": "desk",
+        "blurb": "Glows when you're in the wrong class.",
+        "emoji": "🔮",
+        "unlock_card": "silencio",
+    },
+    "shelf_of_oddities": {
+        "name": "Shelf of Oddities",
+        "slot": "shelf",
+        "blurb": "None of these objects agree on a theme.",
+        "emoji": "📦",
+        "unlock_card": "hopsalot",
     },
     "jar_of_fireflies": {
         "name": "Jar of Fireflies",
         "slot": "shelf",
         "blurb": "They blink in Morse. Mostly insults.",
         "emoji": "🫙",
+        "unlock_card": "ventus",
     },
     "snow_globe_castle": {
         "name": "Castle Snow Globe",
         "slot": "shelf",
         "blurb": "Shake for weather. Overuse for detention.",
         "emoji": "❄️",
+        "unlock_card": "wild_threat",
     },
     "tiny_broom_display": {
         "name": "Tiny Broom Display",
         "slot": "shelf",
         "blurb": "1:12 scale. Full attitude.",
         "emoji": "🧹",
-    },
-    "shell_from_lake": {
-        "name": "Lake Shell Collection",
-        "slot": "shelf",
-        "blurb": "Each hums a different rumor.",
-        "emoji": "🐚",
+        "unlock_card": "wingardium",
     },
     "crystal_geode": {
         "name": "Split Crystal Geode",
         "slot": "shelf",
         "blurb": "Purple inside. Ambition outside.",
         "emoji": "💎",
-    },
-    "stack_of_letters": {
-        "name": "Tied Letter Stack",
-        "slot": "shelf",
-        "blurb": "Addresses smudged. Feelings intact.",
-        "emoji": "💌",
-    },
-    "pocket_watch_stopped": {
-        "name": "Stopped Pocket Watch",
-        "slot": "shelf",
-        "blurb": "Frozen at the best minute of last term.",
-        "emoji": "⌚",
-    },
-    "miniature_snitch": {
-        "name": "Miniature Snitch",
-        "slot": "shelf",
-        "blurb": "Wings twitch when you procrastinate.",
-        "emoji": "🏆",
-    },
-    "bottle_ship_spell": {
-        "name": "Ship-in-a-Bottle Spell",
-        "slot": "shelf",
-        "blurb": "Sails when you study. Sinks when you don't.",
-        "emoji": "🚢",
-    },
-    "herbology_clippings": {
-        "name": "Herbology Clippings",
-        "slot": "shelf",
-        "blurb": "Growing. Plotting. Photosynthesizing spite.",
-        "emoji": "🌿",
-    },
-    "marble_bust_frog": {
-        "name": "Marble Frog Bust",
-        "slot": "shelf",
-        "blurb": "Classical. Amphibious. Unimpressed.",
-        "emoji": "🗿",
-    },
-    "candle_that_listens": {
-        "name": "Candle That Listens",
-        "slot": "shelf",
-        "blurb": "Flame leans toward secrets.",
-        "emoji": "🕯️",
-    },
-    "dice_of_destiny": {
-        "name": "Dice of Destiny",
-        "slot": "shelf",
-        "blurb": "Always land on 'group project'.",
-        "emoji": "🎲",
-    },
-    "tea_tin_tower": {
-        "name": "Tea Tin Tower",
-        "slot": "shelf",
-        "blurb": "Seven flavors. One is revenge.",
-        "emoji": "🍵",
-    },
-    "hourglass_sand_pink": {
-        "name": "Rose Sand Hourglass",
-        "slot": "shelf",
-        "blurb": "Pretty. Useless. Essential.",
-        "emoji": "⏳",
-    },
-    "beast_figurine": {
-        "name": "Beast Figurine Set",
-        "slot": "shelf",
-        "blurb": "Rearranges overnight into a tableau.",
-        "emoji": "🦁",
-    },
-    "compass_that_points_home": {
-        "name": "Homeward Compass",
-        "slot": "shelf",
-        "blurb": "Points to common room. Or biscuits.",
-        "emoji": "🧭",
+        "unlock_card": "arresto",
     },
     "orb_of_static": {
         "name": "Orb of Pleasant Static",
         "slot": "shelf",
         "blurb": "White noise for anxious brains.",
         "emoji": "🔮",
-    },
-    "folded_paper_crane": {
-        "name": "Enchanted Paper Crane",
-        "slot": "shelf",
-        "blurb": "Delivers notes across the room only.",
-        "emoji": "🕊️",
-    },
-    "trophy_participation": {
-        "name": "Participation Trophy",
-        "slot": "shelf",
-        "blurb": "Won for showing up. Displayed with irony.",
-        "emoji": "🏅",
-    },
-    "bookend_wolves": {
-        "name": "Wolf Bookends",
-        "slot": "shelf",
-        "blurb": "Growl if you shelve out of order.",
-        "emoji": "🐺",
+        "unlock_card": "bombarda",
     },
     "mushroom_lamp": {
         "name": "Mushroom Shelf Lamp",
         "slot": "shelf",
         "blurb": "Soft glow. Soft spores. Soft threats.",
         "emoji": "🍄",
+        "unlock_card": "ember_hound",
     },
-    "empty_frame_waiting": {
-        "name": "Empty Frame (Waiting)",
+    "frost_sheet_set": {
+        "name": "Frost Sheet Set",
+        "slot": "bed",
+        "blurb": "Cool side of the pillow, forever.",
+        "emoji": "❄️",
+        "unlock_card": "glacius",
+    },
+    "compass_that_points_home": {
+        "name": "Homeward Compass",
         "slot": "shelf",
-        "blurb": "For the frog card you haven't pulled yet.",
-        "emoji": "🖼️",
-    },
-    # --- window (25) ---
-    "window_charm_rain": {
-        "name": "Rain Charm Pane",
-        "slot": "window",
-        "blurb": "Soft rain against the glass even in drought.",
-        "emoji": "🌧️",
+        "blurb": "Points to common room. Or biscuits.",
+        "emoji": "🧭",
+        "unlock_card": "lanternback_stag",
     },
     "window_charm_aurora": {
         "name": "Aurora Pane",
         "slot": "window",
         "blurb": "Northern lights on demand. Show-off setting included.",
         "emoji": "🌌",
+        "unlock_card": "moonglass_owl",
+    },
+    "crystal_paperweight": {
+        "name": "Crystal Paperweight",
+        "slot": "desk",
+        "blurb": "Contains a tiny storm. Office-safe.",
+        "emoji": "💎",
+        "unlock_card": "niffler",
     },
     "moon_catcher": {
         "name": "Moon Catcher",
         "slot": "window",
         "blurb": "Catches moonlight. Releases gossip.",
         "emoji": "🌙",
-    },
-    "sunbeam_filter": {
-        "name": "Sunbeam Filter",
-        "slot": "window",
-        "blurb": "Golden hour, all day. Skin optional.",
-        "emoji": "☀️",
-    },
-    "fog_on_purpose": {
-        "name": "Purposeful Fog",
-        "slot": "window",
-        "blurb": "Mystery mode for dramatic exits.",
-        "emoji": "🌫️",
-    },
-    "starfield_glass": {
-        "name": "Starfield Glass",
-        "slot": "window",
-        "blurb": "Constellations of your choosing.",
-        "emoji": "✨",
-    },
-    "lake_view_charm": {
-        "name": "Lake View Charm",
-        "slot": "window",
-        "blurb": "Shows the shore. Hides the homework.",
-        "emoji": "🌊",
-    },
-    "forest_edge_pane": {
-        "name": "Forest Edge Pane",
-        "slot": "window",
-        "blurb": "Trees lean in when you're lonely.",
-        "emoji": "🌲",
-    },
-    "quidditch_pitch_view": {
-        "name": "Pitch View Charm",
-        "slot": "window",
-        "blurb": "Live score smudges on the glass.",
-        "emoji": "🏟️",
+        "unlock_card": "obliviate",
     },
     "snowfall_loop": {
         "name": "Looping Snowfall",
         "slot": "window",
         "blurb": "Never drifts inside. Almost.",
         "emoji": "❄️",
-    },
-    "stained_house_glass": {
-        "name": "House Stained Glass",
-        "slot": "window",
-        "blurb": "Your crest in light. Slightly biased.",
-        "emoji": "🪟",
-    },
-    "curtain_beads": {
-        "name": "Beaded Curtain",
-        "slot": "window",
-        "blurb": "Announces every entrance with clatter.",
-        "emoji": "📿",
-    },
-    "breeze_catcher": {
-        "name": "Breeze Catcher",
-        "slot": "window",
-        "blurb": "Smells like spring. Feels like recess.",
-        "emoji": "🍃",
+        "unlock_card": "petrificus",
     },
     "thunderstorm_pane": {
         "name": "Thunderstorm Pane",
         "slot": "window",
         "blurb": "Rumbles softly during essays. Supportive.",
         "emoji": "⛈️",
+        "unlock_card": "stormcaller",
     },
-    "candlefly_dusk": {
-        "name": "Candlefly Dusk",
+    "stained_house_glass": {
+        "name": "House Stained Glass",
         "slot": "window",
-        "blurb": "Fireflies outside on cue.",
-        "emoji": "🪲",
+        "blurb": "Your crest in light. Slightly biased.",
+        "emoji": "🪟",
+        "unlock_card": "stupefy",
     },
-    "mirror_window": {
-        "name": "Mirror Window",
+    "quidditch_pitch_view": {
+        "name": "Pitch View Charm",
         "slot": "window",
-        "blurb": "Looks out. Also looks back.",
-        "emoji": "🪞",
+        "blurb": "Live score smudges on the glass.",
+        "emoji": "🏟️",
+        "unlock_card": "volt_serpent",
     },
-    "travel_postcard_view": {
-        "name": "Postcard View",
-        "slot": "window",
-        "blurb": "Cycles through places you've never been.",
-        "emoji": "🏞️",
+    "aster_chaos_blanket": {
+        "name": "AsterWilde Chaos Blanket",
+        "slot": "bed",
+        "blurb": "No two folds agree. Neither do you.",
+        "emoji": "🐿️",
+        "unlock_card": "crest_asterwilde",
     },
-    "greenhouse_mist": {
-        "name": "Greenhouse Mist",
-        "slot": "window",
-        "blurb": "Warm humidity. Occasional vine knock.",
-        "emoji": "🪴",
+    "caldrin_measured_sheets": {
+        "name": "Caldrin Measured Sheets",
+        "slot": "bed",
+        "blurb": "Hospital corners. Emotional support optional.",
+        "emoji": "📐",
+        "unlock_card": "crest_caldrin",
     },
-    "midnight_blue_tint": {
-        "name": "Midnight Blue Tint",
-        "slot": "window",
-        "blurb": "Night mode for day people.",
-        "emoji": "💙",
+    "oakmont_coverlet": {
+        "name": "Oakmont Coverlet",
+        "slot": "bed",
+        "blurb": "Purple stitching. Patient warmth.",
+        "emoji": "🐻",
+        "unlock_card": "crest_oakmont",
     },
-    "sunrise_alarm_pane": {
-        "name": "Sunrise Alarm Pane",
-        "slot": "window",
-        "blurb": "Gets brighter until you rise. Evil. Effective.",
-        "emoji": "🌅",
+    "bookend_wolves": {
+        "name": "Wolf Bookends",
+        "slot": "shelf",
+        "blurb": "Growl if you shelve out of order.",
+        "emoji": "🐺",
+        "unlock_card": "crest_thornmere",
     },
-    "owlery_glimpse": {
-        "name": "Owlery Glimpse",
-        "slot": "window",
-        "blurb": "Feathers against the glass. Letters inbound.",
-        "emoji": "🦉",
+    "veyren_wool_throw": {
+        "name": "Veyren Wool Throw",
+        "slot": "bed",
+        "blurb": "Quiet as a deer. Soft as a promise.",
+        "emoji": "🦌",
+        "unlock_card": "crest_veyren",
     },
-    "rainbow_prism": {
-        "name": "Rainbow Prism Latch",
-        "slot": "window",
-        "blurb": "Scatters light into gossip colors.",
-        "emoji": "🌈",
-    },
-    "frost_filigree": {
-        "name": "Frost Filigree",
-        "slot": "window",
-        "blurb": "Ice lace that spells your initials.",
-        "emoji": "❄️",
-    },
-    "curtain_velvet_green": {
-        "name": "Velvet Green Drapes",
-        "slot": "window",
-        "blurb": "Thornmere-adjacent drama.",
-        "emoji": "🟢",
+    "midnight_canopy": {
+        "name": "Midnight Canopy",
+        "slot": "bed",
+        "blurb": "Stars painted underneath. Some move.",
+        "emoji": "🌌",
+        "unlock_card": "dementor",
     },
     "open_sky_charm": {
         "name": "Open Sky Charm",
         "slot": "window",
         "blurb": "No glass. Just breeze and bravery.",
         "emoji": "🌤️",
+        "unlock_card": "expelliarmus",
+    },
+    "ember_bed_warmer": {
+        "name": "Ember Bed Warmer",
+        "slot": "bed",
+        "blurb": "Safe heat. Unsafe temptation to never rise.",
+        "emoji": "🔥",
+        "unlock_card": "incendio",
+    },
+    "focus_charm_lamp": {
+        "name": "Focus Charm Lamp",
+        "slot": "desk",
+        "blurb": "Brightens only what you're avoiding.",
+        "emoji": "💡",
+        "unlock_card": "protego",
+    },
+    "thornmere_wolf_pelt": {
+        "name": "Thornmere Wolf Pelt",
+        "slot": "bed",
+        "blurb": "Loyalty earned. Naps taken.",
+        "emoji": "🐺",
+        "unlock_card": "shadow_wolf",
+    },
+    "beast_figurine": {
+        "name": "Beast Figurine Set",
+        "slot": "shelf",
+        "blurb": "Rearranges overnight into a tableau.",
+        "emoji": "🦁",
+        "unlock_card": "chimera_saro",
+    },
+    "patronus_silhouette": {
+        "name": "Patronus Silhouette",
+        "slot": "wall",
+        "blurb": "Silver outline of courage on quiet nights.",
+        "emoji": "🦌",
+        "unlock_card": "expecto",
+    },
+    "lake_view_charm": {
+        "name": "Lake View Charm",
+        "slot": "window",
+        "blurb": "Shows the shore. Hides the homework.",
+        "emoji": "🌊",
+        "unlock_card": "kraken_lumi",
+    },
+    "owlery_glimpse": {
+        "name": "Owlery Glimpse",
+        "slot": "window",
+        "blurb": "Feathers against the glass. Letters inbound.",
+        "emoji": "🦉",
+        "unlock_card": "griffin",
+    },
+    "velmora_map": {
+        "name": "Annotated Velmora Map",
+        "slot": "wall",
+        "blurb": "Shortcuts in red. Detours in denial.",
+        "emoji": "🗺️",
+        "unlock_card": "sorting_net",
+    },
+    "wax_seal_kit": {
+        "name": "Wax Seal Kit",
+        "slot": "desk",
+        "blurb": "Crest stamps included. Taste debated.",
+        "emoji": "🔏",
+        "unlock_card": "velmora_seal",
+    },
+    "starfield_glass": {
+        "name": "Starfield Glass",
+        "slot": "window",
+        "blurb": "Constellations of your choosing.",
+        "emoji": "✨",
+        "unlock_card": "lumen_aegis",
     },
 }
 
+# card_id -> decor_id for frog unlocks
+DECOR_BY_CARD = {
+    "accio": "star_mobile",
+    "alohomora": "cloud_duvet",
+    "blackcap_squirrel": "moving_sketch",
+    "button_magpie": "quidditch_poster",
+    "cistern_toad": "night_sky_mural",
+    "colloportus": "crest_embroidery",
+    "descendo": "duel_score_slate",
+    "duskpup": "tapestry_forest",
+    "episkey": "spell_diagram",
+    "field_cow": "broom_mount",
+    "finite": "ink_stained_desk",
+    "impedimenta": "mini_cauldron",
+    "lumos": "candle_cluster",
+    "orbitcat": "potion_sample_rack",
+    "reparo": "desk_globe_velmora",
+    "riddikulus": "paperweight_frog",
+    "silencio": "timetable_crystal",
+    "hopsalot": "shelf_of_oddities",
+    "ventus": "jar_of_fireflies",
+    "wild_threat": "snow_globe_castle",
+    "wingardium": "tiny_broom_display",
+    "arresto": "crystal_geode",
+    "bombarda": "orb_of_static",
+    "ember_hound": "mushroom_lamp",
+    "glacius": "frost_sheet_set",
+    "lanternback_stag": "compass_that_points_home",
+    "moonglass_owl": "window_charm_aurora",
+    "niffler": "crystal_paperweight",
+    "obliviate": "moon_catcher",
+    "petrificus": "snowfall_loop",
+    "stormcaller": "thunderstorm_pane",
+    "stupefy": "stained_house_glass",
+    "volt_serpent": "quidditch_pitch_view",
+    "crest_asterwilde": "aster_chaos_blanket",
+    "crest_caldrin": "caldrin_measured_sheets",
+    "crest_oakmont": "oakmont_coverlet",
+    "crest_thornmere": "bookend_wolves",
+    "crest_veyren": "veyren_wool_throw",
+    "dementor": "midnight_canopy",
+    "expelliarmus": "open_sky_charm",
+    "incendio": "ember_bed_warmer",
+    "protego": "focus_charm_lamp",
+    "shadow_wolf": "thornmere_wolf_pelt",
+    "chimera_saro": "beast_figurine",
+    "expecto": "patronus_silhouette",
+    "kraken_lumi": "lake_view_charm",
+    "griffin": "owlery_glimpse",
+    "sorting_net": "velmora_map",
+    "velmora_seal": "wax_seal_kit",
+    "lumen_aegis": "starfield_glass",
+}
+
+STARTER_DECOR = {cid for cid, d in DECOR.items() if d.get("unlock_card") is None}
+assert len(STARTER_DECOR) == 5
+assert len(DECOR) == 55
+assert len(DECOR_BY_CARD) == 50
 
 
 def _channel_hint() -> str:
@@ -852,8 +542,100 @@ class Dorm(commands.Cog):
         rec = self.state.setdefault("players", {}).setdefault(str(user_id), {})
         rec.setdefault("stash", {})  # decor_id -> count
         rec.setdefault("slots", {})  # slot -> {"kind":"decor"|"frog", "id":...}
+        rec.setdefault("unlocked", [])  # decor ids unlocked via frogs / staff (beyond starters)
         rec.setdefault("found_on", "")
         return rec
+
+    def unlocked_ids(self, user_id: int) -> set[str]:
+        """Starters + permanently unlocked card decor."""
+        rec = self.record(user_id)
+        out = set(STARTER_DECOR)
+        for did in rec.get("unlocked") or []:
+            if did in DECOR:
+                out.add(did)
+        # Backfill: owning a frog card counts as unlocked
+        frogs = self.bot.get_cog("Frogs")
+        if frogs:
+            for card_id, n in frogs.counts(user_id).items():
+                if n < 1:
+                    continue
+                did = DECOR_BY_CARD.get(card_id)
+                if did:
+                    out.add(did)
+        return out
+
+    def unlock_from_frog(self, user_id: int, card_id: str, *, save: bool = True) -> str | None:
+        """Unlock + stash the decor tied to this frog card. Returns a note or None."""
+        decor_id = DECOR_BY_CARD.get(card_id)
+        if not decor_id or decor_id not in DECOR:
+            return None
+        rec = self.record(user_id)
+        unlocked = rec.setdefault("unlocked", [])
+        first = decor_id not in unlocked and decor_id not in STARTER_DECOR
+        if decor_id not in unlocked:
+            unlocked.append(decor_id)
+        stash = rec.setdefault("stash", {})
+        # First unlock grants one copy to place; later pulls of same card don't spam stash
+        if not first:
+            if save:
+                self.save()
+            return None
+        stash[decor_id] = int(stash.get(decor_id, 0)) + 1
+        d = DECOR[decor_id]
+        note = (
+            f"🏠 Unlocked decor: {d['emoji']} **{d['name']}** "
+            f"({SLOT_LABEL[d['slot']]}) — `/room place`"
+        )
+        rec.setdefault("pending_unlock_notes", []).append(note)
+        if save:
+            self.save()
+        return note
+
+    def pop_unlock_notes(self, user_id: int) -> list[str]:
+        rec = self.record(user_id)
+        notes = list(rec.pop("pending_unlock_notes", []) or [])
+        if notes:
+            self.save()
+        return notes
+
+    def grant_decor(
+        self, user_id: int, decor_id: str, *, unlock: bool = True, qty: int = 1
+    ) -> str | None:
+        """Staff/prize: unlock and add decor to stash."""
+        if decor_id not in DECOR:
+            return None
+        rec = self.record(user_id)
+        if unlock and decor_id not in STARTER_DECOR:
+            unlocked = rec.setdefault("unlocked", [])
+            if decor_id not in unlocked:
+                unlocked.append(decor_id)
+        stash = rec.setdefault("stash", {})
+        stash[decor_id] = int(stash.get(decor_id, 0)) + max(1, qty)
+        self.save()
+        d = DECOR[decor_id]
+        return f"{d['emoji']} **{d['name']}** ({SLOT_LABEL[d['slot']]})"
+
+    def ensure_starters(self, user_id: int) -> None:
+        """Give every player the five free starter pieces once."""
+        rec = self.record(user_id)
+        dirty = False
+        if not rec.get("starters_seeded"):
+            stash = rec.setdefault("stash", {})
+            for did in STARTER_DECOR:
+                stash[did] = int(stash.get(did, 0)) + 1
+            rec["starters_seeded"] = True
+            dirty = True
+        # One-time backfill unlocks for frog cards owned before this feature
+        if not rec.get("card_unlocks_synced"):
+            frogs = self.bot.get_cog("Frogs")
+            if frogs:
+                for card_id, n in frogs.counts(user_id).items():
+                    if n >= 1:
+                        self.unlock_from_frog(user_id, card_id, save=False)
+            rec["card_unlocks_synced"] = True
+            dirty = True
+        if dirty:
+            self.save()
 
     def _frog_meta(self, card_id: str) -> dict | None:
         frogs = self.bot.get_cog("Frogs")
@@ -904,20 +686,22 @@ class Dorm(commands.Cog):
         if not await self._require_channel(interaction):
             return
         target = member or interaction.user
+        if target.id == interaction.user.id:
+            self.ensure_starters(target.id)
         rec = self.record(target.id)
         await interaction.response.send_message(
             embed=self.embed_room(target, rec),
             ephemeral=True,
         )
 
-    # Also allow bare /room as alias via same group default? Discord needs subcommand.
-    # Add a top-level convenience: users asked for /room — add both group view and
-    # a top-level command named room_show? Keep group only: /room view
-
-    @room.command(name="find", description="Find one decor item for your stash (once per day).")
+    @room.command(
+        name="find",
+        description="Find a duplicate of unlocked decor for your stash (once per day).",
+    )
     async def room_find(self, interaction: discord.Interaction):
         if not await self._require_channel(interaction):
             return
+        self.ensure_starters(interaction.user.id)
         rec = self.record(interaction.user.id)
         day = today()
         if rec.get("found_on") == day:
@@ -927,34 +711,32 @@ class Dorm(commands.Cog):
                 ephemeral=True,
             )
             return
+        unlocked = self.unlocked_ids(interaction.user.id)
+        if not unlocked:
+            await interaction.response.send_message(
+                "No unlocked decor yet.", ephemeral=True
+            )
+            return
         stash = rec.setdefault("stash", {})
-        owned = {
-            k for k, v in stash.items() if int(v) > 0 and k in DECOR
-        }
-        for placed in (rec.get("slots") or {}).values():
-            if placed and placed.get("kind") == "decor" and placed.get("id") in DECOR:
-                owned.add(placed["id"])
-        # Prefer new pieces so rooms stay unique longer
-        fresh = [cid for cid in DECOR if cid not in owned]
-        item_id = self.rng.choice(fresh or list(DECOR))
+        item_id = self.rng.choice(sorted(unlocked))
         stash[item_id] = int(stash.get(item_id, 0)) + 1
         rec["found_on"] = day
         self.save()
         d = DECOR[item_id]
-        owned_n = len(owned | {item_id})
         embed = discord.Embed(
             title=f"Found: {d['emoji']} {d['name']}",
             description=(
                 f"*{d['blurb']}*\n\n"
                 f"Best on the **{SLOT_LABEL[d['slot']]}**. "
-                f"Place it with `/room place`.\n"
-                f"Collection: **{owned_n}/{len(DECOR)}** decor pieces"
+                f"Place it with `/room place`.\n\n"
+                f"Unlocked: **{len(unlocked)}/{len(DECOR)}** "
+                f"(pull Chocolate Frogs to unlock more)"
             ),
             color=COZY,
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @room.command(name="catalog", description="Browse all decor options for a slot (25 each).")
+    @room.command(name="catalog", description="Browse decor for a slot — locked until you pull the frog card.")
     @app_commands.describe(slot="Which furniture slot to list")
     @app_commands.choices(
         slot=[app_commands.Choice(name=SLOT_LABEL[s], value=s) for s in SLOTS]
@@ -964,36 +746,49 @@ class Dorm(commands.Cog):
     ):
         if not await self._require_channel(interaction):
             return
+        self.ensure_starters(interaction.user.id)
         slot_key = slot.value
         rec = self.record(interaction.user.id)
         stash = rec.get("stash") or {}
+        unlocked = self.unlocked_ids(interaction.user.id)
         placed_id = None
         placed = (rec.get("slots") or {}).get(slot_key)
         if placed and placed.get("kind") == "decor":
             placed_id = placed.get("id")
+        from cogs.frogs import CARDS
+
         lines = []
         for cid, d in sorted(
             ((i, DECOR[i]) for i in DECOR if DECOR[i]["slot"] == slot_key),
             key=lambda kv: kv[1]["name"],
         ):
-            mark = ""
             if cid == placed_id:
                 mark = " · placed"
             elif int(stash.get(cid, 0)) > 0:
-                mark = " · owned"
+                mark = " · in stash"
+            elif cid in unlocked:
+                mark = " · unlocked"
+            elif d.get("unlock_card"):
+                card = CARDS.get(d["unlock_card"], {})
+                mark = f" · 🔒 {card.get('name', d['unlock_card'])}"
+            else:
+                mark = " · starter"
             lines.append(f"{d['emoji']} **{d['name']}**{mark}")
         embed = discord.Embed(
-            title=f"🏠 {SLOT_LABEL[slot_key]} — 25 options",
+            title=f"🏠 {SLOT_LABEL[slot_key]} decor",
             description="\n".join(lines),
             color=COZY,
         )
-        embed.set_footer(text="Find with /room find · place with /room place")
+        embed.set_footer(
+            text="5 starters free · rest unlock from Chocolate Frog cards"
+        )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @room.command(name="stash", description="Decor waiting in your stash.")
     async def room_stash(self, interaction: discord.Interaction):
         if not await self._require_channel(interaction):
             return
+        self.ensure_starters(interaction.user.id)
         rec = self.record(interaction.user.id)
         stash = {
             k: int(v)
@@ -1035,6 +830,7 @@ class Dorm(commands.Cog):
     ):
         if not await self._require_channel(interaction):
             return
+        self.ensure_starters(interaction.user.id)
         rec = self.record(interaction.user.id)
         slot_key = slot.value
         key = item.strip().lower().replace(" ", "_")
@@ -1172,6 +968,53 @@ class Dorm(commands.Cog):
             embed=self.embed_room(interaction.user, rec),
             ephemeral=True,
         )
+
+    async def staff_prize(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        decor: str,
+    ) -> None:
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        key = decor.strip().lower().replace(" ", "_")
+        if key not in DECOR:
+            for did, meta in DECOR.items():
+                if meta["name"].lower() == decor.strip().lower():
+                    key = did
+                    break
+        if key not in DECOR:
+            await interaction.response.send_message(
+                "Unknown decor. Check `/room catalog`.", ephemeral=True
+            )
+            return
+        if member.bot:
+            await interaction.response.send_message(
+                "Bots don't decorate dorms.", ephemeral=True
+            )
+            return
+        self.ensure_starters(member.id)
+        label = self.grant_decor(member.id, key, unlock=True, qty=1)
+        await interaction.response.send_message(
+            f"{interaction.user.mention} awarded room decor {label} "
+            f"to {member.mention}!",
+        )
+
+    async def staff_prize_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> list[app_commands.Choice[str]]:
+        needle = (current or "").lower()
+        out = []
+        for did, meta in sorted(DECOR.items(), key=lambda kv: kv[1]["name"]):
+            label = f"{meta['name']} ({SLOT_LABEL[meta['slot']]})"
+            if needle and needle not in label.lower() and needle not in did:
+                continue
+            out.append(app_commands.Choice(name=label[:100], value=did))
+            if len(out) >= 25:
+                break
+        return out
 
 
 async def setup(bot: commands.Bot):
