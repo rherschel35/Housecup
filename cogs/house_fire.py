@@ -1,19 +1,25 @@
 """
 Common Room Fire — house teamwork daily.
 
-    /stoke   - feed your house fire (once / day)
+    /stoke   - feed your house fire (once / day, private reply + art)
     /fire    - see every house's flame today
 
-If enough distinct members stoke before midnight (America/Chicago), that
-house earns +1 Cup point. A quiet fire is public shame at the daily tally.
+Rules (America/Chicago day):
+  • 5 unique stokers keeps a house fire alive
+  • At midnight, the house(s) with the *most* stokers earn +3 Cup
+    (must have kept the fire alive — 5+)
+  • Any house under 5 is announced as gone out in the event channel,
+    with an embarrassing sarcastic line
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import io
 import json
 import logging
 import os
+import random
 from pathlib import Path
 
 import discord
@@ -33,6 +39,8 @@ log = logging.getLogger("velmora.housefire")
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "house_fire_state.json"
+ART_DIR = Path(__file__).resolve().parent.parent / "fire_art_assets"
+STOKE_ART = ART_DIR / "stoke.jpg"
 
 FIRE_CHANNEL_IDS = with_study_hall_and_duels_potions()
 
@@ -42,9 +50,22 @@ try:
 except Exception:  # pragma: no cover
     CHICAGO = dt.timezone.utc
 
-# Unique stokers needed for the midnight +1
+# Unique stokers needed to keep the fire alive for the day
 STOKE_THRESHOLD = int(os.getenv("FIRE_STOKE_THRESHOLD", "5"))
+# Cup points to the house(s) with the most stokers (must be alive)
+WINNER_PTS = int(os.getenv("FIRE_WINNER_PTS", "3"))
 EMBER = 0xE07A3D
+
+OUTAGE_LINES = (
+    "{emoji} **{name}** let the hearth die ({n}/{need}). The portraits are taking notes. Unkind ones.",
+    "{emoji} **{name}** — fire's out ({n}/{need}). Even the soot looks disappointed.",
+    "{emoji} **{name}** couldn't muster {need} hands ({n}). Cold ashes. Hot shame.",
+    "{emoji} **{name}**'s common room is a fridge now ({n}/{need}). Someone fetch a match. Or pride.",
+    "{emoji} **{name}** extinguished itself through sheer neglect ({n}/{need}). Historic, in a way.",
+    "{emoji} **{name}** — {n} stoker(s). Needed {need}. The broom cupboard was warmer.",
+    "{emoji} **{name}** went dark ({n}/{need}). Prefects are drafting a very polite scolding.",
+    "{emoji} **{name}** treated the fire like optional homework ({n}/{need}). Graded: F for Flame.",
+)
 
 
 def _channel_hint() -> str:
@@ -59,6 +80,12 @@ def _flame_label(count: int) -> str:
     if count < STOKE_THRESHOLD:
         return "🔥 Warm but hungry"
     return "🔥🔥 Roaring"
+
+
+def _stoke_file() -> discord.File | None:
+    if not STOKE_ART.exists():
+        return None
+    return discord.File(io.BytesIO(STOKE_ART.read_bytes()), filename="stoke.jpg")
 
 
 class HouseFire(commands.Cog):
@@ -112,6 +139,13 @@ class HouseFire(commands.Cog):
         bucket = self.day_bucket(day)
         return [int(x) for x in bucket.get(house, [])]
 
+    def _shame_channel_id(self) -> int:
+        """Fires-out + winner tally post here."""
+        raw = os.getenv("EVENT_ANNOUNCE_CHANNEL_ID", "").strip()
+        if raw.isdigit():
+            return int(raw)
+        return EVENT_ANNOUNCE_CHANNEL_ID
+
     @app_commands.command(name="stoke", description="Tend your house's common-room fire (once per day).")
     async def stoke(self, interaction: discord.Interaction):
         if not await self._require_channel(interaction):
@@ -141,7 +175,6 @@ class HouseFire(commands.Cog):
             return
         stokers.append(interaction.user.id)
         bucket[house] = stokers
-        # prune old days (keep ~14)
         days = self.state.get("days", {})
         if len(days) > 16:
             for old in sorted(days)[:-14]:
@@ -149,20 +182,30 @@ class HouseFire(commands.Cog):
         self.save()
         n = len(stokers)
         meta = HOUSES[house]
+        alive = n >= STOKE_THRESHOLD
         embed = discord.Embed(
             title=f"{meta['emoji']} Fire stoked — {meta['name']}",
             description=(
-                f"{interaction.user.mention} feeds the common-room fire.\n\n"
+                f"You feed the common-room fire.\n\n"
                 f"{_flame_label(n)} · **{n}/{STOKE_THRESHOLD}** stokers today\n"
                 + (
-                    "Midnight will bring the house **+1** if it stays roaring."
-                    if n >= STOKE_THRESHOLD
-                    else "Needs more hands before midnight…"
+                    f"Alive for tonight. Most stokers at midnight earn the house "
+                    f"**+{WINNER_PTS}**."
+                    if alive
+                    else f"Needs **{STOKE_THRESHOLD - n}** more before midnight "
+                    f"or it goes out — publicly."
                 )
             ),
             color=meta["color"],
         )
-        await interaction.response.send_message(embed=embed)
+        file = _stoke_file()
+        if file:
+            embed.set_image(url="attachment://stoke.jpg")
+            await interaction.response.send_message(
+                embed=embed, file=file, ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="fire", description="How every house's common-room fire is doing today.")
     async def fire_status(self, interaction: discord.Interaction):
@@ -171,13 +214,16 @@ class HouseFire(commands.Cog):
         day = today()
         bucket = self.day_bucket(day)
         lines = []
+        counts = {hk: len(bucket.get(hk, [])) for hk in HOUSE_KEYS}
+        best = max(counts.values()) if counts else 0
         for hk in HOUSE_KEYS:
             meta = HOUSES[hk]
-            n = len(bucket.get(hk, []))
+            n = counts[hk]
             mark = "✅" if n >= STOKE_THRESHOLD else "⬜"
+            lead = " · leading" if n == best and n > 0 else ""
             lines.append(
                 f"{mark} {meta['emoji']} **{meta['name']}** — "
-                f"{_flame_label(n)} · **{n}/{STOKE_THRESHOLD}**"
+                f"{_flame_label(n)} · **{n}/{STOKE_THRESHOLD}**{lead}"
             )
         embed = discord.Embed(
             title="🔥 Common Room Fires",
@@ -185,70 +231,104 @@ class HouseFire(commands.Cog):
             color=EMBER,
         )
         embed.set_footer(
-            text=f"America/Chicago day {day} · {STOKE_THRESHOLD}+ stokers = +1 at midnight"
+            text=(
+                f"America/Chicago day {day} · {STOKE_THRESHOLD}+ keeps it alive · "
+                f"most stokers = +{WINNER_PTS} at midnight"
+            )
         )
         await interaction.response.send_message(embed=embed)
 
-    def _announce_channel_id(self) -> int:
-        raw = os.getenv("EVENT_ANNOUNCE_CHANNEL_ID", "").strip()
-        if raw.isdigit():
-            return int(raw)
-        return EVENT_ANNOUNCE_CHANNEL_ID
-
     async def _payout_if_needed(self) -> None:
-        """Pay yesterday's fires once we're on a new Chicago day."""
+        """Score yesterday's fires once we're on a new Chicago day."""
         now = dt.datetime.now(CHICAGO)
-        # Pay for the day that just ended when we roll past midnight.
         yesterday = (now.date() - dt.timedelta(days=1)).isoformat()
         if self._last_payout_day == yesterday:
             return
         if yesterday not in self.state.get("days", {}):
-            # Nothing recorded — still mark paid so we don't loop forever
-            # once the day exists empty… only skip if truly nothing ever.
             self._last_payout_day = yesterday
             self.save()
             return
 
         store = self.bot.get_cog("Store")
-        lines = []
+        counts = {hk: len(self.stokers(hk, yesterday)) for hk in HOUSE_KEYS}
+        best = max(counts.values()) if counts else 0
+        winners = [
+            hk
+            for hk, n in counts.items()
+            if n == best and n >= STOKE_THRESHOLD
+        ]
+
+        tally_lines: list[str] = []
+        outage_lines: list[str] = []
+
         for hk in HOUSE_KEYS:
             meta = HOUSES[hk]
-            n = len(self.stokers(hk, yesterday))
-            if n >= STOKE_THRESHOLD and store:
+            n = counts[hk]
+            if hk in winners and store:
                 store.record(
                     house=hk,
-                    delta=1,
+                    delta=WINNER_PTS,
                     actor_id=self.bot.user.id if self.bot.user else 0,
                     target_id=0,
-                    reason=f"Common room fire ({n} stokers)",
+                    reason=f"Common room fire — most stokers ({n})",
                 )
-                lines.append(
-                    f"✅ {meta['emoji']} **{meta['name']}** roared ({n}) — **+1**"
+                tally_lines.append(
+                    f"🏆 {meta['emoji']} **{meta['name']}** kept it roaring "
+                    f"with **{n}** stokers — **+{WINNER_PTS}**"
                 )
-            elif n <= 0:
-                lines.append(
-                    f"❄️ {meta['emoji']} **{meta['name']}** — cold ashes. Shameful."
+            elif n >= STOKE_THRESHOLD:
+                tally_lines.append(
+                    f"✅ {meta['emoji']} **{meta['name']}** stayed lit ({n}) — "
+                    f"not enough hands to take the crown."
                 )
             else:
-                lines.append(
-                    f"🕯️ {meta['emoji']} **{meta['name']}** faded ({n}/{STOKE_THRESHOLD}). No bonus."
+                line = random.choice(OUTAGE_LINES).format(
+                    emoji=meta["emoji"],
+                    name=meta["name"],
+                    n=n,
+                    need=STOKE_THRESHOLD,
                 )
+                outage_lines.append(line)
+                tally_lines.append(
+                    f"❄️ {meta['emoji']} **{meta['name']}** — out ({n}/{STOKE_THRESHOLD})"
+                )
+
+        if best > 0 and not winners:
+            tally_lines.insert(
+                0,
+                f"No house reached **{STOKE_THRESHOLD}** stokers. "
+                f"No **+{WINNER_PTS}** tonight. Tragic.",
+            )
 
         self._last_payout_day = yesterday
         self.save()
 
-        ch = self.bot.get_channel(self._announce_channel_id())
-        if ch and hasattr(ch, "send") and lines:
-            embed = discord.Embed(
-                title="🔥 Midnight fire tally",
-                description="\n".join(lines),
-                color=EMBER,
-            )
-            embed.set_footer(text=f"For Chicago day {yesterday}")
-            try:
-                await ch.send(embed=embed)
-            except discord.DiscordException:
-                log.exception("Fire tally announce failed")
+        ch = self.bot.get_channel(self._shame_channel_id())
+        if not (ch and hasattr(ch, "send")):
+            return
+
+        try:
+            if outage_lines:
+                shame = discord.Embed(
+                    title="🔥 Fires that went out",
+                    description="\n".join(outage_lines),
+                    color=0x5A3A2A,
+                )
+                shame.set_footer(text=f"Chicago day {yesterday} · needed {STOKE_THRESHOLD}")
+                await ch.send(embed=shame)
+
+            if tally_lines:
+                tally = discord.Embed(
+                    title="🔥 Midnight fire tally",
+                    description="\n".join(tally_lines),
+                    color=EMBER,
+                )
+                tally.set_footer(
+                    text=f"For Chicago day {yesterday} · most alive stokers = +{WINNER_PTS}"
+                )
+                await ch.send(embed=tally)
+        except discord.DiscordException:
+            log.exception("Fire announce failed")
 
     @tasks.loop(minutes=1)
     async def midnight_tick(self) -> None:
