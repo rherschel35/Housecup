@@ -35,7 +35,7 @@ HELP = {
             ("bingo mark", "Mark auto-called squares on your card (bingo channel only)."),
             ("bingo called", "List squares called so far (bingo channel only)."),
             ("bingo status", "Lobby / calling status + your progress (bingo channel only)."),
-            ("wand", "Give any three words and a wand chooses you. Yours for good."),
+            ("wand", "Give any three words and a wand chooses you — with a portrait. Yours for good."),
             ("patronus", "Your unique patronus, cast from the same three words as your wand."),
             ("patronusreset", "Once only: three new words for a new unique patronus (customs stay sealed)."),
             ("animagus", "Your Animagus form from three words of your own — you don't pick it. Run again anytime for 1 min of animal sounds on your messages."),
