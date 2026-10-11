@@ -7,7 +7,7 @@ Term Life — anytime school-day RPG sim (v1).
 No daily play limit. Actions spend Energy; Sleep restores it and advances
 the clock. No house points in v1 — skills, bonds, and journal only.
 
-Playable in study hall, open lounges, and the shared games lounge.
+Trial channel only for now (event-board scratch room).
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from cogs.velmora_channels import channel_mentions, with_study_hall_and_duels_potions
+from cogs.velmora_channels import EVENT_BOARD_TEST_CHANNEL_ID, channel_mentions
 
 log = logging.getLogger("velmora.termlife")
 
@@ -32,7 +32,8 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "term_life_state.json"
 
-TERM_LIFE_CHANNEL_IDS = with_study_hall_and_duels_potions()
+# Scratch / trial room only until Term Life is ready for lounges.
+TERM_LIFE_CHANNEL_IDS = frozenset({EVENT_BOARD_TEST_CHANNEL_ID})
 
 INK = 0x3D5A4C
 ENERGY_MAX = 6
