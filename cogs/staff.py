@@ -809,7 +809,7 @@ class Staff(commands.Cog):
             await interaction.followup.send(
                 f"{lead}"
                 "Fully quit Discord and reopen `/`.\n"
-                "• `/familiar` → status / adopt / name / feed / pet / play / scout\n"
+                "• `/familiar` → status / adopt / name / look / looks / feed / pet / play / scout\n"
                 "• Top-level `/play` · `/feed` · `/pet` · `/scout` should be gone",
                 ephemeral=True,
             )
