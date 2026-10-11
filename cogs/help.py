@@ -48,6 +48,8 @@ HELP = {
             ("familiar pet", "Pet your familiar. Once a day."),
             ("familiar play", "Play with your familiar. Once a day."),
             ("familiar scout", "Send your familiar out to bring something back. Once a day."),
+            ("life play", "Term Life — open your anytime school-day board (trial channel only for now)."),
+            ("life status", "Your Term Life sheet — day, energy, skills, bonds (trial channel only)."),
             ("raid", "Open a 3Raid lobby — Attacker, Specialty, Tank, 10 encounters."),
             ("raidstatus", "Your 3Raid weekly clear status."),
             ("piphowdoi", "Ask Pip Wick how to do something (public hearthling answer from help + Compendium)."),

@@ -107,6 +107,7 @@ INITIAL_COGS = (
     "cogs.pip_wick",
     "cogs.checklist",
     "cogs.bingo",
+    "cogs.term_life",
     "cogs.event_board",
     "cogs.avada",
     "cogs.broke",
