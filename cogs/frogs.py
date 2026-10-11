@@ -27,8 +27,8 @@ from pathlib import Path
 import discord
 from discord import app_commands
 from discord.ext import commands
-from PIL import Image, ImageDraw, ImageFont, ImageOps
 
+from cogs.frog_card_art import render_card_png as _compose_card_png
 from cogs.velmora_channels import channel_mentions, with_study_hall_and_duels_potions
 from cogs.world_engine import today
 
@@ -37,7 +37,6 @@ log = logging.getLogger("velmora.frogs")
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "frogs_state.json"
-ART_DIR = Path(__file__).resolve().parent.parent / "frog_art_assets"
 
 FROG_CHANNEL_IDS = with_study_hall_and_duels_potions()
 
@@ -69,34 +68,24 @@ RARITY_LABEL = {
     "legendary": "Legendary",
     "mythic": "✦ Mythic ✦",
 }
-RARITY_FRAME = {
-    "common": (139, 115, 85),
-    "uncommon": (61, 139, 110),
-    "rare": (74, 111, 165),
-    "legendary": (201, 162, 39),
-    "mythic": (62, 142, 90),
-}
-
-# id -> card meta. Optional "art" filename under frog_art_assets/.
+# id -> card meta. Art files live in frog_art_assets/ (see frog_card_art.ART_FILES).
 CARDS: dict[str, dict] = {
     # --- Mythic (1) ---
     MYTHIC_ID: {
         "name": "Herschel & Pod",
         "blurb": (
-            "Thornmere's quiet hour: the Headmaster and the wolf who never "
-            "left his side. Almost never found in a box."
+            "Thornmere's quiet hour: a wizard and the wolf who chose him. "
+            "Almost never found in a box."
         ),
         "rarity": "mythic",
         "emoji": "🐺",
-        "art": "herschel_pod.jpg",
     },
     # --- Legendary ---
     "mordy": {
         "name": "Mordy Velmora",
-        "blurb": "Founder of the school. Leave him alone — he's busy founding.",
+        "blurb": "Founder of the school. Purple robes. Opinions. History.",
         "rarity": "legendary",
         "emoji": "🏰",
-        "art": "mordy.jpg",
     },
     "vida": {
         "name": "Vida Vashara",
@@ -413,133 +402,24 @@ def _resolve_card(query: str) -> str | None:
     return None
 
 
-def _font(size: int) -> ImageFont.ImageFont:
-    for name in (
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-    ):
-        if Path(name).exists():
-            try:
-                return ImageFont.truetype(name, size)
-            except OSError:
-                pass
-    return ImageFont.load_default()
+# Stable album order for #NN/50 footers (mythic first, then by rarity).
+def _index_key(cid: str) -> tuple:
+    r = CARDS[cid]["rarity"]
+    tier = 0 if r == "mythic" else 1 + RARITY_ORDER.index(r)
+    return (tier, CARDS[cid]["name"])
 
 
-def _wrap(draw: ImageDraw.ImageDraw, text: str, font, max_w: int) -> list[str]:
-    words = text.split()
-    lines: list[str] = []
-    cur = ""
-    for w in words:
-        trial = f"{cur} {w}".strip()
-        if draw.textlength(trial, font=font) <= max_w:
-            cur = trial
-        else:
-            if cur:
-                lines.append(cur)
-            cur = w
-    if cur:
-        lines.append(cur)
-    return lines or [""]
+CARD_INDEX = {cid: i + 1 for i, cid in enumerate(sorted(CARDS, key=_index_key))}
 
 
 def render_card_png(card_id: str) -> bytes:
-    """Decorative collectible card PNG (custom art framed, or generated face)."""
-    meta = CARDS[card_id]
-    rarity = meta["rarity"]
-    frame = RARITY_FRAME.get(rarity, (180, 150, 100))
-    w, h = 720, 1000
-    img = Image.new("RGB", (w, h), (28, 22, 18))
-    draw = ImageDraw.Draw(img)
-
-    # Outer sticker rim
-    draw.rounded_rectangle((8, 8, w - 9, h - 9), radius=28, fill=(252, 250, 245))
-    # Rarity frame
-    draw.rounded_rectangle((28, 28, w - 29, h - 29), radius=22, fill=frame)
-    # Inner panel
-    draw.rounded_rectangle((48, 48, w - 49, h - 49), radius=16, fill=(36, 28, 22))
-
-    title_font = _font(36)
-    label_font = _font(22)
-    body_font = _font(24)
-    small_font = _font(18)
-
-    # Header band
-    draw.rounded_rectangle((60, 60, w - 61, 130), radius=12, fill=(48, 36, 28))
-    header = "CHOCOLATE FROG CARD"
-    tw = draw.textlength(header, font=label_font)
-    draw.text(((w - tw) / 2, 82), header, font=label_font, fill=(232, 196, 120))
-
-    art_top, art_bottom = 148, 620
-    art_path = None
-    if meta.get("art"):
-        candidate = ART_DIR / meta["art"]
-        if candidate.exists():
-            art_path = candidate
-
-    if art_path:
-        portrait = Image.open(art_path).convert("RGB")
-        box_w, box_h = w - 120, art_bottom - art_top
-        fitted = ImageOps.fit(portrait, (box_w, box_h), method=Image.Resampling.LANCZOS)
-        # thin gold inner border
-        bordered = ImageOps.expand(fitted, border=4, fill=frame)
-        img.paste(bordered, (60 - 4, art_top - 4))
-    else:
-        # Generated face — drawn chocolate frog (fonts rarely have emoji glyphs)
-        draw.rounded_rectangle(
-            (60, art_top, w - 61, art_bottom), radius=14, fill=(52, 40, 32)
-        )
-        cx, cy = w // 2, (art_top + art_bottom) // 2 - 20
-        # soft glow disc
-        draw.ellipse((cx - 170, cy - 150, cx + 170, cy + 150), fill=(70, 52, 40))
-        # frog body
-        draw.ellipse((cx - 120, cy - 70, cx + 120, cy + 110), fill=frame)
-        draw.ellipse((cx - 90, cy - 130, cx + 90, cy - 20), fill=frame)  # head
-        # eyes
-        draw.ellipse((cx - 70, cy - 145, cx - 20, cy - 95), fill=(250, 240, 210))
-        draw.ellipse((cx + 20, cy - 145, cx + 70, cy - 95), fill=(250, 240, 210))
-        draw.ellipse((cx - 55, cy - 130, cx - 35, cy - 110), fill=(30, 22, 18))
-        draw.ellipse((cx + 35, cy - 130, cx + 55, cy - 110), fill=(30, 22, 18))
-        # smile
-        draw.arc((cx - 40, cy - 70, cx + 40, cy - 20), 20, 160, fill=(30, 22, 18), width=4)
-        # foil shimmer lines
-        for i, y in enumerate(range(cy + 20, cy + 90, 14)):
-            shade = tuple(min(255, c + 30 + i * 8) for c in frame)
-            draw.line((cx - 80, y, cx + 80, y), fill=shade, width=2)
-        # monogram initial
-        initial = (meta["name"][:1] or "?").upper()
-        init_font = _font(48)
-        iw = draw.textlength(initial, font=init_font)
-        draw.text((cx - iw / 2, cy + 95), initial, font=init_font, fill=(250, 235, 200))
-        for xy in ((80, art_top + 20), (w - 100, art_top + 20),
-                   (80, art_bottom - 50), (w - 100, art_bottom - 50)):
-            draw.text(xy, "+", font=label_font, fill=frame)
-
-    # Name + rarity
-    name = meta["name"]
-    nw = draw.textlength(name, font=title_font)
-    name_y = art_bottom + 24
-    draw.text(((w - nw) / 2, name_y), name, font=title_font, fill=(250, 235, 200))
-
-    rlab = RARITY_LABEL.get(rarity, rarity.title())
-    rw = draw.textlength(rlab, font=label_font)
-    draw.text(((w - rw) / 2, name_y + 48), rlab, font=label_font, fill=frame)
-
-    # Blurb
-    blurb_y = name_y + 90
-    for line in _wrap(draw, meta["blurb"], body_font, w - 140)[:5]:
-        lw = draw.textlength(line, font=body_font)
-        draw.text(((w - lw) / 2, blurb_y), line, font=body_font, fill=(220, 200, 170))
-        blurb_y += 30
-
-    foot = "Velmora · Collect · Trade · Display"
-    fw = draw.textlength(foot, font=small_font)
-    draw.text(((w - fw) / 2, h - 78), foot, font=small_font, fill=(160, 140, 110))
-
-    buf = io.BytesIO()
-    img.save(buf, format="PNG", optimize=True)
-    return buf.getvalue()
+    """Decorative Velmora Chocolate Frog card PNG."""
+    return _compose_card_png(
+        card_id,
+        CARDS[card_id],
+        index=CARD_INDEX.get(card_id, 0),
+        total=len(CARDS),
+    )
 
 
 def _card_file(card_id: str) -> discord.File:
