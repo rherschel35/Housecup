@@ -116,7 +116,7 @@ DECOR = {
         "name": "Aurora Pane",
         "slot": "window",
         "blurb": "Northern lights on demand. Show-off setting included.",
-        "emoji": "aurora",
+        "emoji": "🌌",
     },
     "moon_catcher": {
         "name": "Moon Catcher",
@@ -137,9 +137,6 @@ DECOR = {
         "emoji": "🕯️",
     },
 }
-
-# Fix aurora emoji to a real one
-DECOR["window_charm_aurora"]["emoji"] = "🌌"
 
 
 def _channel_hint() -> str:
