@@ -45,6 +45,13 @@ def main() -> None:
         if not path.is_file() or path.stat().st_size < 400_000:
             need.append(animal)
     (Path("/tmp/patronus_still_need.txt")).write_text("\n".join(need) + "\n")
+    # Drop accidental lowercase duplicates (case-sensitive FS).
+    for junk in DST.iterdir():
+        if junk.is_file() and junk.suffix.lower() == ".png" and junk.stem == junk.stem.lower() and junk.stem[0:1].islower():
+            # keep only if it is not a valid slug (valid slugs are Title_Case)
+            if junk.stem not in slugs:
+                junk.unlink(missing_ok=True)
+                print("removed junk", junk.name)
     print(f"installed={installed} still_need_ai={len(need)}")
 
 
