@@ -107,11 +107,10 @@ INITIAL_COGS = (
     "cogs.pip_wick",
     "cogs.checklist",
     "cogs.bingo",
-    "cogs.term_life",
+    "cogs.contracts",
     "cogs.event_board",
     "cogs.avada",
     "cogs.broke",
-    # Forrest of Caden parked for later — re-add "cogs.forrest_caden" when ready.
 )
 
 

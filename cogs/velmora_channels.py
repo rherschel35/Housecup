@@ -7,7 +7,7 @@ Open lounges are multi-game rooms: most games run there, but Wild Threat
 spawns and /explore|/forage stay out on purpose.
 
 Everything lounges are open lounges that also allow explore, Wild Threats,
-practice swarms, Bingo, and Forrest. Still not castle PvP or 3Raid.
+practice swarms, and Bingo. Still not castle PvP or 3Raid.
 """
 
 STUDY_HALL_CHANNEL_ID = 1555035151208153209  # new-student study hall
@@ -20,7 +20,7 @@ EVERYTHING_LOUNGE_CHANNEL_ID = 1558611215054282822
 EVERYTHING_LOUNGE_CHANNEL_IDS = frozenset({EVERYTHING_LOUNGE_CHANNEL_ID})
 
 # Multi-game lounges — duels, potions, Descent, Quidditch/broom, chess/checkers.
-# Not: Wild Threat spawns, exploring, castle PvP, 3Raid, or Forrest
+# Not: Wild Threat spawns, exploring, castle PvP, or 3Raid
 # (except channels also listed in EVERYTHING_LOUNGE_CHANNEL_IDS).
 OPEN_LOUNGE_CHANNEL_IDS = frozenset({
     1557137090058395768,
