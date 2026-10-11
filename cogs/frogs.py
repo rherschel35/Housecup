@@ -10,7 +10,7 @@ Chocolate Frog Cards — daily collectibles.
 Staff:
     /staffgame frog prize      - award any card as a prize/reward
 
-50 cards. Mythic "Gon" is extremely rare from opens.
+50 cards (spells, crests, beasts — no people yet). Mythic Lumen Aegis is extremely rare.
 Every 10 unique cards → +10 house pts. First mythic → +25.
 """
 
@@ -42,7 +42,7 @@ FROG_CHANNEL_IDS = with_study_hall_and_duels_potions()
 
 # Ultra-rare: ~1 in N opens (default 250). Env override for testing.
 MYTHIC_ODDS = max(50, int(os.getenv("FROG_MYTHIC_ODDS", "250")))
-MYTHIC_ID = "gon"
+MYTHIC_ID = "lumen_aegis"
 DECADE_PTS = 10
 MYTHIC_PTS = 25
 
@@ -59,7 +59,7 @@ RARITY_COLOR = {
     "uncommon": 0x3D8B6E,
     "rare": 0x4A6FA5,
     "legendary": 0xC9A227,
-    "mythic": 0x3E8E5A,
+    "mythic": 0xE8D48B,
 }
 RARITY_LABEL = {
     "common": "Common",
@@ -70,313 +70,355 @@ RARITY_LABEL = {
 }
 # id -> card meta. Art files live in frog_art_assets/ (see frog_card_art.ART_FILES).
 CARDS: dict[str, dict] = {
-    # --- Mythic (1) ---
-    MYTHIC_ID: {
-        "name": "Gon",
-        "blurb": (
-            "They just call him Gon. When something breaks, he already knows. "
-            "Almost never found in a box."
-        ),
+    "lumen_aegis": {
+        "name": "Lumen Aegis",
+        "blurb": "Mythic ward-light. Almost never found in a box.",
         "rarity": "mythic",
-        "emoji": "🪄",
-    },
-    # --- Legendary ---
-    "mordy": {
-        "name": "Mordy Velmora",
-        "blurb": "Founder-ghost of the school. Legacy. Power. Eternity.",
-        "rarity": "legendary",
-        "emoji": "👻",
-    },
-    "vida": {
-        "name": "Vida Vashara",
-        "blurb": "Oakmont's founder-ghost. Healing given freely.",
-        "rarity": "legendary",
-        "emoji": "🐻",
-    },
-    "maynard": {
-        "name": "Maynard Moonveil",
-        "blurb": "AsterWilde's happy mad scientist. No tragedy — on purpose.",
-        "rarity": "legendary",
-        "emoji": "🐿️",
-    },
-    "finley": {
-        "name": "Finley Veyren",
-        "blurb": "Veyren's founder. Loved loudly. Left too soon.",
-        "rarity": "legendary",
-        "emoji": "🦌",
-    },
-    "cassy": {
-        "name": "Cassy Caldrin",
-        "blurb": "Caldrin's patent storm. Fixed what others endured.",
-        "rarity": "legendary",
-        "emoji": "🐒",
-    },
-    "sorting_net": {
-        "name": "The Sorting Net",
-        "blurb": "It does not shout. It quietly files you.",
-        "rarity": "legendary",
-        "emoji": "🧵",
+        "kind": "spell",
+        "emoji": "✨",
     },
     "velmora_seal": {
         "name": "The Velmora Seal",
         "blurb": "Five houses. One crest. Wax that never cools.",
         "rarity": "legendary",
+        "kind": "crest",
         "emoji": "🔏",
-    },
-    # --- Rare ---
-    "sebastian": {
-        "name": "Sebastian",
-        "blurb": "Finley's shadow and equal. Still watching the maze.",
-        "rarity": "rare",
-        "emoji": "🕯️",
-    },
-    "hollow_portrait": {
-        "name": "The Hollow Portrait",
-        "blurb": "Gives directions. Sometimes correct ones.",
-        "rarity": "rare",
-        "emoji": "🖼️",
-    },
-    "lake_figure": {
-        "name": "The Hooded Shore",
-        "blurb": "Accepts vials. Offers no names.",
-        "rarity": "rare",
-        "emoji": "🌙",
-    },
-    "chocolate_frog_self": {
-        "name": "Chocolate Frog (Meta)",
-        "blurb": "A card of a frog on a card. Philosophy majors love this one.",
-        "rarity": "rare",
-        "emoji": "🃏",
-    },
-    "room_of_requirement": {
-        "name": "The Room",
-        "blurb": "Appears when needed. Leaves when gossip arrives.",
-        "rarity": "rare",
-        "emoji": "🚪",
-    },
-    "stormcaller": {
-        "name": "The Stormcaller",
-        "blurb": "Descent remembers the thunder. So do your knees.",
-        "rarity": "rare",
-        "emoji": "⛈️",
-    },
-    "hollow_saint": {
-        "name": "The Hollow Saint",
-        "blurb": "Blessings with teeth. Smile carefully.",
-        "rarity": "rare",
-        "emoji": "✝️",
     },
     "chimera_saro": {
         "name": "Chimera Saro",
         "blurb": "Three heads. One argument. Zero patience.",
-        "rarity": "rare",
+        "rarity": "legendary",
+        "kind": "beast",
         "emoji": "🦁",
     },
     "kraken_lumi": {
         "name": "Kraken Lumi",
         "blurb": "Ink, depth, and a very long grudge.",
-        "rarity": "rare",
+        "rarity": "legendary",
+        "kind": "beast",
         "emoji": "🦑",
     },
-    "griffin_pod": {
-        "name": "Griffin Pod",
-        "blurb": "Not the wolf. The other Pod. Wings optional. Pride mandatory.",
-        "rarity": "rare",
+    "griffin": {
+        "name": "The Griffin",
+        "blurb": "Wings optional. Pride mandatory.",
+        "rarity": "legendary",
+        "kind": "beast",
         "emoji": "🦅",
     },
-    # --- Uncommon ---
-    "pip": {
-        "name": "Pip Wick",
-        "blurb": "Hearthling help desk. Answers before you finish asking.",
+    "sorting_net": {
+        "name": "The Sorting Net",
+        "blurb": "It does not shout. It quietly files you.",
+        "rarity": "legendary",
+        "kind": "spell",
+        "emoji": "🧵",
+    },
+    "expecto": {
+        "name": "Expecto Patronum",
+        "blurb": "Silver light with teeth for the dark.",
+        "rarity": "legendary",
+        "kind": "spell",
+        "emoji": "🦌",
+    },
+    "crest_oakmont": {
+        "name": "Crest of Oakmont",
+        "blurb": "Patient. Relentless. Purple.",
+        "rarity": "rare",
+        "kind": "crest",
+        "emoji": "🐻",
+    },
+    "crest_asterwilde": {
+        "name": "Crest of AsterWilde",
+        "blurb": "Wild minds. Fierce hearts. Beautiful chaos.",
+        "rarity": "rare",
+        "kind": "crest",
+        "emoji": "🐿️",
+    },
+    "crest_veyren": {
+        "name": "Crest of Veyren",
+        "blurb": "Some bonds need no words.",
+        "rarity": "rare",
+        "kind": "crest",
+        "emoji": "🦌",
+    },
+    "crest_caldrin": {
+        "name": "Crest of Caldrin",
+        "blurb": "Measured, not meek.",
+        "rarity": "rare",
+        "kind": "crest",
+        "emoji": "🐒",
+    },
+    "crest_thornmere": {
+        "name": "Crest of Thornmere",
+        "blurb": "Loyalty earned. Advantage taken.",
+        "rarity": "rare",
+        "kind": "crest",
+        "emoji": "🐺",
+    },
+    "dementor": {
+        "name": "Dementor",
+        "blurb": "Cold that remembers your name.",
+        "rarity": "rare",
+        "kind": "beast",
+        "emoji": "👻",
+    },
+    "shadow_wolf": {
+        "name": "Shadow Wolf",
+        "blurb": "Howls from the wrong side of the veil.",
+        "rarity": "rare",
+        "kind": "beast",
+        "emoji": "🐺",
+    },
+    "incendio": {
+        "name": "Incendio",
+        "blurb": "Fire on command. Apologies optional.",
+        "rarity": "rare",
+        "kind": "spell",
+        "emoji": "🔥",
+    },
+    "protego": {
+        "name": "Protego",
+        "blurb": "A wall of will. Hold it.",
+        "rarity": "rare",
+        "kind": "spell",
+        "emoji": "🛡️",
+    },
+    "expelliarmus": {
+        "name": "Expelliarmus",
+        "blurb": "Your wand. My terms.",
+        "rarity": "rare",
+        "kind": "spell",
+        "emoji": "🪄",
+    },
+    "stupefy": {
+        "name": "Stupefy",
+        "blurb": "Lights out. Soft landing not included.",
         "rarity": "uncommon",
-        "emoji": "🫖",
+        "kind": "spell",
+        "emoji": "💥",
+    },
+    "bombarda": {
+        "name": "Bombarda",
+        "blurb": "Doors were a suggestion.",
+        "rarity": "uncommon",
+        "kind": "spell",
+        "emoji": "💣",
+    },
+    "petrificus": {
+        "name": "Petrificus Totalus",
+        "blurb": "Full body bind. No stretching.",
+        "rarity": "uncommon",
+        "kind": "spell",
+        "emoji": "🪨",
+    },
+    "obliviate": {
+        "name": "Obliviate",
+        "blurb": "You won't remember reading this.",
+        "rarity": "uncommon",
+        "kind": "spell",
+        "emoji": "🌫️",
+    },
+    "stormcaller": {
+        "name": "Stormcaller",
+        "blurb": "Thunder with a destination.",
+        "rarity": "uncommon",
+        "kind": "beast",
+        "emoji": "⛈️",
+    },
+    "ember_hound": {
+        "name": "Ember Hound",
+        "blurb": "Warm loyalty. Hot breath.",
+        "rarity": "uncommon",
+        "kind": "beast",
+        "emoji": "🐶",
+    },
+    "volt_serpent": {
+        "name": "Volt Serpent",
+        "blurb": "Don't pet the lightning.",
+        "rarity": "uncommon",
+        "kind": "beast",
+        "emoji": "🐍",
     },
     "niffler": {
-        "name": "The First Niffler",
+        "name": "Niffler",
         "blurb": "Shiny things were never safe again.",
         "rarity": "uncommon",
+        "kind": "beast",
         "emoji": "🦡",
     },
-    "broom_fitter": {
-        "name": "The Broom-Fitter",
-        "blurb": "Reads three words. Hands you a destiny with bristles.",
+    "lanternback_stag": {
+        "name": "Lanternback Stag",
+        "blurb": "Lights the path. Judges the traveler.",
         "rarity": "uncommon",
-        "emoji": "🧹",
+        "kind": "beast",
+        "emoji": "🦌",
     },
-    "kitchen_elf_nix": {
-        "name": "Nix of the Kitchens",
-        "blurb": "Opinions. Butter. Absolute power.",
+    "moonglass_owl": {
+        "name": "Moonglass Owl",
+        "blurb": "Sees through excuses.",
         "rarity": "uncommon",
-        "emoji": "🍞",
-    },
-    "mirror_attendant": {
-        "name": "The Mirror Attendant",
-        "blurb": "Adjusts your reflection until you agree.",
-        "rarity": "uncommon",
-        "emoji": "🪞",
-    },
-    "potion_master_quill": {
-        "name": "Master Quill",
-        "blurb": "Brews first. Explains later. Sometimes.",
-        "rarity": "uncommon",
-        "emoji": "⚗️",
-    },
-    "quidditch_captain": {
-        "name": "The Pitch Captain",
-        "blurb": "Whistle louder than the wind. Still loses socks.",
-        "rarity": "uncommon",
-        "emoji": "🏆",
-    },
-    "librarian_hush": {
-        "name": "Librarian Hush",
-        "blurb": "Shushes ghosts. The ghosts apologize.",
-        "rarity": "uncommon",
-        "emoji": "📚",
-    },
-    "groundskeeper": {
-        "name": "The Groundskeeper",
-        "blurb": "Knows every stone. Fines every shortcut.",
-        "rarity": "uncommon",
-        "emoji": "🌿",
-    },
-    "night_watch": {
-        "name": "The Night Watch",
-        "blurb": "Lantern, patience, and a list of your excuses.",
-        "rarity": "uncommon",
-        "emoji": "🔦",
-    },
-    "owl_post": {
-        "name": "Owl Post Express",
-        "blurb": "Late letters. Early judgments.",
-        "rarity": "uncommon",
+        "kind": "beast",
         "emoji": "🦉",
     },
-    "duel_champion": {
-        "name": "The Duel Board",
-        "blurb": "Keeps score. Remembers grudges. Suggests rematches.",
+    "arresto": {
+        "name": "Arresto Momentum",
+        "blurb": "Fall later. Think now.",
         "rarity": "uncommon",
-        "emoji": "⚔️",
+        "kind": "spell",
+        "emoji": "⏳",
     },
-    # --- Common ---
-    "sir_hopsalot": {
+    "glacius": {
+        "name": "Glacius",
+        "blurb": "Ice with opinions.",
+        "rarity": "uncommon",
+        "kind": "spell",
+        "emoji": "❄️",
+    },
+    "lumos": {
+        "name": "Lumos",
+        "blurb": "A little light goes a long hallway.",
+        "rarity": "common",
+        "kind": "spell",
+        "emoji": "💡",
+    },
+    "accio": {
+        "name": "Accio",
+        "blurb": "Come here. Yes, you — the biscuit.",
+        "rarity": "common",
+        "kind": "spell",
+        "emoji": "📦",
+    },
+    "reparo": {
+        "name": "Reparo",
+        "blurb": "Almost as good as new. Almost.",
+        "rarity": "common",
+        "kind": "spell",
+        "emoji": "🔧",
+    },
+    "wingardium": {
+        "name": "Wingardium Leviosa",
+        "blurb": "It's levi-O-sa. The feather knows.",
+        "rarity": "common",
+        "kind": "spell",
+        "emoji": "🪶",
+    },
+    "alohomora": {
+        "name": "Alohomora",
+        "blurb": "Locks are social constructs.",
+        "rarity": "common",
+        "kind": "spell",
+        "emoji": "🔓",
+    },
+    "colloportus": {
+        "name": "Colloportus",
+        "blurb": "Stay closed. We're talking.",
+        "rarity": "common",
+        "kind": "spell",
+        "emoji": "🔒",
+    },
+    "finite": {
+        "name": "Finite Incantatem",
+        "blurb": "Spell's over. Sit down.",
+        "rarity": "common",
+        "kind": "spell",
+        "emoji": "⛔",
+    },
+    "riddikulus": {
+        "name": "Riddikulus",
+        "blurb": "Fear, but make it comedy.",
+        "rarity": "common",
+        "kind": "spell",
+        "emoji": "🎭",
+    },
+    "impedimenta": {
+        "name": "Impedimenta",
+        "blurb": "Slow down. That's an order.",
+        "rarity": "common",
+        "kind": "spell",
+        "emoji": "🌀",
+    },
+    "silencio": {
+        "name": "Silencio",
+        "blurb": "Quiet. Finally.",
+        "rarity": "common",
+        "kind": "spell",
+        "emoji": "🔇",
+    },
+    "episkey": {
+        "name": "Episkey",
+        "blurb": "Small hurts. Quick fix.",
+        "rarity": "common",
+        "kind": "spell",
+        "emoji": "💚",
+    },
+    "descendo": {
+        "name": "Descendo",
+        "blurb": "Gravity, but personal.",
+        "rarity": "common",
+        "kind": "spell",
+        "emoji": "⬇️",
+    },
+    "ventus": {
+        "name": "Ventus",
+        "blurb": "Wind with an agenda.",
+        "rarity": "common",
+        "kind": "spell",
+        "emoji": "💨",
+    },
+    "hopsalot": {
         "name": "Sir Hopsalot",
         "blurb": "A prefect's toad. A legend. A menace.",
         "rarity": "common",
+        "kind": "beast",
         "emoji": "🐸",
     },
-    "oakmont_bear": {
-        "name": "The Oakmont Bear",
-        "blurb": "Patient. Relentless. Purple.",
-        "rarity": "common",
-        "emoji": "🐻",
-    },
-    "aster_squirrel": {
-        "name": "The AsterWilde Squirrel",
-        "blurb": "Beautiful chaos with a nut budget.",
-        "rarity": "common",
-        "emoji": "🐿️",
-    },
-    "veyren_deer": {
-        "name": "The Veyren Deer",
-        "blurb": "Some bonds need no words. Or cards. (Have one anyway.)",
-        "rarity": "common",
-        "emoji": "🦌",
-    },
-    "caldrin_lemur": {
-        "name": "The Caldrin Lemur",
-        "blurb": "Measured, not meek. Still steals biscuits.",
-        "rarity": "common",
-        "emoji": "🐒",
-    },
-    "thornmere_wolf": {
-        "name": "The Thornmere Wolf",
-        "blurb": "Loyalty earned. Advantage taken. Card collected.",
-        "rarity": "common",
-        "emoji": "🐺",
-    },
-    "prefect_marlow": {
-        "name": "Prefect Marlow",
-        "blurb": "Badge heavy. Patience thin. Still trying.",
-        "rarity": "common",
-        "emoji": "🎖️",
-    },
     "wild_threat": {
-        "name": "A Wild Threat",
-        "blurb": "It wandered in. Someone cast. Points happened.",
+        "name": "Wild Threat",
+        "blurb": "It wandered in. Someone cast.",
         "rarity": "common",
+        "kind": "beast",
         "emoji": "👻",
     },
-    "house_elf_tea": {
-        "name": "Tea Tray Imp",
-        "blurb": "Refills forever. Judges your sugar count.",
+    "field_cow": {
+        "name": "Field Cow",
+        "blurb": "Pastoral. Magical. Unbothered.",
         "rarity": "common",
-        "emoji": "🍵",
+        "kind": "beast",
+        "emoji": "🐄",
     },
-    "lost_sock": {
-        "name": "The Lost Sock",
-        "blurb": "Found in the Room. Still looking for its twin.",
+    "cistern_toad": {
+        "name": "Cistern Toad",
+        "blurb": "Lives in the pipes. Knows things.",
         "rarity": "common",
-        "emoji": "🧦",
+        "kind": "beast",
+        "emoji": "🐸",
     },
-    "ink_blot": {
-        "name": "The Living Inkblot",
-        "blurb": "Signed your essay. Not helpfully.",
+    "button_magpie": {
+        "name": "Button Magpie",
+        "blurb": "Collects buttons. Judges fashion.",
         "rarity": "common",
-        "emoji": "🖋️",
+        "kind": "beast",
+        "emoji": "🐦",
     },
-    "hallway_armor": {
-        "name": "Suit of Armor #47",
-        "blurb": "Salutes. Occasionally trips you. No apology.",
+    "blackcap_squirrel": {
+        "name": "Blackcap Squirrel",
+        "blurb": "AsterWilde energy in rodent form.",
         "rarity": "common",
-        "emoji": "🛡️",
+        "kind": "beast",
+        "emoji": "🐿️",
     },
-    "candle_sprite": {
-        "name": "Candle Sprite",
-        "blurb": "Floats. Flickers. Burns homework on principle.",
+    "duskpup": {
+        "name": "Duskpup",
+        "blurb": "Sleeps through Charms. Dreams of snacks.",
         "rarity": "common",
-        "emoji": "🕯️",
+        "kind": "beast",
+        "emoji": "🐕",
     },
-    "stair_that_moves": {
-        "name": "The Moving Stair",
-        "blurb": "Was going to Charms. Arrived at Detention.",
+    "orbitcat": {
+        "name": "Orbitcat",
+        "blurb": "Gravity is a suggestion.",
         "rarity": "common",
-        "emoji": "🪜",
-    },
-    "chocolate_wrapper": {
-        "name": "Empty Wrapper",
-        "blurb": "The frog got away. The card remains. Rude.",
-        "rarity": "common",
-        "emoji": "🍬",
-    },
-    "practice_dummy": {
-        "name": "The Practice Dummy",
-        "blurb": "Has opinions about your aim. Valid ones.",
-        "rarity": "common",
-        "emoji": "🎯",
-    },
-    "lake_pebble": {
-        "name": "A Lake Pebble",
-        "blurb": "Skips thrice. Knows secrets. Won't share.",
-        "rarity": "common",
-        "emoji": "🪨",
-    },
-    "common_room_cushion": {
-        "name": "Common-Room Cushion",
-        "blurb": "Absorbs gossip. Releases crumbs.",
-        "rarity": "common",
-        "emoji": "🪑",
-    },
-    "midnight_snack": {
-        "name": "Midnight Snack",
-        "blurb": "Illegal. Delicious. Worth the write-up.",
-        "rarity": "common",
-        "emoji": "🥐",
-    },
-    "study_hall_clock": {
-        "name": "Study Hall Clock",
-        "blurb": "Runs slow during essays. Fast during fun.",
-        "rarity": "common",
-        "emoji": "🕰️",
+        "kind": "beast",
+        "emoji": "🐱",
     },
 }
 
@@ -664,14 +706,14 @@ class Frogs(commands.Cog):
             msg = self._award_house_pts(
                 user_id,
                 MYTHIC_PTS,
-                "Chocolate Frog — Gon (mythic)",
+                "Chocolate Frog — Lumen Aegis (mythic)",
             )
             rec["mythic_paid"] = True
             if msg:
                 notes.append(f"✦ <@{user_id}> {msg}")
             else:
                 notes.append(
-                    f"✦ <@{user_id}> collected **Gon** "
+                    f"✦ <@{user_id}> collected **Lumen Aegis** "
                     f"(+{MYTHIC_PTS} when a Cup season is live)."
                 )
         self.save()
@@ -755,20 +797,24 @@ class Frogs(commands.Cog):
             title=f"🃏 {target.display_name}'s Frog Album",
             description=(
                 f"**{unique}/{len(CARDS)}** unique · **{copies}** cards\n"
+                f"Spells · Crests · Beasts — people cards later\n"
                 f"Milestones: +{DECADE_PTS} pts every 10 unique · "
-                f"mythic **Gon** +{MYTHIC_PTS}"
+                f"mythic **Lumen Aegis** +{MYTHIC_PTS}"
             ),
             color=RARITY_COLOR["legendary"],
         )
-        for rarity in RARITY_ORDER:
+        kind_order = ("crest", "spell", "beast")
+        kind_label = {"crest": "Crests", "spell": "Spells", "beast": "Beasts"}
+        for kind in kind_order:
             chunk = [
-                f"{CARDS[cid]['emoji']} **{CARDS[cid]['name']}** ×{counts[cid]}"
+                f"{CARDS[cid]['emoji']} **{CARDS[cid]['name']}** "
+                f"· {RARITY_LABEL.get(CARDS[cid]['rarity'], CARDS[cid]['rarity'])} ×{counts[cid]}"
                 for cid in sorted(counts, key=lambda c: CARDS[c]["name"])
-                if CARDS[cid]["rarity"] == rarity
+                if CARDS[cid].get("kind") == kind
             ]
             if chunk:
                 embed.add_field(
-                    name=RARITY_LABEL.get(rarity, rarity.title()),
+                    name=kind_label[kind],
                     value="\n".join(chunk),
                     inline=False,
                 )
