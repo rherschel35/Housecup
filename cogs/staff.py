@@ -45,6 +45,8 @@ class Staff(commands.Cog):
     challenge = sg.challenge
     hex_g = sg.hexes
     bingo = sg.bingo
+    frog = sg.frog
+    room = sg.room
     market = sg.market
     usage = sg.usage
 
@@ -664,6 +666,46 @@ class Staff(commands.Cog):
             return
         await cog.staff_winners(interaction)
 
+    # --------------------------------------------------------------- frog prizes
+
+    @frog.command(name="prize", description="Award a Chocolate Frog card as a prize or reward.")
+    @app_commands.describe(member="Who receives the card", card="Which card (start typing to search)")
+    async def frog_prize(
+        self, interaction: discord.Interaction, member: discord.Member, card: str
+    ):
+        cog = self._cog("Frogs")
+        if not cog:
+            await interaction.response.send_message("Frogs isn't loaded.", ephemeral=True)
+            return
+        await cog.staff_prize(interaction, member, card)
+
+    @frog_prize.autocomplete("card")
+    async def frog_prize_autocomplete(self, interaction: discord.Interaction, current: str):
+        cog = self._cog("Frogs")
+        if not cog:
+            return []
+        return await cog.staff_prize_autocomplete(interaction, current)
+
+    # --------------------------------------------------------------- room decor
+
+    @room.command(name="prize", description="Award dorm decor (unlocks + adds to stash).")
+    @app_commands.describe(member="Who receives the decor", decor="Which piece (start typing to search)")
+    async def room_prize(
+        self, interaction: discord.Interaction, member: discord.Member, decor: str
+    ):
+        cog = self._cog("Dorm")
+        if not cog:
+            await interaction.response.send_message("Dorm isn't loaded.", ephemeral=True)
+            return
+        await cog.staff_prize(interaction, member, decor)
+
+    @room_prize.autocomplete("decor")
+    async def room_prize_autocomplete(self, interaction: discord.Interaction, current: str):
+        cog = self._cog("Dorm")
+        if not cog:
+            return []
+        return await cog.staff_prize_autocomplete(interaction, current)
+
     # --------------------------------------------------------------- market
 
     @market.command(name="sellreset", description="Clear someone's daily Marketplace sell-points cap.")
@@ -767,7 +809,7 @@ class Staff(commands.Cog):
             await interaction.followup.send(
                 f"{lead}"
                 "Fully quit Discord and reopen `/`.\n"
-                "• `/familiar` → status / adopt / name / feed / pet / play / scout\n"
+                "• `/familiar` → status / adopt / name / look / looks / feed / pet / play / scout\n"
                 "• Top-level `/play` · `/feed` · `/pet` · `/scout` should be gone",
                 ephemeral=True,
             )

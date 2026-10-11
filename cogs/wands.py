@@ -11,10 +11,13 @@ when it's available, so the wand is a genuine interpretation with a few
 lines on why it chose you. If the API is unreachable the wand is still
 chosen, deterministically, from the words themselves.
 
-One wand per person, for good. Purely cosmetic.
+One wand per person, for good. Purely cosmetic. Each wood×core pair has a
+portrait under wand_art_assets/, shown whenever you /wand — same idea as
+broom portraits.
 """
 
 import hashlib
+import io
 import json
 import logging
 import os
@@ -30,6 +33,7 @@ log = logging.getLogger("velmora.wands")
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 WANDS_PATH = STATE_DIR / "wands.json"
+ASSETS_DIR = Path(__file__).resolve().parent.parent / "wand_art_assets"
 
 MODEL = os.getenv("WAND_MODEL", "claude-haiku-4-5-20251001")
 
@@ -70,6 +74,16 @@ CORES = {
 FLEXIBILITIES = ["unyielding", "rigid", "firm", "sturdy", "supple", "pliant", "whippy"]
 
 MIN_LENGTH, MAX_LENGTH = 9.0, 14.0  # inches, in quarter steps
+
+
+def image_name(wood: str, core: str) -> str:
+    """Portrait filename for a wood + core pairing."""
+    return f"{wood.replace(' ', '_')}_{core.replace(' ', '_').replace(chr(39), '')}.png"
+
+
+def art_path(wood: str, core: str) -> Path | None:
+    path = ASSETS_DIR / image_name(wood, core)
+    return path if path.is_file() else None
 
 
 def _fmt_length(inches: float) -> str:
@@ -192,6 +206,13 @@ class Wands(commands.Cog):
             return None
         return f"{w['wood'].lower()} & {w['core'].lower()}"
 
+    def portrait_file(self, wand: dict) -> discord.File | None:
+        path = art_path(wand.get("wood") or "", wand.get("core") or "")
+        if path is None:
+            log.warning("Missing wand art for %s / %s", wand.get("wood"), wand.get("core"))
+            return None
+        return discord.File(io.BytesIO(path.read_bytes()), filename="wand.png")
+
     # ------------------------------------------------------------- reading
 
     async def read_wand(self, words: str) -> dict:
@@ -219,7 +240,14 @@ class Wands(commands.Cog):
                 log.exception("Wand reading failed; using the fallback.")
         return fallback_wand(words)
 
-    def embed_for(self, member, wand: dict, fresh: bool = False) -> discord.Embed:
+    def embed_for(
+        self,
+        member,
+        wand: dict,
+        fresh: bool = False,
+        *,
+        with_art: bool = False,
+    ) -> discord.Embed:
         from cogs.store import HOUSES
         store = self.bot.get_cog("Store")
         house = store.member_house(member) if store else None
@@ -234,9 +262,30 @@ class Wands(commands.Cog):
             ),
             color=color,
         )
+        if with_art:
+            embed.set_image(url="attachment://wand.png")
         if fresh:
             embed.set_footer(text=f"{member.display_name}'s wand • it's yours for good")
         return embed
+
+    async def _send_wand(
+        self,
+        interaction: discord.Interaction,
+        member,
+        wand: dict,
+        *,
+        fresh: bool = False,
+        followup: bool = False,
+    ) -> None:
+        art = self.portrait_file(wand)
+        embed = self.embed_for(member, wand, fresh=fresh, with_art=art is not None)
+        kwargs = {"embed": embed}
+        if art is not None:
+            kwargs["file"] = art
+        if followup:
+            await interaction.followup.send(**kwargs)
+        else:
+            await interaction.response.send_message(**kwargs)
 
     # ------------------------------------------------------------ commands
 
@@ -251,7 +300,7 @@ class Wands(commands.Cog):
 
         existing = self.wand_of(target.id)
         if existing:
-            await interaction.response.send_message(embed=self.embed_for(target, existing))
+            await self._send_wand(interaction, target, existing)
             return
 
         if member and member.id != interaction.user.id:
@@ -309,8 +358,8 @@ class WandModal(discord.ui.Modal, title="The wand chooses the wizard"):
 
         # Someone may have double-submitted; the first wand stands.
         if self.cog.wand_of(interaction.user.id):
-            await interaction.response.send_message(
-                embed=self.cog.embed_for(interaction.user, self.cog.wand_of(interaction.user.id))
+            await self.cog._send_wand(
+                interaction, interaction.user, self.cog.wand_of(interaction.user.id)
             )
             return
 
@@ -319,7 +368,9 @@ class WandModal(discord.ui.Modal, title="The wand chooses the wizard"):
         wand["words"] = text
         self.cog.wands[str(interaction.user.id)] = wand
         self.cog.save()
-        await interaction.followup.send(embed=self.cog.embed_for(interaction.user, wand, fresh=True))
+        await self.cog._send_wand(
+            interaction, interaction.user, wand, fresh=True, followup=True
+        )
 
 
 async def setup(bot: commands.Bot):

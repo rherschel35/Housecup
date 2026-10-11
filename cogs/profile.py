@@ -241,9 +241,15 @@ class Profile(commands.Cog):
             meta = FAMILIARS[fam["species"]]
             _, tier_name, _, _ = _tier(fam["friendship"])
             label = f"**{fam['name']}** the {meta['label']}" if fam.get("name") else f"{meta['article']} {meta['label']}"
+            look_name = ""
+            if fam.get("look"):
+                from cogs.familiars import LOOKS
+                lm = LOOKS.get(fam["species"], {}).get(fam["look"])
+                if lm:
+                    look_name = f"\n{lm['label']}"
             embed.add_field(
                 name="Familiar",
-                value=f"{meta['emoji']} {label}\n{tier_name}",
+                value=f"{meta['emoji']} {label}\n{tier_name}{look_name}",
                 inline=True,
             )
         else:

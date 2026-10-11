@@ -834,7 +834,7 @@ EFFECTS = {
     },
     "limp_wand": {
         "name": "Limp Wand",
-        "description": "Their wand hangs limp — /wand, /patronus, and /broom won't answer for an hour.",
+        "description": "Their wand hangs limp — /wand, /patronus, /patronusreset, and /broom won't answer for an hour.",
         "func": None,  # not a chat mangle; blocks wand commands instead
         "blocks_wand": True,
         "fixed_minutes": 60,
@@ -842,7 +842,7 @@ EFFECTS = {
 }
 
 # Player wand-kit slash commands blocked by Limp Wand (staff resets stay usable).
-WAND_KIT_COMMANDS = frozenset({"wand", "patronus", "broom"})
+WAND_KIT_COMMANDS = frozenset({"wand", "patronus", "patronusreset", "broom"})
 
 CAST_FLOURISHES = [
     "draws their wand with a flourish and levels it at",
@@ -978,7 +978,7 @@ class Hexes(commands.Cog):
         )
         msg = (
             "Your wand hangs limp and won't answer. "
-            f"`/wand`, `/patronus`, and `/broom` are out {when}."
+            f"`/wand`, `/patronus`, `/patronusreset`, and `/broom` are out {when}."
         )
         if interaction.response.is_done():
             await interaction.followup.send(msg, ephemeral=True)

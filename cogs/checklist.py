@@ -274,6 +274,39 @@ class Checklist(commands.Cog):
             else:
                 lines.append("⬜ **Familiar** — none yet · `/familiar adopt`")
 
+        # ---- Frog / fire / room (Chicago calendar) ----
+        frogs = self.bot.get_cog("Frogs")
+        if frogs:
+            from cogs.world_engine import today as chi_today
+            rec = frogs.record(member.id)
+            opened = rec.get("opened_on") == chi_today(now)
+            lines.append(_line(
+                opened, "Chocolate Frog",
+                "opened today" if opened else "ready — `/frog open`",
+                chi_reset, "day resets"))
+
+        fire = self.bot.get_cog("HouseFire")
+        if fire:
+            from cogs.world_engine import today as chi_today
+            store = self.bot.get_cog("Store")
+            house = store.member_house(member) if store else None
+            if house:
+                stoked = member.id in fire.stokers(house, chi_today(now))
+                lines.append(_line(
+                    stoked, "House fire",
+                    "stoked today" if stoked else "ready — `/stoke`",
+                    chi_reset, "day resets"))
+
+        dorm = self.bot.get_cog("Dorm")
+        if dorm:
+            from cogs.world_engine import today as chi_today
+            rec = dorm.record(member.id)
+            found = rec.get("found_on") == chi_today(now)
+            lines.append(_line(
+                found, "Room find",
+                "found today" if found else "ready — `/room find`",
+                chi_reset, "day resets"))
+
         # ---- Open challenges ----
         quests = self.bot.get_cog("Quests")
         if quests:

@@ -71,6 +71,12 @@ hexes = app_commands.Group(
 bingo = app_commands.Group(
     name="bingo", parent=staffgame, description="Wizard Bingo staff tools."
 )
+frog = app_commands.Group(
+    name="frog", parent=staffgame, description="Chocolate Frog staff prizes."
+)
+room = app_commands.Group(
+    name="room", parent=staffgame, description="Dorm decor staff prizes."
+)
 market = app_commands.Group(
     name="market", parent=staffgame, description="Marketplace staff tools."
 )
