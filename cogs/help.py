@@ -285,7 +285,7 @@ HELP = {
             ("staffgame bingo call", "Optional manual call (auto-caller runs after Start)."),
             ("staffgame bingo end", "End the open Wizard Bingo round."),
             ("staffgame bingo winners", "List BINGO winners for the open round."),
-            ("staffgame frog prize", "Award any Chocolate Frog card as a prize/reward (incl. mythic Herschel & Pod)."),
+            ("staffgame frog prize", "Award any Chocolate Frog card as a prize/reward (incl. mythic Gon)."),
             ("staffgame duels night", "Start or end House Duel Night — pick 30 minutes or 1 hour; double points, no daily cap; best-of series bank in full; end-night house/MVP bonuses."),
             ("staffgame duels nightschedule", "Schedule 1–3 weekly Duel Nights (30 min or 1 hr) — each with its own Chicago day + time."),
             ("staffgame duels nightscheduleoff", "Turn off the weekly Duel Night schedule."),

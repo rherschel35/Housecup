@@ -10,7 +10,7 @@ Chocolate Frog Cards — daily collectibles.
 Staff:
     /staffgame frog prize      - award any card as a prize/reward
 
-50 cards. Mythic "Herschel & Pod" is extremely rare from opens.
+50 cards. Mythic "Gon" is extremely rare from opens.
 Every 10 unique cards → +10 house pts. First mythic → +25.
 """
 
@@ -42,7 +42,7 @@ FROG_CHANNEL_IDS = with_study_hall_and_duels_potions()
 
 # Ultra-rare: ~1 in N opens (default 250). Env override for testing.
 MYTHIC_ODDS = max(50, int(os.getenv("FROG_MYTHIC_ODDS", "250")))
-MYTHIC_ID = "herschel_pod"
+MYTHIC_ID = "gon"
 DECADE_PTS = 10
 MYTHIC_PTS = 25
 
@@ -72,20 +72,20 @@ RARITY_LABEL = {
 CARDS: dict[str, dict] = {
     # --- Mythic (1) ---
     MYTHIC_ID: {
-        "name": "Herschel & Pod",
+        "name": "Gon",
         "blurb": (
-            "Thornmere's quiet hour: a wizard and the wolf who chose him. "
+            "They just call him Gon. When something breaks, he already knows. "
             "Almost never found in a box."
         ),
         "rarity": "mythic",
-        "emoji": "🐺",
+        "emoji": "🪄",
     },
     # --- Legendary ---
     "mordy": {
         "name": "Mordy Velmora",
-        "blurb": "Founder of the school. Purple robes. Opinions. History.",
+        "blurb": "Founder-ghost of the school. Legacy. Power. Eternity.",
         "rarity": "legendary",
-        "emoji": "🏰",
+        "emoji": "👻",
     },
     "vida": {
         "name": "Vida Vashara",
@@ -111,17 +111,17 @@ CARDS: dict[str, dict] = {
         "rarity": "legendary",
         "emoji": "🐒",
     },
-    "gon": {
-        "name": "Gon Vale",
-        "blurb": "Headmaster. When something breaks, he already knows.",
-        "rarity": "legendary",
-        "emoji": "🪄",
-    },
     "sorting_net": {
         "name": "The Sorting Net",
         "blurb": "It does not shout. It quietly files you.",
         "rarity": "legendary",
         "emoji": "🧵",
+    },
+    "velmora_seal": {
+        "name": "The Velmora Seal",
+        "blurb": "Five houses. One crest. Wax that never cools.",
+        "rarity": "legendary",
+        "emoji": "🔏",
     },
     # --- Rare ---
     "sebastian": {
@@ -664,14 +664,14 @@ class Frogs(commands.Cog):
             msg = self._award_house_pts(
                 user_id,
                 MYTHIC_PTS,
-                "Chocolate Frog — Herschel & Pod (mythic)",
+                "Chocolate Frog — Gon (mythic)",
             )
             rec["mythic_paid"] = True
             if msg:
                 notes.append(f"✦ <@{user_id}> {msg}")
             else:
                 notes.append(
-                    f"✦ <@{user_id}> collected **Herschel & Pod** "
+                    f"✦ <@{user_id}> collected **Gon** "
                     f"(+{MYTHIC_PTS} when a Cup season is live)."
                 )
         self.save()
@@ -756,7 +756,7 @@ class Frogs(commands.Cog):
             description=(
                 f"**{unique}/{len(CARDS)}** unique · **{copies}** cards\n"
                 f"Milestones: +{DECADE_PTS} pts every 10 unique · "
-                f"mythic **Herschel & Pod** +{MYTHIC_PTS}"
+                f"mythic **Gon** +{MYTHIC_PTS}"
             ),
             color=RARITY_COLOR["legendary"],
         )

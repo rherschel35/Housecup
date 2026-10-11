@@ -27,14 +27,14 @@ RARITY_LABEL = {
 
 # card_id -> filename under frog_art_assets/
 ART_FILES = {
-    "herschel_pod": "frog_herschel_pod.jpg",
+    "gon": "frog_gon.jpg",
     "mordy": "frog_mordy.jpg",
     "vida": "frog_vida.jpg",
     "maynard": "frog_maynard.jpg",
     "finley": "frog_finley.jpg",
     "cassy": "frog_cassy.jpg",
-    "gon": "frog_gon.jpg",
     "sorting_net": "frog_sorting_net.jpg",
+    "velmora_seal": "frog_velmora_seal.jpg",
     "sebastian": "frog_sebastian.jpg",
     "hollow_portrait": "frog_hollow_portrait.jpg",
     "lake_figure": "frog_lake_figure.jpg",
