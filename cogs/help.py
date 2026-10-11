@@ -143,7 +143,7 @@ HELP = {
         "title": "Brooms",
         "staff": False,
         "note": (
-            "Claim one unique broom from your wand words (100 portraits). "
+            "Claim one unique broom from your wand words (200 portraits). "
             "Upgrade Speed/Altitude toward 10, then race on the Quidditch pitch. "
             "Every stage shows the full set of lines — read them; stats only decide "
             "whether you can hold a clean line. Traps double time lost. "

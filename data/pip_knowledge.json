@@ -45,7 +45,7 @@
         "claim broom",
         "broom portrait"
       ],
-      "answer": "Yer `/broom` comes from the same three words as yer wand \u2014 100 fixed portraits, one owner each. If that broom's taken, ye get the next-closest. Base Speed an' Altitude are fixed per model (same on the Compendium); ye can upgrade 'em toward 10 with `/broomupgrade`. Need a wand first. Staff free a claim with `/staff identity broomreset` (wand stays). Full gallery's on the Compendium Brooms page.",
+      "answer": "Yer `/broom` comes from the same three words as yer wand \u2014 200 fixed portraits, one owner each. If that broom's taken, ye get the next-closest. Base Speed an' Altitude are fixed per model (same on the Compendium); ye can upgrade 'em toward 10 with `/broomupgrade`. Need a wand first. Staff free a claim with `/staff identity broomreset` (wand stays). Full gallery's on the Compendium Brooms page.",
       "link": "https://everything-velmora.netlify.app/brooms"
     },
     {

@@ -66,7 +66,7 @@ def main() -> int:
     cards = "".join(_card(m, b, brooms_mod) for m, b in brooms_mod.BROOMS.items())
     page = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Brooms · Velmora</title><meta name="description" content="All 100 unique Velmora broom portraits — readings, silly stats, and looks. Claimed with /broom from your wand words.">
+<title>Brooms · Velmora</title><meta name="description" content="All 200 unique Velmora broom portraits — readings, silly stats, and looks. Claimed with /broom from your wand words.">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Alegreya:ital,wght@0,400;0,500;0,700;1,400&family=Alegreya+Sans+SC:wght@500;700&display=swap"><link rel="stylesheet" href="style.css">
 <script>try{{var t=localStorage.getItem('vc-theme');if(t)document.documentElement.dataset.theme=t}}catch(e){{}}</script>
 </head><body>
@@ -75,7 +75,7 @@ def main() -> int:
 <button class="theme" type="button" onclick="(function(){{var d=document.documentElement,n=(d.dataset.theme==='dark'||(!d.dataset.theme&&matchMedia('(prefers-color-scheme: dark)').matches))?'light':'dark';d.dataset.theme=n;try{{localStorage.setItem('vc-theme',n)}}catch(e){{}}}})()">Light / dark</button>
 </div></header>
 <main class="wrap">
-<div class="head"><p class="eyebrow">Velmora · the magic</p><h1>The Brooms</h1><p class="lede">One hundred fixed portraits. <code>/broom</code> claims yours from the same three words as your wand — one owner each, next-closest if taken. Purely cosmetic.</p>
+<div class="head"><p class="eyebrow">Velmora · the magic</p><h1>The Brooms</h1><p class="lede">Two hundred fixed portraits. <code>/broom</code> claims yours from the same three words as your wand — one owner each, next-closest if taken. Purely cosmetic.</p>
 <p class="sub">Each card is the same sheet Discord shows: a short reading of why it fits, plus that broom&#x27;s fixed bragging stats. Words pick which broom finds you; the stats belong to the broom. Jump by name, e.g. <a href="#Hearthfang"><code>#Hearthfang</code></a>.</p></div>
 <section id="gallery">
 <div class="grid broom-grid">{cards}</div>
