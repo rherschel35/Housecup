@@ -45,6 +45,7 @@ class Staff(commands.Cog):
     challenge = sg.challenge
     hex_g = sg.hexes
     bingo = sg.bingo
+    frog = sg.frog
     market = sg.market
     usage = sg.usage
 
@@ -663,6 +664,26 @@ class Staff(commands.Cog):
             await interaction.response.send_message("Bingo isn't loaded.", ephemeral=True)
             return
         await cog.staff_winners(interaction)
+
+    # --------------------------------------------------------------- frog prizes
+
+    @frog.command(name="prize", description="Award a Chocolate Frog card as a prize or reward.")
+    @app_commands.describe(member="Who receives the card", card="Which card (start typing to search)")
+    async def frog_prize(
+        self, interaction: discord.Interaction, member: discord.Member, card: str
+    ):
+        cog = self._cog("Frogs")
+        if not cog:
+            await interaction.response.send_message("Frogs isn't loaded.", ephemeral=True)
+            return
+        await cog.staff_prize(interaction, member, card)
+
+    @frog_prize.autocomplete("card")
+    async def frog_prize_autocomplete(self, interaction: discord.Interaction, current: str):
+        cog = self._cog("Frogs")
+        if not cog:
+            return []
+        return await cog.staff_prize_autocomplete(interaction, current)
 
     # --------------------------------------------------------------- market
 
