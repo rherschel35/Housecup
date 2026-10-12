@@ -11,7 +11,7 @@ Adornments: design your wizard, collect gear, and see it all in the Mirror.
     /title [title]             - choose which earned title shows under your name
     /cheer                     - (House Cup Bracelet) a celebration for your house
     /whistle                   - (Beastcaller's Whistle) call the next beast now, once a week
-    /secrets                   - (Keeper's Talisman) how many secrets you haven't found yet
+    /secrets                   - explore secrets you've found; Keeper's Talisman also shows what's still hidden
     /nightwatch on|off         - (Nightwatch Pendant) night-beast heads-up on or off
     /staff adornadmin give|take|channel|status
 
@@ -306,6 +306,69 @@ class Adornments(commands.Cog):
             for sec in P.c.get("secrets", []):
                 valid.add(f"{key}:{sec['id']}")
         return {f.split("@")[0] for f in s.get("flags", []) if f.split("@")[0] in valid}
+
+    @staticmethod
+    def _secret_label(sec_id: str) -> str:
+        return sec_id.replace("_", " ").strip().title()
+
+    @staticmethod
+    def _secret_memory(response: str, limit: int = 120) -> str:
+        text = " ".join((response or "").split())
+        if not text:
+            return ""
+        for sep in (". ", "! ", "? "):
+            idx = text.find(sep)
+            if 0 < idx <= limit:
+                return text[: idx + 1].strip()
+        if len(text) <= limit:
+            return text
+        cut = text[: limit - 1].rsplit(" ", 1)[0]
+        return (cut or text[: limit - 1]).rstrip(".,;:") + "…"
+
+    def found_secret_details(self, user_id: int) -> dict[str, list[dict]]:
+        """place_key -> [{id, label, memory, reward, event}] for secrets this student found.
+
+        Never includes phrases — only what they've already unlocked.
+        """
+        world_cog = self.bot.get_cog("World")
+        if not world_cog:
+            return {}
+        s = world_cog.state["students"].get(str(user_id), {})
+        catalog: dict[str, dict] = {}
+        for place, P in world_cog.world.places.items():
+            for sec in P.c.get("secrets", []) or []:
+                catalog[f"{place}:{sec['id']}"] = {"place": place, "sec": sec}
+
+        by_place: dict[str, list[dict]] = {k: [] for k in world_cog.world.places}
+        seen: set[str] = set()
+        # Prefer non-event flags when both exist for the same secret.
+        ordered = sorted(
+            (f for f in (s.get("flags") or []) if ":" in f),
+            key=lambda f: (0 if "@" not in f else 1, f),
+        )
+        for flag in ordered:
+            base, _, event = flag.partition("@")
+            if base in seen:
+                continue
+            meta = catalog.get(base)
+            if not meta:
+                continue
+            seen.add(base)
+            sec = meta["sec"]
+            reward = sec.get("reward")
+            reward_name = None
+            if reward and reward in world_cog.world.items:
+                reward_name = world_cog.world.items[reward]["name"]
+            by_place[meta["place"]].append({
+                "id": sec["id"],
+                "label": self._secret_label(sec["id"]),
+                "memory": self._secret_memory(sec.get("response") or ""),
+                "reward": reward_name,
+                "event": event or None,
+            })
+        for place in by_place:
+            by_place[place].sort(key=lambda r: r["label"].lower())
+        return by_place
 
     def _house(self, user_id: int, member=None) -> Optional[str]:
         store = self.bot.get_cog("Store")
@@ -1144,25 +1207,85 @@ class Adornments(commands.Cog):
         await interaction.followup.send(f"Something answered. Go and look in <#{beasts.channel_id()}> — "
                                         "quickly, anyone can befriend it.", ephemeral=True)
 
-    @app_commands.command(name="secrets", description="(Keeper's Talisman) How many secrets you haven't found yet.")
+    @app_commands.command(
+        name="secrets",
+        description="Explore secrets you've found. With Keeper's Talisman: also how many are still hidden.",
+    )
     async def secrets(self, interaction: discord.Interaction):
-        if not await self._needs(interaction, "secret_count", "keepers_talisman"):
-            return
         world_cog = self.bot.get_cog("World")
         if not world_cog:
-            await interaction.response.send_message("The talisman is quiet.", ephemeral=True)
+            await interaction.response.send_message("The places are quiet right now.", ephemeral=True)
             return
-        found = self.secrets_found(interaction.user.id)
-        house = self._house(interaction.user.id, interaction.user)
-        lines = []
-        for place, P in world_cog.world.places.items():
-            need = self.findable_secrets(world_cog.world, place, house)
-            left = len(need - found)
-            lines.append(f"{PLACE_OF.get(place, place)} — " + (f"**{left}** still hidden" if left else "✅ all found"))
-        await interaction.response.send_message(
-            "🗝️ The Keeper's Talisman turns in your hand…\n\n" + "\n".join(lines)
-            + "\n\n-# Counts the secrets you can find for good. Events and one-time surprises aren't included.",
-            ephemeral=True)
+
+        by_place = self.found_secret_details(interaction.user.id)
+        total = sum(len(v) for v in by_place.values())
+        embed = discord.Embed(
+            title=f"🗝️ {interaction.user.display_name}'s found secrets",
+            color=GOLD,
+        )
+        if total == 0:
+            embed.description = (
+                "You haven't discovered any explore secrets yet.\n"
+                "They aren't slash commands — try speaking in a place's channel "
+                "after you've `/explore`d there."
+            )
+        else:
+            embed.description = (
+                f"**{total}** secret{'s' if total != 1 else ''} remembered. "
+                "Only ones you've already found are listed — the phrases stay yours."
+            )
+            for place, P in world_cog.world.places.items():
+                entries = by_place.get(place) or []
+                if not entries:
+                    continue
+                lines = []
+                for e in entries:
+                    bit = f"• **{e['label']}**"
+                    if e.get("memory"):
+                        bit += f" — *{e['memory']}*"
+                    extras = []
+                    if e.get("reward"):
+                        extras.append(e["reward"])
+                    if e.get("event"):
+                        extras.append("during an event")
+                    if extras:
+                        bit += f" · {' · '.join(extras)}"
+                    lines.append(bit)
+                value = "\n".join(lines)
+                if len(value) > 1024:
+                    value = value[:1021] + "…"
+                embed.add_field(
+                    name=P.c.get("title", P.name),
+                    value=value,
+                    inline=False,
+                )
+
+        if self.has_perk(interaction.user.id, "secret_count"):
+            found = self.secrets_found(interaction.user.id)
+            house = self._house(interaction.user.id, interaction.user)
+            remain = []
+            for place in world_cog.world.places:
+                need = self.findable_secrets(world_cog.world, place, house)
+                left = len(need - found)
+                remain.append(
+                    f"{PLACE_OF.get(place, place)} — "
+                    + (f"**{left}** still hidden" if left else "✅ all found")
+                )
+            embed.add_field(
+                name="Keeper's Talisman",
+                value=(
+                    "\n".join(remain)
+                    + "\n-# Counts secrets you can find for good. "
+                    "Events and one-time surprises aren't included."
+                ),
+                inline=False,
+            )
+        else:
+            embed.set_footer(
+                text="Wear the Keeper's Talisman to also see how many are still hidden in each place."
+            )
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="nightwatch", description="(Nightwatch Pendant) Turn the night-beast heads-up on or off.")
     @app_commands.choices(setting=[app_commands.Choice(name="On", value="on"), app_commands.Choice(name="Off", value="off")])

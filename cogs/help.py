@@ -24,7 +24,7 @@ HELP = {
         "title": "Play",
         "staff": False,
         "entries": [
-            ("duel", "Challenge someone. Best of 3 = 1 win; best of 5/7/9/51 = series of first-to-2 sets banking 3/4/5/26 wins. Duel Night pays the full bank at double points."),
+            ("duel", "Challenge someone. Best of 3 = 1 win; best of 5/7/9/51 = series of first-to-2 sets banking 3/4/5/26 wins (sets you take still fill your daily duel checklist/points even if you lose the series). Duel Night pays the full bank at double points."),
             ("trio scramble", "Open a casual 3v3 trio duel — any houses, join either side. House points: 5 wins/day for the house → +5 once."),
             ("trio housematch", "Open a house-vs-house 3v3 trio duel (house role gated). Same house daily set: 5 wins → +5."),
             ("grand", "Challenge someone to a Grand Duel (both need 50+ 1v1 wins)."),
@@ -195,6 +195,7 @@ HELP = {
             ("explore", "Go somewhere and see what you find."),
             ("forage", "Search for ingredients and strange things (Pitch Resin for broom upgrades is forage-only)."),
             ("satchel", "What you're carrying. Only you can see it."),
+            ("secrets", "Explore secrets you've already found (private). Keeper's Talisman also shows how many are still hidden."),
             ("use", "Try something from your satchel where you are."),
             ("offer", "Leave an offering where you are."),
         ],
@@ -230,7 +231,7 @@ HELP = {
             ("title", "Choose which earned title shows under your name."),
             ("cheer", "House Cup Bracelet: a celebration for your house."),
             ("whistle", "Beastcaller's Whistle: call the next beast now. Once a week."),
-            ("secrets", "Keeper's Talisman: how many secrets you haven't found."),
+            ("secrets", "Explore secrets you've found; with Keeper's Talisman, also how many are still hidden."),
             ("nightwatch", "Nightwatch Pendant: night-beast heads-up on or off."),
         ],
     },
@@ -317,6 +318,7 @@ HELP = {
             ("staffgame duels nightscheduleoff", "Turn off the weekly Duel Night schedule."),
             ("staffgame duels nightscheduleroles", "Set Champions + WIZARDS AND WITCHES for Duel Night warn + start pings."),
             ("staffgame duels nightschedulestatus", "Show the weekly Duel Night schedule."),
+            ("staffgame duels housedaygrant", "Complete every house's trio + Quidditch daily sets for today (+5 each if unpaid); fresh at UTC midnight."),
         ],
     },
     "staff_world": {

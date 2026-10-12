@@ -175,9 +175,12 @@
         "observatory",
         "dungeons place",
         "offering",
-        "offer"
+        "offer",
+        "secrets",
+        "found secrets",
+        "explore secrets"
       ],
-      "answer": "Each place has its own channel. Use `/explore` (up to 10/day per place) an' `/forage` (up to 5/day). Check `/satchel`, try `/use`, leave an `/offer`. `/places` shows where ye can go — places remember how ye treat 'em.",
+      "answer": "Each place has its own channel. Use `/explore` (up to 10/day per place) an' `/forage` (up to 5/day). Check `/satchel`, try `/use`, leave an `/offer`. `/places` shows where ye can go — places remember how ye treat 'em. `/secrets` lists explore secrets ye've already found (private; doesn't spoil the phrases). Wear the Keeper's Talisman an' `/secrets` also shows how many are still hidden in each place.",
       "link": "https://everything-velmora.netlify.app/explore"
     },
     {
@@ -243,7 +246,7 @@
         "grand duel",
         "trio"
       ],
-      "answer": "`/duel` is first to 2 (best of three) by default — that banks **1 win**. Pick **best of 5, 7, 9, or 51** an' ye play sets of first-to-2 until someone hits 3 / 4 / 5 / 26 — the series winner banks that many wins without startin' over. On **Duel Night** those banked wins all count on the night board at double points. Press **Open my cast board** an' yer spell buttons sit under that private board (same idea as broom races). Hex, Ward, Disarm, Bind, Mirror; each beats two an' loses to two. `/trio` wins are house-level: **5** trio wins in a UTC day for that house pay **+5** house points once (anyone on the team can contribute). There's also `/trio scramble`, `/trio housematch`, an' `/grand`. Stuck on \"already in a duel\"? Cast `/duelend` to clear the lock.",
+      "answer": "`/duel` is first to 2 (best of three) by default — that banks **1 win**. Pick **best of 5, 7, 9, or 51** an' ye play sets of first-to-2 until someone hits 3 / 4 / 5 / 26 — the series winner banks that many wins without startin' over. Sets ye take in a series still fill yer daily duel checklist / house points (up to 3/day) even if ye lose the series. On **Duel Night** those banked wins all count on the night board at double points. Press **Open my cast board** an' yer spell buttons sit under that private board (same idea as broom races). Hex, Ward, Disarm, Bind, Mirror; each beats two an' loses to two. `/trio` wins are house-level: **5** trio wins in a UTC day for that house pay **+5** house points once (anyone on the team can contribute). There's also `/trio scramble`, `/trio housematch`, an' `/grand`. Stuck on \"already in a duel\"? Cast `/duelend` to clear the lock.",
       "link": "https://everything-velmora.netlify.app/duels"
     },
     {
