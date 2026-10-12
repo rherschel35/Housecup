@@ -14,6 +14,7 @@ Frog cards can also sit on the shelf. Purely cosmetic.
 
 from __future__ import annotations
 
+import io
 import json
 import logging
 import os
@@ -24,6 +25,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.dorm_room_art import render_room_png
 from cogs.world_engine import today
 
 log = logging.getLogger("velmora.dorm")
@@ -632,7 +634,9 @@ class Dorm(commands.Cog):
         from cogs.frogs import CARDS
         return CARDS.get(card_id)
 
-    def embed_room(self, member: discord.abc.User, rec: dict) -> discord.Embed:
+    def embed_room(
+        self, member: discord.abc.User, rec: dict, *, with_art: bool = False
+    ) -> discord.Embed:
         lines = []
         for slot in SLOTS:
             placed = (rec.get("slots") or {}).get(slot)
@@ -664,7 +668,34 @@ class Dorm(commands.Cog):
         embed.set_footer(
             text=f"Stash: {stash_n} decor · /room find · /room place · shelf holds frog cards too"
         )
+        if with_art:
+            embed.set_image(url="attachment://room.jpg")
         return embed
+
+    def room_image_file(self, rec: dict) -> discord.File | None:
+        raw = render_room_png(
+            rec.get("slots") or {},
+            decor_lookup=DECOR,
+            frog_meta_lookup=self._frog_meta,
+        )
+        if not raw:
+            return None
+        return discord.File(io.BytesIO(raw), filename="room.jpg")
+
+    async def _send_room(
+        self,
+        interaction: discord.Interaction,
+        member: discord.abc.User,
+        rec: dict,
+    ) -> None:
+        art = self.room_image_file(rec)
+        embed = self.embed_room(member, rec, with_art=bool(art))
+        if art:
+            await interaction.response.send_message(
+                embed=embed, file=art, ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @room.command(name="view", description="Look at a dorm room.")
     @app_commands.describe(member="Whose room (default: yours)")
@@ -675,10 +706,7 @@ class Dorm(commands.Cog):
         if target.id == interaction.user.id:
             self.ensure_starters(target.id)
         rec = self.record(target.id)
-        await interaction.response.send_message(
-            embed=self.embed_room(target, rec),
-            ephemeral=True,
-        )
+        await self._send_room(interaction, target, rec)
 
     @room.command(
         name="find",
@@ -848,10 +876,7 @@ class Dorm(commands.Cog):
                 stash.pop(key, None)
             rec.setdefault("slots", {})[slot_key] = {"kind": "decor", "id": key}
             self.save()
-            await interaction.response.send_message(
-                embed=self.embed_room(interaction.user, rec),
-                ephemeral=True,
-            )
+            await self._send_room(interaction, interaction.user, rec)
             return
 
         # Frog card path — shelf only
@@ -889,10 +914,7 @@ class Dorm(commands.Cog):
             stash[pid] = int(stash.get(pid, 0)) + 1
         rec.setdefault("slots", {})["shelf"] = {"kind": "frog", "id": frog_id}
         self.save()
-        await interaction.response.send_message(
-            embed=self.embed_room(interaction.user, rec),
-            ephemeral=True,
-        )
+        await self._send_room(interaction, interaction.user, rec)
 
     @room_place.autocomplete("item")
     async def place_autocomplete(
@@ -940,10 +962,7 @@ class Dorm(commands.Cog):
             pid = prev["id"]
             stash[pid] = int(stash.get(pid, 0)) + 1
         self.save()
-        await interaction.response.send_message(
-            embed=self.embed_room(interaction.user, rec),
-            ephemeral=True,
-        )
+        await self._send_room(interaction, interaction.user, rec)
 
     async def staff_prize(
         self,

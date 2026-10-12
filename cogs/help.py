@@ -58,7 +58,7 @@ HELP = {
             ("frog trade", "Propose a 1:1 card swap — they Accept or Decline."),
             ("stoke", "Tend your house's common-room fire (once/day, private; any channel)."),
             ("fire", "See every house's fire — 5+ keeps it alive; most stokers earn +3 at midnight."),
-            ("room view", "Look at a dorm room (yours or anyone's; any channel)."),
+            ("room view", "Look at a dorm room with a portrait of what's placed (any channel)."),
             ("room find", "Find a duplicate of unlocked decor (once per day)."),
             ("room catalog", "Browse decor for a slot — 🔒 until you pull its frog card."),
             ("room stash", "Decor waiting to be placed."),
