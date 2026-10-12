@@ -317,6 +317,30 @@ class Staff(commands.Cog):
         await cog.descentboost(interaction, member, hp, attack, defense)
 
     @descent.command(
+        name="set",
+        description="Set a player's Descent HP / Attack / Defense to exact combat totals.",
+    )
+    @app_commands.describe(
+        member="Whose stats to set",
+        hp="Combat Max HP to set (same number as on /descentstatus or a broke report)",
+        attack="Combat Attack to set",
+        defense="Combat Defense to set",
+    )
+    async def descent_set(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        hp: app_commands.Range[int, 55, 100000],
+        attack: app_commands.Range[int, 8, 100000],
+        defense: app_commands.Range[int, 3, 100000],
+    ):
+        cog = self._cog("Descent")
+        if not cog:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+        await cog.descentset(interaction, member, hp, attack, defense)
+
+    @descent.command(
         name="backfill",
         description="Add missing army + boss trophies from cleared depth (never replaces army).",
     )
@@ -329,6 +353,134 @@ class Staff(commands.Cog):
             await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
             return
         await cog.descentbackfill(interaction, member)
+
+    @descent.command(
+        name="restore",
+        description="Rebuild wiped Descent progress to a cleared floor (stats + AP + army).",
+    )
+    @app_commands.describe(
+        member="Whose progress to restore",
+        floor="Deepest floor they had cleared (1–100)",
+        backfill_army="Fill army + boss trophies for that depth (default: True)",
+    )
+    async def descent_restore(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        floor: app_commands.Range[int, 1, 100],
+        backfill_army: bool = True,
+    ):
+        cog = self._cog("Descent")
+        if not cog:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+        await cog.descentrestore(interaction, member, floor, backfill_army)
+
+    @descent.command(
+        name="recover",
+        description="Scan the volume for Descent backups and reload everyone if one exists.",
+    )
+    @app_commands.describe(
+        apply="If True (default), load the best backup into live state. False = report only.",
+    )
+    async def descent_recover(self, interaction: discord.Interaction, apply: bool = True):
+        cog = self._cog("Descent")
+        if not cog:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+        await cog.descentrecover(interaction, apply)
+
+    @descent.command(
+        name="restorebulk",
+        description="Restore many wiped Descent players at once from a floor list.",
+    )
+    @app_commands.describe(
+        mapping=(
+            "Paste lines: `user_id floor` or `<@id> floor`, or JSON "
+            '{"123": 47, "456": 12}'
+        ),
+        backfill_army="Fill army + boss trophies for each depth (default: True)",
+    )
+    async def descent_restorebulk(
+        self,
+        interaction: discord.Interaction,
+        mapping: str,
+        backfill_army: bool = True,
+    ):
+        cog = self._cog("Descent")
+        if not cog:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+        await cog.descentrestorebulk(interaction, mapping, backfill_army)
+
+    @descent.command(
+        name="claims",
+        description="List pending /descentclaim wipe-restore reports.",
+    )
+    async def descent_claims(self, interaction: discord.Interaction):
+        cog = self._cog("Descent")
+        if not cog:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+        await cog.descentclaims(interaction)
+
+    @descent.command(
+        name="fixap",
+        description="Correct everyone's Max AP from cleared floors (+1 per 10).",
+    )
+    @app_commands.describe(
+        only_wrong="Only change players whose Max AP is wrong (default: True)",
+    )
+    async def descent_fixap(
+        self,
+        interaction: discord.Interaction,
+        only_wrong: bool = True,
+    ):
+        cog = self._cog("Descent")
+        if not cog:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+        await cog.descentfixap(interaction, only_wrong)
+
+    @descent.command(
+        name="approveclaims",
+        description="Restore floors/army + Max AP (+1 per 10 floors); combat stats untouched.",
+    )
+    @app_commands.describe(
+        backfill_army="Fill army + boss trophies (default: True)",
+        clear="Clear the claim list after restore (default: True)",
+    )
+    async def descent_approveclaims(
+        self,
+        interaction: discord.Interaction,
+        backfill_army: bool = True,
+        clear: bool = True,
+    ):
+        cog = self._cog("Descent")
+        if not cog:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+        await cog.descentapproveclaims(interaction, backfill_army, clear)
+
+    @descent.command(
+        name="restorespire",
+        description="Restore Spireheart owners to at least floor 90 (or chosen floor).",
+    )
+    @app_commands.describe(
+        floor="Cleared floor to grant (default 90)",
+        backfill_army="Fill army + boss trophies (default: True)",
+    )
+    async def descent_restorespire(
+        self,
+        interaction: discord.Interaction,
+        floor: app_commands.Range[int, 1, 100] = 90,
+        backfill_army: bool = True,
+    ):
+        cog = self._cog("Descent")
+        if not cog:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+        await cog.descentrestorespire(interaction, floor, backfill_army)
 
     # -------------------------------------------------------------- castles
 

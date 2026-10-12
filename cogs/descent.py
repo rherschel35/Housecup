@@ -10,6 +10,17 @@ The Descent - a 100-floor solo dungeon crawl.
     /staff descent unlock - clear the 3-loss lockout without wiping progress
     /staffgame descent backfill - add missing army + bosses from cleared depth
       (additive — never replaces an existing army)
+    /staffgame descent restore - rebuild wiped progress to a cleared floor
+      (depth, Max AP, fair stat points, optional army/boss backfill)
+    /staffgame descent recover - scan the volume for descent_state backups
+      and reload everyone if a good copy still exists
+    /staffgame descent restorebulk - paste many "user_id floor" lines at once
+    /descentclaim floor:<n> - players self-report deepest cleared floor after a wipe
+    /staffgame descent claims - list pending claims
+    /staffgame descent approveclaims - restore floors/army + Max AP (+1 per 10 floors); stats untouched
+    /staffgame descent fixap - set every player's Max AP from cleared floors (+1 per 10)
+    /staffgame descent restorespire - restore Spireheart owners to at least floor 90
+    /staffgame descent set - set a player's combat HP / Attack / Defense in one go
 
 Ten zones of ten floors each, one primary element per zone plus a second
 element mixed in (about 30% of non-boss monsters), so a floor is never a
@@ -18,7 +29,7 @@ order:
 
     - Win all 10 -> advance a floor and level up (level = deepest floor
       cleared): a stat point (HP/Attack/Defense) at monster #5, and your
-      max AP goes up by 1 every time you clear a new floor.
+      max AP goes up by 1 every 10 floors cleared (floors 10, 20, … 100).
     - Lose a fight -> refight that same monster; you don't lose progress
       on the floor for a single loss.
     - Lose 3 times on the same floor -> locked out of it for 24 hours.
@@ -83,6 +94,7 @@ log = logging.getLogger("velmora.descent")
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "descent_state.json"
+CLAIMS_PATH = STATE_DIR / "descent_restore_claims.json"
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "monster_art_assets"
 WILD_THREAT_ASSETS = Path(__file__).resolve().parent.parent / "wild_threat_art_assets"
 SHADOW_IMAGE = "Shadow_Wolf.png"
@@ -377,6 +389,16 @@ MAX_FLOOR = 100
 # ---------------------------------------------------------------------- AP
 
 STARTING_MAX_AP = 5
+# +1 Max AP at each decade clear (10, 20, … 100) → at most +10 over a full run.
+AP_PER_TEN_FLOORS = 10
+
+
+def max_ap_for_depth(depth: int) -> int:
+    """Max AP after having cleared `depth` floors ( +1 per 10 floors )."""
+    depth = max(0, min(MAX_FLOOR, int(depth)))
+    return STARTING_MAX_AP + depth // AP_PER_TEN_FLOORS
+
+
 AP_REGEN_PER_TURN = 1
 CAST_AP_COST = 3
 DEFEND_AP_COST = 0
@@ -393,6 +415,15 @@ def player_stats(rec: dict) -> tuple[int, int, int]:
     return (BASE_HP + pts["hp"] * HP_PER_POINT,
             BASE_ATK + pts["atk"] * ATK_PER_POINT,
             BASE_DEF + pts["def"] * DEF_PER_POINT)
+
+
+def combat_to_points(hp: int, attack: int, defense: int) -> dict[str, int]:
+    """Convert displayed combat totals (broke report / status) into stat points."""
+    return {
+        "hp": max(0, (int(hp) - BASE_HP) // HP_PER_POINT),
+        "atk": max(0, (int(attack) - BASE_ATK) // ATK_PER_POINT),
+        "def": max(0, (int(defense) - BASE_DEF) // DEF_PER_POINT),
+    }
 
 
 def blank_record() -> dict:
@@ -1048,16 +1079,142 @@ class Descent(commands.Cog):
         except discord.DiscordException:
             log.exception("Could not edit Descent fight message after forfeit")
 
+    def _parse_state_file(self, path: Path) -> dict | None:
+        """Return parsed Descent state, or None if missing/empty/invalid."""
+        try:
+            raw = path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return None
+        except OSError:
+            log.exception("Could not read Descent state at %s", path)
+            return None
+        if not raw.strip():
+            log.error("Descent state at %s is empty (0 bytes / whitespace).", path)
+            return None
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            log.exception("Descent state at %s is corrupt JSON.", path)
+            return None
+        if not isinstance(data, dict):
+            log.error("Descent state at %s is not a JSON object.", path)
+            return None
+        players = data.get("players")
+        if not isinstance(players, dict):
+            data["players"] = {}
+        return data
+
+    def _candidate_state_paths(self) -> list[Path]:
+        """Main file first, then tmp / recent backups (crash recovery)."""
+        paths = [STATE_PATH, STATE_PATH.with_suffix(".tmp")]
+        try:
+            backups = sorted(
+                STATE_DIR.glob("descent_state.corrupt.*.json"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            paths.extend(backups[:5])
+        except OSError:
+            pass
+        return paths
+
+    def _quarantine_corrupt(self, path: Path) -> Path | None:
+        if not path.exists():
+            return None
+        try:
+            backup = STATE_DIR / f"descent_state.corrupt.{int(time.time())}.json"
+            os.replace(path, backup)
+            log.error("Moved unreadable Descent state %s → %s", path, backup)
+            return backup
+        except OSError:
+            log.exception("Could not quarantine corrupt Descent state at %s", path)
+            return None
+
     def _load(self) -> dict:
+        """Load Descent state, recovering from .tmp / corrupt backups when needed.
+
+        An empty file (JSONDecodeError char 0) usually means a non-atomic write
+        was interrupted mid-redeploy. We never silently treat that as 'no players'
+        without checking recovery copies first.
+        """
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        primary_bad = False
         if STATE_PATH.exists():
+            data = self._parse_state_file(STATE_PATH)
+            if data is not None and data.get("players"):
+                log.info(
+                    "Loaded Descent state: %d players from %s",
+                    len(data["players"]),
+                    STATE_PATH,
+                )
+                return data
+            if data is not None and not data.get("players"):
+                log.warning("Descent state at %s has 0 players.", STATE_PATH)
+                # Still prefer an empty-but-valid file over inventing one — but
+                # keep looking for a richer backup below.
+                empty_valid = data
+            else:
+                empty_valid = None
+                primary_bad = True
+                self._quarantine_corrupt(STATE_PATH)
+        else:
+            empty_valid = None
+
+        for path in self._candidate_state_paths():
+            if path == STATE_PATH:
+                continue
+            data = self._parse_state_file(path)
+            if data is None or not data.get("players"):
+                continue
+            log.error(
+                "Recovered Descent state with %d players from %s "
+                "(primary was %s).",
+                len(data["players"]),
+                path,
+                "corrupt/empty" if primary_bad else "missing/empty",
+            )
+            # Restore recovered copy to the canonical path.
             try:
-                return json.loads(STATE_PATH.read_text())
-            except Exception:
-                log.exception("Failed to load descent state")
+                tmp = STATE_PATH.with_suffix(".tmp")
+                tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+                os.replace(tmp, STATE_PATH)
+            except OSError:
+                log.exception("Could not restore recovered Descent state to %s", STATE_PATH)
+            return data
+
+        if empty_valid is not None:
+            return empty_valid
+
+        log.warning(
+            "No usable Descent state under %s — starting empty. "
+            "Check for descent_state.corrupt.*.json on the volume.",
+            STATE_DIR,
+        )
         return {"players": {}}
 
     def save(self):
-        STATE_PATH.write_text(json.dumps(self.state, indent=2))
+        """Atomic write. Never clobber a populated file with an empty ledger."""
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        incoming = self.state.get("players") if isinstance(self.state, dict) else None
+        if not incoming and STATE_PATH.exists():
+            try:
+                existing = self._parse_state_file(STATE_PATH)
+                prior = (existing or {}).get("players") if existing else None
+                if prior:
+                    log.error(
+                        "Refusing to save empty Descent state over %d players at %s",
+                        len(prior),
+                        STATE_PATH,
+                    )
+                    return
+            except Exception:
+                log.exception("Could not verify existing Descent state before save")
+        tmp = STATE_PATH.with_suffix(".tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(self.state, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, STATE_PATH)
 
     def record(self, user_id: int) -> dict:
         rec = self.state["players"].setdefault(str(user_id), blank_record())
@@ -1559,9 +1716,11 @@ class Descent(commands.Cog):
             rec["floor"] = min(floor + 1, MAX_FLOOR)
             rec["monster_index"] = 1
             rec["losses"] = 0
-            ap_increased = floor % 10 == 0
+            # +1 Max AP every 10 floors cleared (10, 20, … 100).
+            target_ap = max_ap_for_depth(rec["highest_cleared"])
+            ap_increased = int(rec.get("max_ap") or STARTING_MAX_AP) < target_ap
             if ap_increased:
-                rec["max_ap"] += 1
+                rec["max_ap"] = target_ap
             clear_drop = await self._drop_loot(member, zone_for(floor)["element"], FLOOR_CLEAR_GUARANTEED)
             # Fury bosses (60/70/80/90/100) bank three free picks; everything else one.
             clear_picks = 3 if fight.is_boss and floor in FURY_BOSS_FLOORS else 1
@@ -2102,6 +2261,51 @@ class Descent(commands.Cog):
             ephemeral=True,
         )
 
+    async def descentset(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        hp: int,
+        attack: int,
+        defense: int,
+    ):
+        """Staff: set combat HP / Attack / Defense to absolute totals in one go."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        if hp < BASE_HP or attack < BASE_ATK or defense < BASE_DEF:
+            await interaction.response.send_message(
+                f"Combat totals can't be below the base "
+                f"(❤️ {BASE_HP} · ⚔️ {BASE_ATK} · 🛡️ {BASE_DEF}).",
+                ephemeral=True,
+            )
+            return
+
+        rec = self.record(member.id)
+        before = player_stats(rec)
+        pts = combat_to_points(hp, attack, defense)
+        rec["stat_points"] = pts
+        old = self.fights.pop(member.id, None)
+        if old is not None:
+            old.cancel_idle()
+        self.save()
+
+        p_hp, p_atk, p_def = player_stats(rec)
+        note = ""
+        if (p_hp, p_atk, p_def) != (hp, attack, defense):
+            note = (
+                f"\n_(Rounded to the nearest achievable totals from point steps: "
+                f"+{HP_PER_POINT} HP / +{ATK_PER_POINT} ATK / +{DEF_PER_POINT} DEF.)_"
+            )
+        await interaction.response.send_message(
+            f"Set **{member.display_name}**'s Descent combat stats.\n"
+            f"Was: ❤️ **{before[0]}** · ⚔️ **{before[1]}** · 🛡️ **{before[2]}**\n"
+            f"Now: ❤️ **{p_hp}** · ⚔️ **{p_atk}** · 🛡️ **{p_def}**"
+            f"{note}",
+            ephemeral=True,
+        )
+
     def apply_progress_backfill(self, user_id: int) -> dict:
         """Add missing boss trophies + one-clear army credit. Never wipes army."""
         rec = self.record(user_id)
@@ -2153,6 +2357,155 @@ class Descent(commands.Cog):
             "bosses_after": len(rec.get("bosses_bound") or []),
         }
 
+    @staticmethod
+    def estimate_restore_points(depth: int) -> dict[str, int]:
+        """Fair stat-point credit for having cleared `depth` floors once.
+
+        Per floor cleared: +1 from monster #5, +1 from floor clear
+        (+2 more on Fury boss floors 60/70/80/90/100 where clear pays 3).
+        Split evenly across HP / Attack / Defense (remainder → HP).
+        """
+        depth = max(0, min(MAX_FLOOR, int(depth)))
+        if depth <= 0:
+            return {"hp": 0, "atk": 0, "def": 0}
+        fury = sum(1 for fl in FURY_BOSS_FLOORS if fl <= depth)
+        total = depth * 2 + fury * 2
+        base, rem = divmod(total, 3)
+        return {"hp": base + rem, "atk": base, "def": base}
+
+    def apply_progress_restore(
+        self,
+        user_id: int,
+        depth: int,
+        *,
+        backfill_army: bool = True,
+        force: bool = False,
+        set_stats: bool = True,
+        set_max_ap: bool = True,
+    ) -> dict:
+        """Rebuild wiped progress to a cleared depth. Never lowers an existing depth.
+
+        set_stats=False keeps existing combat stat points (or base zeros) so staff
+        can assign HP/ATK/DEF with /staffgame descent set.
+        set_max_ap=True grants Max AP as 5 + (floors cleared // 10).
+        """
+        depth = max(0, min(MAX_FLOOR, int(depth)))
+        prior = self.state["players"].get(str(user_id))
+        prior_depth = 0
+        if isinstance(prior, dict):
+            prior_depth = max(
+                int(prior.get("highest_cleared") or 0),
+                max(0, int(prior.get("floor") or 1) - 1),
+            )
+        if not force and prior_depth >= depth:
+            rec = prior if isinstance(prior, dict) else blank_record()
+            p_hp, p_atk, p_def = player_stats(rec)
+            return {
+                "depth": prior_depth,
+                "floor": int(rec.get("floor") or 1),
+                "max_ap": int(rec.get("max_ap") or STARTING_MAX_AP),
+                "stat_points": dict(rec.get("stat_points") or {}),
+                "hp": p_hp,
+                "atk": p_atk,
+                "def": p_def,
+                "army": len(rec.get("army") or []),
+                "bosses": len(rec.get("bosses_bound") or []),
+                "backfill": {"bosses_added": 0, "units_added": 0},
+                "skipped": True,
+                "reason": f"already at cleared floor {prior_depth}",
+            }
+
+        old = self.fights.pop(user_id, None)
+        if old is not None:
+            old.cancel_idle()
+        self.stop_auto(user_id)
+
+        rec = blank_record()
+        rec["highest_cleared"] = depth
+        rec["floor"] = min(MAX_FLOOR, depth + 1) if depth < MAX_FLOOR else MAX_FLOOR
+        rec["monster_index"] = 1
+        rec["losses"] = 0
+        rec["locked_until"] = 0.0
+        if set_max_ap:
+            rec["max_ap"] = max_ap_for_depth(depth)
+        elif isinstance(prior, dict) and prior.get("max_ap") is not None:
+            rec["max_ap"] = max(STARTING_MAX_AP, int(prior.get("max_ap") or STARTING_MAX_AP))
+        # else blank_record already has STARTING_MAX_AP
+        if set_stats:
+            rec["stat_points"] = self.estimate_restore_points(depth)
+        elif isinstance(prior, dict) and isinstance(prior.get("stat_points"), dict):
+            pts = prior["stat_points"]
+            rec["stat_points"] = {
+                "hp": max(0, int(pts.get("hp") or 0)),
+                "atk": max(0, int(pts.get("atk") or 0)),
+                "def": max(0, int(pts.get("def") or 0)),
+            }
+        rec["pending_statup"] = 0
+        if isinstance(prior, dict) and prior.get("army"):
+            rec["army"] = list(prior["army"])
+            rec["army_seq"] = int(prior.get("army_seq") or len(rec["army"]))
+            rec["bosses_bound"] = list(prior.get("bosses_bound") or [])
+        self.state["players"][str(user_id)] = rec
+
+        backfill = {"bosses_added": 0, "units_added": 0}
+        if backfill_army and depth >= 1:
+            backfill = self.apply_progress_backfill(user_id)
+        else:
+            self.save()
+
+        p_hp, p_atk, p_def = player_stats(rec)
+        return {
+            "depth": depth,
+            "floor": rec["floor"],
+            "max_ap": rec["max_ap"],
+            "stat_points": dict(rec["stat_points"]),
+            "hp": p_hp,
+            "atk": p_atk,
+            "def": p_def,
+            "army": len(rec.get("army") or []),
+            "bosses": len(rec.get("bosses_bound") or []),
+            "backfill": backfill,
+            "skipped": False,
+        }
+    async def descentrestore(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        floor: int,
+        backfill_army: bool = True,
+    ):
+        """Staff: rebuild wiped Descent progress to a cleared floor depth."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        if floor < 1 or floor > MAX_FLOOR:
+            await interaction.response.send_message(
+                f"`floor` must be 1–{MAX_FLOOR} (deepest floor they had cleared).",
+                ephemeral=True,
+            )
+            return
+        result = self.apply_progress_restore(
+            member.id, floor, backfill_army=backfill_army
+        )
+        pts = result["stat_points"]
+        extra = ""
+        if backfill_army:
+            extra = (
+                f" Backfill +{result['backfill'].get('units_added', 0)} units, "
+                f"+{result['backfill'].get('bosses_added', 0)} bosses."
+            )
+        await interaction.response.send_message(
+            f"Restored **{member.display_name}** to cleared floor **{result['depth']}** "
+            f"(now on floor **{result['floor']}**).\n"
+            f"⚡ Max AP **{result['max_ap']}** · "
+            f"❤️ **{result['hp']}** · ⚔️ **{result['atk']}** · 🛡️ **{result['def']}** "
+            f"(points hp={pts['hp']}, atk={pts['atk']}, def={pts['def']}).\n"
+            f"Army **{result['army']}** · bosses bound **{result['bosses']}**."
+            f"{extra}",
+            ephemeral=True,
+        )
+
     async def descentbackfill(self, interaction: discord.Interaction, member: discord.Member):
         """Staff: add pre-tracking army/boss credit from cleared depth (additive)."""
         store = self.bot.get_cog("Store")
@@ -2199,6 +2552,542 @@ class Descent(commands.Cog):
             f"Each cleared floor is topped up to **{MONSTERS_PER_FLOOR}** binds "
             f"(one clear's worth); floors already at that count were left alone."
             f"{adorn_note}",
+            ephemeral=True,
+        )
+
+    def scan_volume_recovery(self) -> list[dict]:
+        """Report every Descent state candidate on the volume (path, size, players)."""
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        seen: set[Path] = set()
+        rows: list[dict] = []
+        for path in self._candidate_state_paths():
+            if path in seen:
+                continue
+            seen.add(path)
+            try:
+                exists = path.exists()
+            except OSError:
+                continue
+            if not exists:
+                rows.append(
+                    {
+                        "path": str(path),
+                        "exists": False,
+                        "bytes": 0,
+                        "players": None,
+                        "ok": False,
+                        "note": "missing",
+                    }
+                )
+                continue
+            try:
+                size = path.stat().st_size
+            except OSError:
+                size = -1
+            data = self._parse_state_file(path)
+            if data is None:
+                rows.append(
+                    {
+                        "path": str(path),
+                        "exists": True,
+                        "bytes": size,
+                        "players": None,
+                        "ok": False,
+                        "note": "empty/corrupt",
+                    }
+                )
+                continue
+            n = len(data.get("players") or {})
+            rows.append(
+                {
+                    "path": str(path),
+                    "exists": True,
+                    "bytes": size,
+                    "players": n,
+                    "ok": n > 0,
+                    "note": "usable" if n > 0 else "0 players",
+                    "data": data if n > 0 else None,
+                }
+            )
+        # Also list any other descent_state* we might have missed
+        try:
+            for path in sorted(STATE_DIR.glob("descent_state*")):
+                if path in seen:
+                    continue
+                seen.add(path)
+                try:
+                    size = path.stat().st_size
+                except OSError:
+                    size = -1
+                data = self._parse_state_file(path)
+                n = len((data or {}).get("players") or {}) if data else None
+                rows.append(
+                    {
+                        "path": str(path),
+                        "exists": True,
+                        "bytes": size,
+                        "players": n,
+                        "ok": bool(data and n),
+                        "note": "extra" if data and n else "empty/corrupt",
+                        "data": data if data and n else None,
+                    }
+                )
+        except OSError:
+            pass
+        return rows
+
+    def apply_volume_recovery(self) -> dict | None:
+        """Reload the richest usable backup into live state. Returns summary or None."""
+        rows = self.scan_volume_recovery()
+        best = None
+        for row in rows:
+            if not row.get("ok") or not row.get("data"):
+                continue
+            n = int(row["players"] or 0)
+            if best is None or n > best["players"]:
+                best = row
+        if best is None:
+            return None
+        self.state = best["data"]
+        self.save()
+        return {
+            "path": best["path"],
+            "players": best["players"],
+            "bytes": best["bytes"],
+        }
+
+    @staticmethod
+    def parse_restore_bulk_text(text: str) -> tuple[list[tuple[int, int]], list[str]]:
+        """Parse lines of `user_id floor` or `<@id> floor`. Returns (ok, errors)."""
+        import re
+
+        ok: list[tuple[int, int]] = []
+        errors: list[str] = []
+        text = (text or "").strip()
+        if not text:
+            return ok, ["No lines provided."]
+        # JSON object {"123": 47, ...} or [[id, floor], ...]
+        if text[0] in "{[":
+            try:
+                payload = json.loads(text)
+            except json.JSONDecodeError as e:
+                return ok, [f"Invalid JSON: {e}"]
+            if isinstance(payload, dict):
+                pairs = list(payload.items())
+            elif isinstance(payload, list):
+                pairs = []
+                for row in payload:
+                    if isinstance(row, (list, tuple)) and len(row) >= 2:
+                        pairs.append((row[0], row[1]))
+                    elif isinstance(row, dict) and "id" in row and "floor" in row:
+                        pairs.append((row["id"], row["floor"]))
+                    else:
+                        errors.append(f"Bad JSON row: {row!r}")
+            else:
+                return ok, ["JSON must be an object or list."]
+            for uid, floor in pairs:
+                try:
+                    uid_i = int(str(uid).strip())
+                    floor_i = int(floor)
+                except (TypeError, ValueError):
+                    errors.append(f"Bad entry {uid!r} → {floor!r}")
+                    continue
+                if floor_i < 1 or floor_i > MAX_FLOOR:
+                    errors.append(f"{uid_i}: floor {floor_i} out of range")
+                    continue
+                ok.append((uid_i, floor_i))
+            return ok, errors
+
+        mention = re.compile(r"<@!?(\d+)>")
+        for i, line in enumerate(text.splitlines(), 1):
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            line = line.replace(",", " ").replace(":", " ")
+            m = mention.search(line)
+            if m:
+                uid_s = m.group(1)
+                rest = mention.sub(" ", line).strip()
+                parts = rest.split()
+                floor_s = parts[0] if parts else ""
+            else:
+                parts = line.split()
+                if len(parts) < 2:
+                    errors.append(f"Line {i}: need `user_id floor` — got {line!r}")
+                    continue
+                uid_s, floor_s = parts[0], parts[1]
+            try:
+                uid_i = int(uid_s)
+                floor_i = int(floor_s)
+            except ValueError:
+                errors.append(f"Line {i}: bad numbers — {line!r}")
+                continue
+            if floor_i < 1 or floor_i > MAX_FLOOR:
+                errors.append(f"Line {i}: floor {floor_i} out of range")
+                continue
+            ok.append((uid_i, floor_i))
+        return ok, errors
+
+    def _player_snapshot_lines(self, limit: int = 12) -> list[str]:
+        players = (self.state or {}).get("players") or {}
+        rows = []
+        for uid, rec in players.items():
+            if not isinstance(rec, dict):
+                continue
+            cleared = int(rec.get("highest_cleared") or 0)
+            floor = int(rec.get("floor") or 1)
+            rows.append((cleared, floor, uid))
+        rows.sort(reverse=True)
+        lines = []
+        for cleared, floor, uid in rows[:limit]:
+            lines.append(f"• <@{uid}> cleared **{cleared}** (on floor {floor})")
+        if len(rows) > limit:
+            lines.append(f"• …and {len(rows) - limit} more")
+        return lines
+
+    def load_claims(self) -> dict:
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        if not CLAIMS_PATH.exists():
+            return {"claims": {}}
+        try:
+            data = json.loads(CLAIMS_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            log.exception("Could not read Descent restore claims")
+            return {"claims": {}}
+        if not isinstance(data, dict):
+            return {"claims": {}}
+        data.setdefault("claims", {})
+        if not isinstance(data["claims"], dict):
+            data["claims"] = {}
+        return data
+
+    def save_claims(self, data: dict) -> None:
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        tmp = CLAIMS_PATH.with_suffix(".tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, CLAIMS_PATH)
+
+    async def descentrecover(self, interaction: discord.Interaction, apply: bool = True):
+        """Staff: scan volume for Descent backups; optionally reload the best one."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        rows = self.scan_volume_recovery()
+        live_n = len((self.state or {}).get("players") or {})
+        lines = [
+            f"**STATE_DIR** `{STATE_DIR}`",
+            f"Live memory: **{live_n}** players",
+            "",
+            "**Files on volume:**",
+        ]
+        for row in rows:
+            if not row["exists"]:
+                lines.append(f"• `{Path(row['path']).name}` — missing")
+                continue
+            players = row["players"]
+            ptxt = "corrupt/empty" if players is None else f"{players} players"
+            mark = "✅" if row["ok"] else "⚠️"
+            lines.append(
+                f"• {mark} `{Path(row['path']).name}` — {row['bytes']} bytes, {ptxt}"
+            )
+
+        applied = None
+        if apply:
+            applied = self.apply_volume_recovery()
+            if applied:
+                self.fights.clear()
+                lines.append("")
+                lines.append(
+                    f"**Recovered** **{applied['players']}** players from "
+                    f"`{Path(applied['path']).name}` into live state."
+                )
+                if applied["players"] < 20:
+                    lines.append(
+                        "That’s only what’s left on the volume after the wipe — "
+                        "not a full historical backup. Everyone else needs "
+                        "`/descentclaim` → `/staffgame descent approveclaims`, "
+                        "or `/staffgame descent restorebulk`."
+                    )
+            else:
+                lines.append("")
+                lines.append(
+                    "**No usable backup found.** Exact stats are gone. "
+                    "Have players `/descentclaim floor:<n>`, then "
+                    "`/staffgame descent approveclaims`."
+                )
+        else:
+            lines.append("")
+            lines.append("Scan only (apply=False). Re-run with apply=True to reload.")
+
+        snap = self._player_snapshot_lines()
+        if snap:
+            lines.append("")
+            lines.append("**Who’s in the ledger now:**")
+            lines.extend(snap)
+
+        msg = "\n".join(lines)
+        if len(msg) > 1900:
+            msg = msg[:1900] + "\n…"
+        await interaction.followup.send(msg, ephemeral=True)
+    async def descentrestorebulk(
+        self,
+        interaction: discord.Interaction,
+        mapping: str,
+        backfill_army: bool = True,
+    ):
+        """Staff: restore many players from a paste of user_id + floor."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        entries, errors = self.parse_restore_bulk_text(mapping)
+        if not entries and errors:
+            await interaction.followup.send(
+                "Could not parse mapping:\n" + "\n".join(f"• {e}" for e in errors[:15]),
+                ephemeral=True,
+            )
+            return
+
+        restored = 0
+        skipped = 0
+        for uid, floor in entries:
+            result = self.apply_progress_restore(uid, floor, backfill_army=backfill_army)
+            if result.get("skipped"):
+                skipped += 1
+            else:
+                restored += 1
+
+        summary = [
+            f"Restored **{restored}** players "
+            f"(fair Max AP + stats"
+            f"{' + army/boss backfill' if backfill_army else ''})"
+            + (f"; skipped **{skipped}** already at/above claim." if skipped else ".")
+        ]
+        if errors:
+            summary.append(f"Skipped/errors ({len(errors)}):")
+            summary.extend(f"• {e}" for e in errors[:12])
+            if len(errors) > 12:
+                summary.append(f"• …and {len(errors) - 12} more")
+        sample = ", ".join(f"`{u}`→F{f}" for u, f in entries[:8])
+        if sample:
+            summary.append(f"Sample: {sample}" + ("…" if len(entries) > 8 else ""))
+        await interaction.followup.send("\n".join(summary), ephemeral=True)
+
+    @app_commands.command(
+        name="descentclaim",
+        description="After a wipe: report the deepest Descent floor you had cleared.",
+    )
+    @app_commands.describe(floor="Deepest floor you had cleared (1–100)")
+    async def descentclaim(
+        self,
+        interaction: discord.Interaction,
+        floor: app_commands.Range[int, 1, 100],
+    ):
+        data = self.load_claims()
+        uid = str(interaction.user.id)
+        data["claims"][uid] = {
+            "floor": int(floor),
+            "name": interaction.user.display_name,
+            "at": time.time(),
+        }
+        self.save_claims(data)
+        await interaction.response.send_message(
+            f"Claimed deepest cleared floor **{floor}**. "
+            f"Staff will approve with `/staffgame descent approveclaims` "
+            f"(restores floor, army, and Max AP at +1 per 10 floors — "
+            f"combat stats are set by staff separately).",
+            ephemeral=True,
+        )
+
+    async def descentclaims(self, interaction: discord.Interaction):
+        """Staff: list pending wipe-restore claims."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        data = self.load_claims()
+        claims = data.get("claims") or {}
+        if not claims:
+            await interaction.response.send_message(
+                "No pending `/descentclaim` entries.",
+                ephemeral=True,
+            )
+            return
+        rows = sorted(
+            claims.items(),
+            key=lambda kv: int((kv[1] or {}).get("floor") or 0),
+            reverse=True,
+        )
+        lines = [f"**{len(rows)} pending claims:**"]
+        for uid, info in rows[:40]:
+            fl = int((info or {}).get("floor") or 0)
+            name = (info or {}).get("name") or "?"
+            lines.append(f"• <@{uid}> ({name}) → floor **{fl}**")
+        if len(rows) > 40:
+            lines.append(f"• …and {len(rows) - 40} more")
+        lines.append("Approve all with `/staffgame descent approveclaims`.")
+        msg = "\n".join(lines)
+        if len(msg) > 1900:
+            msg = msg[:1900] + "\n…"
+        await interaction.response.send_message(msg, ephemeral=True)
+
+    def apply_fix_all_max_ap(self, *, only_wrong: bool = True) -> dict:
+        """Set every player's Max AP from cleared depth (5 + floors//10)."""
+        players = (self.state or {}).get("players") or {}
+        changed = 0
+        checked = 0
+        samples: list[str] = []
+        for uid, rec in players.items():
+            if not isinstance(rec, dict):
+                continue
+            checked += 1
+            depth = cleared_depth(rec)
+            target = max_ap_for_depth(depth)
+            current = int(rec.get("max_ap") or STARTING_MAX_AP)
+            if only_wrong and current == target:
+                continue
+            rec["max_ap"] = target
+            rec.setdefault("highest_cleared", 0)
+            # Keep highest_cleared at least as deep as we used for the formula.
+            rec["highest_cleared"] = max(int(rec.get("highest_cleared") or 0), depth)
+            changed += 1
+            if len(samples) < 8:
+                samples.append(f"<@{uid}> F{depth}: {current}→{target}")
+        if changed:
+            self.save()
+        return {
+            "checked": checked,
+            "changed": changed,
+            "samples": samples,
+        }
+
+    async def descentfixap(
+        self,
+        interaction: discord.Interaction,
+        only_wrong: bool = True,
+    ):
+        """Staff: correct Max AP for everyone from cleared floors (+1 per 10)."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        result = self.apply_fix_all_max_ap(only_wrong=only_wrong)
+        lines = [
+            f"Fixed Max AP for **{result['changed']}** / {result['checked']} players "
+            f"(rule: **5 + floors÷10**)."
+        ]
+        if result["samples"]:
+            lines.append("Sample:")
+            lines.extend(f"• {s}" for s in result["samples"])
+            if result["changed"] > len(result["samples"]):
+                lines.append(f"• …and {result['changed'] - len(result['samples'])} more")
+        if result["changed"] == 0:
+            lines.append("Everyone already matched the rule.")
+        await interaction.followup.send("\n".join(lines), ephemeral=True)
+
+    async def descentapproveclaims(
+        self,
+        interaction: discord.Interaction,
+        backfill_army: bool = True,
+        clear: bool = True,
+    ):
+        """Staff: restore floors/army + Max AP (+1/10 floors); leave combat stats alone."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        data = self.load_claims()
+        claims = data.get("claims") or {}
+        if not claims:
+            await interaction.followup.send("No pending claims.", ephemeral=True)
+            return
+        restored = skipped = 0
+        for uid, info in claims.items():
+            try:
+                uid_i = int(uid)
+                floor = int((info or {}).get("floor") or 0)
+            except (TypeError, ValueError):
+                continue
+            if floor < 1:
+                continue
+            result = self.apply_progress_restore(
+                uid_i,
+                floor,
+                backfill_army=backfill_army,
+                set_stats=False,
+                set_max_ap=True,
+            )
+            if result.get("skipped"):
+                skipped += 1
+            else:
+                restored += 1
+        if clear:
+            data["claims"] = {}
+            self.save_claims(data)
+        await interaction.followup.send(
+            f"Approved claims: restored **{restored}** "
+            f"(floor / army / Max AP at +1 per 10 floors — **combat stats untouched**), "
+            f"skipped **{skipped}** already at/above their claim"
+            + (" (claim list cleared)." if clear else " (claims kept).")
+            + "\nSet combat stats with `/staffgame descent set`.",
+            ephemeral=True,
+        )
+
+    async def descentrestorespire(
+        self,
+        interaction: discord.Interaction,
+        floor: int = 90,
+        backfill_army: bool = True,
+    ):
+        """Staff: restore everyone who owns Spireheart to at least `floor`."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        adorn = self.bot.get_cog("Adornments")
+        if not adorn:
+            await interaction.response.send_message(
+                "Adornments isn't loaded — can't see Spireheart owners.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.defer(ephemeral=True)
+        floor = max(1, min(MAX_FLOOR, int(floor)))
+        owners = []
+        for uid, rec in (adorn.state.get("members") or {}).items():
+            owned = (rec or {}).get("owned") or {}
+            if "spireheart_necklace" in owned:
+                try:
+                    owners.append(int(uid))
+                except ValueError:
+                    continue
+        if not owners:
+            await interaction.followup.send(
+                "Nobody in adornments owns Spireheart.",
+                ephemeral=True,
+            )
+            return
+        restored = skipped = 0
+        for uid in owners:
+            result = self.apply_progress_restore(
+                uid, floor, backfill_army=backfill_army
+            )
+            if result.get("skipped"):
+                skipped += 1
+            else:
+                restored += 1
+        await interaction.followup.send(
+            f"Spireheart owners: restored **{restored}** to floor **{floor}**, "
+            f"skipped **{skipped}** already at/above that depth "
+            f"({len(owners)} owners total).",
             ephemeral=True,
         )
 
