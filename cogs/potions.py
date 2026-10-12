@@ -40,8 +40,11 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "potions_state.json"
 
-# Potions classroom + new-student study hall.
-POTIONS_CHANNEL_IDS = with_study_hall_and_duels_potions(1553253009398693958)
+# Potions classroom + scratch/test room + study hall / open lounges.
+POTIONS_CHANNEL_IDS = with_study_hall_and_duels_potions(
+    1553253009398693958,
+    1552401261184155648,
+)
 # Kept for any older references / embeds that expect a single home channel.
 POTIONS_CHANNEL_ID = 1553253009398693958
 
