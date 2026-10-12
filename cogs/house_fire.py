@@ -27,11 +27,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from cogs.store import HOUSES, HOUSE_KEYS, house_display
-from cogs.velmora_channels import (
-    EVENT_ANNOUNCE_CHANNEL_ID,
-    channel_mentions,
-    with_study_hall_and_duels_potions,
-)
+from cogs.velmora_channels import EVENT_ANNOUNCE_CHANNEL_ID
 from cogs.world_engine import today
 
 log = logging.getLogger("velmora.housefire")
@@ -41,8 +37,6 @@ STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "house_fire_state.json"
 ART_DIR = Path(__file__).resolve().parent.parent / "fire_art_assets"
 STOKE_ART = ART_DIR / "stoke.jpg"
-
-FIRE_CHANNEL_IDS = with_study_hall_and_duels_potions()
 
 try:
     from zoneinfo import ZoneInfo
@@ -66,10 +60,6 @@ OUTAGE_LINES = (
     "{emoji} **{name}** went dark ({n}/{need}). Prefects are drafting a very polite scolding.",
     "{emoji} **{name}** treated the fire like optional homework ({n}/{need}). Graded: F for Flame.",
 )
-
-
-def _channel_hint() -> str:
-    return f"House fires are tended in {channel_mentions(FIRE_CHANNEL_IDS)}."
 
 
 def _flame_label(count: int) -> str:
@@ -122,12 +112,6 @@ class HouseFire(commands.Cog):
         except OSError:
             log.exception("Could not save house fire state.")
 
-    async def _require_channel(self, interaction: discord.Interaction) -> bool:
-        if interaction.channel_id in FIRE_CHANNEL_IDS:
-            return True
-        await interaction.response.send_message(_channel_hint(), ephemeral=True)
-        return False
-
     def day_bucket(self, day: str | None = None) -> dict:
         day = day or today()
         bucket = self.state.setdefault("days", {}).setdefault(day, {})
@@ -148,8 +132,6 @@ class HouseFire(commands.Cog):
 
     @app_commands.command(name="stoke", description="Tend your house's common-room fire (once per day).")
     async def stoke(self, interaction: discord.Interaction):
-        if not await self._require_channel(interaction):
-            return
         store = self.bot.get_cog("Store")
         if not store:
             await interaction.response.send_message(
@@ -209,8 +191,6 @@ class HouseFire(commands.Cog):
 
     @app_commands.command(name="fire", description="How every house's common-room fire is doing today.")
     async def fire_status(self, interaction: discord.Interaction):
-        if not await self._require_channel(interaction):
-            return
         day = today()
         bucket = self.day_bucket(day)
         lines = []

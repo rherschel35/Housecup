@@ -29,7 +29,6 @@ from discord import app_commands
 from discord.ext import commands
 
 from cogs.frog_card_art import render_card_png as _compose_card_png
-from cogs.velmora_channels import channel_mentions, with_study_hall_and_duels_potions
 from cogs.world_engine import today
 
 log = logging.getLogger("velmora.frogs")
@@ -37,8 +36,6 @@ log = logging.getLogger("velmora.frogs")
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "frogs_state.json"
-
-FROG_CHANNEL_IDS = with_study_hall_and_duels_potions()
 
 # Ultra-rare: ~1 in N opens (default 250). Env override for testing.
 MYTHIC_ODDS = max(50, int(os.getenv("FROG_MYTHIC_ODDS", "250")))
@@ -426,10 +423,6 @@ assert len(CARDS) == 50, f"expected 50 frog cards, got {len(CARDS)}"
 assert MYTHIC_ID in CARDS and CARDS[MYTHIC_ID]["rarity"] == "mythic"
 
 
-def _channel_hint() -> str:
-    return f"Chocolate Frogs open in {channel_mentions(FROG_CHANNEL_IDS)}."
-
-
 def _resolve_card(query: str) -> str | None:
     key = query.strip().lower().replace(" ", "_")
     if key in CARDS:
@@ -602,12 +595,6 @@ class Frogs(commands.Cog):
         except OSError:
             log.exception("Could not save frogs state.")
 
-    async def _require_channel(self, interaction: discord.Interaction) -> bool:
-        if interaction.channel_id in FROG_CHANNEL_IDS:
-            return True
-        await interaction.response.send_message(_channel_hint(), ephemeral=True)
-        return False
-
     def record(self, user_id: int) -> dict:
         rec = self.state.setdefault("players", {}).setdefault(str(user_id), {})
         rec.setdefault("cards", {})
@@ -757,8 +744,6 @@ class Frogs(commands.Cog):
 
     @frog.command(name="open", description="Unwrap today's Chocolate Frog (once per day).")
     async def frog_open(self, interaction: discord.Interaction):
-        if not await self._require_channel(interaction):
-            return
         rec = self.record(interaction.user.id)
         day = today()
         if rec.get("opened_on") == day:
@@ -794,8 +779,6 @@ class Frogs(commands.Cog):
     async def frog_album(
         self, interaction: discord.Interaction, member: discord.Member | None = None
     ):
-        if not await self._require_channel(interaction):
-            return
         target = member or interaction.user
         counts = self.counts(target.id)
         unique, copies = self.owned_total(target.id)
@@ -836,8 +819,6 @@ class Frogs(commands.Cog):
     @frog.command(name="show", description="Show off a Chocolate Frog card from your album.")
     @app_commands.describe(card="Card name or id from your album")
     async def frog_show(self, interaction: discord.Interaction, card: str):
-        if not await self._require_channel(interaction):
-            return
         key = _resolve_card(card)
         if not key:
             await interaction.response.send_message(
@@ -871,8 +852,6 @@ class Frogs(commands.Cog):
         member: discord.Member,
         card: str,
     ):
-        if not await self._require_channel(interaction):
-            return
         if member.id == interaction.user.id:
             await interaction.response.send_message(
                 "Gifting yourself a frog is just holding it differently.",
@@ -945,8 +924,6 @@ class Frogs(commands.Cog):
         offer: str,
         want: str,
     ):
-        if not await self._require_channel(interaction):
-            return
         if member.id == interaction.user.id or member.bot:
             await interaction.response.send_message(
                 "Pick another collector.", ephemeral=True
