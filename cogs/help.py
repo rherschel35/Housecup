@@ -86,7 +86,8 @@ HELP = {
                  "Practice cleared floors with `/descend floor:n` for loot; nearby floors can sharpen a free stat pick. "
                  "`/descend auto:True` posts the next monster after each win. "
                  "Idle 3 minutes with no button press counts as a loss. "
-                 "Wins bind monsters into your army for castle sieges."),
+                 "Wins bind monsters into your army for castle sieges. "
+                 "Bind 200 floor-40+ monsters in a Central day for +10 house points once."),
         "entries": [
             ("descend", "Fight the next monster (or resume). Use auto:True to chain wins without retyping."),
             ("descendend", "Forfeit an open fight (counts as a loss). Idle 3 min with no button also loses. Staff can forfeit others."),
@@ -100,10 +101,12 @@ HELP = {
         "staff": False,
         "note": ("Army PvP in the castles channel. Bind Descent monsters, hold one of six castles, "
                  "siege on Wed & Sat (Chicago). Reinforce anytime except mid-assault. "
-                 "One castle per player — abandon before attacking another."),
+                 "One castle per player — abandon before attacking another. "
+                 "200 floor-40+ binds in a Central day = +10 house points."),
         "entries": [
             ("castles", "Map board: owners, perks, reinforce anytime (not mid-assault), siege, abandon."),
             ("army", "Full paged roster + sacrifice 500 → ATK/DEF (castles + Descent channels). Size (5000) and daily bind caps start when PvP goes live."),
+            ("checklist", "Tracks floor-40+ binds toward the daily +10."),
         ],
     },
     "potions": {
@@ -241,7 +244,7 @@ HELP = {
         "staff": False,
         "entries": [
             ("profile", "Your Mirror, wand, patronus, Animagus, broom, points, duel rank, beasts and honours - or anyone's."),
-            ("checklist", "Your daily points board (public) — duels, Quidditch, broom, beasts, potions, frog, market, and more. Full clears every 10 days pay +5."),
+            ("checklist", "Your daily points board (public) — duels, Quidditch, broom, beasts, potions, F40+ binds, frog, market, and more. Full clears every 10 days pay +5."),
             ("reportcard", "Public report card — big letter grade from your average checklist % complete."),
             ("gpa", "School-wide GPA ranking from average checklist completion."),
             ("points", "Your points (or anyone's), this season and all time."),

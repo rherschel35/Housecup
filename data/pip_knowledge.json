@@ -114,7 +114,7 @@
         "what can I still do",
         "what can i still do"
       ],
-      "answer": "`/checklist` is yer daily points board — what's left for house points an' habits, with reset timers. Finish every scored box for a full clear; every 10 full clears pays +5 house points. `/reportcard` shows a big letter grade from yer average % complete (GPA = that % × 4.0). `/gpa` ranks the school. Includes duels, Quidditch house-match wins, broom solo (5/day, +3 for finishing all 5), broom challenge (3 awards/day at 3 pts — win or +0s tie), beast befriends (+3 for 5), potion brews (+3 for 5), Chocolate Frog (`/frog open`), house fire, market sells, an' more.",
+      "answer": "`/checklist` is yer daily points board — what's left for house points an' habits, with reset timers. Finish every scored box for a full clear; every 10 full clears pays +5 house points. `/reportcard` shows a big letter grade from yer average % complete (GPA = that % × 4.0). `/gpa` ranks the school. Includes duels, Quidditch house-match wins, broom solo (5/day, +3 for finishing all 5), broom challenge (3 awards/day at 3 pts — win or +0s tie), beast befriends (+3 for 5), potion brews (+3 for 5), army binds (200 floor-40+ for +10), Chocolate Frog (`/frog open`), house fire, market sells, an' more.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {
@@ -278,7 +278,7 @@
         "stuck descent",
         "idle fight"
       ],
-      "answer": "The Descent is a hundred-floor solo dungeon — only in Descent channels. `/descend` fights yer next monster; add `auto:True` to chain the next fight after each win. `/descend floor:n` replays a cleared floor for practice an' loot. Idle 3 minutes with no button counts as a loss; `/descendend` forfeits the same way so ye can start fresh. `/descentstatus` shows floor, stats, an' lockouts. Three losses on a floor locks ye out 24 hours. Every win binds that monster into yer army for castle sieges.",
+      "answer": "The Descent is a hundred-floor solo dungeon — only in Descent channels. `/descend` fights yer next monster; add `auto:True` to chain the next fight after each win. `/descend floor:n` replays a cleared floor for practice an' loot. Idle 3 minutes with no button counts as a loss; `/descendend` forfeits the same way so ye can start fresh. `/descentstatus` shows floor, stats, an' lockouts. Three losses on a floor locks ye out 24 hours. Every win binds that monster into yer army for castle sieges. Bind **200** floor-**40**+ monsters in a Central day for **+10** house points once (check `/checklist`). Boss floors no longer pay house points.",
       "link": "https://everything-velmora.netlify.app/descent"
     },
     {
@@ -314,7 +314,7 @@
         "hold a castle",
         "castle perk"
       ],
-      "answer": "Castle PvP lives in the castles channel. Descent wins bind monsters into yer army — `/army` shows the roster (castles + Descent channels) an' lets ye sacrifice 500 regulars for ATK or DEF. `/castles` opens the map: reinforce anytime (not mid-assault), siege on Wed & Sat (Chicago), or abandon. One castle per player. Before PvP goes live, binds are uncapped; once live it's 200/day an' 5,000 total. Each keep has a perk (duel ties, Descent half-attack, `/cast` auto-pick, an' more) — full list on the Compendium Castles page.",
+      "answer": "Castle PvP lives in the castles channel. Descent wins bind monsters into yer army — `/army` shows the roster (castles + Descent channels) an' lets ye sacrifice 500 regulars for ATK or DEF. `/castles` opens the map: reinforce anytime (not mid-assault), siege on Wed & Sat (Chicago), or abandon. One castle per player. Before PvP goes live, binds are uncapped; once live it's 200/day an' 5,000 total. Bind **200** floor-**40**+ monsters in a Central day for **+10** house points once. Each keep has a perk (duel ties, Descent half-attack, `/cast` auto-pick, an' more) — full list on the Compendium Castles page.",
       "link": "https://everything-velmora.netlify.app/castles"
     },
     {

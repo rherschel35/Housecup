@@ -1685,21 +1685,39 @@ class Descent(commands.Cog):
         castles = self.bot.get_cog("Castles")
         allowed = castles.recruit_allowed(member.id, 1) if castles else 1
         unit = None
+        bind_pts = 0
         if allowed > 0:
             unit = recruit_from_fight(rec, fight)
             if castles:
                 castles.note_recruits(member.id, 1)
+                bind_pts += castles.note_bind40(
+                    member, floor=fight.floor, n=1
+                )
                 bonus = castles.fifth_muster_bonus(member.id)
                 if bonus and castles.recruit_allowed(member.id, bonus) > 0:
                     clone_army_unit(rec, unit)
                     castles.note_recruits(member.id, bonus)
+                    bind_pts += castles.note_bind40(
+                        member, floor=fight.floor, n=bonus
+                    )
         elif castles:
             # Still tick Fifth Muster progress even when the daily cap blocks a bind.
             castles.fifth_muster_bonus(member.id)
         self.save()
 
+        bind_line = ""
+        if bind_pts:
+            from cogs.castles import BIND_BONUS_GOAL, BIND_BONUS_MIN_FLOOR
+            bind_line = (
+                f"\n🏰 **+{bind_pts}** house points — "
+                f"**{BIND_BONUS_GOAL}** floor-{BIND_BONUS_MIN_FLOOR}+ "
+                "monsters bound today!"
+            )
+
         if fight.is_practice:
-            await self._on_practice_win(interaction, fight, rec, member)
+            await self._on_practice_win(
+                interaction, fight, rec, member, bind_line=bind_line
+            )
             return
 
         drop_text = None
@@ -1745,12 +1763,7 @@ class Descent(commands.Cog):
             if fortune_drop:
                 desc += f"\n🍀 Draught of Fortune paid off: {fortune_drop}."
             if fight.is_boss:
-                store = self.bot.get_cog("Store")
-                house = store.member_house(member) if store else None
-                if house:
-                    store.record(house=house, delta=5, actor_id=self.bot.user.id if self.bot.user else 0,
-                                 target_id=member.id, reason=f"Descent: floor {floor} boss defeated")
-                desc += f"\n🏆 You defeated **{fight.name}** and earned House {house or 'points (unassigned)'} 5 points."
+                desc += f"\n🏆 You defeated **{fight.name}**!"
                 if floor not in rec["bosses_bound"]:
                     rec["bosses_bound"].append(floor)
                     self.save()
@@ -1778,6 +1791,8 @@ class Descent(commands.Cog):
                 desc += "\n\nYou've earned a stat point for clearing the floor - pick where it goes."
             if spire_line:
                 desc += f"\n{spire_line}"
+            if bind_line:
+                desc += bind_line
             if self.is_auto(member.id) and floor < MAX_FLOOR:
                 desc += "\n⚡ Auto paused for your stat pick — next monster follows when you're done."
             embed = discord.Embed(title=f"{fight.emoji} Victory!", description=desc, color=0x2ECC71)
@@ -1799,6 +1814,8 @@ class Descent(commands.Cog):
             desc += "\n\nYou've earned a stat point - pick where it goes."
         if spire_line:
             desc += f"\n{spire_line}"
+        if bind_line:
+            desc += bind_line
         embed = discord.Embed(
             title=f"{fight.emoji} Victory!",
             description=desc,
@@ -1816,13 +1833,23 @@ class Descent(commands.Cog):
             embed.description += "\nUse `/descend` to keep going."
             await self._publish_board(interaction, fight, embed, None)
 
-    async def _on_practice_win(self, interaction: discord.Interaction, fight: Fight, rec: dict, member: discord.Member):
+    async def _on_practice_win(
+        self,
+        interaction: discord.Interaction,
+        fight: Fight,
+        rec: dict,
+        member: discord.Member,
+        *,
+        bind_line: str = "",
+    ):
         got_loot = random.random() < MONSTER_DROP_CHANCE
         if got_loot:
             await self._drop_loot(member, fight.element)
 
         desc = f"**{fight.name}** falls. This was a practice fight - your floor progress hasn't changed."
         desc += "\nA material dropped!" if got_loot else "\nNo material dropped this time."
+        if bind_line:
+            desc += bind_line
 
         chance = practice_statup_chance(rec["floor"], fight.floor)
         pct = max(1, int(round(chance * 100)))
