@@ -451,16 +451,10 @@ class Checklist(commands.Cog):
                 f"**{left}/{SELL_DAILY_CAP}** pts left from selling",
                 utc_reset, "day resets"))
 
-        # ---- Potions (brew set + brewable / bottled / active) ----
+        # ---- Potions (UTC day brew set) ----
         potions = self.bot.get_cog("Potions")
         if potions:
-            from cogs.potions import (
-                BREW_COMPLETION_POINTS,
-                BREW_GOAL,
-                RECIPES,
-                TIER_MIN_RANK,
-                rank_info,
-            )
+            from cogs.potions import BREW_COMPLETION_POINTS, BREW_GOAL
             prec = potions.record(member.id)
             brew_day = prec.get("brew_day") or {}
             brewed = int(brew_day.get("count") or 0)
@@ -476,24 +470,6 @@ class Checklist(commands.Cog):
             items.append(CheckItem(
                 "Potion brews", brew_bonus, brew_detail, utc_reset, "day resets"))
 
-            p_idx, _, _ = rank_info(prec.get("rep_xp", 0))
-            have = potions._satchel_items(member)
-            brewable = sum(
-                1 for r in RECIPES.values()
-                if p_idx >= TIER_MIN_RANK[r["tier"]]
-                and all(have.get(i, 0) >= 1 for i in r["ingredients"])
-            )
-            bottled = sum(int(n) for n in (prec.get("inventory") or {}).values() if int(n) > 0)
-            active_n = len(prec.get("active") or [])
-            bits = [f"**{brewable}** brewable", f"**{bottled}** ready to drink"]
-            if active_n:
-                bits.append(f"**{active_n}** active")
-            satchel_done = brewable == 0 and bottled == 0
-            mark = "✅" if satchel_done else "⬜"
-            items.append(CheckItem(
-                "Potions satchel", satchel_done,
-                f"{' · '.join(bits)} · `/brew` / `/drink`",
-                raw=f"{mark} **Potions satchel** — {' · '.join(bits)} · `/brew` / `/drink`"))
         # ---- Familiar care / scout ----
         familiars = self.bot.get_cog("Familiars")
         if familiars:
@@ -542,48 +518,6 @@ class Checklist(commands.Cog):
                     "stoked today" if stoked else "ready — `/stoke`",
                     chi_reset, "day resets"))
 
-        # ---- Open challenges ----
-        quests = self.bot.get_cog("Quests")
-        if quests:
-            from cogs.quests import TIERS
-            open_bits = []
-            any_open = False
-            for tier in ("daily", "trial", "rite"):
-                meta = TIERS[tier]
-                round_ = quests.state.get("active", {}).get(tier)
-                if not round_ or round_.get("closed"):
-                    continue
-                any_open = True
-                attempted = member.id in (round_.get("attempted") or [])
-                won = any(w.get("id") == member.id for w in (round_.get("winners") or []))
-                done = won or attempted
-                open_bits.append(
-                    f"{'✅' if done else '⬜'} {meta['label']}"
-                    + (
-                        " (you scored)" if won
-                        else " (attempt used)" if attempted
-                        else " open — try it!"
-                    )
-                )
-                items.append(CheckItem(
-                    f"Challenge · {meta['label']}", done,
-                    "attempted" if done else "open — try it!",
-                ))
-            if any_open:
-                items.append(CheckItem(
-                    "Challenges open now", True,
-                    "",
-                    scored=False,
-                    raw="**Challenges open now**\n" + "\n".join(open_bits),
-                ))
-            else:
-                items.append(CheckItem(
-                    "Challenges", False,
-                    "none open · `/challengestatus` for next times",
-                    scored=False,
-                    raw="⬜ **Challenges** — none open · `/challengestatus` for next times",
-                ))
-
         return items
 
     def _build_checklist_embed(
@@ -591,12 +525,7 @@ class Checklist(commands.Cog):
     ) -> discord.Embed:
         now = time.time()
         items = self._collect(member, now)
-        # Prefer display lines: use challenge open banner instead of per-tier scored rows
-        lines: list[str] = []
-        for item in items:
-            if item.label.startswith("Challenge · "):
-                continue  # shown under the banner raw line
-            lines.append(_line(item))
+        lines = [_line(item) for item in items]
 
         rec = self.player(member.id)
         full_n = int(rec.get("full_completions") or 0)
