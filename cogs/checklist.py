@@ -388,20 +388,23 @@ class Checklist(commands.Cog):
                 SOLO_COMPLETION_POINTS,
                 SOLO_DAILY_CAP,
             )
+            # Retry +3 if they finished all 5 but an earlier payout missed.
+            broom_race.try_award_solo_completion(member)
             solo_left = broom_race.solo_left(member.id)
             solo_done = broom_race.solo_used(member.id)
             solo_bonus = bool(broom_race.daily_rec(member.id).get("solo_bonus"))
             chall_left = broom_race.challenge_pts_left(member.id)
-            solo_detail = (
-                f"**{solo_done}/{SOLO_DAILY_CAP}** done · "
-                + (
-                    f"+{SOLO_COMPLETION_POINTS} pts claimed"
-                    if solo_bonus
-                    else f"+{SOLO_COMPLETION_POINTS} pts when all 5 finish"
+            if solo_bonus:
+                solo_tail = f"+{SOLO_COMPLETION_POINTS} pts claimed"
+            elif solo_done >= SOLO_DAILY_CAP:
+                solo_tail = (
+                    f"+{SOLO_COMPLETION_POINTS} pts ready — need a house?"
                 )
-            )
+            else:
+                solo_tail = f"+{SOLO_COMPLETION_POINTS} pts when all 5 finish"
+            solo_detail = f"**{solo_done}/{SOLO_DAILY_CAP}** finished · {solo_tail}"
             items.append(CheckItem(
-                "Broom race (solo)", solo_left == 0 and solo_bonus,
+                "Broom race (solo)", solo_bonus,
                 solo_detail, utc_reset, "day resets"))
             items.append(CheckItem(
                 "Broom race (challenge wins)", chall_left == 0,

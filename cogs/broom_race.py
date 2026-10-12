@@ -14,8 +14,8 @@ notes warn you off traps on that course again. Challenges share one
 course; lower time-lost wins.
 
 Daily caps (UTC):
-    - Solo: 5 learning races/day (hard stop — those unlock study notes);
-      finishing all 5 pays +3 house points once
+    - Solo: 5 finished learning races/day (hard stop — those unlock study notes);
+      finishing all 5 pays +3 house points once (abandons don't count)
     - Challenge: always allowed; first 3 point awards pay 3 house points each
       (wins, or a perfect +0s finish even on a tie)
 """
@@ -395,15 +395,6 @@ class BroomRace(commands.Cog):
     def challenge_pts_left(self, user_id: int) -> int:
         return max(0, CHALLENGE_POINT_CAP - self.challenge_pts_used(user_id))
 
-    def consume_solo_slot(self, user_id: int) -> bool:
-        """Spend one of today's solo learning races. False if already at cap."""
-        rec = self.daily_rec(user_id)
-        if int(rec["solo"]) >= SOLO_DAILY_CAP:
-            return False
-        rec["solo"] = int(rec["solo"]) + 1
-        self.save()
-        return True
-
     def try_award_challenge_points(
         self, member: discord.Member, *, reason: str = "Broom race challenge win"
     ) -> str:
@@ -435,6 +426,7 @@ class BroomRace(commands.Cog):
         """+SOLO_COMPLETION_POINTS once after finishing all solo races today.
 
         Returns: "awarded" | "not_ready" | "already" | "no_house" | "no_store"
+        Safe to call from /checklist — retries if an earlier finish missed the payout.
         """
         rec = self.daily_rec(member.id)
         if int(rec.get("solo") or 0) < SOLO_DAILY_CAP:
@@ -446,6 +438,18 @@ class BroomRace(commands.Cog):
             return "no_store"
         house = store.member_house(member)
         if not house:
+            # interaction.user is sometimes a bare User without roles — refresh.
+            guild = getattr(member, "guild", None)
+            if guild is not None:
+                fresh = guild.get_member(member.id)
+                if fresh is not None:
+                    house = store.member_house(fresh)
+                    member = fresh
+        if not house:
+            log.info(
+                "Solo broom completion ready for %s but no house yet",
+                member.id,
+            )
             return "no_house"
         store.record(
             house=house,
@@ -457,6 +461,17 @@ class BroomRace(commands.Cog):
         rec["solo_bonus"] = True
         self.save()
         return "awarded"
+
+    def count_solo_finish(self, member: discord.Member) -> str:
+        """Record one finished solo race and try the daily completion bonus.
+
+        Returns the try_award_solo_completion result.
+        """
+        rec = self.daily_rec(member.id)
+        if int(rec.get("solo") or 0) < SOLO_DAILY_CAP:
+            rec["solo"] = int(rec.get("solo") or 0) + 1
+            self.save()
+        return self.try_award_solo_completion(member)
 
     def notes_of(self, user_id: int) -> list[str]:
         return list(self.state["notes"].get(str(user_id), []))
@@ -777,19 +792,9 @@ class BroomRace(commands.Cog):
             return
 
         course = self._pick_course(interaction.user.id)
-        if not self.consume_solo_slot(interaction.user.id):
-            await interaction.response.send_message(
-                f"You've used all **{SOLO_DAILY_CAP}** solo learning races today.",
-                ephemeral=True,
-            )
-            return
-
+        # Cap is on finishes (not starts): abandoned races don't burn a slot.
         race = self._begin_session(interaction.user.id, course)
         if not race:
-            # Refund the solo slot if we somehow failed to start.
-            rec = self.daily_rec(interaction.user.id)
-            rec["solo"] = max(0, int(rec["solo"]) - 1)
-            self.save()
             await interaction.response.send_message(
                 "You need a claimed broom first — `/broom`.", ephemeral=True
             )
@@ -803,7 +808,8 @@ class BroomRace(commands.Cog):
                     f"**{interaction.user.display_name}** takes **{course['name']}**.\n"
                     f"*{course['blurb']}*\n\n"
                     "Stages are private — only they see the choices.\n"
-                    f"Solo learning races left today · **{left}/{SOLO_DAILY_CAP}**"
+                    f"Solo finishes left today · **{left}/{SOLO_DAILY_CAP}** "
+                    "(counts when you finish)"
                 ),
                 color=RACE_COLOR,
             )
@@ -1055,7 +1061,7 @@ class BroomRace(commands.Cog):
             else None
         )
         if member is not None:
-            bonus = self.try_award_solo_completion(member)
+            bonus = self.count_solo_finish(member)
             if bonus == "awarded":
                 bonus_line = (
                     f"\n\n+**{SOLO_COMPLETION_POINTS}** house points — "
@@ -1104,12 +1110,18 @@ class BroomRace(commands.Cog):
             return
 
         embed = self._finish_embed(interaction.user, race, new_note, new_best)
-        bonus = self.try_award_solo_completion(interaction.user)
+        bonus = self.count_solo_finish(interaction.user)
         if bonus == "awarded":
             embed.description = (
                 (embed.description or "")
                 + f"\n\n+**{SOLO_COMPLETION_POINTS}** house points — "
                 f"all **{SOLO_DAILY_CAP}** solo races done today."
+            )
+        elif bonus == "no_house":
+            embed.description = (
+                (embed.description or "")
+                + "\n\nSolo set complete — join a house to claim the "
+                f"+**{SOLO_COMPLETION_POINTS}** points (`/checklist` retries)."
             )
         await interaction.response.edit_message(embed=embed, view=None)
         try:
