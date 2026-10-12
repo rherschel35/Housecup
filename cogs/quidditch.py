@@ -17,11 +17,10 @@ Rewards:
     - Scramble win: updates your personal Quidditch record only. No
       house points, no loot - mixed-house teams have no single house to
       credit.
-    - House match win: updates your personal record AND gives your house
-      3 points per winning player - but only your first 3 point-earning
-      house-match wins each day count. You can keep playing past that,
-      it just stops adding house points for the day (your win record and
-      title still climb).
+    - House match win: updates your personal record. House points are
+      house-level only: 5 house-match wins in a UTC day for that house
+      pay +5 house points once (who played doesn't matter). Personal
+      win record and titles still climb past that.
     - Titles (shown via /quidditch stats): a ladder based on total house
       match wins - 5 -> Rising Chaser, 15 -> Storm Breaker, 30 -> Pitch
       Veteran, 50 -> Legend of the Pitch.
@@ -85,8 +84,11 @@ GOAL_POINTS = 10
 SNITCH_CHANCE_PER_CHASER = 0.12   # per chaser, per round
 SNITCH_BONUS = 30                 # added to the catcher's side's score
 
-HOUSE_POINTS_PER_WIN = 3
-DAILY_HOUSE_WIN_CAP = 3   # a player's own first N point-earning house-match wins each day
+# House-level daily set: 5 house-match wins for that house → +5 once.
+HOUSE_WIN_GOAL = 5
+HOUSE_COMPLETION_POINTS = 5
+HOUSE_POINTS_PER_WIN = HOUSE_COMPLETION_POINTS  # legacy alias
+DAILY_HOUSE_WIN_CAP = HOUSE_WIN_GOAL  # legacy alias / checklist
 
 # (min house-match wins, title)
 TITLE_THRESHOLDS = [
@@ -251,10 +253,17 @@ class Quidditch(commands.Cog):
     def _load(self) -> dict:
         if STATE_PATH.exists():
             try:
-                return json.loads(STATE_PATH.read_text())
+                data = json.loads(STATE_PATH.read_text())
             except Exception:
                 log.exception("Failed to load quidditch state")
-        return {"players": {}}
+                data = {}
+        else:
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        data.setdefault("players", {})
+        data.setdefault("house_day", {})  # house -> {date, wins, bonus}
+        return data
 
     def save(self):
         STATE_PATH.write_text(json.dumps(self.state, indent=2))
@@ -264,6 +273,23 @@ class Quidditch(commands.Cog):
         if rec["daily"]["date"] != today_str():
             rec["daily"] = {"date": today_str(), "count": 0}
         return rec
+
+    def house_day_rec(self, house: str) -> dict:
+        bag = self.state.setdefault("house_day", {})
+        day = today_str()
+        rec = bag.get(house) or {}
+        if rec.get("date") != day:
+            rec = {"date": day, "wins": 0, "bonus": False}
+            bag[house] = rec
+        rec.setdefault("wins", 0)
+        rec.setdefault("bonus", False)
+        return rec
+
+    def house_wins_today(self, house: str) -> int:
+        return int(self.house_day_rec(house).get("wins") or 0)
+
+    def house_bonus_claimed(self, house: str) -> bool:
+        return bool(self.house_day_rec(house).get("bonus"))
 
     def _in_channel(self, interaction: discord.Interaction) -> bool:
         return interaction.channel_id in QUIDDITCH_CHANNEL_IDS
@@ -507,8 +533,10 @@ class Quidditch(commands.Cog):
         elif match.winner == "b":
             winning_team, losing_team = match.team_b, match.team_a
 
-        awarded: list[int] = []
-        capped: list[int] = []
+        winning_house = None
+        house_pts = 0
+        house_wins = 0
+        house_bonus = False
 
         if not match.is_house:
             for uid in winning_team or []:
@@ -520,34 +548,60 @@ class Quidditch(commands.Cog):
         else:
             store = self.bot.get_cog("Store")
             winning_house = normalize_house(
-                match.house_a if match.winner == "a" else (match.house_b if match.winner == "b" else None)
+                match.house_a if match.winner == "a" else (
+                    match.house_b if match.winner == "b" else None
+                )
             )
             for uid in winning_team or []:
                 rec = self.record(uid)
                 rec["house_w"] += 1
-                if winning_house and rec["daily"]["count"] < DAILY_HOUSE_WIN_CAP:
-                    rec["daily"]["count"] += 1
-                    awarded.append(uid)
-                    if store:
-                        store.record(house=winning_house, delta=HOUSE_POINTS_PER_WIN,
-                                     actor_id=self.bot.user.id if self.bot.user else 0,
-                                     target_id=uid, reason="Quidditch house match win")
-                else:
-                    capped.append(uid)
             for uid in losing_team or []:
                 rec = self.record(uid)
                 rec["house_l"] += 1
+
+            if winning_house and match.winner is not None:
+                day = self.house_day_rec(winning_house)
+                if not day.get("bonus"):
+                    day["wins"] = int(day.get("wins") or 0) + 1
+                house_wins = int(day.get("wins") or 0)
+                house_bonus = bool(day.get("bonus"))
+                if house_wins >= HOUSE_WIN_GOAL and not house_bonus and store:
+                    store.record(
+                        house=winning_house,
+                        delta=HOUSE_COMPLETION_POINTS,
+                        actor_id=self.bot.user.id if self.bot.user else 0,
+                        target_id=(winning_team or [None])[0],
+                        reason=(
+                            f"House Quidditch set complete ({HOUSE_WIN_GOAL} wins)"
+                        ),
+                    )
+                    day["bonus"] = True
+                    house_bonus = True
+                    house_pts = HOUSE_COMPLETION_POINTS
         self.save()
 
         if match.winner is None:
             desc = f"**It's a tie!** {match.score_a} — {match.score_b}. No wins or points recorded."
         else:
             desc = f"🏆 **{match.side_name(match.winner)} wins!** {match.score_a} — {match.score_b}"
-            if match.is_house:
-                if awarded:
-                    desc += "\n+3 house points: " + ", ".join(f"<@{u}>" for u in awarded)
-                if capped:
-                    desc += "\nDaily cap reached (no points, win still recorded): " + ", ".join(f"<@{u}>" for u in capped)
+            if match.is_house and winning_house:
+                label = house_name(winning_house)
+                if house_pts:
+                    desc += (
+                        f"\n+**{house_pts}** to **{label}** — house Quidditch set "
+                        f"complete ({HOUSE_WIN_GOAL}/{HOUSE_WIN_GOAL})"
+                    )
+                elif house_bonus:
+                    desc += (
+                        f"\n**{label}** Quidditch set already claimed today "
+                        f"({HOUSE_WIN_GOAL}/{HOUSE_WIN_GOAL})"
+                    )
+                else:
+                    desc += (
+                        f"\n**{label}** house-match wins today · "
+                        f"**{house_wins}/{HOUSE_WIN_GOAL}** "
+                        f"(+{HOUSE_COMPLETION_POINTS} at {HOUSE_WIN_GOAL})"
+                    )
 
         embed = discord.Embed(title="Match Result", description=desc, color=0x2ECC71)
 
@@ -579,9 +633,24 @@ class Quidditch(commands.Cog):
             return
         rec = self.record(interaction.user.id)
         title = title_for(rec["house_w"])
-        desc = [f"Scramble: **{rec['scramble_w']}W - {rec['scramble_l']}L**",
-                f"House matches: **{rec['house_w']}W - {rec['house_l']}L**",
-                f"Point-earning wins today: {rec['daily']['count']}/{DAILY_HOUSE_WIN_CAP}"]
+        desc = [
+            f"Scramble: **{rec['scramble_w']}W - {rec['scramble_l']}L**",
+            f"House matches: **{rec['house_w']}W - {rec['house_l']}L**",
+        ]
+        store = self.bot.get_cog("Store")
+        house = store.member_house(interaction.user) if store else None
+        if house:
+            hw = self.house_wins_today(house)
+            claimed = self.house_bonus_claimed(house)
+            desc.append(
+                f"**{house_name(house)}** today: "
+                f"**{min(hw, HOUSE_WIN_GOAL)}/{HOUSE_WIN_GOAL}** house-match wins"
+                + (
+                    f" · +{HOUSE_COMPLETION_POINTS} claimed"
+                    if claimed
+                    else f" · +{HOUSE_COMPLETION_POINTS} at {HOUSE_WIN_GOAL}"
+                )
+            )
         if title:
             desc.append(f"🏅 Title: **{title}**")
         embed = discord.Embed(title=f"{interaction.user.display_name}'s Quidditch Record",
