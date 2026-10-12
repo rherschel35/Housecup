@@ -18,7 +18,7 @@ Every spend deducts from the member's season contribution AND the house total
 Rare, very_rare, and legendary place-ingredients cannot be bought or sold
 (Pitch Resin included — forage only). Descent materials (any zone drop /
 boss sigil) sell in batches of 25. Defaults: common 3 / uncommon 6 / scroll 30 /
-title 50 / room 500 / broom token 50 / sell batch 3 / sell cap 21 — staff can
+title 50 / room 500 / broom token 50 / sell batch 3 / sell cap 6 — staff can
 reprice via `/staff market setprice`.
 """
 
@@ -49,7 +49,7 @@ DEFAULT_PRICES = {
     "buy_common": 3,
     "buy_uncommon": 6,
     "sell_payout": 3,
-    "sell_daily_cap": 21,
+    "sell_daily_cap": 6,
     "scroll": 30,
     "title": 50,
     "room": 500,
@@ -233,6 +233,11 @@ class Marketplace(commands.Cog):
         prices = state.setdefault("prices", {})
         for key, value in DEFAULT_PRICES.items():
             prices.setdefault(key, value)
+        # One-shot: old default sell cap was 21; narrow to 6 unless staff
+        # already set a different custom value.
+        if prices.get("sell_daily_cap") == 21:
+            prices["sell_daily_cap"] = DEFAULT_PRICES["sell_daily_cap"]
+            log.info("Migrated Marketplace sell_daily_cap 21 → %s", prices["sell_daily_cap"])
         # Rewrite retired shop-title spellings so buyers keep their purchase.
         changed = False
         for uid, owned in list(state["titles"].items()):
