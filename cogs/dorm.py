@@ -24,7 +24,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from cogs.velmora_channels import channel_mentions, with_study_hall_and_duels_potions
 from cogs.world_engine import today
 
 log = logging.getLogger("velmora.dorm")
@@ -33,7 +32,6 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "dorm_state.json"
 
-ROOM_CHANNEL_IDS = with_study_hall_and_duels_potions()
 COZY = 0x6B4F3A
 
 SLOTS = ("bed", "wall", "desk", "shelf", "window")
@@ -495,10 +493,6 @@ assert len(DECOR) == 55
 assert len(DECOR_BY_CARD) == 50
 
 
-def _channel_hint() -> str:
-    return f"Dorm rooms are in {channel_mentions(ROOM_CHANNEL_IDS)}."
-
-
 class Dorm(commands.Cog):
     room = app_commands.Group(
         name="room",
@@ -531,12 +525,6 @@ class Dorm(commands.Cog):
             os.replace(tmp, STATE_PATH)
         except OSError:
             log.exception("Could not save dorm state.")
-
-    async def _require_channel(self, interaction: discord.Interaction) -> bool:
-        if interaction.channel_id in ROOM_CHANNEL_IDS:
-            return True
-        await interaction.response.send_message(_channel_hint(), ephemeral=True)
-        return False
 
     def record(self, user_id: int) -> dict:
         rec = self.state.setdefault("players", {}).setdefault(str(user_id), {})
@@ -683,8 +671,6 @@ class Dorm(commands.Cog):
     async def room_view(
         self, interaction: discord.Interaction, member: discord.Member | None = None
     ):
-        if not await self._require_channel(interaction):
-            return
         target = member or interaction.user
         if target.id == interaction.user.id:
             self.ensure_starters(target.id)
@@ -699,8 +685,6 @@ class Dorm(commands.Cog):
         description="Find a duplicate of unlocked decor for your stash (once per day).",
     )
     async def room_find(self, interaction: discord.Interaction):
-        if not await self._require_channel(interaction):
-            return
         self.ensure_starters(interaction.user.id)
         rec = self.record(interaction.user.id)
         day = today()
@@ -744,8 +728,6 @@ class Dorm(commands.Cog):
     async def room_catalog(
         self, interaction: discord.Interaction, slot: app_commands.Choice[str]
     ):
-        if not await self._require_channel(interaction):
-            return
         self.ensure_starters(interaction.user.id)
         slot_key = slot.value
         rec = self.record(interaction.user.id)
@@ -786,8 +768,6 @@ class Dorm(commands.Cog):
 
     @room.command(name="stash", description="Decor waiting in your stash.")
     async def room_stash(self, interaction: discord.Interaction):
-        if not await self._require_channel(interaction):
-            return
         self.ensure_starters(interaction.user.id)
         rec = self.record(interaction.user.id)
         stash = {
@@ -828,8 +808,6 @@ class Dorm(commands.Cog):
         item: str,
         slot: app_commands.Choice[str],
     ):
-        if not await self._require_channel(interaction):
-            return
         self.ensure_starters(interaction.user.id)
         rec = self.record(interaction.user.id)
         slot_key = slot.value
@@ -949,8 +927,6 @@ class Dorm(commands.Cog):
     async def room_clear(
         self, interaction: discord.Interaction, slot: app_commands.Choice[str]
     ):
-        if not await self._require_channel(interaction):
-            return
         rec = self.record(interaction.user.id)
         slot_key = slot.value
         prev = (rec.get("slots") or {}).pop(slot_key, None)
