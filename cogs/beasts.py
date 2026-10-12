@@ -20,10 +20,9 @@ window anyone can try. Items are used up on a successful befriend. It
 slips away after 10 minutes if nobody does.
 
 Rarer beasts turn up less often, and a few only appear after dark
-(8 PM - 6 AM, Velmora time). Befriending pays house points by rarity -
-only the first time you befriend that particular beast - up to 5 beast
-points per person per day. /summon is purely for fun: no points, no
-advantage.
+(8 PM - 6 AM, Velmora time). Completing **5 befriends in a UTC day**
+pays **+3 house points** once (repeats count). /summon is purely for
+fun: no points, no advantage.
 
 /study fills a personal Beast Journal: three pages per beast (field notes,
 habits, bond). One study per student per day. Finishing all three pages
@@ -35,6 +34,7 @@ five legendaries. Both show on /bestiary and /profile.
 """
 
 import asyncio
+import datetime
 import json
 import logging
 import os
@@ -66,12 +66,14 @@ STAY_MINUTES = 10
 APPROACH_CLAIM_SECONDS = 60  # first /approach gets exclusive dibs this long
 
 RARITY_WEIGHTS = {"common": 50, "uncommon": 30, "rare": 15, "legendary": 5}
-RARITY_POINTS = {"common": 1, "uncommon": 2, "rare": 3, "legendary": 5}
+RARITY_POINTS = {"common": 1, "uncommon": 2, "rare": 3, "legendary": 5}  # legacy
 RARITY_COLORS = {"common": 0x7FA66A, "uncommon": 0x4F8FC0, "rare": 0x9B59B6, "legendary": 0xE0A526}
 SIGHTING_COLOR = 0x2E8B44  # every "X appears!" alert, regardless of rarity, so it never blends in
 RARITY_LABEL = {"common": "Common", "uncommon": "Uncommon", "rare": "Rare", "legendary": "Legendary"}
-DAILY_POINT_CAP = 5
-WINDOW = 24 * 3600
+BEFRIEND_GOAL = 5
+BEFRIEND_COMPLETION_POINTS = 3
+DAILY_POINT_CAP = BEFRIEND_GOAL  # checklist / back-compat alias
+WINDOW = 24 * 3600  # legacy rolling window (journal / old paid rows)
 SUMMON_COOLDOWN = 60
 LINGER_GRACE = 120           # Lingering Charm: wearers can still approach this long after a beast leaves
 JOURNAL_PAGES = 3            # studies needed to complete one beast's journal entry
@@ -160,6 +162,7 @@ class Beasts(commands.Cog):
         state.setdefault("channel_id", None)
         state.setdefault("next_at", time.time() + self._gap())
         state.setdefault("study_day", {})  # uid -> {date, at}
+        state.setdefault("befriend_day", {})  # uid -> {date, count, bonus}
         return state
 
     def save(self) -> None:
@@ -250,9 +253,29 @@ class Beasts(commands.Cog):
         return titles
 
     def points_today(self, user_id: int, now: float) -> int:
+        """Legacy rolling paid-points sum (kept for old rows / tools)."""
         rows = [r for r in self.state["paid"].get(str(user_id), []) if now - r[0] < WINDOW]
         self.state["paid"][str(user_id)] = rows
         return sum(r[1] for r in rows)
+
+    @staticmethod
+    def _utc_day() -> str:
+        return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+
+    def befriend_day_rec(self, user_id: int) -> dict:
+        key = str(user_id)
+        bag = self.state.setdefault("befriend_day", {})
+        rec = bag.get(key) or {}
+        day = self._utc_day()
+        if rec.get("date") != day:
+            rec = {"date": day, "count": 0, "bonus": False}
+            bag[key] = rec
+        rec.setdefault("count", 0)
+        rec.setdefault("bonus", False)
+        return rec
+
+    def befriends_today(self, user_id: int) -> int:
+        return int(self.befriend_day_rec(user_id).get("count") or 0)
 
     def items_line(self, wants: list[str]) -> str:
         world = self.bot.get_cog("World")
@@ -423,8 +446,7 @@ class Beasts(commands.Cog):
     # ----------------------------------------------------------- befriending
 
     def befriend(self, member, key: str, now: float) -> dict:
-        """Record the friendship, pay points if earned, and work out any
-        rank-up or new titles. Returns what happened."""
+        """Record the friendship; +3 once for 5 befriends in a UTC day."""
         uid = str(member.id)
         b = self.beasts[key]
         col = self.state["collections"].setdefault(uid, {})
@@ -432,21 +454,39 @@ class Beasts(commands.Cog):
         entry = col.setdefault(key, {"n": 0, "first": now})
         entry["n"] += 1
 
-        out = {"first": first, "points": 0, "house": None, "capped": False, "notes": []}
+        out = {
+            "first": first,
+            "points": 0,
+            "house": None,
+            "capped": False,
+            "befriends_today": 0,
+            "notes": [],
+        }
         store = self.bot.get_cog("Store")
         house = store.member_house(member) if store else None
         out["house"] = house
-        if first and store and house:
-            want = RARITY_POINTS[b["rarity"]]
-            room = max(0, DAILY_POINT_CAP - self.points_today(member.id, now))
-            pts = min(want, room)
-            out["capped"] = pts < want
-            if pts:
-                store.record(house=house, delta=pts,
-                             actor_id=self.bot.user.id if self.bot.user else 0,
-                             target_id=member.id, reason=f"Befriended a {b['name']}")
-                self.state["paid"].setdefault(uid, []).append([now, pts])
-                out["points"] = pts
+
+        day = self.befriend_day_rec(member.id)
+        day["count"] = int(day.get("count") or 0) + 1
+        out["befriends_today"] = int(day["count"])
+        if (
+            store
+            and house
+            and int(day["count"]) >= BEFRIEND_GOAL
+            and not day.get("bonus")
+        ):
+            store.record(
+                house=house,
+                delta=BEFRIEND_COMPLETION_POINTS,
+                actor_id=self.bot.user.id if self.bot.user else 0,
+                target_id=member.id,
+                reason=f"Completed {BEFRIEND_GOAL} beast befriends today",
+            )
+            day["bonus"] = True
+            out["points"] = BEFRIEND_COMPLETION_POINTS
+            self.state["paid"].setdefault(uid, []).append(
+                [now, BEFRIEND_COMPLETION_POINTS]
+            )
 
         count = len(col)
         idx = rank_index(count)
@@ -551,16 +591,19 @@ class Beasts(commands.Cog):
                      f"and befriends the **{b['name']}**!", f"*{b['desc']}*"]
         if lingered:
             lines.insert(1, "⏳ *It had nearly gone, but the Lingering Charm made it look back.*")
-        if out["first"]:
-            if out["points"]:
-                h = HOUSES.get(out["house"], {})
-                lines.append(f"+{out['points']} to {h.get('emoji', '')} {h.get('name', out['house'])}"
-                             + (" (daily beast points reached)" if out["capped"] else ""))
-            elif out["capped"]:
-                lines.append("*(They've already earned today's beast points.)*")
-        else:
-            lines.append(f"*They've befriended a {b['name']} before - it's added to their bestiary again. "
-                         "(Points only come the first time.)*")
+        today_n = int(out.get("befriends_today") or 0)
+        lines.append(
+            f"Befriends today · **{today_n}/{BEFRIEND_GOAL}**"
+            + (
+                f" · +**{out['points']}** house points (set complete!)"
+                if out.get("points")
+                else ""
+            )
+        )
+        if not out["first"]:
+            lines.append(
+                f"*They've befriended a {b['name']} before — counted again toward today's set.*"
+            )
         if b["rarity"] in ("rare", "legendary") and out["first"]:
             lines.append(f"🌟 **A {RARITY_LABEL[b['rarity']].lower()} beast!** The whole castle is talking about it.")
         lines += out["notes"]

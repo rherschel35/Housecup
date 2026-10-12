@@ -14,8 +14,9 @@ notes warn you off traps on that course again. Challenges share one
 course; lower time-lost wins.
 
 Daily caps (UTC):
-    - Solo: 5 learning races/day (hard stop — those unlock study notes)
-    - Challenge: always allowed; first 5 wins pay 3 house points each
+    - Solo: 5 learning races/day (hard stop — those unlock study notes);
+      finishing all 5 pays +3 house points once
+    - Challenge: always allowed; first 3 wins pay 3 house points each
 """
 
 from __future__ import annotations
@@ -51,7 +52,8 @@ ACCEPT_TIMEOUT = 60
 STAGES = 6
 
 SOLO_DAILY_CAP = 5
-CHALLENGE_POINT_CAP = 5
+SOLO_COMPLETION_POINTS = 3  # once for finishing all 5 solo races in a day
+CHALLENGE_POINT_CAP = 3
 CHALLENGE_POINTS = 3
 
 
@@ -368,10 +370,16 @@ class BroomRace(commands.Cog):
         bag = self.state.setdefault("daily", {})
         rec = bag.get(key) or {}
         if rec.get("date") != today_str():
-            rec = {"date": today_str(), "solo": 0, "challenge_pts": 0}
+            rec = {
+                "date": today_str(),
+                "solo": 0,
+                "challenge_pts": 0,
+                "solo_bonus": False,
+            }
             bag[key] = rec
         rec.setdefault("solo", 0)
         rec.setdefault("challenge_pts", 0)
+        rec.setdefault("solo_bonus", False)
         return rec
 
     def solo_used(self, user_id: int) -> int:
@@ -417,6 +425,33 @@ class BroomRace(commands.Cog):
             reason="Broom race challenge win",
         )
         rec["challenge_pts"] = int(rec["challenge_pts"]) + 1
+        self.save()
+        return "awarded"
+
+    def try_award_solo_completion(self, member: discord.Member) -> str:
+        """+SOLO_COMPLETION_POINTS once after finishing all solo races today.
+
+        Returns: "awarded" | "not_ready" | "already" | "no_house" | "no_store"
+        """
+        rec = self.daily_rec(member.id)
+        if int(rec.get("solo") or 0) < SOLO_DAILY_CAP:
+            return "not_ready"
+        if rec.get("solo_bonus"):
+            return "already"
+        store = self.bot.get_cog("Store")
+        if not store:
+            return "no_store"
+        house = store.member_house(member)
+        if not house:
+            return "no_house"
+        store.record(
+            house=house,
+            delta=SOLO_COMPLETION_POINTS,
+            actor_id=self.bot.user.id if self.bot.user else 0,
+            target_id=member.id,
+            reason="Finished all solo broom races today",
+        )
+        rec["solo_bonus"] = True
         self.save()
         return "awarded"
 
@@ -639,7 +674,7 @@ class BroomRace(commands.Cog):
         description="Solo (5 learning races/day) or challenge someone on the same track (Quidditch channel).",
     )
     @app_commands.describe(
-        opponent="Challenge this member to the same course (always allowed; wins pay pts up to 5/day)",
+        opponent="Challenge this member to the same course (always allowed; wins pay pts up to 3/day)",
     )
     async def broomrace(
         self,
@@ -1009,6 +1044,20 @@ class BroomRace(commands.Cog):
             await self._maybe_announce_challenge(race.match)
             return
 
+        bonus_line = ""
+        member = (
+            race.message.guild.get_member(race.user_id)
+            if race.message and race.message.guild
+            else None
+        )
+        if member is not None:
+            bonus = self.try_award_solo_completion(member)
+            if bonus == "awarded":
+                bonus_line = (
+                    f"\n\n+**{SOLO_COMPLETION_POINTS}** house points — "
+                    f"all **{SOLO_DAILY_CAP}** solo races done today."
+                )
+
         if race.message is not None:
             try:
                 await race.message.edit(
@@ -1023,6 +1072,7 @@ class BroomRace(commands.Cog):
                                 else ""
                             )
                             + ("\n\n🏆 Personal best (somehow)." if new_best else "")
+                            + bonus_line
                         ),
                         color=0x95A5A6,
                     ),
@@ -1050,6 +1100,13 @@ class BroomRace(commands.Cog):
             return
 
         embed = self._finish_embed(interaction.user, race, new_note, new_best)
+        bonus = self.try_award_solo_completion(interaction.user)
+        if bonus == "awarded":
+            embed.description = (
+                (embed.description or "")
+                + f"\n\n+**{SOLO_COMPLETION_POINTS}** house points — "
+                f"all **{SOLO_DAILY_CAP}** solo races done today."
+            )
         await interaction.response.edit_message(embed=embed, view=None)
         try:
             await interaction.channel.send(
@@ -1059,6 +1116,11 @@ class BroomRace(commands.Cog):
                         f"**{interaction.user.display_name}** clears **{race.course['name']}** "
                         f"with **+{race.penalty}s** time lost."
                         + (" · study note unlocked" if new_note else "")
+                        + (
+                            f" · +{SOLO_COMPLETION_POINTS} pts (solo set complete)"
+                            if bonus == "awarded"
+                            else ""
+                        )
                     ),
                     color=RACE_COLOR,
                 )

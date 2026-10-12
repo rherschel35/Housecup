@@ -385,33 +385,51 @@ class Checklist(commands.Cog):
             from cogs.broom_race import (
                 CHALLENGE_POINT_CAP,
                 CHALLENGE_POINTS,
+                SOLO_COMPLETION_POINTS,
                 SOLO_DAILY_CAP,
             )
             solo_left = broom_race.solo_left(member.id)
+            solo_done = broom_race.solo_used(member.id)
+            solo_bonus = bool(broom_race.daily_rec(member.id).get("solo_bonus"))
             chall_left = broom_race.challenge_pts_left(member.id)
+            solo_detail = (
+                f"**{solo_done}/{SOLO_DAILY_CAP}** done · "
+                + (
+                    f"+{SOLO_COMPLETION_POINTS} pts claimed"
+                    if solo_bonus
+                    else f"+{SOLO_COMPLETION_POINTS} pts when all 5 finish"
+                )
+            )
             items.append(CheckItem(
-                "Broom race (solo)", solo_left == 0,
-                f"**{solo_left}/{SOLO_DAILY_CAP}** learning races left",
-                utc_reset, "day resets"))
+                "Broom race (solo)", solo_left == 0 and solo_bonus,
+                solo_detail, utc_reset, "day resets"))
             items.append(CheckItem(
                 "Broom race (challenge wins)", chall_left == 0,
                 f"**{chall_left}/{CHALLENGE_POINT_CAP}** point wins left "
                 f"({CHALLENGE_POINTS} pts each · challenges always open)",
                 utc_reset, "day resets"))
 
-        # ---- Beasts (rolling points + study) ----
+        # ---- Beasts (UTC day befriend set + study) ----
         beasts = self.bot.get_cog("Beasts")
         if beasts:
-            from cogs.beasts import DAILY_POINT_CAP, WINDOW, STUDY_WINDOW
-            used = beasts.points_today(member.id, now)
-            left = max(0, DAILY_POINT_CAP - used)
-            payments = [(r[0], r[1]) for r in beasts.state.get("paid", {}).get(str(member.id), [])
-                        if now - r[0] < WINDOW]
-            reset = _when_points_free(payments, WINDOW, DAILY_POINT_CAP, now)
+            from cogs.beasts import (
+                BEFRIEND_COMPLETION_POINTS,
+                BEFRIEND_GOAL,
+                STUDY_WINDOW,
+            )
+            day = beasts.befriend_day_rec(member.id)
+            done = int(day.get("count") or 0)
+            bonus = bool(day.get("bonus"))
+            detail = (
+                f"**{min(done, BEFRIEND_GOAL)}/{BEFRIEND_GOAL}** befriends · "
+                + (
+                    f"+{BEFRIEND_COMPLETION_POINTS} pts claimed"
+                    if bonus
+                    else f"+{BEFRIEND_COMPLETION_POINTS} pts at {BEFRIEND_GOAL}"
+                )
+            )
             items.append(CheckItem(
-                "Beast befriends", left == 0,
-                f"**{left}/{DAILY_POINT_CAP}** pts left", reset,
-                "cap frees" if left == 0 else "oldest clears"))
+                "Beast befriends", bonus, detail, utc_reset, "day resets"))
 
             study_rec = beasts.state.get("study_day", {}).get(str(member.id), {})
             last_study = float(study_rec.get("at", 0) or 0)
@@ -433,11 +451,31 @@ class Checklist(commands.Cog):
                 f"**{left}/{SELL_DAILY_CAP}** pts left from selling",
                 utc_reset, "day resets"))
 
-        # ---- Potions (brewable / bottled / active) ----
+        # ---- Potions (brew set + brewable / bottled / active) ----
         potions = self.bot.get_cog("Potions")
         if potions:
-            from cogs.potions import RECIPES, TIER_MIN_RANK, rank_info
+            from cogs.potions import (
+                BREW_COMPLETION_POINTS,
+                BREW_GOAL,
+                RECIPES,
+                TIER_MIN_RANK,
+                rank_info,
+            )
             prec = potions.record(member.id)
+            brew_day = prec.get("brew_day") or {}
+            brewed = int(brew_day.get("count") or 0)
+            brew_bonus = bool(brew_day.get("bonus"))
+            brew_detail = (
+                f"**{min(brewed, BREW_GOAL)}/{BREW_GOAL}** brewed · "
+                + (
+                    f"+{BREW_COMPLETION_POINTS} pts claimed"
+                    if brew_bonus
+                    else f"+{BREW_COMPLETION_POINTS} pts at {BREW_GOAL}"
+                )
+            )
+            items.append(CheckItem(
+                "Potion brews", brew_bonus, brew_detail, utc_reset, "day resets"))
+
             p_idx, _, _ = rank_info(prec.get("rep_xp", 0))
             have = potions._satchel_items(member)
             brewable = sum(
@@ -450,13 +488,12 @@ class Checklist(commands.Cog):
             bits = [f"**{brewable}** brewable", f"**{bottled}** ready to drink"]
             if active_n:
                 bits.append(f"**{active_n}** active")
-            done = brewable == 0 and bottled == 0
-            mark = "✅" if done else "⬜"
+            satchel_done = brewable == 0 and bottled == 0
+            mark = "✅" if satchel_done else "⬜"
             items.append(CheckItem(
-                "Potions", done,
+                "Potions satchel", satchel_done,
                 f"{' · '.join(bits)} · `/brew` / `/drink`",
-                raw=f"{mark} **Potions** — {' · '.join(bits)} · `/brew` / `/drink`"))
-
+                raw=f"{mark} **Potions satchel** — {' · '.join(bits)} · `/brew` / `/drink`"))
         # ---- Familiar care / scout ----
         familiars = self.bot.get_cog("Familiars")
         if familiars:

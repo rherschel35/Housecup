@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import logging
+import datetime
 import os
 import random
 import time
@@ -434,6 +435,14 @@ def next_rank(idx: int) -> Optional[tuple[int, str]]:
     return REP_RANKS[idx + 1][0], REP_RANKS[idx + 1][1]
 
 
+BREW_GOAL = 5
+BREW_COMPLETION_POINTS = 3
+
+
+def _utc_day() -> str:
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+
+
 def blank_player() -> dict:
     return {
         "rep_xp": 0,
@@ -441,6 +450,7 @@ def blank_player() -> dict:
         "inventory": {},
         "active": [],
         "felix_free_at": 0,
+        "brew_day": {"date": _utc_day(), "count": 0, "bonus": False},
     }
 
 
@@ -525,7 +535,41 @@ class Potions(commands.Cog):
         rec.setdefault("discovered", [])
         rec.setdefault("inventory", {})
         rec.setdefault("felix_free_at", 0)
+        day = _utc_day()
+        brew_day = rec.get("brew_day")
+        if not isinstance(brew_day, dict) or brew_day.get("date") != day:
+            rec["brew_day"] = {"date": day, "count": 0, "bonus": False}
+        else:
+            brew_day.setdefault("count", 0)
+            brew_day.setdefault("bonus", False)
         return rec
+
+    def brews_today(self, user_id: int) -> int:
+        return int(self.record(user_id)["brew_day"].get("count") or 0)
+
+    def try_award_brew_completion(self, member: discord.Member) -> int:
+        """Count a successful brew; return points awarded (0 or BREW_COMPLETION_POINTS)."""
+        rec = self.record(member.id)
+        day = rec["brew_day"]
+        day["count"] = int(day.get("count") or 0) + 1
+        if day["count"] < BREW_GOAL or day.get("bonus"):
+            self.save()
+            return 0
+        store = self.bot.get_cog("Store")
+        house = store.member_house(member) if store else None
+        if not (store and house):
+            self.save()
+            return 0
+        store.record(
+            house=house,
+            delta=BREW_COMPLETION_POINTS,
+            actor_id=self.bot.user.id if self.bot.user else 0,
+            target_id=member.id,
+            reason=f"Completed {BREW_GOAL} potion brews today",
+        )
+        day["bonus"] = True
+        self.save()
+        return BREW_COMPLETION_POINTS
 
     def felix_free_ready(self, user_id: int, now: float | None = None) -> bool:
         now = now if now is not None else time.time()
@@ -790,10 +834,16 @@ class Potions(commands.Cog):
             rec["discovered"].append(recipe_id)
         self.save()
 
+        pts = self.try_award_brew_completion(interaction.user)
+        today_n = self.brews_today(interaction.user.id)
+
         lines = [last_feedback, "", f"**{'Perfect brew!' if perfect else 'Passable brew.'}** "
                 f"You've got a {recipe['emoji']} **{recipe['name']}** in your satchel now "
                 f"({correct}/{rounds}).",
-                f"+{xp} Potion Rep."]
+                f"+{xp} Potion Rep.",
+                f"Brews today · **{today_n}/{BREW_GOAL}**"]
+        if pts:
+            lines.append(f"+**{pts}** house points — {BREW_GOAL} brews done today.")
         if perfect and newly_discovered:
             lines.append(f"You've cracked the recipe - the correct sequence for **{recipe['name']}** is yours for good.")
         embed = discord.Embed(title=f"{recipe['emoji']} Brew complete", description="\n".join(lines),
