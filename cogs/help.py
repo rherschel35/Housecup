@@ -109,7 +109,11 @@ HELP = {
     "potions": {
         "title": "Potions",
         "staff": False,
-        "note": "Brew from satchel ingredients. Descent buffs last 5 fights (simple) or 10 (harder). Felix Felicis is a free weekly 10-step brew.",
+        "note": (
+            "Brew from satchel ingredients. Descent buffs last 5 fights (simple) or 10 (harder). "
+            "Felix Felicis is a free weekly 10-step brew. Finish 5 successful brews in a UTC day "
+            "for +3 house points once."
+        ),
         "entries": [
             ("brew", "Spend ingredients and try to brew a potion (🟢 = you have them; Felix free once / 7 days)."),
             ("drink", "Drink a brewed potion from your satchel to activate it."),
@@ -157,8 +161,8 @@ HELP = {
             "Upgrade Speed/Altitude toward 10, then race on the Quidditch pitch. "
             "Every stage shows the full set of lines — read them; stats only decide "
             "whether you can hold a clean line. Traps double time lost. "
-            "Solo: 5 learning races/day (UTC). Challenges: always open; wins pay 3 pts "
-            "(5 paid wins/day), then free play."
+            "Solo: 5 learning races/day (UTC); finish all 5 for +3 pts. Challenges: "
+            "always open; wins pay 3 pts (3 paid wins/day), then free play."
         ),
         "entries": [
             ("broom", "Claim your unique broom from the same three words — or view yours / @member's."),
@@ -189,6 +193,7 @@ HELP = {
         "title": "Beasts",
         "staff": False,
         "note": ("A few times a day a beast wanders into the explore channel and says what it wants. "
+                 "Five befriends in a UTC day pay +3 house points once. "
                  "First to `/approach` gets 60 seconds alone; then anyone can try. "
                  "71 to find — including Nifflers — some only after dark."),
         "entries": [
