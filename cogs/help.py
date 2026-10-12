@@ -133,8 +133,8 @@ HELP = {
         "note": (
             "Chess and Checkers share the board-games channel. Challenge → Accept → "
             "Make move (piece, then square). Captures are mandatory in checkers; "
-            "multi-jumps stay on the same piece. Point wins are capped at 3 per "
-            "UTC week for each game."
+            "multi-jumps stay on the same piece. Wins count for record and titles "
+            "only — no House Cup points."
         ),
         "entries": [
             ("chess challenge", "Challenge someone to Wizard's Chess (chess channel)."),

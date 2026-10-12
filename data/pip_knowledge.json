@@ -423,7 +423,7 @@
         "checkers",
         "board game"
       ],
-      "answer": "Wizard's Chess an' Wizard's Checkers share the board-games channel \u2014 `/chess challenge` or `/checkers challenge`. Accept, then tap Make move (piece \u2192 square). Checkers jumps are mandatory; keep jumpin' with the same piece. Wins pay house points (chess 3, checkers 1), capped at 3 point wins per UTC week for each game.",
+      "answer": "Wizard's Chess an' Wizard's Checkers share the board-games channel \u2014 `/chess challenge` or `/checkers challenge`. Accept, then tap Make move (piece \u2192 square). Checkers jumps are mandatory; keep jumpin' with the same piece. Wins count for yer record an' titles only — no house points from chess or checkers.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {
