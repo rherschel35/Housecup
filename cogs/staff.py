@@ -389,6 +389,57 @@ class Staff(commands.Cog):
             return
         await cog.descentrestorebulk(interaction, mapping, backfill_army)
 
+    @descent.command(
+        name="claims",
+        description="List pending /descentclaim wipe-restore reports.",
+    )
+    async def descent_claims(self, interaction: discord.Interaction):
+        cog = self._cog("Descent")
+        if not cog:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+        await cog.descentclaims(interaction)
+
+    @descent.command(
+        name="approveclaims",
+        description="Restore every pending /descentclaim in one shot.",
+    )
+    @app_commands.describe(
+        backfill_army="Fill army + boss trophies (default: True)",
+        clear="Clear the claim list after restore (default: True)",
+    )
+    async def descent_approveclaims(
+        self,
+        interaction: discord.Interaction,
+        backfill_army: bool = True,
+        clear: bool = True,
+    ):
+        cog = self._cog("Descent")
+        if not cog:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+        await cog.descentapproveclaims(interaction, backfill_army, clear)
+
+    @descent.command(
+        name="restorespire",
+        description="Restore Spireheart owners to at least floor 90 (or chosen floor).",
+    )
+    @app_commands.describe(
+        floor="Cleared floor to grant (default 90)",
+        backfill_army="Fill army + boss trophies (default: True)",
+    )
+    async def descent_restorespire(
+        self,
+        interaction: discord.Interaction,
+        floor: app_commands.Range[int, 1, 100] = 90,
+        backfill_army: bool = True,
+    ):
+        cog = self._cog("Descent")
+        if not cog:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+        await cog.descentrestorespire(interaction, floor, backfill_army)
+
     # -------------------------------------------------------------- castles
 
     @castles.command(
