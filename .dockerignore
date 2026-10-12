@@ -10,7 +10,6 @@ compendium_site/
 sorting_site/
 deploy/
 tools/
-scripts/
 
 # Local / test noise
 data/castles_state.json
@@ -18,4 +17,3 @@ data/wizard_assets/
 mirror_test*.png
 chess_ui_*.png
 *.md
-!requirements.txt
