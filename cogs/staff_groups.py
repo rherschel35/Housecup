@@ -48,7 +48,9 @@ houses = app_commands.Group(
     name="houses", parent=staff, description="Pin members to houses."
 )
 identity = app_commands.Group(
-    name="identity", parent=staff, description="Wand, broom, and Animagus staff tools."
+    name="identity",
+    parent=staff,
+    description="Wand, broom, patronus, and Animagus staff tools.",
 )
 descent = app_commands.Group(
     name="descent", parent=staffgame, description="Descent staff tools."
