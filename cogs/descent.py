@@ -18,6 +18,7 @@ The Descent - a 100-floor solo dungeon crawl.
     /descentclaim floor:<n> - players self-report deepest cleared floor after a wipe
     /staffgame descent claims - list pending claims
     /staffgame descent approveclaims - restore floors/army + Max AP (+1 per 10 floors); stats untouched
+    /staffgame descent fixap - set every player's Max AP from cleared floors (+1 per 10)
     /staffgame descent restorespire - restore Spireheart owners to at least floor 90
     /staffgame descent set - set a player's combat HP / Attack / Defense in one go
 
@@ -2935,6 +2936,61 @@ class Descent(commands.Cog):
         if len(msg) > 1900:
             msg = msg[:1900] + "\n…"
         await interaction.response.send_message(msg, ephemeral=True)
+
+    def apply_fix_all_max_ap(self, *, only_wrong: bool = True) -> dict:
+        """Set every player's Max AP from cleared depth (5 + floors//10)."""
+        players = (self.state or {}).get("players") or {}
+        changed = 0
+        checked = 0
+        samples: list[str] = []
+        for uid, rec in players.items():
+            if not isinstance(rec, dict):
+                continue
+            checked += 1
+            depth = cleared_depth(rec)
+            target = max_ap_for_depth(depth)
+            current = int(rec.get("max_ap") or STARTING_MAX_AP)
+            if only_wrong and current == target:
+                continue
+            rec["max_ap"] = target
+            rec.setdefault("highest_cleared", 0)
+            # Keep highest_cleared at least as deep as we used for the formula.
+            rec["highest_cleared"] = max(int(rec.get("highest_cleared") or 0), depth)
+            changed += 1
+            if len(samples) < 8:
+                samples.append(f"<@{uid}> F{depth}: {current}→{target}")
+        if changed:
+            self.save()
+        return {
+            "checked": checked,
+            "changed": changed,
+            "samples": samples,
+        }
+
+    async def descentfixap(
+        self,
+        interaction: discord.Interaction,
+        only_wrong: bool = True,
+    ):
+        """Staff: correct Max AP for everyone from cleared floors (+1 per 10)."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        result = self.apply_fix_all_max_ap(only_wrong=only_wrong)
+        lines = [
+            f"Fixed Max AP for **{result['changed']}** / {result['checked']} players "
+            f"(rule: **5 + floors÷10**)."
+        ]
+        if result["samples"]:
+            lines.append("Sample:")
+            lines.extend(f"• {s}" for s in result["samples"])
+            if result["changed"] > len(result["samples"]):
+                lines.append(f"• …and {result['changed'] - len(result['samples'])} more")
+        if result["changed"] == 0:
+            lines.append("Everyone already matched the rule.")
+        await interaction.followup.send("\n".join(lines), ephemeral=True)
 
     async def descentapproveclaims(
         self,

@@ -425,6 +425,24 @@ class Staff(commands.Cog):
         await cog.descentclaims(interaction)
 
     @descent.command(
+        name="fixap",
+        description="Correct everyone's Max AP from cleared floors (+1 per 10).",
+    )
+    @app_commands.describe(
+        only_wrong="Only change players whose Max AP is wrong (default: True)",
+    )
+    async def descent_fixap(
+        self,
+        interaction: discord.Interaction,
+        only_wrong: bool = True,
+    ):
+        cog = self._cog("Descent")
+        if not cog:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+        await cog.descentfixap(interaction, only_wrong)
+
+    @descent.command(
         name="approveclaims",
         description="Restore floors/army + Max AP (+1 per 10 floors); combat stats untouched.",
     )
