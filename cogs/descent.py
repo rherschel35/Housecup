@@ -1686,23 +1686,30 @@ class Descent(commands.Cog):
         allowed = castles.recruit_allowed(member.id, 1) if castles else 1
         unit = None
         bind_pts = 0
+        muster_extra = 0
         if allowed > 0:
             unit = recruit_from_fight(rec, fight)
             if castles:
                 castles.note_recruits(member.id, 1)
-                bind_pts += castles.note_bind40(
-                    member, floor=fight.floor, n=1
-                )
-                bonus = castles.fifth_muster_bonus(member.id)
-                if bonus and castles.recruit_allowed(member.id, bonus) > 0:
+                muster_extra = castles.fifth_muster_bonus(member.id)
+                if muster_extra and castles.recruit_allowed(member.id, muster_extra) > 0:
                     clone_army_unit(rec, unit)
-                    castles.note_recruits(member.id, bonus)
-                    bind_pts += castles.note_bind40(
-                        member, floor=fight.floor, n=bonus
-                    )
+                    castles.note_recruits(member.id, muster_extra)
+                else:
+                    muster_extra = 0
         elif castles:
-            # Still tick Fifth Muster progress even when the daily cap blocks a bind.
+            # Still tick Fifth Muster progress even when the daily/size cap
+            # blocks a new army unit.
             castles.fifth_muster_bonus(member.id)
+
+        # Daily F40+ checklist / +10 house-point goal counts every win on
+        # floor 40+, even when the army cannot take another recruit (full
+        # roster or live 200/day cap). Otherwise deep players freeze mid-day
+        # (e.g. stuck at 174/200) while still clearing F40+ fights.
+        if castles:
+            bind_pts += castles.note_bind40(
+                member, floor=fight.floor, n=1 + muster_extra
+            )
         self.save()
 
         bind_line = ""

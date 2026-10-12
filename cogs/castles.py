@@ -642,7 +642,12 @@ class Castles(commands.Cog):
         return bool(self._bind40_rec(user_id).get("bind40_bonus"))
 
     def note_bind40(self, member: discord.Member, *, floor: int, n: int = 1) -> int:
-        """Count floor-40+ binds toward the daily +10 bonus. Returns points awarded."""
+        """Count floor-40+ Descent wins toward the daily +10 bonus.
+
+        Call this for every F40+ win, even when ``recruit_allowed`` is 0 —
+        the checklist goal is independent of army size / daily recruit caps.
+        Returns house points awarded (0 or ``BIND_BONUS_POINTS``).
+        """
         if n <= 0 or int(floor) < BIND_BONUS_MIN_FLOOR:
             return 0
         prec = self._bind40_rec(member.id)
