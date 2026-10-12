@@ -265,6 +265,8 @@ HELP = {
             ("staffgame descent unlock", "Clear the 3-loss Descent lockout without wiping progress."),
             ("staffgame descent reset", "Wipe someone's Descent progress back to floor 1."),
             ("staffgame descent restore", "Rebuild wiped Descent to a cleared floor (Max AP, fair stats, army/bosses)."),
+            ("staffgame descent recover", "Scan the volume for Descent backups and reload everyone if a good copy exists."),
+            ("staffgame descent restorebulk", "Paste many user_id + floor lines to restore everyone at once."),
             ("staffgame descent backfill", "Add missing army + boss trophies from cleared depth (keeps existing army)."),
             ("staffgame castles unlock", "Clear all castle lock timers and allow sieges any day."),
             ("staffgame castles schedule", "Restore normal Wed/Sat siege days after a staff unlock."),

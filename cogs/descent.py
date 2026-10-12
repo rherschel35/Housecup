@@ -12,6 +12,9 @@ The Descent - a 100-floor solo dungeon crawl.
       (additive — never replaces an existing army)
     /staffgame descent restore - rebuild wiped progress to a cleared floor
       (depth, Max AP, fair stat points, optional army/boss backfill)
+    /staffgame descent recover - scan the volume for descent_state backups
+      and reload everyone if a good copy still exists
+    /staffgame descent restorebulk - paste many "user_id floor" lines at once
 
 Ten zones of ten floors each, one primary element per zone plus a second
 element mixed in (about 30% of non-boss monsters), so a floor is never a
@@ -2434,6 +2437,270 @@ class Descent(commands.Cog):
             f"{adorn_note}",
             ephemeral=True,
         )
+
+    def scan_volume_recovery(self) -> list[dict]:
+        """Report every Descent state candidate on the volume (path, size, players)."""
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        seen: set[Path] = set()
+        rows: list[dict] = []
+        for path in self._candidate_state_paths():
+            if path in seen:
+                continue
+            seen.add(path)
+            try:
+                exists = path.exists()
+            except OSError:
+                continue
+            if not exists:
+                rows.append(
+                    {
+                        "path": str(path),
+                        "exists": False,
+                        "bytes": 0,
+                        "players": None,
+                        "ok": False,
+                        "note": "missing",
+                    }
+                )
+                continue
+            try:
+                size = path.stat().st_size
+            except OSError:
+                size = -1
+            data = self._parse_state_file(path)
+            if data is None:
+                rows.append(
+                    {
+                        "path": str(path),
+                        "exists": True,
+                        "bytes": size,
+                        "players": None,
+                        "ok": False,
+                        "note": "empty/corrupt",
+                    }
+                )
+                continue
+            n = len(data.get("players") or {})
+            rows.append(
+                {
+                    "path": str(path),
+                    "exists": True,
+                    "bytes": size,
+                    "players": n,
+                    "ok": n > 0,
+                    "note": "usable" if n > 0 else "0 players",
+                    "data": data if n > 0 else None,
+                }
+            )
+        # Also list any other descent_state* we might have missed
+        try:
+            for path in sorted(STATE_DIR.glob("descent_state*")):
+                if path in seen:
+                    continue
+                seen.add(path)
+                try:
+                    size = path.stat().st_size
+                except OSError:
+                    size = -1
+                data = self._parse_state_file(path)
+                n = len((data or {}).get("players") or {}) if data else None
+                rows.append(
+                    {
+                        "path": str(path),
+                        "exists": True,
+                        "bytes": size,
+                        "players": n,
+                        "ok": bool(data and n),
+                        "note": "extra" if data and n else "empty/corrupt",
+                        "data": data if data and n else None,
+                    }
+                )
+        except OSError:
+            pass
+        return rows
+
+    def apply_volume_recovery(self) -> dict | None:
+        """Reload the richest usable backup into live state. Returns summary or None."""
+        rows = self.scan_volume_recovery()
+        best = None
+        for row in rows:
+            if not row.get("ok") or not row.get("data"):
+                continue
+            n = int(row["players"] or 0)
+            if best is None or n > best["players"]:
+                best = row
+        if best is None:
+            return None
+        self.state = best["data"]
+        self.save()
+        return {
+            "path": best["path"],
+            "players": best["players"],
+            "bytes": best["bytes"],
+        }
+
+    @staticmethod
+    def parse_restore_bulk_text(text: str) -> tuple[list[tuple[int, int]], list[str]]:
+        """Parse lines of `user_id floor` or `<@id> floor`. Returns (ok, errors)."""
+        import re
+
+        ok: list[tuple[int, int]] = []
+        errors: list[str] = []
+        text = (text or "").strip()
+        if not text:
+            return ok, ["No lines provided."]
+        # JSON object {"123": 47, ...} or [[id, floor], ...]
+        if text[0] in "{[":
+            try:
+                payload = json.loads(text)
+            except json.JSONDecodeError as e:
+                return ok, [f"Invalid JSON: {e}"]
+            if isinstance(payload, dict):
+                pairs = list(payload.items())
+            elif isinstance(payload, list):
+                pairs = []
+                for row in payload:
+                    if isinstance(row, (list, tuple)) and len(row) >= 2:
+                        pairs.append((row[0], row[1]))
+                    elif isinstance(row, dict) and "id" in row and "floor" in row:
+                        pairs.append((row["id"], row["floor"]))
+                    else:
+                        errors.append(f"Bad JSON row: {row!r}")
+            else:
+                return ok, ["JSON must be an object or list."]
+            for uid, floor in pairs:
+                try:
+                    uid_i = int(str(uid).strip())
+                    floor_i = int(floor)
+                except (TypeError, ValueError):
+                    errors.append(f"Bad entry {uid!r} → {floor!r}")
+                    continue
+                if floor_i < 1 or floor_i > MAX_FLOOR:
+                    errors.append(f"{uid_i}: floor {floor_i} out of range")
+                    continue
+                ok.append((uid_i, floor_i))
+            return ok, errors
+
+        mention = re.compile(r"<@!?(\d+)>")
+        for i, line in enumerate(text.splitlines(), 1):
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            line = line.replace(",", " ").replace(":", " ")
+            m = mention.search(line)
+            if m:
+                uid_s = m.group(1)
+                rest = mention.sub(" ", line).strip()
+                parts = rest.split()
+                floor_s = parts[0] if parts else ""
+            else:
+                parts = line.split()
+                if len(parts) < 2:
+                    errors.append(f"Line {i}: need `user_id floor` — got {line!r}")
+                    continue
+                uid_s, floor_s = parts[0], parts[1]
+            try:
+                uid_i = int(uid_s)
+                floor_i = int(floor_s)
+            except ValueError:
+                errors.append(f"Line {i}: bad numbers — {line!r}")
+                continue
+            if floor_i < 1 or floor_i > MAX_FLOOR:
+                errors.append(f"Line {i}: floor {floor_i} out of range")
+                continue
+            ok.append((uid_i, floor_i))
+        return ok, errors
+
+    async def descentrecover(self, interaction: discord.Interaction, apply: bool = True):
+        """Staff: scan volume for Descent backups; optionally reload the best one."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        rows = self.scan_volume_recovery()
+        live_n = len((self.state or {}).get("players") or {})
+        lines = [
+            f"**STATE_DIR** `{STATE_DIR}`",
+            f"Live memory: **{live_n}** players",
+            "",
+            "**Files on volume:**",
+        ]
+        for row in rows:
+            if not row["exists"]:
+                lines.append(f"• `{row['path']}` — missing")
+                continue
+            players = row["players"]
+            ptxt = "corrupt/empty" if players is None else f"{players} players"
+            mark = "✅" if row["ok"] else "⚠️"
+            lines.append(
+                f"• {mark} `{Path(row['path']).name}` — {row['bytes']} bytes, {ptxt}"
+            )
+
+        applied = None
+        if apply:
+            applied = self.apply_volume_recovery()
+            if applied:
+                self.fights.clear()
+                lines.append("")
+                lines.append(
+                    f"**Recovered** **{applied['players']}** players from "
+                    f"`{Path(applied['path']).name}` into live state."
+                )
+            else:
+                lines.append("")
+                lines.append(
+                    "**No usable backup found.** Exact stats are gone unless you have "
+                    "another copy. Use `/staffgame descent restorebulk` with floor depths."
+                )
+        else:
+            lines.append("")
+            lines.append("Scan only (apply=False). Re-run with apply=True to reload.")
+
+        msg = "\n".join(lines)
+        if len(msg) > 1900:
+            msg = msg[:1900] + "\n…"
+        await interaction.followup.send(msg, ephemeral=True)
+
+    async def descentrestorebulk(
+        self,
+        interaction: discord.Interaction,
+        mapping: str,
+        backfill_army: bool = True,
+    ):
+        """Staff: restore many players from a paste of user_id + floor."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        entries, errors = self.parse_restore_bulk_text(mapping)
+        if not entries and errors:
+            await interaction.followup.send(
+                "Could not parse mapping:\n" + "\n".join(f"• {e}" for e in errors[:15]),
+                ephemeral=True,
+            )
+            return
+
+        restored = 0
+        for uid, floor in entries:
+            self.apply_progress_restore(uid, floor, backfill_army=backfill_army)
+            restored += 1
+
+        summary = [
+            f"Restored **{restored}** players "
+            f"(fair Max AP + stats"
+            f"{' + army/boss backfill' if backfill_army else ''})."
+        ]
+        if errors:
+            summary.append(f"Skipped/errors ({len(errors)}):")
+            summary.extend(f"• {e}" for e in errors[:12])
+            if len(errors) > 12:
+                summary.append(f"• …and {len(errors) - 12} more")
+        sample = ", ".join(f"`{u}`→F{f}" for u, f in entries[:8])
+        if sample:
+            summary.append(f"Sample: {sample}" + ("…" if len(entries) > 8 else ""))
+        await interaction.followup.send("\n".join(summary), ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

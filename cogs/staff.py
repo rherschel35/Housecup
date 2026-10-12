@@ -352,6 +352,43 @@ class Staff(commands.Cog):
             return
         await cog.descentrestore(interaction, member, floor, backfill_army)
 
+    @descent.command(
+        name="recover",
+        description="Scan the volume for Descent backups and reload everyone if one exists.",
+    )
+    @app_commands.describe(
+        apply="If True (default), load the best backup into live state. False = report only.",
+    )
+    async def descent_recover(self, interaction: discord.Interaction, apply: bool = True):
+        cog = self._cog("Descent")
+        if not cog:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+        await cog.descentrecover(interaction, apply)
+
+    @descent.command(
+        name="restorebulk",
+        description="Restore many wiped Descent players at once from a floor list.",
+    )
+    @app_commands.describe(
+        mapping=(
+            "Paste lines: `user_id floor` or `<@id> floor`, or JSON "
+            '{"123": 47, "456": 12}'
+        ),
+        backfill_army="Fill army + boss trophies for each depth (default: True)",
+    )
+    async def descent_restorebulk(
+        self,
+        interaction: discord.Interaction,
+        mapping: str,
+        backfill_army: bool = True,
+    ):
+        cog = self._cog("Descent")
+        if not cog:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+        await cog.descentrestorebulk(interaction, mapping, backfill_army)
+
     # -------------------------------------------------------------- castles
 
     @castles.command(
