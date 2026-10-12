@@ -1,0 +1,9 @@
+# Keep Railway/Nixpacks image builds lean — site drops are not needed at runtime.
+**/*.zip
+.git
+**/__pycache__
+**/*.pyc
+.cursor
+data/castles_state.json
+mirror_test*.png
+chess_ui_*.png
