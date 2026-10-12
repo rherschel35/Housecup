@@ -46,7 +46,6 @@ class Staff(commands.Cog):
     hex_g = sg.hexes
     bingo = sg.bingo
     frog = sg.frog
-    room = sg.room
     market = sg.market
     usage = sg.usage
 
@@ -696,26 +695,6 @@ class Staff(commands.Cog):
     @frog_prize.autocomplete("card")
     async def frog_prize_autocomplete(self, interaction: discord.Interaction, current: str):
         cog = self._cog("Frogs")
-        if not cog:
-            return []
-        return await cog.staff_prize_autocomplete(interaction, current)
-
-    # --------------------------------------------------------------- room decor
-
-    @room.command(name="prize", description="Award dorm decor (unlocks + adds to stash).")
-    @app_commands.describe(member="Who receives the decor", decor="Which piece (start typing to search)")
-    async def room_prize(
-        self, interaction: discord.Interaction, member: discord.Member, decor: str
-    ):
-        cog = self._cog("Dorm")
-        if not cog:
-            await interaction.response.send_message("Dorm isn't loaded.", ephemeral=True)
-            return
-        await cog.staff_prize(interaction, member, decor)
-
-    @room_prize.autocomplete("decor")
-    async def room_prize_autocomplete(self, interaction: discord.Interaction, current: str):
-        cog = self._cog("Dorm")
         if not cog:
             return []
         return await cog.staff_prize_autocomplete(interaction, current)
