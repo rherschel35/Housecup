@@ -1,6 +1,8 @@
 """
 Wizard duels. Best of three by default. Optional best-of 5/7/9/51 series:
-each set is first to 2, and the series winner banks 3/4/5/26 wins.
+each set is first to 2, and the series winner banks 3/4/5/26 wins. Sets the
+loser takes in that series still fill their daily duel checklist / house
+points (same daily cap as a normal duel).
 
     /duel @member              - challenge someone (1v1)
     /duelrecord [member]       - rank, wins, streak, rivals, trio/grand, points
@@ -1010,6 +1012,72 @@ class Duels(commands.Cog):
                      actor_id=self.bot.user.id if self.bot.user else 0,
                      target_id=target_id, reason=reason)
 
+    def _pay_banked_wins(
+        self,
+        store,
+        member,
+        house: str | None,
+        *,
+        banks: int,
+        opponent_name: str,
+        same_house: bool,
+        night: bool,
+        rivals: bool,
+        now: float,
+        series: bool,
+        role: str,
+    ) -> tuple[int, str | None]:
+        """Pay house points for banked set/series wins. Returns (pts, reason).
+
+        ``role`` is ``\"win\"`` (series/duel champion) or ``\"sets\"`` (sets taken
+        in a best-of series even if they lost the series). Off-night payouts
+        fill the daily duel checklist (``rewarded`` stamps) up to
+        ``REWARDED_PER_DAY``.
+        """
+        banks = max(0, int(banks))
+        if banks <= 0:
+            return 0, None
+        if not store or not house:
+            return 0, "no-house"
+        if same_house:
+            return 0, "same-house"
+
+        uid = str(member.id)
+        if role == "win":
+            why = f"Duel win over {opponent_name}"
+        else:
+            why = f"Duel set wins vs {opponent_name}"
+        if series:
+            why += f" (best-of series ×{banks})"
+
+        if night:
+            per_bank = 2 if rivals else 1
+            paid_units = banks * per_bank
+            total_pts = paid_units * REWARD_POINTS * DUEL_NIGHT_MULTIPLIER
+            self._credit_duel_night(member.id, house, total_pts, wins=banks)
+            if rivals:
+                why += " (rival)"
+            why += " (Duel Night)"
+            self._award(store, house, total_pts, member.id, why)
+            return total_pts, None
+
+        total_pts = 0
+        paid_units = 0
+        for _ in range(banks):
+            slots = REWARDED_PER_DAY - self.rewarded_today(member.id, now)
+            if slots <= 0:
+                break
+            wins_paid = 1 + (1 if rivals and slots >= 2 else 0)
+            total_pts += wins_paid * REWARD_POINTS
+            paid_units += wins_paid
+            self.state["rewarded"].setdefault(uid, []).extend([now] * wins_paid)
+        if total_pts:
+            if rivals and paid_units > banks:
+                why += " (rival)"
+            self._award(store, house, total_pts, member.id, why)
+            return total_pts, None
+        return 0, "daily-cap"
+
     def settle(self, winner, loser, now: float = None, *, match_wins: int = 1,
                winner_sets: int | None = None, loser_sets: int | None = None) -> dict:
         """Record the result, award points, and work out every reward it
@@ -1022,6 +1090,9 @@ class Duels(commands.Cog):
         When omitted (normal duel), the winner gets ``match_wins`` wins and
         the loser ``match_wins`` losses. For a series ending 4–1, pass those
         so both players' set wins *and* set losses land on the record.
+
+        In a best-of series, the loser's set wins also fill their daily duel
+        checklist / house points (same daily cap as a normal duel win).
         """
         now = now if now is not None else time.time()
         match_wins = max(1, int(match_wins))
@@ -1065,57 +1136,39 @@ class Duels(commands.Cog):
                 )
 
         # ------------------------------------------------ house points (per banked win, capped)
+        series = match_wins > 1 or winner_sets > 1 or loser_sets > 0
+        w_pts, w_reason = self._pay_banked_wins(
+            store, winner, w_house,
+            banks=match_wins,
+            opponent_name=loser.display_name,
+            same_house=same_house,
+            night=night,
+            rivals=rivals,
+            now=now,
+            series=series and match_wins > 1,
+            role="win",
+        )
+        # Best-of: sets the loser took still count toward their daily duel
+        # checklist + house points (capped like a normal win).
+        l_pts, l_reason = (0, None)
+        if loser_sets > 0 and (match_wins > 1 or winner_sets > 1):
+            l_pts, l_reason = self._pay_banked_wins(
+                store, loser, l_house,
+                banks=loser_sets,
+                opponent_name=winner.display_name,
+                same_house=same_house,
+                night=night,
+                rivals=rivals,
+                now=now,
+                series=True,
+                role="sets",
+            )
         outcome = {
-            "awarded": 0, "reason": None, "house": w_house, "notes": notes,
+            "awarded": w_pts, "reason": w_reason, "house": w_house, "notes": notes,
             "night": night, "rival": rivals, "match_wins": match_wins,
             "winner_sets": winner_sets, "loser_sets": loser_sets,
+            "loser_awarded": l_pts, "loser_reason": l_reason, "loser_house": l_house,
         }
-        if not store or not w_house:
-            outcome["reason"] = "no-house"
-        elif same_house:
-            outcome["reason"] = "same-house"
-        elif night:
-            # Duel Night: no daily cap. Every banked series win pays double
-            # (rival meetings still double again). Scoreboard tallies the
-            # full best-of bank in one credit so MVP / house totals match.
-            per_bank = 2 if rivals else 1
-            paid_units = match_wins * per_bank
-            total_pts = paid_units * REWARD_POINTS * DUEL_NIGHT_MULTIPLIER
-            self._credit_duel_night(
-                winner.id, w_house, total_pts, wins=match_wins,
-            )
-            why = f"Duel win over {loser.display_name}"
-            if match_wins > 1:
-                why += f" (best-of series ×{match_wins})"
-            if rivals:
-                why += " (rival)"
-            why += " (Duel Night)"
-            self._award(store, w_house, total_pts, winner.id, why)
-            outcome["awarded"] = total_pts
-        else:
-            total_pts = 0
-            paid_units = 0
-            for _ in range(match_wins):
-                slots = REWARDED_PER_DAY - self.rewarded_today(winner.id, now)
-                if slots <= 0:
-                    if paid_units == 0:
-                        outcome["reason"] = "daily-cap"
-                    break
-                wins_paid = 1 + (1 if rivals and slots >= 2 else 0)
-                pts = wins_paid * REWARD_POINTS
-                total_pts += pts
-                paid_units += wins_paid
-                self.state["rewarded"].setdefault(wid, []).extend([now] * wins_paid)
-            if total_pts:
-                why = f"Duel win over {loser.display_name}"
-                if match_wins > 1:
-                    why += f" (best-of series ×{match_wins})"
-                if rivals and paid_units > match_wins:
-                    why += " (rival)"
-                self._award(store, w_house, total_pts, winner.id, why)
-                outcome["awarded"] = total_pts
-            elif outcome.get("reason") is None:
-                outcome["reason"] = "daily-cap"
 
         # ------------------------------------------------ Triple Tithe castle perk
         castles = self.bot.get_cog("Castles")
@@ -2701,17 +2754,51 @@ class Duel:
         from cogs.store import HOUSES
         if outcome.get("flourish"):
             self.history.append(f"*{outcome['flourish']}*")
-        if outcome["awarded"]:
-            h = HOUSES[outcome["house"]]
-            tail = f"+{outcome['awarded']} to {h['emoji']} {h['name']}"
-            if outcome.get("night"):
-                tail += " (Duel Night!)"
-        elif outcome["reason"] == "same-house":
-            tail = "Housemates — no points change hands"
-        elif outcome["reason"] == "daily-cap":
-            tail = f"{winner.display_name} has taken today's {REWARDED_PER_DAY} duel points already"
-        else:
-            tail = "No house to credit"
+
+        def _points_bit(member, awarded, reason, house_key) -> str:
+            if awarded and house_key and house_key in HOUSES:
+                h = HOUSES[house_key]
+                bit = f"+{awarded} to {h['emoji']} {h['name']}"
+                if outcome.get("night"):
+                    bit += " (Duel Night!)"
+                return bit
+            if reason == "same-house":
+                return "Housemates — no points change hands"
+            if reason == "daily-cap":
+                return (
+                    f"{member.display_name} has taken today's "
+                    f"{REWARDED_PER_DAY} duel points already"
+                )
+            if reason == "no-house":
+                return f"{member.display_name}: no house to credit"
+            return ""
+
+        bits = [
+            _points_bit(
+                winner,
+                outcome.get("awarded") or 0,
+                outcome.get("reason"),
+                outcome.get("house"),
+            )
+        ]
+        # Best-of series: mention the loser's set-win payout / cap separately.
+        if (outcome.get("loser_sets") or 0) > 0 and self.match_wins > 1:
+            loser_bit = _points_bit(
+                loser,
+                outcome.get("loser_awarded") or 0,
+                outcome.get("loser_reason"),
+                outcome.get("loser_house"),
+            )
+            if loser_bit and loser_bit != bits[0]:
+                # Same-house already said once; otherwise append set credit.
+                if outcome.get("loser_reason") != "same-house":
+                    if outcome.get("loser_awarded"):
+                        loser_bit = (
+                            f"{loser.display_name}'s sets: {loser_bit}"
+                        )
+                    bits.append(loser_bit)
+        bits = [b for b in bits if b]
+        tail = " • ".join(bits) if bits else "No house to credit"
         if forfeit:
             verb = "wins by forfeit"
         elif self.match_wins > 1:

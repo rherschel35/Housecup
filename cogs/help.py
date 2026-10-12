@@ -24,7 +24,7 @@ HELP = {
         "title": "Play",
         "staff": False,
         "entries": [
-            ("duel", "Challenge someone. Best of 3 = 1 win; best of 5/7/9/51 = series of first-to-2 sets banking 3/4/5/26 wins. Duel Night pays the full bank at double points."),
+            ("duel", "Challenge someone. Best of 3 = 1 win; best of 5/7/9/51 = series of first-to-2 sets banking 3/4/5/26 wins (sets you take still fill your daily duel checklist/points even if you lose the series). Duel Night pays the full bank at double points."),
             ("trio scramble", "Open a casual 3v3 trio duel — any houses, join either side. House points: 5 wins/day for the house → +5 once."),
             ("trio housematch", "Open a house-vs-house 3v3 trio duel (house role gated). Same house daily set: 5 wins → +5."),
             ("grand", "Challenge someone to a Grand Duel (both need 50+ 1v1 wins)."),
