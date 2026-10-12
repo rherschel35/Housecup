@@ -17,7 +17,7 @@ The Descent - a 100-floor solo dungeon crawl.
     /staffgame descent restorebulk - paste many "user_id floor" lines at once
     /descentclaim floor:<n> - players self-report deepest cleared floor after a wipe
     /staffgame descent claims - list pending claims
-    /staffgame descent approveclaims - restore every pending claim in one shot
+    /staffgame descent approveclaims - restore floors/AP/army from claims (leaves stats alone)
     /staffgame descent restorespire - restore Spireheart owners to at least floor 90
     /staffgame descent set - set a player's combat HP / Attack / Defense in one go
 
@@ -2367,8 +2367,13 @@ class Descent(commands.Cog):
         *,
         backfill_army: bool = True,
         force: bool = False,
+        set_stats: bool = True,
     ) -> dict:
-        """Rebuild wiped progress to a cleared depth. Never lowers an existing depth."""
+        """Rebuild wiped progress to a cleared depth. Never lowers an existing depth.
+
+        set_stats=False keeps existing combat stat points (or base zeros) so staff
+        can assign HP/ATK/DEF themselves with /staffgame descent set.
+        """
         depth = max(0, min(MAX_FLOOR, int(depth)))
         prior = self.state["players"].get(str(user_id))
         prior_depth = 0
@@ -2407,7 +2412,15 @@ class Descent(commands.Cog):
         rec["losses"] = 0
         rec["locked_until"] = 0.0
         rec["max_ap"] = STARTING_MAX_AP + depth
-        rec["stat_points"] = self.estimate_restore_points(depth)
+        if set_stats:
+            rec["stat_points"] = self.estimate_restore_points(depth)
+        elif isinstance(prior, dict) and isinstance(prior.get("stat_points"), dict):
+            pts = prior["stat_points"]
+            rec["stat_points"] = {
+                "hp": max(0, int(pts.get("hp") or 0)),
+                "atk": max(0, int(pts.get("atk") or 0)),
+                "def": max(0, int(pts.get("def") or 0)),
+            }
         rec["pending_statup"] = 0
         if isinstance(prior, dict) and prior.get("army"):
             rec["army"] = list(prior["army"])
@@ -2868,7 +2881,7 @@ class Descent(commands.Cog):
         await interaction.response.send_message(
             f"Claimed deepest cleared floor **{floor}**. "
             f"Staff will approve with `/staffgame descent approveclaims` "
-            f"(this rebuilds fair Max AP, stats, and army — not the exact old rolls).",
+            f"(restores floor, Max AP, and army — combat stats are set by staff separately).",
             ephemeral=True,
         )
 
@@ -2910,7 +2923,7 @@ class Descent(commands.Cog):
         backfill_army: bool = True,
         clear: bool = True,
     ):
-        """Staff: restore every pending /descentclaim in one shot."""
+        """Staff: restore floors/AP/army from claims — does not touch combat stats."""
         store = self.bot.get_cog("Store")
         if not (store and store.is_staff(interaction.user)):
             await interaction.response.send_message("That's for staff.", ephemeral=True)
@@ -2931,7 +2944,10 @@ class Descent(commands.Cog):
             if floor < 1:
                 continue
             result = self.apply_progress_restore(
-                uid_i, floor, backfill_army=backfill_army
+                uid_i,
+                floor,
+                backfill_army=backfill_army,
+                set_stats=False,
             )
             if result.get("skipped"):
                 skipped += 1
@@ -2941,9 +2957,10 @@ class Descent(commands.Cog):
             data["claims"] = {}
             self.save_claims(data)
         await interaction.followup.send(
-            f"Approved claims: restored **{restored}**, "
-            f"skipped **{skipped}** already at/above their claim"
-            + (" (claim list cleared)." if clear else " (claims kept)."),
+            f"Approved claims: restored **{restored}** (floor / Max AP / army only — "
+            f"**stats untouched**), skipped **{skipped}** already at/above their claim"
+            + (" (claim list cleared)." if clear else " (claims kept).")
+            + "\nSet combat stats with `/staffgame descent set`.",
             ephemeral=True,
         )
 
