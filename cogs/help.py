@@ -271,7 +271,7 @@ HELP = {
             ("staffgame descent restorebulk", "Paste many user_id + floor lines to restore everyone at once."),
             ("descentclaim", "After a wipe: report your deepest cleared floor for staff restore."),
             ("staffgame descent claims", "List pending /descentclaim wipe-restore reports."),
-            ("staffgame descent approveclaims", "Restore floors/AP/army from claims (stats untouched — use descent set)."),
+            ("staffgame descent approveclaims", "Restore floors/army from claims (Max AP + stats untouched — use descent set)."),
             ("staffgame descent restorespire", "Restore Spireheart owners to at least floor 90."),
             ("staffgame descent backfill", "Add missing army + boss trophies from cleared depth (keeps existing army)."),
             ("staffgame castles unlock", "Clear all castle lock timers and allow sieges any day."),

@@ -426,7 +426,7 @@ class Staff(commands.Cog):
 
     @descent.command(
         name="approveclaims",
-        description="Restore floors/AP/army from claims (does not change combat stats).",
+        description="Restore floors/army from claims (does not change Max AP or combat stats).",
     )
     @app_commands.describe(
         backfill_army="Fill army + boss trophies (default: True)",
