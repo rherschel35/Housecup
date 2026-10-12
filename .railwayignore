@@ -1,8 +1,14 @@
-**/*.zip
 .git
+.cursor
 **/__pycache__
 **/*.pyc
-.cursor
+**/*.zip
+compendium_site/
+sorting_site/
+deploy/
+tools/
 data/castles_state.json
+data/wizard_assets/
 mirror_test*.png
 chess_ui_*.png
+*.md

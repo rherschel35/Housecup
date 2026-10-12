@@ -1,9 +1,19 @@
-# Keep Railway/Nixpacks image builds lean — site drops are not needed at runtime.
-**/*.zip
+# Keep Railway/Nixpacks image builds lean — only the Discord bot runtime is needed.
 .git
+.cursor
 **/__pycache__
 **/*.pyc
-.cursor
+**/*.zip
+
+# Netlify / static site drops (not used by the bot process)
+compendium_site/
+sorting_site/
+deploy/
+tools/
+
+# Local / test noise
 data/castles_state.json
+data/wizard_assets/
 mirror_test*.png
 chess_ui_*.png
+*.md
