@@ -109,7 +109,6 @@ INITIAL_COGS = (
     "cogs.bingo",
     "cogs.frogs",
     "cogs.house_fire",
-    "cogs.dorm",
     "cogs.event_board",
     "cogs.avada",
     "cogs.broke",

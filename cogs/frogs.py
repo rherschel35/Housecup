@@ -519,10 +519,6 @@ class TradeView(discord.ui.View):
         self.cog._transfer(to_id, from_id, want)
         notes_a = self.cog._apply_rewards(from_id)
         notes_b = self.cog._apply_rewards(to_id)
-        dorm = self.cog.bot.get_cog("Dorm")
-        if dorm:
-            notes_a.extend(dorm.pop_unlock_notes(from_id))
-            notes_b.extend(dorm.pop_unlock_notes(to_id))
         trade["status"] = "done"
         self.cog.save()
         self.stop()
@@ -631,11 +627,6 @@ class Frogs(commands.Cog):
         cards = rec.setdefault("cards", {})
         before = int(cards.get(card_id, 0))
         cards[card_id] = before + 1
-        # First time pulling a card unlocks its matching room decor
-        if before == 0:
-            dorm = self.bot.get_cog("Dorm")
-            if dorm:
-                dorm.unlock_from_frog(user_id, card_id, save=True)
         if save:
             self.save()
         return cards[card_id], before == 0
@@ -759,16 +750,13 @@ class Frogs(commands.Cog):
         rec["opened_on"] = day
         self.save()
         reward_notes = self._apply_rewards(interaction.user.id)
-        dorm = self.bot.get_cog("Dorm")
-        if dorm:
-            reward_notes.extend(dorm.pop_unlock_notes(interaction.user.id))
         unique, copies = self.owned_total(interaction.user.id)
         flag = "**NEW!**" if is_new else f"Duplicate ×{count}"
         embed = self.embed_card(
             card_id,
             flag=flag,
             album_line=f"Album: **{unique}/{len(CARDS)}** unique · **{copies}** cards",
-            footer="1 frog / day · unlocks room decor · /frog trade · /room",
+            footer="1 frog / day · /frog trade · /frog album",
         )
         file = _card_file(card_id)
         content = "\n".join(reward_notes) if reward_notes else None
@@ -885,9 +873,6 @@ class Frogs(commands.Cog):
         self.add_card(member.id, key, save=False)
         self.save()
         notes = self._apply_rewards(member.id)
-        dorm = self.bot.get_cog("Dorm")
-        if dorm:
-            notes.extend(dorm.pop_unlock_notes(member.id))
         embed = self.embed_card(
             key,
             title_prefix="🎁 Gifted Chocolate Frog",
@@ -1045,9 +1030,6 @@ class Frogs(commands.Cog):
         count, is_new = self.add_card(member.id, key, save=False)
         self.save()
         notes = self._apply_rewards(member.id)
-        dorm = self.bot.get_cog("Dorm")
-        if dorm:
-            notes.extend(dorm.pop_unlock_notes(member.id))
         flag = "**NEW!**" if is_new else f"now ×{count}"
         embed = self.embed_card(
             key,
