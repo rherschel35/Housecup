@@ -634,8 +634,8 @@ class Checklist(commands.Cog):
             color=0x6C5CE7,
         )
         embed.set_footer(
-            text="Explore/familiar day = Central · Chess/Checkers = UTC week (Mon) · "
-                 "Market/Quidditch = UTC midnight · Duels/beans/beasts = rolling 24h · "
+            text="Explore/familiar/frog/fire day = Central · Chess/Checkers = UTC week (Mon) · "
+                 "Market/Quidditch = UTC midnight · Duels/beans = rolling 24h · "
                  "Report-card day = UTC"
         )
         return embed
