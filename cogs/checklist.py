@@ -140,37 +140,6 @@ class Checklist(commands.Cog):
                     f"**{left}/{cap}** paid wins left", reset,
                     "next slot" if left == 0 else "oldest clears"))
 
-        # ---- Chess / Checkers (UTC week, Mon–Sun) ----
-        chess = self.bot.get_cog("Chess")
-        if chess:
-            from cogs.chess import (
-                WEEKLY_WIN_CAP, week_str, POINTS_PER_WIN, next_week_reset_ts,
-            )
-            rec = chess.state.get("players", {}).get(str(member.id), {})
-            weekly = rec.get("weekly") or {}
-            used = int(weekly.get("count", 0)) if weekly.get("week") == week_str() else 0
-            left = max(0, WEEKLY_WIN_CAP - used)
-            week_reset = next_week_reset_ts(now)
-            lines.append(_line(
-                left == 0, "Chess",
-                f"**{left}/{WEEKLY_WIN_CAP}** point wins left ({POINTS_PER_WIN} pts each)",
-                week_reset, "week resets"))
-
-        checkers = self.bot.get_cog("Checkers")
-        if checkers:
-            from cogs.checkers import (
-                WEEKLY_WIN_CAP, week_str, POINTS_PER_WIN, next_week_reset_ts,
-            )
-            rec = checkers.state.get("players", {}).get(str(member.id), {})
-            weekly = rec.get("weekly") or {}
-            used = int(weekly.get("count", 0)) if weekly.get("week") == week_str() else 0
-            left = max(0, WEEKLY_WIN_CAP - used)
-            week_reset = next_week_reset_ts(now)
-            lines.append(_line(
-                left == 0, "Checkers",
-                f"**{left}/{WEEKLY_WIN_CAP}** point wins left ({POINTS_PER_WIN} pt each)",
-                week_reset, "week resets"))
-
         # ---- Quidditch house matches (UTC calendar) ----
         quidditch = self.bot.get_cog("Quidditch")
         if quidditch:
@@ -336,8 +305,8 @@ class Checklist(commands.Cog):
             color=0x6C5CE7,
         )
         embed.set_footer(
-            text="Explore/familiar day = Central · Chess/Checkers = UTC week (Mon) · "
-                 "Market/Quidditch = UTC midnight · Duels/beans/beasts = rolling 24h"
+            text="Explore/familiar day = Central · Market/Quidditch = UTC midnight · "
+                 "Duels/beans/beasts = rolling 24h"
         )
         return embed
 
