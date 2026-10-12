@@ -162,7 +162,8 @@ HELP = {
             "Every stage shows the full set of lines — read them; stats only decide "
             "whether you can hold a clean line. Traps double time lost. "
             "Solo: 5 learning races/day (UTC); finish all 5 for +3 pts. Challenges: "
-            "always open; wins pay 3 pts (3 paid wins/day), then free play."
+            "always open; wins pay 3 pts (3/day), and a perfect +0s finish pays even "
+            "on a tie, then free play."
         ),
         "entries": [
             ("broom", "Claim your unique broom from the same three words — or view yours / @member's."),
