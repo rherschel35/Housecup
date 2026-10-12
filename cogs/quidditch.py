@@ -291,6 +291,41 @@ class Quidditch(commands.Cog):
     def house_bonus_claimed(self, house: str) -> bool:
         return bool(self.house_day_rec(house).get("bonus"))
 
+    def grant_all_houses_set_today(self, actor_id: int) -> list[dict]:
+        """Mark every house's Quidditch set complete for today; award +5 if unpaid.
+
+        UTC midnight naturally starts a fresh day (wins/bonus reset on date mismatch).
+        """
+        store = self.bot.get_cog("Store")
+        results: list[dict] = []
+        for house in HOUSE_KEYS:
+            day = self.house_day_rec(house)
+            already = bool(day.get("bonus"))
+            day["wins"] = HOUSE_WIN_GOAL
+            awarded = 0
+            if not already:
+                if store:
+                    store.record(
+                        house=house,
+                        delta=HOUSE_COMPLETION_POINTS,
+                        actor_id=actor_id,
+                        target_id=None,
+                        reason=(
+                            f"Staff grant: house Quidditch set complete "
+                            f"({HOUSE_WIN_GOAL} wins)"
+                        ),
+                    )
+                    awarded = HOUSE_COMPLETION_POINTS
+                day["bonus"] = True
+            results.append({
+                "house": house,
+                "name": house_name(house),
+                "awarded": awarded,
+                "already": already,
+            })
+        self.save()
+        return results
+
     def _in_channel(self, interaction: discord.Interaction) -> bool:
         return interaction.channel_id in QUIDDITCH_CHANNEL_IDS
 

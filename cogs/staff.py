@@ -705,6 +705,67 @@ class Staff(commands.Cog):
             return
         await cog.nightschedulestatus(interaction)
 
+    @duels.command(
+        name="housedaygrant",
+        description="Complete every house's trio + Quidditch daily sets for today (+5 each if unpaid).",
+    )
+    async def duels_housedaygrant(self, interaction: discord.Interaction):
+        store = self._cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        duels = self._cog("Duels")
+        quidditch = self._cog("Quidditch")
+        if not duels:
+            await interaction.response.send_message("Duels isn't loaded.", ephemeral=True)
+            return
+        if not quidditch:
+            await interaction.response.send_message("Quidditch isn't loaded.", ephemeral=True)
+            return
+
+        actor_id = interaction.user.id
+        trio_by = {r["house"]: r for r in duels.grant_all_houses_trio_set_today(actor_id)}
+        quid_by = {r["house"]: r for r in quidditch.grant_all_houses_set_today(actor_id)}
+
+        from cogs.duels import TRIO_HOUSE_COMPLETION_POINTS, TRIO_HOUSE_WIN_GOAL
+        from cogs.quidditch import HOUSE_COMPLETION_POINTS, HOUSE_WIN_GOAL
+        from cogs.store import HOUSE_KEYS
+
+        lines: list[str] = []
+        trio_awarded = 0
+        quid_awarded = 0
+        for house in HOUSE_KEYS:
+            t = trio_by.get(house) or {}
+            q = quid_by.get(house) or {}
+            name = t.get("name") or q.get("name") or house
+            t_bits = (
+                f"+{t['awarded']} trio"
+                if t.get("awarded")
+                else ("trio already claimed" if t.get("already") else "trio marked")
+            )
+            q_bits = (
+                f"+{q['awarded']} Quidditch"
+                if q.get("awarded")
+                else ("Quidditch already claimed" if q.get("already") else "Quidditch marked")
+            )
+            trio_awarded += int(t.get("awarded") or 0)
+            quid_awarded += int(q.get("awarded") or 0)
+            lines.append(f"• **{name}** — {t_bits}, {q_bits}")
+
+        embed = discord.Embed(
+            title="House daily sets granted",
+            description=(
+                f"Every house is at **{TRIO_HOUSE_WIN_GOAL}/{TRIO_HOUSE_WIN_GOAL}** trio "
+                f"and **{HOUSE_WIN_GOAL}/{HOUSE_WIN_GOAL}** Quidditch for **today (UTC)**.\n"
+                f"Awarded **+{trio_awarded}** trio / **+{quid_awarded}** Quidditch "
+                f"(+{TRIO_HOUSE_COMPLETION_POINTS} / +{HOUSE_COMPLETION_POINTS} per unpaid house).\n"
+                "Fresh counters start automatically at the next UTC midnight."
+            ),
+            color=0xC9A227,
+        )
+        embed.add_field(name="Houses", value="\n".join(lines) or "—", inline=False)
+        await interaction.response.send_message(embed=embed)
+
     # ------------------------------------------------------------ challenge
 
     @challenge.command(name="post", description="Post a challenge to the channel right now.")

@@ -777,6 +777,41 @@ class Duels(commands.Cog):
     def trio_house_bonus_claimed(self, house: str, now: float | None = None) -> bool:
         return bool(self.trio_house_day_rec(house, now).get("bonus"))
 
+    def grant_all_houses_trio_set_today(self, actor_id: int) -> list[dict]:
+        """Mark every house's trio set complete for today; award +5 if unpaid.
+
+        UTC midnight naturally starts a fresh day (wins/bonus reset on date mismatch).
+        """
+        from cogs.store import HOUSE_KEYS, HOUSES
+
+        store = self.bot.get_cog("Store")
+        now = time.time()
+        results: list[dict] = []
+        for house in HOUSE_KEYS:
+            day = self.trio_house_day_rec(house, now)
+            already = bool(day.get("bonus"))
+            day["wins"] = TRIO_HOUSE_WIN_GOAL
+            awarded = 0
+            if not already:
+                if store:
+                    self._award(
+                        store,
+                        house,
+                        TRIO_HOUSE_COMPLETION_POINTS,
+                        actor_id,
+                        f"Staff grant: house trio set complete ({TRIO_HOUSE_WIN_GOAL} wins)",
+                    )
+                    awarded = TRIO_HOUSE_COMPLETION_POINTS
+                day["bonus"] = True
+            results.append({
+                "house": house,
+                "name": HOUSES[house]["name"],
+                "awarded": awarded,
+                "already": already,
+            })
+        self.save()
+        return results
+
     def grand_rewarded_today(self, user_id: int, now: float = None) -> int:
         return self._rewarded_count("grand_rewarded", user_id, now)
 

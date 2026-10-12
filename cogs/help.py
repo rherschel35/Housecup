@@ -317,6 +317,7 @@ HELP = {
             ("staffgame duels nightscheduleoff", "Turn off the weekly Duel Night schedule."),
             ("staffgame duels nightscheduleroles", "Set Champions + WIZARDS AND WITCHES for Duel Night warn + start pings."),
             ("staffgame duels nightschedulestatus", "Show the weekly Duel Night schedule."),
+            ("staffgame duels housedaygrant", "Complete every house's trio + Quidditch daily sets for today (+5 each if unpaid); fresh at UTC midnight."),
         ],
     },
     "staff_world": {
