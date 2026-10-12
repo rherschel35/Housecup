@@ -19,6 +19,7 @@ The Descent - a 100-floor solo dungeon crawl.
     /staffgame descent claims - list pending claims
     /staffgame descent approveclaims - restore every pending claim in one shot
     /staffgame descent restorespire - restore Spireheart owners to at least floor 90
+    /staffgame descent set - set a player's combat HP / Attack / Defense in one go
 
 Ten zones of ten floors each, one primary element per zone plus a second
 element mixed in (about 30% of non-boss monsters), so a floor is never a
@@ -403,6 +404,15 @@ def player_stats(rec: dict) -> tuple[int, int, int]:
     return (BASE_HP + pts["hp"] * HP_PER_POINT,
             BASE_ATK + pts["atk"] * ATK_PER_POINT,
             BASE_DEF + pts["def"] * DEF_PER_POINT)
+
+
+def combat_to_points(hp: int, attack: int, defense: int) -> dict[str, int]:
+    """Convert displayed combat totals (broke report / status) into stat points."""
+    return {
+        "hp": max(0, (int(hp) - BASE_HP) // HP_PER_POINT),
+        "atk": max(0, (int(attack) - BASE_ATK) // ATK_PER_POINT),
+        "def": max(0, (int(defense) - BASE_DEF) // DEF_PER_POINT),
+    }
 
 
 def blank_record() -> dict:
@@ -2235,6 +2245,51 @@ class Descent(commands.Cog):
             f"(+{hp} HP pts, +{attack} ATK pts, +{defense} DEF pts).\n"
             f"Now: ❤️ **{p_hp}** · ⚔️ **{p_atk}** · 🛡️ **{p_def}** "
             f"(points: hp={pts['hp']}, atk={pts['atk']}, def={pts['def']}).",
+            ephemeral=True,
+        )
+
+    async def descentset(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        hp: int,
+        attack: int,
+        defense: int,
+    ):
+        """Staff: set combat HP / Attack / Defense to absolute totals in one go."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        if hp < BASE_HP or attack < BASE_ATK or defense < BASE_DEF:
+            await interaction.response.send_message(
+                f"Combat totals can't be below the base "
+                f"(❤️ {BASE_HP} · ⚔️ {BASE_ATK} · 🛡️ {BASE_DEF}).",
+                ephemeral=True,
+            )
+            return
+
+        rec = self.record(member.id)
+        before = player_stats(rec)
+        pts = combat_to_points(hp, attack, defense)
+        rec["stat_points"] = pts
+        old = self.fights.pop(member.id, None)
+        if old is not None:
+            old.cancel_idle()
+        self.save()
+
+        p_hp, p_atk, p_def = player_stats(rec)
+        note = ""
+        if (p_hp, p_atk, p_def) != (hp, attack, defense):
+            note = (
+                f"\n_(Rounded to the nearest achievable totals from point steps: "
+                f"+{HP_PER_POINT} HP / +{ATK_PER_POINT} ATK / +{DEF_PER_POINT} DEF.)_"
+            )
+        await interaction.response.send_message(
+            f"Set **{member.display_name}**'s Descent combat stats.\n"
+            f"Was: ❤️ **{before[0]}** · ⚔️ **{before[1]}** · 🛡️ **{before[2]}**\n"
+            f"Now: ❤️ **{p_hp}** · ⚔️ **{p_atk}** · 🛡️ **{p_def}**"
+            f"{note}",
             ephemeral=True,
         )
 

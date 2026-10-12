@@ -263,6 +263,7 @@ HELP = {
             ("triwizard crown", "Record a Tri-Wizard Tournament winner."),
             ("triwizard remove", "Undo a Tri-Wizard entry made by mistake."),
             ("staffgame descent boost", "Add Descent HP / Attack / Defense points to a player."),
+            ("staffgame descent set", "Set a player's Descent HP / Attack / Defense to exact combat totals in one go."),
             ("staffgame descent unlock", "Clear the 3-loss Descent lockout without wiping progress."),
             ("staffgame descent reset", "Wipe someone's Descent progress back to floor 1."),
             ("staffgame descent restore", "Rebuild wiped Descent to a cleared floor (Max AP, fair stats, army/bosses)."),
