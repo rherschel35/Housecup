@@ -526,8 +526,8 @@ class Checklist(commands.Cog):
             rec = frogs.record(member.id)
             opened = rec.get("opened_on") == chi_today(now)
             items.append(CheckItem(
-                "Chocolate Frog", opened,
-                "opened today" if opened else "ready — `/frog open`",
+                "Frog", opened,
+                "Chocolate Frog opened today" if opened else "ready — `/frog open`",
                 chi_reset, "day resets"))
 
         fire = self.bot.get_cog("HouseFire")

@@ -240,7 +240,7 @@ HELP = {
         "staff": False,
         "entries": [
             ("profile", "Your Mirror, wand, patronus, Animagus, broom, points, duel rank, beasts and honours - or anyone's."),
-            ("checklist", "Your daily points board (public) — duels, Quidditch, broom, beasts, potions, market, and more. Full clears every 10 days pay +5."),
+            ("checklist", "Your daily points board (public) — duels, Quidditch, broom, beasts, potions, frog, market, and more. Full clears every 10 days pay +5."),
             ("reportcard", "Public report card — big letter grade from your average checklist % complete."),
             ("gpa", "School-wide GPA ranking from average checklist completion."),
             ("points", "Your points (or anyone's), this season and all time."),
