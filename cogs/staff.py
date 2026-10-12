@@ -426,7 +426,7 @@ class Staff(commands.Cog):
 
     @descent.command(
         name="approveclaims",
-        description="Restore every pending /descentclaim in one shot.",
+        description="Restore floors/AP/army from claims (does not change combat stats).",
     )
     @app_commands.describe(
         backfill_army="Fill army + boss trophies (default: True)",
