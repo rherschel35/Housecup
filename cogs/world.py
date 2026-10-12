@@ -5,7 +5,7 @@ Everyone shares one student record (satchel, reputation with each place,
 discoveries, flags) stored in STATE_DIR/world_state.json, so something
 found in one place can matter in another.
 
-Players:  /explore  /forage  /satchel  /use  /offer  /places
+Players:  /explore  /forage  /satchel  /secrets  /use  /offer  /places
 Staff:    /staff world eventstart | eventend | eventstatus | academy | rep | give | channel | reload
 
 Secret interactions are NOT commands: they're typed as plain messages in a
@@ -485,9 +485,10 @@ class WorldCog(commands.Cog, name="World"):
             if ev:
                 bit += " · *something unusual is happening*"
             lines.append(f"**{P.c.get('title', P.name)}**{bit}\n{P.c.get('blurb', '')}")
-        lines.append("\n`/explore` · `/forage` · `/satchel` · `/use` · `/offer`\n"
+        lines.append("\n`/explore` · `/forage` · `/satchel` · `/secrets` · `/use` · `/offer`\n"
                      "*Not everything you can do is on this list. Some things you'll only learn from classes, "
-                     "books, riddles, rumours - or other students. If you discover something, you decide whether to share it.*")
+                     "books, riddles, rumours - or other students. If you discover something, you decide whether to share it. "
+                     "`/secrets` shows the ones you've already found.*")
         await interaction.response.send_message(embed=self.embed("\n\n".join(lines), "Velmora"))
 
     # ------------------------------------------------------------ secrets, typed wherever you're currently exploring

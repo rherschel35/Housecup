@@ -314,7 +314,7 @@ GEAR = {
         "name": "Keeper's Talisman", "slot": "talisman", "rarity": "legendary",
         "desc": "An old iron key that fits no lock. It knows where the secrets are, if not what they are.",
         "earn": "place_secrets", "earn_text": "Find every secret in one place.",
-        "perk": "secret_count", "perk_text": "/secrets shows how many you haven't found yet in each place.",
+        "perk": "secret_count", "perk_text": "/secrets lists secrets you've found, and with this worn also how many are still hidden in each place.",
         "visual": {"shape": "key", "color": "#8A5A2A"},
     },
     "beastcallers_whistle": {

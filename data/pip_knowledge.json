@@ -175,9 +175,12 @@
         "observatory",
         "dungeons place",
         "offering",
-        "offer"
+        "offer",
+        "secrets",
+        "found secrets",
+        "explore secrets"
       ],
-      "answer": "Each place has its own channel. Use `/explore` (up to 10/day per place) an' `/forage` (up to 5/day). Check `/satchel`, try `/use`, leave an `/offer`. `/places` shows where ye can go — places remember how ye treat 'em.",
+      "answer": "Each place has its own channel. Use `/explore` (up to 10/day per place) an' `/forage` (up to 5/day). Check `/satchel`, try `/use`, leave an `/offer`. `/places` shows where ye can go — places remember how ye treat 'em. `/secrets` lists explore secrets ye've already found (private; doesn't spoil the phrases). Wear the Keeper's Talisman an' `/secrets` also shows how many are still hidden in each place.",
       "link": "https://everything-velmora.netlify.app/explore"
     },
     {
