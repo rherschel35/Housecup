@@ -342,8 +342,11 @@ RIVAL_BOARD_BANTER = {
 TRIO_SIZE = 3
 TRIO_SIGNUP_TIMEOUT = 90
 TRIO_ROUNDS_TO_WIN = 2       # best of three
-TRIO_REWARD_POINTS = 1
-TRIO_REWARDED_PER_DAY = 3
+# House-level daily set: 5 trio wins for that house → +5 house points once.
+TRIO_HOUSE_WIN_GOAL = 5
+TRIO_HOUSE_COMPLETION_POINTS = 5
+TRIO_REWARD_POINTS = 1  # legacy alias
+TRIO_REWARDED_PER_DAY = TRIO_HOUSE_WIN_GOAL  # legacy alias / checklist
 TRIO_TITLE_TIERS = [         # (trio wins, title) - highest first
     (50, "Three's Company"),
     (30, "Pack Hunter"),
@@ -674,7 +677,8 @@ class Duels(commands.Cog):
             state = {}
         state.setdefault("records", {})
         state.setdefault("rewarded", {})
-        state.setdefault("trio_rewarded", {})
+        state.setdefault("trio_rewarded", {})  # legacy individual stamps
+        state.setdefault("trio_house_day", {})  # house -> {date, wins, bonus}
         state.setdefault("grand_rewarded", {})
         for key in ("rep", "streaks", "bounties", "pairs", "spell_wins", "signature",
                     "rank_seen", "gifted", "rivals_announced", "signature_announced",
@@ -748,7 +752,30 @@ class Duels(commands.Cog):
         return self._rewarded_count("rewarded", user_id, now)
 
     def trio_rewarded_today(self, user_id: int, now: float = None) -> int:
+        """Legacy individual counter (unused for payouts)."""
         return self._rewarded_count("trio_rewarded", user_id, now)
+
+    @staticmethod
+    def _utc_day(now: float | None = None) -> str:
+        ts = now if now is not None else time.time()
+        return dt.datetime.fromtimestamp(ts, dt.timezone.utc).strftime("%Y-%m-%d")
+
+    def trio_house_day_rec(self, house: str, now: float | None = None) -> dict:
+        bag = self.state.setdefault("trio_house_day", {})
+        day = self._utc_day(now)
+        rec = bag.get(house) or {}
+        if rec.get("date") != day:
+            rec = {"date": day, "wins": 0, "bonus": False}
+            bag[house] = rec
+        rec.setdefault("wins", 0)
+        rec.setdefault("bonus", False)
+        return rec
+
+    def trio_house_wins_today(self, house: str, now: float | None = None) -> int:
+        return int(self.trio_house_day_rec(house, now).get("wins") or 0)
+
+    def trio_house_bonus_claimed(self, house: str, now: float | None = None) -> bool:
+        return bool(self.trio_house_day_rec(house, now).get("bonus"))
 
     def grand_rewarded_today(self, user_id: int, now: float = None) -> int:
         return self._rewarded_count("grand_rewarded", user_id, now)
@@ -1385,8 +1412,18 @@ class Duels(commands.Cog):
         member = member or interaction.user
         wins = self.wins_of(member.id)
         left = max(0, REWARDED_PER_DAY - self.rewarded_today(member.id))
-        trio_left = max(0, TRIO_REWARDED_PER_DAY - self.trio_rewarded_today(member.id))
         grand_left = max(0, GRAND_REWARDED_PER_DAY - self.grand_rewarded_today(member.id))
+        store = self.bot.get_cog("Store")
+        house = store.member_house(member) if store else None
+        if house:
+            trio_wins = self.trio_house_wins_today(house)
+            trio_bonus = self.trio_house_bonus_claimed(house)
+            trio_bit = (
+                f"{min(trio_wins, TRIO_HOUSE_WIN_GOAL)}/{TRIO_HOUSE_WIN_GOAL} house trio wins"
+                + (" (+5 claimed)" if trio_bonus else "")
+            )
+        else:
+            trio_bit = "no house for trio set"
 
         title = member.display_name
         sig = self.signature_of(member.id)
@@ -1441,8 +1478,10 @@ class Duels(commands.Cog):
             glow = " ✨ *(it glows)*" if self.rep_of(member.id) >= REP_GLOW else ""
             embed.add_field(name="Wand", value=f"{wand['wood']}, {wand['core'].lower()}{glow}",
                             inline=False)
-        footer = (f"{left}/{REWARDED_PER_DAY} 1v1 • {trio_left}/{TRIO_REWARDED_PER_DAY} trio • "
-                  f"{grand_left}/{GRAND_REWARDED_PER_DAY} grand points left today")
+        footer = (
+            f"{left}/{REWARDED_PER_DAY} 1v1 • {trio_bit} • "
+            f"{grand_left}/{GRAND_REWARDED_PER_DAY} grand points left today"
+        )
         if self.duel_night_on():
             footer += " • ⚔️ Duel Night: double points, no daily cap, no same-house points"
         embed.set_footer(text=footer)
@@ -2013,7 +2052,7 @@ class Duels(commands.Cog):
         return next(iter(houses)) if len(houses) == 1 else None
 
     def settle_trio(self, winners: list, losers: list, now: float = None) -> dict:
-        """Record a trio result. Never touches 1v1 w/l, streaks, signatures, or pairs."""
+        """Record a trio result. House points: 5 wins/day for the house → +5 once."""
         now = now if now is not None else time.time()
         notes: list[str] = []
         for m in winners:
@@ -2028,30 +2067,27 @@ class Duels(commands.Cog):
         same_house_teams = bool(house_w and house_l and house_w == house_l)
 
         awarded = 0
-        paid_names: list[str] = []
-        capped_names: list[str] = []
-        if store and not same_house_teams:
-            for member in winners:
-                house = store.member_house(member)
-                if not house:
-                    continue
-                if (not night) and self.trio_rewarded_today(member.id, now) >= TRIO_REWARDED_PER_DAY:
-                    capped_names.append(member.display_name)
-                    continue
-                pts = TRIO_REWARD_POINTS * (DUEL_NIGHT_MULTIPLIER if night else 1)
-                why = f"Trio win"
-                if night:
-                    why += " (Duel Night)"
-                self._award(store, house, pts, member.id, why)
-                if night:
-                    self._credit_duel_night(member.id, house, pts)
-                else:
-                    self.state["trio_rewarded"].setdefault(str(member.id), []).append(now)
-                awarded += pts
-                paid_names.append(member.display_name)
+        house_wins = 0
+        house_bonus = False
+        if store and house_w and not same_house_teams:
+            day = self.trio_house_day_rec(house_w, now)
+            if not day.get("bonus"):
+                day["wins"] = int(day.get("wins") or 0) + 1
+            house_wins = int(day.get("wins") or 0)
+            house_bonus = bool(day.get("bonus"))
+            if house_wins >= TRIO_HOUSE_WIN_GOAL and not house_bonus:
+                self._award(
+                    store,
+                    house_w,
+                    TRIO_HOUSE_COMPLETION_POINTS,
+                    winners[0].id if winners else None,
+                    f"House trio set complete ({TRIO_HOUSE_WIN_GOAL} wins)",
+                )
+                day["bonus"] = True
+                house_bonus = True
+                awarded = TRIO_HOUSE_COMPLETION_POINTS
 
         for member in winners:
-            uid = str(member.id)
             wins = self.record_of(member.id)["trio_w"]
             prev = highest_title(TRIO_TITLE_TIERS, wins - 1)
             now_title = highest_title(TRIO_TITLE_TIERS, wins)
@@ -2060,9 +2096,16 @@ class Duels(commands.Cog):
 
         self.save()
         return {
-            "awarded": awarded, "night": night, "notes": notes,
-            "same_house": same_house_teams, "paid": paid_names, "capped": capped_names,
+            "awarded": awarded,
+            "night": night,
+            "notes": notes,
+            "same_house": same_house_teams,
             "house": house_w,
+            "house_wins": house_wins,
+            "house_goal": TRIO_HOUSE_WIN_GOAL,
+            "house_bonus": house_bonus,
+            "paid": [],
+            "capped": [],
         }
 
     def settle_grand(self, winner, loser, now: float = None) -> dict:
@@ -3190,20 +3233,24 @@ class TrioMatch:
         from cogs.store import HOUSES
         win_ids = {m.id for m in winners}
         win_side = "a" if win_ids == {m.id for m in self.team_a} else "b"
+        h = HOUSES.get(outcome.get("house") or "", {})
+        h_label = f"{h.get('emoji', '')} {h.get('name', '')}".strip() or "the house"
+        hw = int(outcome.get("house_wins") or 0)
+        goal = int(outcome.get("house_goal") or TRIO_HOUSE_WIN_GOAL)
         if outcome["awarded"]:
-            h = HOUSES.get(outcome.get("house") or "", {})
-            if h:
-                tail = f"+{outcome['awarded']} to {h.get('emoji', '')} {h.get('name', '')}"
-            else:
-                tail = f"+{outcome['awarded']} house points"
-            if outcome.get("night"):
-                tail += " (Duel Night!)"
+            tail = (
+                f"+{outcome['awarded']} to {h_label} — "
+                f"house trio set complete ({goal}/{goal})"
+            )
         elif outcome.get("same_house"):
             tail = "Same-house teams — no points"
-        elif outcome.get("capped") and not outcome.get("paid"):
-            tail = "Daily trio point cap reached"
+        elif outcome.get("house"):
+            if outcome.get("house_bonus"):
+                tail = f"{h_label} trio set already claimed today ({goal}/{goal})"
+            else:
+                tail = f"{h_label} trio wins today · {hw}/{goal} (+5 at {goal})"
         else:
-            tail = "No house points this match"
+            tail = "No unanimous house — no house points"
         async with self.lock:
             snap = self._snapshot(
                 view=None,

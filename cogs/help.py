@@ -25,8 +25,8 @@ HELP = {
         "staff": False,
         "entries": [
             ("duel", "Challenge someone. Best of 3 = 1 win; best of 5/7/9/51 = series of first-to-2 sets banking 3/4/5/26 wins. Duel Night pays the full bank at double points."),
-            ("trio scramble", "Open a casual 3v3 trio duel — any houses, join either side."),
-            ("trio housematch", "Open a house-vs-house 3v3 trio duel (house role gated)."),
+            ("trio scramble", "Open a casual 3v3 trio duel — any houses, join either side. House points: 5 wins/day for the house → +5 once."),
+            ("trio housematch", "Open a house-vs-house 3v3 trio duel (house role gated). Same house daily set: 5 wins → +5."),
             ("grand", "Challenge someone to a Grand Duel (both need 50+ 1v1 wins)."),
             ("duelend", "Clear a stuck duel lock so you can fight again (staff can clear others)."),
             ("houseduels", "Each house's overall duel wins."),
@@ -126,11 +126,15 @@ HELP = {
     "quidditch": {
         "title": "Quidditch",
         "staff": False,
-        "note": "Team pickup matches live here. Solo and challenge broom races (`/broomrace`) also run in the Quidditch channel — see Brooms.",
+        "note": (
+            "Team pickup matches live here. House matches: 5 wins in a UTC day for that "
+            "house pay +5 house points once (shared — not per player). "
+            "Solo and challenge broom races (`/broomrace`) also run in the Quidditch channel — see Brooms."
+        ),
         "entries": [
-            ("quidditch scramble", "Start a casual pickup match — any houses, either side."),
-            ("quidditch housematch", "Start a house-vs-house Quidditch match."),
-            ("quidditch stats", "Your Quidditch record and title."),
+            ("quidditch scramble", "Start a casual pickup match — any houses, either side (no house points)."),
+            ("quidditch housematch", "Start a house-vs-house Quidditch match (counts toward the house's daily 5 → +5)."),
+            ("quidditch stats", "Your Quidditch record, title, and your house's daily set progress."),
             ("broomrace", "Private broom races / challenges on this pitch (see Brooms for daily caps)."),
         ],
     },
@@ -244,14 +248,14 @@ HELP = {
         "staff": False,
         "entries": [
             ("profile", "Your Mirror, wand, patronus, Animagus, broom, points, duel rank, beasts and honours - or anyone's."),
-            ("checklist", "Your daily points board (public) — duels, Quidditch, broom, beasts, potions, F40+ binds, frog, market, and more. Full clears every 10 days pay +5."),
+            ("checklist", "Your daily points board (public) — house trio/Quidditch sets, duels, broom, beasts, potions, F40+ binds, frog, market, and more."),
             ("reportcard", "Public report card — big letter grade from your average checklist % complete."),
             ("gpa", "School-wide GPA ranking from average checklist completion."),
             ("points", "Your points (or anyone's), this season and all time."),
             ("standings", "The House Cup table."),
             ("leaderboard", "The top earners."),
             ("ranks", "Everyone with points, ranked from first to last."),
-            ("duelrecord", "Your duel rank, wins, streak, rivals, trio/grand wins, and today's duel points left."),
+            ("duelrecord", "Your duel rank, wins, streak, rivals, trio/grand wins, and today's 1v1/grand points + house trio set."),
             ("history", "Recent points activity."),
             ("housecup", "Past seasons and their champions."),
             ("triwizard history", "Every Tri-Wizard champion so far."),

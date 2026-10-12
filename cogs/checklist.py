@@ -315,15 +315,27 @@ class Checklist(commands.Cog):
                 f"**{left}/{BEANS_PER_DAY}** left", reset,
                 "next bean" if left == 0 else "oldest clears"))
 
-        # ---- Duels (rolling 24h) ----
+        # ---- Duels (rolling 24h 1v1/grand; UTC house trio set) ----
+        store = self.bot.get_cog("Store")
+        member_house = store.member_house(member) if store else None
+        from cogs.store import HOUSES as STORE_HOUSES
+        house_label = (
+            f"{STORE_HOUSES[member_house]['emoji']} {STORE_HOUSES[member_house]['name']}"
+            if member_house and member_house in STORE_HOUSES
+            else None
+        )
+
         duels = self.bot.get_cog("Duels")
         if duels:
             from cogs.duels import (
-                REWARDED_PER_DAY, TRIO_REWARDED_PER_DAY, GRAND_REWARDED_PER_DAY, WINDOW,
+                GRAND_REWARDED_PER_DAY,
+                REWARDED_PER_DAY,
+                TRIO_HOUSE_COMPLETION_POINTS,
+                TRIO_HOUSE_WIN_GOAL,
+                WINDOW,
             )
             for label, bucket, cap in (
                 ("Duels (1v1)", "rewarded", REWARDED_PER_DAY),
-                ("Trio duels", "trio_rewarded", TRIO_REWARDED_PER_DAY),
                 ("Grand duels", "grand_rewarded", GRAND_REWARDED_PER_DAY),
             ):
                 stamps = [t for t in duels.state.get(bucket, {}).get(str(member.id), [])
@@ -334,6 +346,27 @@ class Checklist(commands.Cog):
                     label, left == 0,
                     f"**{left}/{cap}** paid wins left", reset,
                     "next slot" if left == 0 else "oldest clears"))
+
+            if member_house:
+                twin = duels.trio_house_wins_today(member_house)
+                tbonus = duels.trio_house_bonus_claimed(member_house)
+                items.append(CheckItem(
+                    f"Trio ({house_label})", tbonus,
+                    f"**{min(twin, TRIO_HOUSE_WIN_GOAL)}/{TRIO_HOUSE_WIN_GOAL}** "
+                    f"house wins · "
+                    + (
+                        f"+{TRIO_HOUSE_COMPLETION_POINTS} pts claimed"
+                        if tbonus
+                        else f"+{TRIO_HOUSE_COMPLETION_POINTS} pts at {TRIO_HOUSE_WIN_GOAL}"
+                    ),
+                    utc_reset, "day resets"))
+            else:
+                items.append(CheckItem(
+                    "Trio (house)", False,
+                    "join a house to share the daily trio set",
+                    scored=False,
+                    raw="⬜ **Trio (house)** — join a house to share the daily trio set",
+                ))
 
         # ---- Chess / Checkers (UTC week, Mon–Sun) ----
         chess = self.bot.get_cog("Chess")
@@ -366,18 +399,30 @@ class Checklist(commands.Cog):
                 f"**{left}/{WEEKLY_WIN_CAP}** point wins left ({POINTS_PER_WIN} pt each)",
                 week_reset, "week resets"))
 
-        # ---- Quidditch house matches (UTC calendar) ----
+        # ---- Quidditch house matches (UTC house set) ----
         quidditch = self.bot.get_cog("Quidditch")
         if quidditch:
-            from cogs.quidditch import DAILY_HOUSE_WIN_CAP, HOUSE_POINTS_PER_WIN, today_str
-            rec = quidditch.state.get("players", {}).get(str(member.id), {})
-            daily = rec.get("daily") or {}
-            used = int(daily.get("count", 0)) if daily.get("date") == today_str() else 0
-            left = max(0, DAILY_HOUSE_WIN_CAP - used)
-            items.append(CheckItem(
-                "Quidditch (house match)", left == 0,
-                f"**{left}/{DAILY_HOUSE_WIN_CAP}** point wins left ({HOUSE_POINTS_PER_WIN} pts each)",
-                utc_reset, "day resets"))
+            from cogs.quidditch import HOUSE_COMPLETION_POINTS, HOUSE_WIN_GOAL
+            if member_house:
+                qwins = quidditch.house_wins_today(member_house)
+                qbonus = quidditch.house_bonus_claimed(member_house)
+                items.append(CheckItem(
+                    f"Quidditch ({house_label})", qbonus,
+                    f"**{min(qwins, HOUSE_WIN_GOAL)}/{HOUSE_WIN_GOAL}** "
+                    f"house-match wins · "
+                    + (
+                        f"+{HOUSE_COMPLETION_POINTS} pts claimed"
+                        if qbonus
+                        else f"+{HOUSE_COMPLETION_POINTS} pts at {HOUSE_WIN_GOAL}"
+                    ),
+                    utc_reset, "day resets"))
+            else:
+                items.append(CheckItem(
+                    "Quidditch (house)", False,
+                    "join a house to share the daily house-match set",
+                    scored=False,
+                    raw="⬜ **Quidditch (house)** — join a house to share the daily house-match set",
+                ))
 
         # ---- Broom races (UTC calendar) ----
         broom_race = self.bot.get_cog("BroomRace")
