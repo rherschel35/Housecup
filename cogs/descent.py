@@ -17,7 +17,7 @@ The Descent - a 100-floor solo dungeon crawl.
     /staffgame descent restorebulk - paste many "user_id floor" lines at once
     /descentclaim floor:<n> - players self-report deepest cleared floor after a wipe
     /staffgame descent claims - list pending claims
-    /staffgame descent approveclaims - restore floors/army from claims (leaves stats + Max AP alone)
+    /staffgame descent approveclaims - restore floors/army + Max AP (+1 per 10 floors); stats untouched
     /staffgame descent restorespire - restore Spireheart owners to at least floor 90
     /staffgame descent set - set a player's combat HP / Attack / Defense in one go
 
@@ -28,7 +28,7 @@ order:
 
     - Win all 10 -> advance a floor and level up (level = deepest floor
       cleared): a stat point (HP/Attack/Defense) at monster #5, and your
-      max AP goes up by 1 every time you clear a new floor.
+      max AP goes up by 1 every 10 floors cleared (floors 10, 20, … 100).
     - Lose a fight -> refight that same monster; you don't lose progress
       on the floor for a single loss.
     - Lose 3 times on the same floor -> locked out of it for 24 hours.
@@ -388,6 +388,16 @@ MAX_FLOOR = 100
 # ---------------------------------------------------------------------- AP
 
 STARTING_MAX_AP = 5
+# +1 Max AP at each decade clear (10, 20, … 100) → at most +10 over a full run.
+AP_PER_TEN_FLOORS = 10
+
+
+def max_ap_for_depth(depth: int) -> int:
+    """Max AP after having cleared `depth` floors ( +1 per 10 floors )."""
+    depth = max(0, min(MAX_FLOOR, int(depth)))
+    return STARTING_MAX_AP + depth // AP_PER_TEN_FLOORS
+
+
 AP_REGEN_PER_TURN = 1
 CAST_AP_COST = 3
 DEFEND_AP_COST = 0
@@ -1705,9 +1715,11 @@ class Descent(commands.Cog):
             rec["floor"] = min(floor + 1, MAX_FLOOR)
             rec["monster_index"] = 1
             rec["losses"] = 0
-            ap_increased = floor % 10 == 0
+            # +1 Max AP every 10 floors cleared (10, 20, … 100).
+            target_ap = max_ap_for_depth(rec["highest_cleared"])
+            ap_increased = int(rec.get("max_ap") or STARTING_MAX_AP) < target_ap
             if ap_increased:
-                rec["max_ap"] += 1
+                rec["max_ap"] = target_ap
             clear_drop = await self._drop_loot(member, zone_for(floor)["element"], FLOOR_CLEAR_GUARANTEED)
             # Fury bosses (60/70/80/90/100) bank three free picks; everything else one.
             clear_picks = 3 if fight.is_boss and floor in FURY_BOSS_FLOORS else 1
@@ -2374,8 +2386,7 @@ class Descent(commands.Cog):
 
         set_stats=False keeps existing combat stat points (or base zeros) so staff
         can assign HP/ATK/DEF with /staffgame descent set.
-        set_max_ap=False keeps existing Max AP (or starting Max AP) instead of
-        auto-granting 5 + floors cleared.
+        set_max_ap=True grants Max AP as 5 + (floors cleared // 10).
         """
         depth = max(0, min(MAX_FLOOR, int(depth)))
         prior = self.state["players"].get(str(user_id))
@@ -2415,7 +2426,7 @@ class Descent(commands.Cog):
         rec["losses"] = 0
         rec["locked_until"] = 0.0
         if set_max_ap:
-            rec["max_ap"] = STARTING_MAX_AP + depth
+            rec["max_ap"] = max_ap_for_depth(depth)
         elif isinstance(prior, dict) and prior.get("max_ap") is not None:
             rec["max_ap"] = max(STARTING_MAX_AP, int(prior.get("max_ap") or STARTING_MAX_AP))
         # else blank_record already has STARTING_MAX_AP
@@ -2888,7 +2899,8 @@ class Descent(commands.Cog):
         await interaction.response.send_message(
             f"Claimed deepest cleared floor **{floor}**. "
             f"Staff will approve with `/staffgame descent approveclaims` "
-            f"(restores floor and army only — Max AP and combat stats are set by staff).",
+            f"(restores floor, army, and Max AP at +1 per 10 floors — "
+            f"combat stats are set by staff separately).",
             ephemeral=True,
         )
 
@@ -2930,7 +2942,7 @@ class Descent(commands.Cog):
         backfill_army: bool = True,
         clear: bool = True,
     ):
-        """Staff: restore floors/army from claims — leaves Max AP and combat stats alone."""
+        """Staff: restore floors/army + Max AP (+1/10 floors); leave combat stats alone."""
         store = self.bot.get_cog("Store")
         if not (store and store.is_staff(interaction.user)):
             await interaction.response.send_message("That's for staff.", ephemeral=True)
@@ -2955,7 +2967,7 @@ class Descent(commands.Cog):
                 floor,
                 backfill_army=backfill_army,
                 set_stats=False,
-                set_max_ap=False,
+                set_max_ap=True,
             )
             if result.get("skipped"):
                 skipped += 1
@@ -2965,8 +2977,9 @@ class Descent(commands.Cog):
             data["claims"] = {}
             self.save_claims(data)
         await interaction.followup.send(
-            f"Approved claims: restored **{restored}** (floor / army only — "
-            f"**Max AP and stats untouched**), skipped **{skipped}** already at/above their claim"
+            f"Approved claims: restored **{restored}** "
+            f"(floor / army / Max AP at +1 per 10 floors — **combat stats untouched**), "
+            f"skipped **{skipped}** already at/above their claim"
             + (" (claim list cleared)." if clear else " (claims kept).")
             + "\nSet combat stats with `/staffgame descent set`.",
             ephemeral=True,
