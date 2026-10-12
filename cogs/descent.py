@@ -1050,33 +1050,116 @@ class Descent(commands.Cog):
         except discord.DiscordException:
             log.exception("Could not edit Descent fight message after forfeit")
 
+    def _parse_state_file(self, path: Path) -> dict | None:
+        """Return parsed Descent state, or None if missing/empty/invalid."""
+        try:
+            raw = path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return None
+        except OSError:
+            log.exception("Could not read Descent state at %s", path)
+            return None
+        if not raw.strip():
+            log.error("Descent state at %s is empty (0 bytes / whitespace).", path)
+            return None
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            log.exception("Descent state at %s is corrupt JSON.", path)
+            return None
+        if not isinstance(data, dict):
+            log.error("Descent state at %s is not a JSON object.", path)
+            return None
+        players = data.get("players")
+        if not isinstance(players, dict):
+            data["players"] = {}
+        return data
+
+    def _candidate_state_paths(self) -> list[Path]:
+        """Main file first, then tmp / recent backups (crash recovery)."""
+        paths = [STATE_PATH, STATE_PATH.with_suffix(".tmp")]
+        try:
+            backups = sorted(
+                STATE_DIR.glob("descent_state.corrupt.*.json"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            paths.extend(backups[:5])
+        except OSError:
+            pass
+        return paths
+
+    def _quarantine_corrupt(self, path: Path) -> Path | None:
+        if not path.exists():
+            return None
+        try:
+            backup = STATE_DIR / f"descent_state.corrupt.{int(time.time())}.json"
+            os.replace(path, backup)
+            log.error("Moved unreadable Descent state %s → %s", path, backup)
+            return backup
+        except OSError:
+            log.exception("Could not quarantine corrupt Descent state at %s", path)
+            return None
+
     def _load(self) -> dict:
+        """Load Descent state, recovering from .tmp / corrupt backups when needed.
+
+        An empty file (JSONDecodeError char 0) usually means a non-atomic write
+        was interrupted mid-redeploy. We never silently treat that as 'no players'
+        without checking recovery copies first.
+        """
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        primary_bad = False
         if STATE_PATH.exists():
-            try:
-                data = json.loads(STATE_PATH.read_text())
-            except Exception:
-                log.exception("Failed to load descent state from %s", STATE_PATH)
-                return {"players": {}}
-            if not isinstance(data, dict):
-                log.error("Descent state is not an object — starting empty.")
-                return {"players": {}}
-            players = data.get("players")
-            if not isinstance(players, dict):
-                data["players"] = {}
-                log.error("Descent state missing players map — repaired empty.")
-            elif not players:
-                log.warning(
-                    "Loaded Descent state with 0 players from %s — "
-                    "if this follows a redeploy, check STATE_DIR volume.",
+            data = self._parse_state_file(STATE_PATH)
+            if data is not None and data.get("players"):
+                log.info(
+                    "Loaded Descent state: %d players from %s",
+                    len(data["players"]),
                     STATE_PATH,
                 )
+                return data
+            if data is not None and not data.get("players"):
+                log.warning("Descent state at %s has 0 players.", STATE_PATH)
+                # Still prefer an empty-but-valid file over inventing one — but
+                # keep looking for a richer backup below.
+                empty_valid = data
             else:
-                log.info("Loaded Descent state: %d players from %s", len(players), STATE_PATH)
+                empty_valid = None
+                primary_bad = True
+                self._quarantine_corrupt(STATE_PATH)
+        else:
+            empty_valid = None
+
+        for path in self._candidate_state_paths():
+            if path == STATE_PATH:
+                continue
+            data = self._parse_state_file(path)
+            if data is None or not data.get("players"):
+                continue
+            log.error(
+                "Recovered Descent state with %d players from %s "
+                "(primary was %s).",
+                len(data["players"]),
+                path,
+                "corrupt/empty" if primary_bad else "missing/empty",
+            )
+            # Restore recovered copy to the canonical path.
+            try:
+                tmp = STATE_PATH.with_suffix(".tmp")
+                tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+                os.replace(tmp, STATE_PATH)
+            except OSError:
+                log.exception("Could not restore recovered Descent state to %s", STATE_PATH)
             return data
+
+        if empty_valid is not None:
+            return empty_valid
+
         log.warning(
-            "No Descent state at %s — starting empty. "
-            "On Railway, STATE_DIR must be a persistent volume.",
-            STATE_PATH,
+            "No usable Descent state under %s — starting empty. "
+            "Check for descent_state.corrupt.*.json on the volume.",
+            STATE_DIR,
         )
         return {"players": {}}
 
@@ -1086,8 +1169,8 @@ class Descent(commands.Cog):
         incoming = self.state.get("players") if isinstance(self.state, dict) else None
         if not incoming and STATE_PATH.exists():
             try:
-                existing = json.loads(STATE_PATH.read_text())
-                prior = existing.get("players") if isinstance(existing, dict) else None
+                existing = self._parse_state_file(STATE_PATH)
+                prior = (existing or {}).get("players") if existing else None
                 if prior:
                     log.error(
                         "Refusing to save empty Descent state over %d players at %s",
@@ -1098,7 +1181,10 @@ class Descent(commands.Cog):
             except Exception:
                 log.exception("Could not verify existing Descent state before save")
         tmp = STATE_PATH.with_suffix(".tmp")
-        tmp.write_text(json.dumps(self.state, indent=2))
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(self.state, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
         os.replace(tmp, STATE_PATH)
 
     def record(self, user_id: int) -> dict:
