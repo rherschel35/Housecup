@@ -495,6 +495,28 @@ class Checklist(commands.Cog):
                     scored=False,
                     raw="⬜ **Familiar** — none yet · `/familiar adopt`"))
 
+        # ---- Army binds floor 40+ (Chicago calendar) ----
+        castles = self.bot.get_cog("Castles")
+        if castles:
+            from cogs.castles import (
+                BIND_BONUS_GOAL,
+                BIND_BONUS_MIN_FLOOR,
+                BIND_BONUS_POINTS,
+            )
+            bound = castles.bind40_today(member.id)
+            claimed = castles.bind40_bonus_claimed(member.id)
+            detail = (
+                f"**{min(bound, BIND_BONUS_GOAL)}/{BIND_BONUS_GOAL}** "
+                f"floor-{BIND_BONUS_MIN_FLOOR}+ bound · "
+                + (
+                    f"+{BIND_BONUS_POINTS} pts claimed"
+                    if claimed
+                    else f"+{BIND_BONUS_POINTS} pts at {BIND_BONUS_GOAL}"
+                )
+            )
+            items.append(CheckItem(
+                "Army binds (F40+)", claimed, detail, chi_reset, "day resets"))
+
         # ---- Frog / fire (Chicago calendar) ----
         frogs = self.bot.get_cog("Frogs")
         if frogs:
@@ -563,9 +585,9 @@ class Checklist(commands.Cog):
             color=0x6C5CE7,
         )
         embed.set_footer(
-            text="Explore/familiar/frog/fire day = Central · Chess/Checkers = UTC week (Mon) · "
-                 "Market/Quidditch = UTC midnight · Duels/beans = rolling 24h · "
-                 "Report-card day = UTC"
+            text="Explore/familiar/frog/fire/army-binds day = Central · "
+                 "Chess/Checkers = UTC week (Mon) · Market/Quidditch = UTC midnight · "
+                 "Duels/beans = rolling 24h · Report-card day = UTC"
         )
         return embed
 

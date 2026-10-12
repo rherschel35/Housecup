@@ -73,6 +73,10 @@ ARMY_CAP = 5000  # total monsters (home + garrison + march) — only while PvP i
 ARMY_PAGE_SIZE = 12  # units listed per /army page
 SUNDAY_CASTLE_POINTS = 50
 BANNERHALL_PER_CASTLE = 30
+# Daily house-point bonus: bind this many floor-40+ monsters (Chicago day).
+BIND_BONUS_GOAL = 200
+BIND_BONUS_POINTS = 10
+BIND_BONUS_MIN_FLOOR = 40
 
 SIEGE_WEEKDAYS = {2, 5}  # Wed=2, Sat=5 in datetime
 
@@ -203,6 +207,9 @@ def blank_player() -> dict:
         "army_def_steps": 0,
         "recruit_day": "",
         "recruits_today": 0,
+        "bind40_day": "",
+        "bind40_today": 0,
+        "bind40_bonus": False,
         "muster_beats": 0,
     }
 
@@ -616,6 +623,54 @@ class Castles(commands.Cog):
             prec["recruits_today"] = 0
         prec["recruits_today"] = int(prec.get("recruits_today") or 0) + n
         self.save()
+
+    def _bind40_rec(self, user_id: int) -> dict:
+        prec = self.prec(user_id)
+        day = chicago_day()
+        if prec.get("bind40_day") != day:
+            prec["bind40_day"] = day
+            prec["bind40_today"] = 0
+            prec["bind40_bonus"] = False
+        prec.setdefault("bind40_today", 0)
+        prec.setdefault("bind40_bonus", False)
+        return prec
+
+    def bind40_today(self, user_id: int) -> int:
+        return int(self._bind40_rec(user_id).get("bind40_today") or 0)
+
+    def bind40_bonus_claimed(self, user_id: int) -> bool:
+        return bool(self._bind40_rec(user_id).get("bind40_bonus"))
+
+    def note_bind40(self, member: discord.Member, *, floor: int, n: int = 1) -> int:
+        """Count floor-40+ binds toward the daily +10 bonus. Returns points awarded."""
+        if n <= 0 or int(floor) < BIND_BONUS_MIN_FLOOR:
+            return 0
+        prec = self._bind40_rec(member.id)
+        prec["bind40_today"] = int(prec.get("bind40_today") or 0) + n
+        if (
+            int(prec["bind40_today"]) < BIND_BONUS_GOAL
+            or prec.get("bind40_bonus")
+        ):
+            self.save()
+            return 0
+        store = self.bot.get_cog("Store")
+        house = store.member_house(member) if store else None
+        if not (store and house):
+            self.save()
+            return 0
+        store.record(
+            house=house,
+            delta=BIND_BONUS_POINTS,
+            actor_id=self.bot.user.id if self.bot.user else 0,
+            target_id=member.id,
+            reason=(
+                f"Bound {BIND_BONUS_GOAL} floor-{BIND_BONUS_MIN_FLOOR}+ "
+                "Descent monsters today"
+            ),
+        )
+        prec["bind40_bonus"] = True
+        self.save()
+        return BIND_BONUS_POINTS
 
     def fifth_muster_bonus(self, user_id: int) -> int:
         """Call after a Descent win. Returns how many extra units to clone (0 or 1)."""
