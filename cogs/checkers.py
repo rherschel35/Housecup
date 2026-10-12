@@ -21,11 +21,11 @@ UX mirrors Wizard's Chess: PNG board, public Make move / Resign buttons,
 ephemeral piece → square picks, 60s challenge timeout, and a turn @mention
 ping (edits don't notify).
 
-Rewards: +1 House Cup point per win, capped at 5 points (5 point-earning
-wins) per player per day - beyond that, wins still count for your record
-and title, just without points. Beating someone from your own house never
-pays points either way. A resignation counts exactly like a loss/win. A
-match with no move in 24 hours auto-forfeits: whoever's turn it was takes
+Rewards: +1 House Cup point per win, capped at 3 point-earning wins per
+player per UTC week (Mon–Sun) - beyond that, wins still count for your
+record and title, just without points. Beating someone from your own house
+never pays points either way. A resignation counts exactly like a loss/win.
+A match with no move in 24 hours auto-forfeits: whoever's turn it was takes
 a loss, and the other player does NOT get a win for it.
 """
 
@@ -60,9 +60,11 @@ CHECKERS_CHANNEL_ID = 1553832675993985024
 CHECKERS_CHANNEL_IDS = frozenset({CHECKERS_CHANNEL_ID, *OPEN_LOUNGE_CHANNEL_IDS})
 
 POINTS_PER_WIN = 1
-DAILY_WIN_CAP = 5
+WEEKLY_WIN_CAP = 3  # point-earning wins per UTC week (Mon–Sun)
 TIMEOUT_SECONDS = 24 * 3600
 CHALLENGE_TIMEOUT_SECONDS = 60
+# Back-compat alias for anything that still imports the old name.
+DAILY_WIN_CAP = WEEKLY_WIN_CAP
 
 TITLE_TIERS = [
     (10, ["Checker Wrecker", "Minor Strategic Nuisance"]),
@@ -98,8 +100,32 @@ def today_str() -> str:
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
 
 
+def week_str() -> str:
+    """UTC ISO week label (Monday-start), e.g. 2026-W42."""
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%G-W%V")
+
+
+def next_week_reset_ts(now: float | None = None) -> int:
+    """Unix time of next Monday 00:00 UTC."""
+    now_dt = datetime.datetime.fromtimestamp(
+        now if now is not None else time.time(), datetime.timezone.utc
+    )
+    monday = now_dt.date() - datetime.timedelta(days=now_dt.weekday())
+    nxt = datetime.datetime.combine(
+        monday + datetime.timedelta(days=7),
+        datetime.time(0, 0),
+        tzinfo=datetime.timezone.utc,
+    )
+    return int(nxt.timestamp())
+
+
 def blank_player() -> dict:
-    return {"wins": 0, "losses": 0, "daily": {"date": today_str(), "count": 0}, "titles_seen": []}
+    return {
+        "wins": 0,
+        "losses": 0,
+        "weekly": {"week": week_str(), "count": 0},
+        "titles_seen": [],
+    }
 
 
 def title_for(wins: int) -> list[str]:
@@ -498,8 +524,11 @@ class Checkers(commands.Cog):
 
     def record(self, user_id: int) -> dict:
         rec = self.state["players"].setdefault(str(user_id), blank_player())
-        if rec["daily"]["date"] != today_str():
-            rec["daily"] = {"date": today_str(), "count": 0}
+        week = week_str()
+        weekly = rec.get("weekly")
+        if not isinstance(weekly, dict) or weekly.get("week") != week:
+            rec["weekly"] = {"week": week, "count": 0}
+        rec.pop("daily", None)  # old daily cap field
         rec.setdefault("titles_seen", [])
         return rec
 
@@ -705,11 +734,11 @@ class Checkers(commands.Cog):
             paid = False
             if store and winner_member and loser_member:
                 wh, lh = store.member_house(winner_member), store.member_house(loser_member)
-                if wh and wh != lh and winner_rec["daily"]["count"] < DAILY_WIN_CAP:
+                if wh and wh != lh and winner_rec["weekly"]["count"] < WEEKLY_WIN_CAP:
                     store.record(house=wh, delta=POINTS_PER_WIN,
                                 actor_id=self.bot.user.id if self.bot.user else 0,
                                 target_id=winner_id, reason=f"Wizard's Checkers: won by {reason}")
-                    winner_rec["daily"]["count"] += 1
+                    winner_rec["weekly"]["count"] += 1
                     paid = True
             self.save()
 
@@ -994,7 +1023,9 @@ class Checkers(commands.Cog):
         desc = [f"**{rec['wins']}W - {rec['losses']}L**"]
         if title:
             desc.append(f"Title: **{title}**")
-        desc.append(f"Point-earning wins today: {rec['daily']['count']}/{DAILY_WIN_CAP}")
+        desc.append(
+            f"Point-earning wins this week: {rec['weekly']['count']}/{WEEKLY_WIN_CAP}"
+        )
         embed = discord.Embed(title=f"{target.display_name}'s Checkers record", description="\n".join(desc),
                               color=0xC0392B)
         embed.add_field(name="Active games", value="\n".join(active_lines) if active_lines else "*None right now.*",
