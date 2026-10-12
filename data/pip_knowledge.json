@@ -114,7 +114,7 @@
         "what can I still do",
         "what can i still do"
       ],
-      "answer": "`/checklist` is yer daily points board — what's left for house points an' habits, with reset timers. Finish every scored box for a full clear; every 10 full clears pays +5 house points. `/reportcard` shows a big letter grade from yer average % complete (GPA = that % × 4.0). `/gpa` ranks the school. Includes duels, Quidditch house-match wins, broom solo (5/day, +3 for finishing all 5), broom challenge (3 paid wins/day at 3 pts), beast befriends (+3 for 5), potion brews (+3 for 5), potions satchel, market sells, an' more.",
+      "answer": "`/checklist` is yer daily points board — what's left for house points an' habits, with reset timers. Finish every scored box for a full clear; every 10 full clears pays +5 house points. `/reportcard` shows a big letter grade from yer average % complete (GPA = that % × 4.0). `/gpa` ranks the school. Includes duels, Quidditch house-match wins, broom solo (5/day, +3 for finishing all 5), broom challenge (3 paid wins/day at 3 pts), beast befriends (+3 for 5), potion brews (+3 for 5), Chocolate Frog (`/frog open`), house fire, market sells, an' more.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {
