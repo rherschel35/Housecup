@@ -14,12 +14,10 @@ Only one active match is allowed between any two given players at a time,
 but everyone can be in as many simultaneous matches (against different
 people) as they like.
 
-Rewards: +3 House Cup points per win, capped at 3 point-earning wins per
-player per UTC week (Mon–Sun) - beyond that, wins still count for your
-record and title, just without points. Beating someone from your own house
-never pays points either way. A resignation counts exactly like a loss/win.
-A match with no move in 24 hours auto-forfeits: whoever's turn it was takes
-a loss, and the other player does NOT get a win for it.
+Wins count for your record and titles only — no House Cup points.
+A resignation counts exactly like a loss/win. A match with no move in
+24 hours auto-forfeits: whoever's turn it was takes a loss, and the other
+player does NOT get a win for it.
 """
 
 from __future__ import annotations
@@ -52,8 +50,8 @@ from cogs.velmora_channels import OPEN_LOUNGE_CHANNEL_IDS, channel_mentions
 CHESS_CHANNEL_ID = 1553832675993985024
 CHESS_CHANNEL_IDS = frozenset({CHESS_CHANNEL_ID, *OPEN_LOUNGE_CHANNEL_IDS})
 
-POINTS_PER_WIN = 3
-WEEKLY_WIN_CAP = 3  # point-earning wins per UTC week (Mon–Sun)
+POINTS_PER_WIN = 0  # board games do not award House Cup points
+WEEKLY_WIN_CAP = 0
 TIMEOUT_SECONDS = 24 * 3600
 CHALLENGE_TIMEOUT_SECONDS = 60
 # Back-compat alias for anything that still imports the old name.
@@ -626,18 +624,7 @@ class Chess(commands.Cog):
         if winner_id is not None:
             winner_rec = self.record(winner_id)
             winner_rec["wins"] += 1
-            store = self.bot.get_cog("Store")
             winner_member = channel.guild.get_member(winner_id) if channel.guild else None
-            loser_member = channel.guild.get_member(loser_id) if channel.guild else None
-            paid = False
-            if store and winner_member and loser_member:
-                wh, lh = store.member_house(winner_member), store.member_house(loser_member)
-                if wh and wh != lh and winner_rec["weekly"]["count"] < WEEKLY_WIN_CAP:
-                    store.record(house=wh, delta=POINTS_PER_WIN,
-                                actor_id=self.bot.user.id if self.bot.user else 0,
-                                target_id=winner_id, reason=f"Wizard's Chess: won by {reason}")
-                    winner_rec["weekly"]["count"] += 1
-                    paid = True
             self.save()
 
             for threshold, names in TITLE_TIERS:
@@ -647,8 +634,6 @@ class Chess(commands.Cog):
                     lines.append(f"🏆 **{winner_member.display_name if winner_member else winner_id}** just "
                                 f"unlocked a new tier of Chess titles ({', '.join(names)})! {line}")
             self.save()
-            if paid and winner_member:
-                lines.insert(0, f"+{POINTS_PER_WIN} House Cup points to {winner_member.display_name}'s house.")
         else:
             self.save()
 
@@ -907,9 +892,6 @@ class Chess(commands.Cog):
         desc = [f"**{rec['wins']}W - {rec['losses']}L - {rec['draws']}D**"]
         if title:
             desc.append(f"Title: **{title}**")
-        desc.append(
-            f"Point-earning wins this week: {rec['weekly']['count']}/{WEEKLY_WIN_CAP}"
-        )
         embed = discord.Embed(title=f"{target.display_name}'s Chess record", description="\n".join(desc),
                               color=0x8B5FBF)
         embed.add_field(name="Active games", value="\n".join(active_lines) if active_lines else "*None right now.*",
