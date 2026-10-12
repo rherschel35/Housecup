@@ -5,6 +5,9 @@ Patronuses — silver guardians, one unique form each.
     /patronus @member      - see someone else's
     /patronusreset         - once: three new words, a new unique patronus
 
+Staff:
+    /staff identity patronusreset @member - new words for them; wand stays
+
 First cast reuses the wandmaker's three words. Forms are unique across the
 school (like brooms) — if the shape your words want is taken, the next-closest
 open form is yours. Headmaster-sealed customs stay put and are not resettable.
@@ -837,6 +840,32 @@ class Patronus(commands.Cog):
 
         await interaction.response.send_modal(PatronusResetModal(self))
 
+    async def staff_patronusreset(
+        self, interaction: discord.Interaction, member: discord.Member
+    ) -> None:
+        """Staff: new patronus words for someone else; wand untouched."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message(
+                "That one's for staff.", ephemeral=True
+            )
+            return
+        if self.custom_of(member.id):
+            await interaction.response.send_message(
+                f"{member.display_name}'s patronus is headmaster-sealed — it can't be reset.",
+                ephemeral=True,
+            )
+            return
+        if not self.patronus_of(member.id):
+            await interaction.response.send_message(
+                f"{member.display_name} doesn't have a patronus to reset yet.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.send_modal(
+            StaffPatronusResetModal(self, member)
+        )
+
 
 class PatronusResetModal(discord.ui.Modal, title="A new patronus"):
     words = discord.ui.TextInput(
@@ -925,6 +954,103 @@ class PatronusResetModal(discord.ui.Modal, title="A new patronus"):
         self.cog.save()
         await self.cog._send_patronus(
             interaction, interaction.user, result, fresh=True, followup=True, reset=True
+        )
+
+
+class StaffPatronusResetModal(discord.ui.Modal, title="Staff: new patronus"):
+    words = discord.ui.TextInput(
+        label="Three words for their new patronus",
+        placeholder="Any order. Wand stays — only the patronus changes.",
+        max_length=120,
+    )
+
+    def __init__(self, cog: Patronus, member: discord.Member):
+        super().__init__()
+        self.cog = cog
+        self.member = member
+
+    async def on_submit(self, interaction: discord.Interaction):
+        store = self.cog.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message(
+                "That one's for staff.", ephemeral=True
+            )
+            return
+
+        uid = self.member.id
+        if self.cog.custom_of(uid):
+            await interaction.response.send_message(
+                f"{self.member.display_name}'s patronus is headmaster-sealed — "
+                "it can't be reset.",
+                ephemeral=True,
+            )
+            return
+        if not self.cog.patronus_of(uid):
+            await interaction.response.send_message(
+                f"{self.member.display_name} doesn't have a patronus to reset yet.",
+                ephemeral=True,
+            )
+            return
+
+        words = str(self.words.value or "").strip()
+        toks = re.findall(r"[\w']+", words)
+        if len(toks) < 3:
+            await interaction.response.send_message(
+                "I need at least three words to read a new patronus.",
+                ephemeral=True,
+            )
+            return
+
+        old = self.cog.owners.pop(str(uid), None)
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        result = await self.cog.cast(words, user_id=uid)
+        if result is None:
+            if old is not None:
+                self.cog.owners[str(uid)] = old
+                self.cog.save()
+            await interaction.followup.send(
+                f"Every other patronus form is already claimed — "
+                f"{self.member.display_name}'s stays as it was.",
+                ephemeral=True,
+            )
+            return
+
+        claimed = self.cog.claimed_animals()
+        owner = claimed.get(result["animal"])
+        if owner and owner != str(uid):
+            alt = self.cog.assign_animal(words, user_id=uid)
+            if alt is None:
+                if old is not None:
+                    self.cog.owners[str(uid)] = old
+                    self.cog.save()
+                await interaction.followup.send(
+                    f"Every other patronus form is already claimed — "
+                    f"{self.member.display_name}'s stays as it was.",
+                    ephemeral=True,
+                )
+                return
+            result = fallback_patronus(words, alt)
+
+        # Wand words stay on the Wands cog. Don't spend their one player reset.
+        self.cog.owners[str(uid)] = {
+            **result,
+            "words": words,
+            "reset": True,
+            "staff_reset": True,
+        }
+        self.cog.save()
+        await interaction.followup.send(
+            f"Reset {self.member.display_name}'s patronus (wand unchanged).",
+            ephemeral=True,
+        )
+        await self.cog._send_patronus(
+            interaction,
+            self.member,
+            result,
+            fresh=True,
+            followup=True,
+            reset=True,
         )
 
 

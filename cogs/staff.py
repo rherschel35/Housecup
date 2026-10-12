@@ -235,6 +235,20 @@ class Staff(commands.Cog):
         await cog.animagusreset(interaction, member)
 
     @identity.command(
+        name="patronusreset",
+        description="Give someone a new patronus from three words (wand stays).",
+    )
+    @app_commands.describe(member="Whose patronus to reset")
+    async def identity_patronusreset(
+        self, interaction: discord.Interaction, member: discord.Member
+    ):
+        cog = self._cog("Patronus")
+        if not cog:
+            await interaction.response.send_message("Patronus isn't loaded.", ephemeral=True)
+            return
+        await cog.staff_patronusreset(interaction, member)
+
+    @identity.command(
         name="upgradebroom",
         description="Freely raise a member's broom Speed or Altitude / control.",
     )

@@ -361,6 +361,7 @@ HELP = {
             ("staff houses unsort", "Go back to reading their roles."),
             ("staff identity wandreset", "Let a wand choose someone again (their patronus too; broom stays)."),
             ("staff identity broomreset", "Free someone's broom claim (wand and patronus stay)."),
+            ("staff identity patronusreset", "Give someone a new patronus from three words (wand stays; customs stay sealed)."),
             ("staff identity animagusreset", "Release someone's Animagus form so they can be found again."),
             ("staff identity upgradebroom", "Freely raise anyone's broom Speed or Altitude / control (pick the member)."),
             ("staff setup setannounce", "Post the standings weekly."),
