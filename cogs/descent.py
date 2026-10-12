@@ -10,6 +10,8 @@ The Descent - a 100-floor solo dungeon crawl.
     /staff descent unlock - clear the 3-loss lockout without wiping progress
     /staffgame descent backfill - add missing army + bosses from cleared depth
       (additive — never replaces an existing army)
+    /staffgame descent restore - rebuild wiped progress to a cleared floor
+      (depth, Max AP, fair stat points, optional army/boss backfill)
 
 Ten zones of ten floors each, one primary element per zone plus a second
 element mixed in (about 30% of non-boss monsters), so a floor is never a
@@ -1051,13 +1053,53 @@ class Descent(commands.Cog):
     def _load(self) -> dict:
         if STATE_PATH.exists():
             try:
-                return json.loads(STATE_PATH.read_text())
+                data = json.loads(STATE_PATH.read_text())
             except Exception:
-                log.exception("Failed to load descent state")
+                log.exception("Failed to load descent state from %s", STATE_PATH)
+                return {"players": {}}
+            if not isinstance(data, dict):
+                log.error("Descent state is not an object — starting empty.")
+                return {"players": {}}
+            players = data.get("players")
+            if not isinstance(players, dict):
+                data["players"] = {}
+                log.error("Descent state missing players map — repaired empty.")
+            elif not players:
+                log.warning(
+                    "Loaded Descent state with 0 players from %s — "
+                    "if this follows a redeploy, check STATE_DIR volume.",
+                    STATE_PATH,
+                )
+            else:
+                log.info("Loaded Descent state: %d players from %s", len(players), STATE_PATH)
+            return data
+        log.warning(
+            "No Descent state at %s — starting empty. "
+            "On Railway, STATE_DIR must be a persistent volume.",
+            STATE_PATH,
+        )
         return {"players": {}}
 
     def save(self):
-        STATE_PATH.write_text(json.dumps(self.state, indent=2))
+        """Atomic write. Never clobber a populated file with an empty ledger."""
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        incoming = self.state.get("players") if isinstance(self.state, dict) else None
+        if not incoming and STATE_PATH.exists():
+            try:
+                existing = json.loads(STATE_PATH.read_text())
+                prior = existing.get("players") if isinstance(existing, dict) else None
+                if prior:
+                    log.error(
+                        "Refusing to save empty Descent state over %d players at %s",
+                        len(prior),
+                        STATE_PATH,
+                    )
+                    return
+            except Exception:
+                log.exception("Could not verify existing Descent state before save")
+        tmp = STATE_PATH.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.state, indent=2))
+        os.replace(tmp, STATE_PATH)
 
     def record(self, user_id: int) -> dict:
         rec = self.state["players"].setdefault(str(user_id), blank_record())
@@ -2152,6 +2194,111 @@ class Descent(commands.Cog):
             "army_after": len(rec.get("army") or []),
             "bosses_after": len(rec.get("bosses_bound") or []),
         }
+
+    @staticmethod
+    def estimate_restore_points(depth: int) -> dict[str, int]:
+        """Fair stat-point credit for having cleared `depth` floors once.
+
+        Per floor cleared: +1 from monster #5, +1 from floor clear
+        (+2 more on Fury boss floors 60/70/80/90/100 where clear pays 3).
+        Split evenly across HP / Attack / Defense (remainder → HP).
+        """
+        depth = max(0, min(MAX_FLOOR, int(depth)))
+        if depth <= 0:
+            return {"hp": 0, "atk": 0, "def": 0}
+        fury = sum(1 for fl in FURY_BOSS_FLOORS if fl <= depth)
+        total = depth * 2 + fury * 2
+        base, rem = divmod(total, 3)
+        return {"hp": base + rem, "atk": base, "def": base}
+
+    def apply_progress_restore(
+        self,
+        user_id: int,
+        depth: int,
+        *,
+        backfill_army: bool = True,
+    ) -> dict:
+        """Rebuild wiped progress to a cleared depth. Replaces floor/stats/AP."""
+        depth = max(0, min(MAX_FLOOR, int(depth)))
+        old = self.fights.pop(user_id, None)
+        if old is not None:
+            old.cancel_idle()
+        self.stop_auto(user_id)
+
+        prior = self.state["players"].get(str(user_id))
+        rec = blank_record()
+        rec["highest_cleared"] = depth
+        rec["floor"] = min(MAX_FLOOR, depth + 1) if depth < MAX_FLOOR else MAX_FLOOR
+        rec["monster_index"] = 1
+        rec["losses"] = 0
+        rec["locked_until"] = 0.0
+        rec["max_ap"] = STARTING_MAX_AP + depth
+        rec["stat_points"] = self.estimate_restore_points(depth)
+        rec["pending_statup"] = 0
+        if isinstance(prior, dict) and prior.get("army"):
+            rec["army"] = list(prior["army"])
+            rec["army_seq"] = int(prior.get("army_seq") or len(rec["army"]))
+            rec["bosses_bound"] = list(prior.get("bosses_bound") or [])
+        self.state["players"][str(user_id)] = rec
+
+        backfill = {"bosses_added": 0, "units_added": 0}
+        if backfill_army and depth >= 1:
+            backfill = self.apply_progress_backfill(user_id)
+        else:
+            self.save()
+
+        p_hp, p_atk, p_def = player_stats(rec)
+        return {
+            "depth": depth,
+            "floor": rec["floor"],
+            "max_ap": rec["max_ap"],
+            "stat_points": dict(rec["stat_points"]),
+            "hp": p_hp,
+            "atk": p_atk,
+            "def": p_def,
+            "army": len(rec.get("army") or []),
+            "bosses": len(rec.get("bosses_bound") or []),
+            "backfill": backfill,
+        }
+
+    async def descentrestore(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        floor: int,
+        backfill_army: bool = True,
+    ):
+        """Staff: rebuild wiped Descent progress to a cleared floor depth."""
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        if floor < 1 or floor > MAX_FLOOR:
+            await interaction.response.send_message(
+                f"`floor` must be 1–{MAX_FLOOR} (deepest floor they had cleared).",
+                ephemeral=True,
+            )
+            return
+        result = self.apply_progress_restore(
+            member.id, floor, backfill_army=backfill_army
+        )
+        pts = result["stat_points"]
+        extra = ""
+        if backfill_army:
+            extra = (
+                f" Backfill +{result['backfill'].get('units_added', 0)} units, "
+                f"+{result['backfill'].get('bosses_added', 0)} bosses."
+            )
+        await interaction.response.send_message(
+            f"Restored **{member.display_name}** to cleared floor **{result['depth']}** "
+            f"(now on floor **{result['floor']}**).\n"
+            f"⚡ Max AP **{result['max_ap']}** · "
+            f"❤️ **{result['hp']}** · ⚔️ **{result['atk']}** · 🛡️ **{result['def']}** "
+            f"(points hp={pts['hp']}, atk={pts['atk']}, def={pts['def']}).\n"
+            f"Army **{result['army']}** · bosses bound **{result['bosses']}**."
+            f"{extra}",
+            ephemeral=True,
+        )
 
     async def descentbackfill(self, interaction: discord.Interaction, member: discord.Member):
         """Staff: add pre-tracking army/boss credit from cleared depth (additive)."""

@@ -330,6 +330,28 @@ class Staff(commands.Cog):
             return
         await cog.descentbackfill(interaction, member)
 
+    @descent.command(
+        name="restore",
+        description="Rebuild wiped Descent progress to a cleared floor (stats + AP + army).",
+    )
+    @app_commands.describe(
+        member="Whose progress to restore",
+        floor="Deepest floor they had cleared (1–100)",
+        backfill_army="Fill army + boss trophies for that depth (default: True)",
+    )
+    async def descent_restore(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        floor: app_commands.Range[int, 1, 100],
+        backfill_army: bool = True,
+    ):
+        cog = self._cog("Descent")
+        if not cog:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+        await cog.descentrestore(interaction, member, floor, backfill_army)
+
     # -------------------------------------------------------------- castles
 
     @castles.command(
