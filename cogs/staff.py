@@ -317,6 +317,30 @@ class Staff(commands.Cog):
         await cog.descentboost(interaction, member, hp, attack, defense)
 
     @descent.command(
+        name="set",
+        description="Set a player's Descent HP / Attack / Defense to exact combat totals.",
+    )
+    @app_commands.describe(
+        member="Whose stats to set",
+        hp="Combat Max HP to set (same number as on /descentstatus or a broke report)",
+        attack="Combat Attack to set",
+        defense="Combat Defense to set",
+    )
+    async def descent_set(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        hp: app_commands.Range[int, 55, 100000],
+        attack: app_commands.Range[int, 8, 100000],
+        defense: app_commands.Range[int, 3, 100000],
+    ):
+        cog = self._cog("Descent")
+        if not cog:
+            await interaction.response.send_message("Descent isn't loaded.", ephemeral=True)
+            return
+        await cog.descentset(interaction, member, hp, attack, defense)
+
+    @descent.command(
         name="backfill",
         description="Add missing army + boss trophies from cleared depth (never replaces army).",
     )
