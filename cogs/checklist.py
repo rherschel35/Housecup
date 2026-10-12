@@ -405,8 +405,8 @@ class Checklist(commands.Cog):
                 solo_detail, utc_reset, "day resets"))
             items.append(CheckItem(
                 "Broom race (challenge wins)", chall_left == 0,
-                f"**{chall_left}/{CHALLENGE_POINT_CAP}** point wins left "
-                f"({CHALLENGE_POINTS} pts each · challenges always open)",
+                f"**{chall_left}/{CHALLENGE_POINT_CAP}** point awards left "
+                f"({CHALLENGE_POINTS} pts each · win or +0s tie · always open)",
                 utc_reset, "day resets"))
 
         # ---- Beasts (UTC day befriend set + study) ----

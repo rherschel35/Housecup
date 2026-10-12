@@ -16,7 +16,8 @@ course; lower time-lost wins.
 Daily caps (UTC):
     - Solo: 5 learning races/day (hard stop — those unlock study notes);
       finishing all 5 pays +3 house points once
-    - Challenge: always allowed; first 3 wins pay 3 house points each
+    - Challenge: always allowed; first 3 point awards pay 3 house points each
+      (wins, or a perfect +0s finish even on a tie)
 """
 
 from __future__ import annotations
@@ -403,8 +404,10 @@ class BroomRace(commands.Cog):
         self.save()
         return True
 
-    def try_award_challenge_points(self, member: discord.Member) -> str:
-        """Award CHALLENGE_POINTS for a challenge win if under daily cap.
+    def try_award_challenge_points(
+        self, member: discord.Member, *, reason: str = "Broom race challenge win"
+    ) -> str:
+        """Award CHALLENGE_POINTS for a challenge result if under daily cap.
 
         Returns: "awarded" | "capped" | "no_house" | "no_store"
         """
@@ -422,7 +425,7 @@ class BroomRace(commands.Cog):
             delta=CHALLENGE_POINTS,
             actor_id=self.bot.user.id if self.bot.user else 0,
             target_id=member.id,
-            reason="Broom race challenge win",
+            reason=reason,
         )
         rec["challenge_pts"] = int(rec["challenge_pts"]) + 1
         self.save()
@@ -674,7 +677,7 @@ class BroomRace(commands.Cog):
         description="Solo (5 learning races/day) or challenge someone on the same track (Quidditch channel).",
     )
     @app_commands.describe(
-        opponent="Challenge this member to the same course (always allowed; wins pay pts up to 3/day)",
+        opponent="Challenge this member (wins or +0s ties pay pts up to 3/day)",
     )
     async def broomrace(
         self,
@@ -860,9 +863,10 @@ class BroomRace(commands.Cog):
                     f"**Course · {course['name']}**\n*{course['blurb']}*\n\n"
                     "Accept to race head-to-head — private stages, shared course, "
                     f"lowest time lost wins. Winner earns **{CHALLENGE_POINTS}** "
-                    f"house points (up to **{CHALLENGE_POINT_CAP}**/day; challenges "
-                    "always allowed past that).\n\n"
-                    f"Point wins left today · "
+                    f"house points; a perfect **+0s** finish pays even on a tie "
+                    f"(up to **{CHALLENGE_POINT_CAP}**/day; challenges always "
+                    "allowed past that).\n\n"
+                    f"Point awards left today · "
                     f"**{me.display_name}** {my_pts_left}/{CHALLENGE_POINT_CAP} · "
                     f"**{opponent.display_name}** {their_pts_left}/{CHALLENGE_POINT_CAP}"
                 ),
@@ -1159,28 +1163,45 @@ class BroomRace(commands.Cog):
 
         self._versus_bump(winner_id, a.id, b.id)
 
-        pts_line = ""
+        # Wins pay as usual; a perfect +0s finish also pays on a tie (both can).
+        payees: list[tuple[discord.Member, str]] = []
         if winner_id is not None:
             winner = a if winner_id == a.id else b
-            outcome = self.try_award_challenge_points(winner)
+            reason = (
+                "Broom race challenge perfect (+0s)"
+                if match.results[winner.id] == 0
+                else "Broom race challenge win"
+            )
+            payees.append((winner, reason))
+        else:
+            if pa == 0:
+                payees.append((a, "Broom race challenge perfect (+0s)"))
+            if pb == 0:
+                payees.append((b, "Broom race challenge perfect (+0s)"))
+
+        pts_bits: list[str] = []
+        for member, reason in payees:
+            outcome = self.try_award_challenge_points(member, reason=reason)
             if outcome == "awarded":
-                left = self.challenge_pts_left(winner.id)
-                pts_line = (
-                    f"\n\n+**{CHALLENGE_POINTS}** house points to "
-                    f"**{winner.display_name}** "
-                    f"(point wins left today · **{left}/{CHALLENGE_POINT_CAP}**)."
+                left = self.challenge_pts_left(member.id)
+                pts_bits.append(
+                    f"+**{CHALLENGE_POINTS}** house points to "
+                    f"**{member.display_name}**"
+                    + (" · perfect **+0s**" if match.results[member.id] == 0 else "")
+                    + f" (point awards left today · **{left}/{CHALLENGE_POINT_CAP}**)"
                 )
             elif outcome == "capped":
-                pts_line = (
-                    f"\n\n**{winner.display_name}** is at today's challenge "
-                    f"point cap (**{CHALLENGE_POINT_CAP}** wins) — race counted, "
-                    "no points."
+                pts_bits.append(
+                    f"**{member.display_name}** is at today's challenge "
+                    f"point cap (**{CHALLENGE_POINT_CAP}**) — race counted, "
+                    "no points"
                 )
             elif outcome == "no_house":
-                pts_line = (
-                    f"\n\n**{winner.display_name}** needs a house before "
-                    "challenge wins can pay points."
+                pts_bits.append(
+                    f"**{member.display_name}** needs a house before "
+                    "challenge races can pay points"
                 )
+        pts_line = ("\n\n" + "\n".join(pts_bits) + ".") if pts_bits else ""
 
         embed = discord.Embed(
             title="🏁 Head-to-head result",
