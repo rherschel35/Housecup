@@ -167,7 +167,9 @@ HELP = {
             ("broomrace", "Solo 6-stage race (Quidditch channel), or pass opponent: to challenge on the same track."),
             ("broomraceend", "Clear a stuck broom race — yours or anyone else's."),
             ("broomnotes", "Permanent study notes from courses you've finished (⚠ marks known traps when studied)."),
-            ("checklist", "Daily points board — broom races, potions, and the rest of today's caps."),
+            ("checklist", "Daily points board — broom races, potions, and the rest of today's caps. Full clears → +5 every 10."),
+            ("reportcard", "Big letter grade from your average checklist completion."),
+            ("gpa", "GPA ranking for the whole school."),
         ],
     },
     "explore": {
@@ -233,7 +235,9 @@ HELP = {
         "staff": False,
         "entries": [
             ("profile", "Your Mirror, wand, patronus, Animagus, broom, points, duel rank, beasts and honours - or anyone's."),
-            ("checklist", "Your daily points board (public) — duels, Quidditch, broom, beasts, potions, market, and more."),
+            ("checklist", "Your daily points board (public) — duels, Quidditch, broom, beasts, potions, market, and more. Full clears every 10 days pay +5."),
+            ("reportcard", "Public report card — big letter grade from your average checklist % complete."),
+            ("gpa", "School-wide GPA ranking from average checklist completion."),
             ("points", "Your points (or anyone's), this season and all time."),
             ("standings", "The House Cup table."),
             ("leaderboard", "The top earners."),

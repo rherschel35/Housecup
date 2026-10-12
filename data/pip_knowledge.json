@@ -114,7 +114,23 @@
         "what can I still do",
         "what can i still do"
       ],
-      "answer": "`/checklist` is yer daily points board \u2014 what's left for house points an' habits, with reset timers. Includes duels, Quidditch house-match wins, broom solo learning races (5/day), broom challenge point-wins (5/day at 3 pts), beasts, potions (brewable / ready to drink), market sells, an' more.",
+      "answer": "`/checklist` is yer daily points board — what's left for house points an' habits, with reset timers. Finish every scored box for a full clear; every 10 full clears pays +5 house points. `/reportcard` shows a big letter grade from yer average % complete (GPA = that % × 4.0). `/gpa` ranks the school. Includes duels, Quidditch house-match wins, broom races, beasts, potions, market sells, an' more.",
+      "link": "https://everything-velmora.netlify.app/commands"
+    },
+    {
+      "id": "reportcard",
+      "keywords": [
+        "report card",
+        "reportcard",
+        "letter grade",
+        "checklist grade",
+        "checklist gpa",
+        "gpa",
+        "gpa ranking",
+        "grade point",
+        "school ranking checklist"
+      ],
+      "answer": "`/reportcard` posts yer public report card — big letter grade from the average percent of `/checklist` boxes ye finish (A≥90, B≥80, C≥70, D≥60, else F). GPA is that average on a 4.0 scale. `/gpa` shows everyone ranked. Every 10 fully cleared checklist days pays +5 house points.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {
