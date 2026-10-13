@@ -29,6 +29,14 @@ When /explore or /forage in a dangerous place stirs one up, that student
 gets 25 seconds alone to /cast at it. After that window, anyone can try.
 Scheduled sightings and staff summons stay open to everyone from the start.
 
+A monster stirred by /explore still pays its usual house points in full,
+every time — the daily explore cap does not reduce that payout. Those
+same points also count toward the checklist line "Explore points" (3,
+resets midnight America/Chicago). Progress on that line stops at 3, so
+once it shows complete it stays complete while later kills keep paying
+in full. The checklist credit is not a second payout. Forage, scheduled
+sightings, staff summons, and Attack swarms do not touch that line.
+
     /staff dementor eventstart [minutes] [name]  - start "Attack on Velmora"
     /staff dementor practice [channel] [minutes] - house practice swarm
         (one channel — house rooms, study hall, or swarm practice room;
@@ -229,6 +237,26 @@ def kill_share_awards(
             out[int(r["uid"])] = pts
     return out
 
+
+def format_kill_footer(
+    results: list[tuple[int, str | None]],
+    *,
+    points_word: bool = False,
+) -> str:
+    """Defeat footer from (awarded, house_key) rows.
+
+    ``points_word`` keeps the Dementor line ("+3 points for House …").
+    Other creatures stay "+3 for House …".
+    """
+    from cogs.store import HOUSES
+    label = "points for House" if points_word else "for House"
+    parts: list[str] = []
+    for awarded, house in results:
+        if awarded and house in HOUSES:
+            parts.append(f"+{awarded} {label} {HOUSES[house]['name']}")
+    return " • ".join(parts)
+
+
 ATTACK_INTRO = [
     "Something has broken through the wards. Fight back - every monster you put down counts "
     "toward the tally. Nobody's told which spell beats which. Work it out, or find someone who knows.",
@@ -266,6 +294,8 @@ BANISHED = [
 #   (not split - a pack of 2 means two people each get the full amount).
 #   During an event, this same number is what's earned as personal rep
 #   instead, and only gets converted to house points at the very end.
+#   When the creature was stirred by /explore, this same full amount also
+#   counts toward the Explore points checklist, clamped at 3 for that line.
 # "wander": if true, an uncaught one relocates to another configured
 #   channel after WANDER_MINUTES instead of waiting to be found. (Outside
 #   an event only - during an event, waves already replace it every 15s.)
@@ -683,13 +713,17 @@ class Dementors(commands.Cog):
                 f"<t:{int(until)}:R> to cast at it. After that, anyone can try.")
 
     async def spawn(self, channel_id: int = None, creature_id: str = None,
-                    finder_id: int | None = None) -> discord.TextChannel | None:
+                    finder_id: int | None = None, *,
+                    pay_explore_points: bool = False) -> discord.TextChannel | None:
         """Make a creature appear. Picks a random configured channel if none
         is given, and a random creature (weighted) if none is given - except
         a manual, unspecified /staff dementor summon still defaults to a Dementor,
         same as it always has. When finder_id is set (explore/forage stir),
-        that student gets FINDER_EXCLUSIVE_SECONDS alone to /cast. Returns
-        the channel it landed in, or None."""
+        that student gets FINDER_EXCLUSIVE_SECONDS alone to /cast.
+        pay_explore_points is only for a threat stirred by /explore: the
+        defeat still pays full house points, and those points also count
+        on the Explore points checklist. Returns the channel it landed in,
+        or None."""
         pool = self._configured_channel_ids()
         if channel_id is None:
             if not pool:
@@ -717,6 +751,10 @@ class Dementors(commands.Cog):
         if finder_id:
             active["finder_id"] = finder_id
             active["exclusive_until"] = exclusive_until
+        if pay_explore_points:
+            # Stays set if the creature wanders, so the checklist credit
+            # still applies after a Storm Sprite bolts.
+            active["pay_explore_points"] = True
         self.state["active"] = active
         self.state["spawns_today"] = self.state.get("spawns_today", 0) + 1
         self.save()
@@ -724,13 +762,17 @@ class Dementors(commands.Cog):
         return channel
 
     async def try_ambient_spawn(self, channel_id: int, creature_id: str = None,
-                                finder_id: int | None = None) -> bool:
+                                finder_id: int | None = None, *,
+                                pay_explore_points: bool = False) -> bool:
         """Let another cog (right now: searching the Dungeons or the
         Forbidden Woods) try to drop a Wild Threat into a specific channel
         on the spot. Refuses quietly - no error, just nothing happens - if
         something's already loose or an event is running, so it never
         steals the encounter out from under another channel. finder_id is
-        the explorer who stirred it — they get a short exclusive cast window."""
+        the explorer who stirred it — they get a short exclusive cast window.
+        pay_explore_points counts the eventual kill on the Explore points
+        checklist. /explore sets it; /forage does not. The house-point
+        payout is the full creature amount either way."""
         async with self.lock:
             if self.state.get("active") or self.state.get("event"):
                 return False
@@ -738,7 +780,8 @@ class Dementors(commands.Cog):
             # should draw from the whole weighted roster, not default to a
             # plain Dementor.
             landed = await self.spawn(channel_id, creature_id or self._roll_creature(),
-                                      finder_id=finder_id)
+                                      finder_id=finder_id,
+                                      pay_explore_points=pay_explore_points)
         return bool(landed)
 
     def _roll_creature(self) -> str:
@@ -775,6 +818,7 @@ class Dementors(commands.Cog):
         active["spawned_at"] = time.time()
         active["hits"] = []
         # New channel, open season — the explorer's exclusive window doesn't travel.
+        # pay_explore_points stays with the creature so the checklist still counts it.
         active.pop("finder_id", None)
         active.pop("exclusive_until", None)
         self.save()
@@ -886,9 +930,48 @@ class Dementors(commands.Cog):
             ephemeral=True,
         )
 
+    async def _award_kill_points(
+        self, member, amount: int, reason: str, *, explore: bool,
+    ) -> tuple[int, str | None]:
+        """Pay a wild-threat kill its full house points. Returns (awarded, house).
+
+        A creature stirred by /explore also adds those points to the Explore
+        points checklist, clamped at the daily 3. That credit is not a second
+        house-point payout, and a finished checklist does not reduce the kill.
+        """
+        amount = int(amount)
+        if member is None or amount <= 0:
+            return 0, None
+        store = self.bot.get_cog("Store")
+        house = store.member_house(member) if store else None
+        if not (store and house):
+            return 0, None
+        store.record(
+            house=house,
+            delta=amount,
+            actor_id=self.bot.user.id if self.bot.user else 0,
+            target_id=member.id,
+            reason=reason,
+        )
+        if explore:
+            await self._count_explore_kill(member, amount)
+        return amount, house
+
+    async def _count_explore_kill(self, member, amount: int) -> None:
+        """Add an explore-stirred kill to the checklist counter. No payout."""
+        world_cog = self.bot.get_cog("World")
+        if world_cog is None:
+            log.warning("Explore kill checklist not updated; World cog is not loaded")
+            return
+        async with world_cog.lock:
+            student = world_cog.student(member)
+            world_cog.world.note_explore_kill(student, amount)
+            world_cog.save()
+
     async def resolve_cast(self, interaction: discord.Interaction, spell: SpellPick):
         """Resolve a cast once the spell is known (auto-pick or button)."""
         event_reply = None
+        explore_pay = False
         async with self.lock:
             channel_id = interaction.channel_id
             event = self.state.get("event")
@@ -938,6 +1021,7 @@ class Dementors(commands.Cog):
                     return
 
                 # Defeated - award every contributor and clear the encounter.
+                explore_pay = bool(active.get("pay_explore_points"))
                 self.state["active"] = None
                 self.save()
 
@@ -946,20 +1030,13 @@ class Dementors(commands.Cog):
             return
 
         contributors = active["hits"]
-        store = self.bot.get_cog("Store")
         credited = []
         for uid in contributors:
             member = interaction.guild.get_member(uid) if interaction.guild else None
-            house = store.member_house(member) if (store and member) else None
-            if store and house:
-                store.record(
-                    house=house,
-                    delta=creature["points"],
-                    actor_id=self.bot.user.id if self.bot.user else 0,
-                    target_id=uid,
-                    reason=f"Defeated a {creature['name']}",
-                )
-            credited.append((uid, house))
+            awarded, house = await self._award_kill_points(
+                member, creature["points"], f"Defeated a {creature['name']}", explore=explore_pay,
+            )
+            credited.append((awarded, house))
 
         if creature["pack"] > 1:
             others = ", ".join(f"<@{uid}>" for uid in contributors[:-1]) or "someone else"
@@ -968,12 +1045,9 @@ class Dementors(commands.Cog):
             line = self.rng.choice(creature["victory"]).format(member=interaction.user.mention)
 
         embed = discord.Embed(title=f"✨ The {creature['name']} is defeated", description=line, color=creature["color"])
-        from cogs.store import HOUSES
-        footer_parts = [
-            f"+{creature['points']} for House {HOUSES[house]['name']}" for uid, house in credited if house
-        ]
-        if footer_parts:
-            embed.set_footer(text=" • ".join(footer_parts))
+        footer = format_kill_footer(credited)
+        if footer:
+            embed.set_footer(text=footer)
         file = self._attach_art(embed, creature_id, field="defeat_image")
         if file:
             await interaction.response.send_message(embed=embed, file=file)
@@ -981,8 +1055,9 @@ class Dementors(commands.Cog):
             await interaction.response.send_message(embed=embed)
 
     async def _cast_dementor(self, interaction, spell, active):
-        """The original Dementor flow, unchanged: needs an already-cast
-        patronus, resolves in a single hit, uses its own flavour text."""
+        """Dementor flow: needs an already-cast patronus, resolves in a single
+        hit, uses its own flavour text. An explore-stirred one also counts
+        toward the Explore points checklist."""
         if spell.value != "patronus":
             await interaction.response.send_message("Nothing happens.", ephemeral=True)
             return
@@ -996,22 +1071,14 @@ class Dementors(commands.Cog):
             )
             return
 
+        explore_pay = bool(active.get("pay_explore_points"))
         self.state["active"] = None
         self.save()
 
-        store = self.bot.get_cog("Store")
-        house = store.member_house(interaction.user) if store else None
-        awarded = 0
         points = CREATURES["dementor"]["points"]
-        if store and house:
-            store.record(
-                house=house,
-                delta=points,
-                actor_id=self.bot.user.id if self.bot.user else 0,
-                target_id=interaction.user.id,
-                reason="Banished a Dementor",
-            )
-            awarded = points
+        awarded, house = await self._award_kill_points(
+            interaction.user, points, "Banished a Dementor", explore=explore_pay,
+        )
 
         animal = mine["animal"].lower()
         line = self.rng.choice(BANISHED).format(
@@ -1020,9 +1087,9 @@ class Dementors(commands.Cog):
             member=interaction.user.mention,
         )
         embed = discord.Embed(title="✨ The Dementor is banished", description=line, color=0xC4CCD6)
-        if awarded:
-            from cogs.store import HOUSES
-            embed.set_footer(text=f"+{awarded} points for House {HOUSES[house]['name']}")
+        footer = format_kill_footer([(awarded, house)], points_word=True)
+        if footer:
+            embed.set_footer(text=footer)
         file = self._dementor_defeat_art(embed, interaction.user.id)
         if file:
             await interaction.response.send_message(embed=embed, file=file)

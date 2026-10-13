@@ -251,6 +251,8 @@ class Checklist(commands.Cog):
             from cogs.world_engine import POINTS_PER_DAY
             student = world_cog.student(member)
             day = world_cog.world.day(student, now)
+            # Finds, secrets, item uses, and /explore kills. Kills fill this
+            # line up to 3 and do not reduce their own house-point payout.
             pts_used = int(day.get("points", 0))
             pts_left = max(0, POINTS_PER_DAY - pts_used)
             explore_cap = DEFAULT_LIMITS.get("explore", 10)

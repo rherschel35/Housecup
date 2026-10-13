@@ -407,6 +407,25 @@ class World:
         d["points"] = d.get("points", 0) + delta
         return delta
 
+    def note_explore_kill(self, student, amount, now=None) -> int:
+        """Count a /explore monster kill on the Explore points checklist.
+
+        House points for the kill are paid separately and are not reduced
+        here. Progress stops at POINTS_PER_DAY, so a finished line stays
+        finished. Returns how much checklist progress was added.
+        """
+        amount = int(amount)
+        if amount <= 0:
+            return 0
+        d = self.day(student, now)
+        used = int(d.get("points") or 0)
+        if used < 0:
+            used = 0
+        added = min(amount, max(0, POINTS_PER_DAY - used))
+        if added:
+            d["points"] = used + added
+        return added
+
     def refund_points(self, student, delta):
         if delta > 0:
             student["day"]["points"] = max(0, student["day"].get("points", 0) - delta)
