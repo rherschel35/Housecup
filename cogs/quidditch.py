@@ -18,8 +18,9 @@ Rewards:
       house points, no loot - mixed-house teams have no single house to
       credit.
     - House match win: updates your personal record. House points are
-      house-level only: 5 house-match wins in a UTC day for that house
-      pay +5 house points once (who played doesn't matter). Personal
+      house-level only: 5 house-match wins in a Central day (midnight
+      America/Chicago) for that house pay +5 house points once (who played
+      doesn't matter). Personal
       win record and titles still climb past that.
     - Titles (shown via /quidditch stats): a ladder based on total house
       match wins - 5 -> Rising Chaser, 15 -> Storm Breaker, 30 -> Pitch
@@ -29,7 +30,6 @@ Rewards:
 from __future__ import annotations
 
 import asyncio
-import datetime
 import json
 import logging
 import os
@@ -99,15 +99,11 @@ TITLE_THRESHOLDS = [
 ]
 
 
-def today_str() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
-
-
 def blank_player() -> dict:
     return {
         "scramble_w": 0, "scramble_l": 0,
         "house_w": 0, "house_l": 0,
-        "daily": {"date": today_str(), "count": 0},
+        "daily": {"date": "", "count": 0},
     }
 
 
@@ -268,21 +264,56 @@ class Quidditch(commands.Cog):
     def save(self):
         STATE_PATH.write_text(json.dumps(self.state, indent=2))
 
+    def _ledger_entries(self):
+        store = self.bot.get_cog("Store")
+        if store is None:
+            return None
+        return store.state.get("ledger") or []
+
     def record(self, user_id: int) -> dict:
+        from cogs.world_engine import carry_dated_record
+
         rec = self.state["players"].setdefault(str(user_id), blank_player())
-        if rec["daily"]["date"] != today_str():
-            rec["daily"] = {"date": today_str(), "count": 0}
+        if not isinstance(rec.get("daily"), dict):
+            rec["daily"] = {"date": "", "count": 0}
+        daily, needs = carry_dated_record(rec.get("daily"), None, {"count": 0})
+        if needs:
+            # Personal daily count is not a house-point bonus.
+            daily.pop("legacy_utc_rekey", None)
+        daily.setdefault("count", 0)
+        rec["daily"] = daily
         return rec
 
     def house_day_rec(self, house: str) -> dict:
+        from cogs.world_engine import (
+            carry_dated_record, central_day_start, claim_bonus_from_ledger,
+        )
+
         bag = self.state.setdefault("house_day", {})
-        day = today_str()
-        rec = bag.get(house) or {}
-        if rec.get("date") != day:
-            rec = {"date": day, "wins": 0, "bonus": False}
-            bag[house] = rec
+        rec, needs = carry_dated_record(
+            bag.get(house), None, {"wins": 0, "bonus": False},
+        )
+        if needs:
+            entries = self._ledger_entries()
+            if entries is not None:
+                reasons = (
+                    f"House Quidditch set complete ({HOUSE_WIN_GOAL} wins)",
+                    f"Staff grant: house Quidditch set complete ({HOUSE_WIN_GOAL} wins)",
+                )
+                if rec.get("bonus"):
+                    if int(rec.get("wins") or 0) < HOUSE_WIN_GOAL:
+                        rec["wins"] = HOUSE_WIN_GOAL
+                else:
+                    claim_bonus_from_ledger(
+                        rec, entries, central_day_start(),
+                        bonus_key="bonus", reasons=reasons,
+                        count_key="wins", count_floor=HOUSE_WIN_GOAL,
+                        house=house,
+                    )
+                rec.pop("legacy_utc_rekey", None)
         rec.setdefault("wins", 0)
         rec.setdefault("bonus", False)
+        bag[house] = rec
         return rec
 
     def house_wins_today(self, house: str) -> int:
@@ -294,7 +325,7 @@ class Quidditch(commands.Cog):
     def grant_all_houses_set_today(self, actor_id: int) -> list[dict]:
         """Mark every house's Quidditch set complete for today; award +5 if unpaid.
 
-        UTC midnight naturally starts a fresh day (wins/bonus reset on date mismatch).
+        Central midnight starts a fresh day (wins/bonus reset on date mismatch).
         """
         store = self.bot.get_cog("Store")
         results: list[dict] = []

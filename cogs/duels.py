@@ -25,7 +25,8 @@ there is no safe pick - only reading your opponent. Both duelists open a
 private cast board (spell buttons under the board, like broom races), then
 both spells are revealed at once.
 
-The winner's house earns 1 point, up to 3 duel points per person per day.
+The winner's house earns 1 point, up to 3 duel points per person per
+Central day (midnight America/Chicago).
 Duels past that still count toward the win/loss record. Duels between two
 members of the SAME house never award points - otherwise two housemates
 could simply trade wins and mint points for their house. Same-house wins
@@ -93,7 +94,6 @@ ROUND_TIMEOUT = 60
 GRAND_LOCK_TIMEOUT = ACCEPT_TIMEOUT  # 2 min to lock both sequences, same as accept
 REWARD_POINTS = 1
 REWARDED_PER_DAY = 3
-WINDOW = 24 * 3600
 
 # Optional: a single Discord user ID who quietly wins duel exchanges more
 # often than the spells alone would give them. Applies to 1v1 rounds, trio
@@ -757,20 +757,42 @@ class Duels(commands.Cog):
         """Legacy individual counter (unused for payouts)."""
         return self._rewarded_count("trio_rewarded", user_id, now)
 
-    @staticmethod
-    def _utc_day(now: float | None = None) -> str:
-        ts = now if now is not None else time.time()
-        return dt.datetime.fromtimestamp(ts, dt.timezone.utc).strftime("%Y-%m-%d")
+    def _ledger_entries(self):
+        store = self.bot.get_cog("Store")
+        if store is None:
+            return None
+        return store.state.get("ledger") or []
 
     def trio_house_day_rec(self, house: str, now: float | None = None) -> dict:
+        from cogs.world_engine import (
+            carry_dated_record, central_day_start, claim_bonus_from_ledger,
+        )
+
         bag = self.state.setdefault("trio_house_day", {})
-        day = self._utc_day(now)
-        rec = bag.get(house) or {}
-        if rec.get("date") != day:
-            rec = {"date": day, "wins": 0, "bonus": False}
-            bag[house] = rec
+        rec, needs = carry_dated_record(
+            bag.get(house), now, {"wins": 0, "bonus": False},
+        )
+        if needs:
+            entries = self._ledger_entries()
+            if entries is not None:
+                reasons = (
+                    f"House trio set complete ({TRIO_HOUSE_WIN_GOAL} wins)",
+                    f"Staff grant: house trio set complete ({TRIO_HOUSE_WIN_GOAL} wins)",
+                )
+                if rec.get("bonus"):
+                    if int(rec.get("wins") or 0) < TRIO_HOUSE_WIN_GOAL:
+                        rec["wins"] = TRIO_HOUSE_WIN_GOAL
+                else:
+                    claim_bonus_from_ledger(
+                        rec, entries, central_day_start(now),
+                        bonus_key="bonus", reasons=reasons,
+                        count_key="wins", count_floor=TRIO_HOUSE_WIN_GOAL,
+                        house=house,
+                    )
+                rec.pop("legacy_utc_rekey", None)
         rec.setdefault("wins", 0)
         rec.setdefault("bonus", False)
+        bag[house] = rec
         return rec
 
     def trio_house_wins_today(self, house: str, now: float | None = None) -> int:
@@ -782,7 +804,7 @@ class Duels(commands.Cog):
     def grant_all_houses_trio_set_today(self, actor_id: int) -> list[dict]:
         """Mark every house's trio set complete for today; award +5 if unpaid.
 
-        UTC midnight naturally starts a fresh day (wins/bonus reset on date mismatch).
+        Central midnight starts a fresh day (wins/bonus reset on date mismatch).
         """
         from cogs.store import HOUSE_KEYS, HOUSES
 
@@ -818,8 +840,20 @@ class Duels(commands.Cog):
         return self._rewarded_count("grand_rewarded", user_id, now)
 
     def _rewarded_count(self, bucket: str, user_id: int, now: float = None) -> int:
+        """Paid wins whose timestamp falls on today's America/Chicago day.
+
+        The saved lists used to be a rolling 24h window. Stamps from earlier
+        today still fill the cap; stamps from a previous Central day drop off
+        even if they are less than 24h old. Nothing is paid again for a stamp
+        that is still here.
+        """
+        from cogs.world_engine import on_central_day
+
         now = now if now is not None else time.time()
-        stamps = [t for t in self.state[bucket].get(str(user_id), []) if now - t < WINDOW]
+        stamps = [
+            t for t in self.state[bucket].get(str(user_id), [])
+            if on_central_day(t, now)
+        ]
         self.state[bucket][str(user_id)] = stamps
         return len(stamps)
 

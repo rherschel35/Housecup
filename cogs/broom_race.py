@@ -13,7 +13,7 @@ double time lost. Finish a course to unlock its study note forever;
 notes warn you off traps on that course again. Challenges share one
 course; lower time-lost wins.
 
-Daily caps (UTC):
+Daily caps (midnight America/Chicago):
     - Solo: 5 finished learning races/day (hard stop — those unlock study notes);
       finishing all 5 pays +3 house points once (abandons don't count)
     - Challenge: always allowed; first 3 point awards pay 3 house points each
@@ -22,7 +22,6 @@ Daily caps (UTC):
 
 from __future__ import annotations
 
-import datetime
 import json
 import logging
 import os
@@ -57,9 +56,6 @@ SOLO_COMPLETION_POINTS = 3  # once for finishing all 5 solo races in a day
 CHALLENGE_POINT_CAP = 3
 CHALLENGE_POINTS = 3
 
-
-def today_str() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
 
 # kind -> base time penalty (seconds of "race time")
 # Trap is "double time" vs a normal wrong pick (bold).
@@ -366,21 +362,52 @@ class BroomRace(commands.Cog):
         except OSError:
             log.exception("Could not save broom race state")
 
+    def _ledger_entries(self):
+        store = self.bot.get_cog("Store")
+        if store is None:
+            return None
+        return store.state.get("ledger") or []
+
     def daily_rec(self, user_id: int) -> dict:
+        from cogs.world_engine import (
+            carry_dated_record, central_day_start,
+            claim_bonus_from_ledger, raise_tally_from_ledger,
+        )
+
         key = str(user_id)
         bag = self.state.setdefault("daily", {})
-        rec = bag.get(key) or {}
-        if rec.get("date") != today_str():
-            rec = {
-                "date": today_str(),
-                "solo": 0,
-                "challenge_pts": 0,
-                "solo_bonus": False,
-            }
-            bag[key] = rec
+        rec, needs = carry_dated_record(
+            bag.get(key),
+            None,
+            {"solo": 0, "challenge_pts": 0, "solo_bonus": False},
+        )
+        if needs:
+            entries = self._ledger_entries()
+            if entries is not None:
+                since = central_day_start()
+                if rec.get("solo_bonus"):
+                    if int(rec.get("solo") or 0) < SOLO_DAILY_CAP:
+                        rec["solo"] = SOLO_DAILY_CAP
+                else:
+                    claim_bonus_from_ledger(
+                        rec, entries, since,
+                        bonus_key="solo_bonus",
+                        reasons=("Finished all solo broom races today",),
+                        count_key="solo", count_floor=SOLO_DAILY_CAP,
+                        target_id=user_id,
+                    )
+                raise_tally_from_ledger(
+                    rec, entries, since,
+                    field="challenge_pts", cap=CHALLENGE_POINT_CAP,
+                    target_id=user_id,
+                    prefixes=("Broom race challenge",),
+                    mode="count",
+                )
+                rec.pop("legacy_utc_rekey", None)
         rec.setdefault("solo", 0)
         rec.setdefault("challenge_pts", 0)
         rec.setdefault("solo_bonus", False)
+        bag[key] = rec
         return rec
 
     def solo_used(self, user_id: int) -> int:

@@ -20,12 +20,12 @@ window anyone can try. Items are used up on a successful befriend. It
 slips away after 10 minutes if nobody does.
 
 Rarer beasts turn up less often, and a few only appear after dark
-(8 PM - 6 AM, Velmora time). Completing **5 befriends in a UTC day**
-pays **+3 house points** once (repeats count). /summon is purely for
-fun: no points, no advantage.
+(8 PM - 6 AM, Velmora time). Completing **3 befriends in a Central day**
+(midnight America/Chicago) pays **+3 house points** once (repeats count).
+/summon is purely for fun: no points, no advantage.
 
 /study fills a personal Beast Journal: three pages per beast (field notes,
-habits, bond). One study per student per day. Finishing all three pages
+habits, bond). One study per student per Central day. Finishing all three pages
 pays 5 house points once per beast. /journal reads what you've written.
 
 Collector ranks rise with how many different beasts you've befriended, and
@@ -34,7 +34,6 @@ five legendaries. Both show on /bestiary and /profile.
 """
 
 import asyncio
-import datetime
 import json
 import logging
 import os
@@ -70,15 +69,20 @@ RARITY_POINTS = {"common": 1, "uncommon": 2, "rare": 3, "legendary": 5}  # legac
 RARITY_COLORS = {"common": 0x7FA66A, "uncommon": 0x4F8FC0, "rare": 0x9B59B6, "legendary": 0xE0A526}
 SIGHTING_COLOR = 0x2E8B44  # every "X appears!" alert, regardless of rarity, so it never blends in
 RARITY_LABEL = {"common": "Common", "uncommon": "Uncommon", "rare": "Rare", "legendary": "Legendary"}
-BEFRIEND_GOAL = 5
+BEFRIEND_GOAL = 3
 BEFRIEND_COMPLETION_POINTS = 3
 DAILY_POINT_CAP = BEFRIEND_GOAL  # checklist / back-compat alias
 WINDOW = 24 * 3600  # legacy rolling window (journal / old paid rows)
 SUMMON_COOLDOWN = 60
 LINGER_GRACE = 120           # Lingering Charm: wearers can still approach this long after a beast leaves
 JOURNAL_PAGES = 3            # studies needed to complete one beast's journal entry
-STUDY_WINDOW = 24 * 3600     # one study action per student per day
 JOURNAL_COMPLETE_POINTS = 5  # house points when a beast's journal is finished (once)
+# Old payout text, from when the daily set was 5. Still blocks a second +3
+# if that bonus was already written to the ledger today.
+_BEFRIEND_BONUS_REASONS = (
+    "Completed 5 beast befriends today",
+    f"Completed {BEFRIEND_GOAL} beast befriends today",
+)
 
 PLACES = {
     "garden": "The Garden",
@@ -197,11 +201,39 @@ class Beasts(commands.Cog):
         return journal[key]
 
     def _studied_today(self, user_id: int, now: float) -> bool:
+        """One study per America/Chicago day.
+
+        This used to be a rolling 24h cooldown (``at`` + 24h), which is a
+        daily limit rather than a short cooldown. A study whose timestamp
+        falls on today's Central day still blocks another page; a study from
+        yesterday does not, even if it was less than 24h ago.
+        """
+        from cogs.world_engine import today
+
         rec = self.state["study_day"].get(str(user_id), {})
-        return bool(rec) and (now - float(rec.get("at", 0))) < STUDY_WINDOW
+        if not isinstance(rec, dict):
+            return False
+        day = today(now)
+        if rec.get("date") == day:
+            return True
+        at = float(rec.get("at") or 0)
+        if at > 0 and today(at) == day:
+            rec["date"] = day
+            rec["at"] = at
+            self.state["study_day"][str(user_id)] = rec
+            return True
+        return False
 
     def _mark_studied(self, user_id: int, now: float):
-        self.state["study_day"][str(user_id)] = {"at": now}
+        from cogs.world_engine import today
+
+        self.state["study_day"][str(user_id)] = {"date": today(now), "at": now}
+
+    def _ledger_entries(self):
+        store = self.bot.get_cog("Store")
+        if store is None:
+            return None
+        return store.state.get("ledger") or []
 
     def _page_text(self, key: str, page: int) -> str:
         """Build journal page text from beast data (no per-beast lore bank needed)."""
@@ -258,24 +290,66 @@ class Beasts(commands.Cog):
         self.state["paid"][str(user_id)] = rows
         return sum(r[1] for r in rows)
 
-    @staticmethod
-    def _utc_day() -> str:
-        return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
-
     def befriend_day_rec(self, user_id: int) -> dict:
+        from cogs.world_engine import (
+            carry_dated_record, central_day_start, claim_bonus_from_ledger,
+        )
+
         key = str(user_id)
         bag = self.state.setdefault("befriend_day", {})
-        rec = bag.get(key) or {}
-        day = self._utc_day()
-        if rec.get("date") != day:
-            rec = {"date": day, "count": 0, "bonus": False}
-            bag[key] = rec
+        rec, needs = carry_dated_record(
+            bag.get(key), None, {"count": 0, "bonus": False},
+        )
+        if needs:
+            entries = self._ledger_entries()
+            if entries is not None:
+                if rec.get("bonus"):
+                    if int(rec.get("count") or 0) < BEFRIEND_GOAL:
+                        rec["count"] = BEFRIEND_GOAL
+                else:
+                    claim_bonus_from_ledger(
+                        rec, entries, central_day_start(),
+                        bonus_key="bonus", reasons=_BEFRIEND_BONUS_REASONS,
+                        count_key="count", count_floor=BEFRIEND_GOAL,
+                        target_id=user_id,
+                    )
+                rec.pop("legacy_utc_rekey", None)
         rec.setdefault("count", 0)
         rec.setdefault("bonus", False)
+        bag[key] = rec
         return rec
 
     def befriends_today(self, user_id: int) -> int:
         return int(self.befriend_day_rec(user_id).get("count") or 0)
+
+    def try_award_befriend_completion(self, member, now: float | None = None) -> int:
+        """+3 once when today's befriends reach BEFRIEND_GOAL.
+
+        Safe to call from /checklist. Does not increment the count. If the
+        ledger already paid today's bonus (including the old 5-befriend
+        reason), befriend_day_rec keeps ``bonus`` set and this returns 0.
+        """
+        now = time.time() if now is None else now
+        day = self.befriend_day_rec(member.id)
+        if int(day.get("count") or 0) < BEFRIEND_GOAL or day.get("bonus"):
+            return 0
+        store = self.bot.get_cog("Store")
+        house = store.member_house(member) if store else None
+        if not (store and house):
+            return 0
+        store.record(
+            house=house,
+            delta=BEFRIEND_COMPLETION_POINTS,
+            actor_id=self.bot.user.id if self.bot.user else 0,
+            target_id=member.id,
+            reason=f"Completed {BEFRIEND_GOAL} beast befriends today",
+        )
+        day["bonus"] = True
+        self.state["paid"].setdefault(str(member.id), []).append(
+            [now, BEFRIEND_COMPLETION_POINTS]
+        )
+        self.save()
+        return BEFRIEND_COMPLETION_POINTS
 
     def items_line(self, wants: list[str]) -> str:
         world = self.bot.get_cog("World")
@@ -446,7 +520,7 @@ class Beasts(commands.Cog):
     # ----------------------------------------------------------- befriending
 
     def befriend(self, member, key: str, now: float) -> dict:
-        """Record the friendship; +3 once for 5 befriends in a UTC day."""
+        """Record the friendship; +3 once for 3 befriends in a Central day."""
         uid = str(member.id)
         b = self.beasts[key]
         col = self.state["collections"].setdefault(uid, {})
@@ -469,24 +543,12 @@ class Beasts(commands.Cog):
         day = self.befriend_day_rec(member.id)
         day["count"] = int(day.get("count") or 0) + 1
         out["befriends_today"] = int(day["count"])
-        if (
-            store
-            and house
-            and int(day["count"]) >= BEFRIEND_GOAL
-            and not day.get("bonus")
-        ):
-            store.record(
-                house=house,
-                delta=BEFRIEND_COMPLETION_POINTS,
-                actor_id=self.bot.user.id if self.bot.user else 0,
-                target_id=member.id,
-                reason=f"Completed {BEFRIEND_GOAL} beast befriends today",
-            )
-            day["bonus"] = True
-            out["points"] = BEFRIEND_COMPLETION_POINTS
-            self.state["paid"].setdefault(uid, []).append(
-                [now, BEFRIEND_COMPLETION_POINTS]
-            )
+        # House was resolved above; try_award looks it up again so /checklist
+        # can retry a payout that was missed (no house yet, or the cap drop
+        # from 5 to 3 left them already at the new goal).
+        awarded = self.try_award_befriend_completion(member, now=now)
+        if awarded:
+            out["points"] = awarded
 
         count = len(col)
         idx = rank_index(count)
@@ -701,10 +763,10 @@ class Beasts(commands.Cog):
             return
         now = time.time()
         if self._studied_today(interaction.user.id, now):
-            rec = self.state["study_day"].get(str(interaction.user.id), {})
-            ready = float(rec.get("at", 0)) + STUDY_WINDOW
+            from cogs.world_engine import next_central_midnight
+            ready = next_central_midnight(now)
             await interaction.response.send_message(
-                f"You've already studied today. Next notebook page <t:{int(ready)}:R>.",
+                f"You've already studied today. Next notebook page <t:{ready}:R>.",
                 ephemeral=True,
             )
             return

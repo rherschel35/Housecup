@@ -30,7 +30,6 @@ BEANS_PATH = STATE_DIR / "beans.json"
 
 COST = 1
 BEANS_PER_DAY = 3
-WINDOW = 24 * 3600
 
 # (weight, net change including the bean's cost, verdict, flavours)
 OUTCOMES = [
@@ -104,8 +103,20 @@ class Beans(commands.Cog):
             log.exception("Could not save bean records.")
 
     def recent(self, user_id: int, now: float = None) -> list[float]:
+        """Beans eaten on the current America/Chicago calendar day.
+
+        Older rows were a rolling 24h list of timestamps. Anything from a
+        previous Central day no longer counts; today's stamps still do, so a
+        deploy does not hand out a second set or erase beans already eaten
+        today.
+        """
+        from cogs.world_engine import on_central_day
+
         now = now if now is not None else time.time()
-        stamps = [t for t in self.state["eaten"].get(str(user_id), []) if now - t < WINDOW]
+        stamps = [
+            t for t in self.state["eaten"].get(str(user_id), [])
+            if on_central_day(t, now)
+        ]
         self.state["eaten"][str(user_id)] = stamps
         return stamps
 
@@ -126,7 +137,8 @@ class Beans(commands.Cog):
 
         eaten = self.recent(member.id, now)
         if len(eaten) >= BEANS_PER_DAY:
-            next_at = min(eaten) + WINDOW
+            from cogs.world_engine import next_central_midnight
+            next_at = next_central_midnight(now)
             return {"error": f"That's your {BEANS_PER_DAY} for today. "
                              f"Another bean <t:{int(next_at)}:R>."}
 

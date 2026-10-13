@@ -24,7 +24,6 @@ reprice via `/staff market setprice`.
 
 from __future__ import annotations
 
-import datetime
 import json
 import logging
 import os
@@ -203,10 +202,6 @@ BROOM_TOKEN_LABELS = {
 }
 
 
-def today_str() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
-
-
 class Marketplace(commands.Cog):
     group = app_commands.Group(name="market", description="The Velmora Marketplace.")
 
@@ -356,19 +351,42 @@ class Marketplace(commands.Cog):
         self.save()
         return True
 
+    def _ledger_entries(self):
+        store = self._store()
+        if store is None:
+            return None
+        return store.state.get("ledger") or []
+
+    def _sell_day_rec(self, user_id: int) -> dict:
+        from cogs.world_engine import (
+            carry_dated_record, central_day_start, raise_tally_from_ledger,
+        )
+
+        key = str(user_id)
+        bag = self.state.setdefault("sell_day", {})
+        rec, needs = carry_dated_record(bag.get(key), None, {"earned": 0})
+        if needs:
+            entries = self._ledger_entries()
+            if entries is not None:
+                raise_tally_from_ledger(
+                    rec, entries, central_day_start(),
+                    field="earned", cap=self.sell_daily_cap(),
+                    target_id=user_id,
+                    prefixes=("Marketplace: sold",),
+                    mode="sum",
+                )
+                rec.pop("legacy_utc_rekey", None)
+        rec.setdefault("earned", 0)
+        bag[key] = rec
+        return rec
+
     def _sell_earned_today(self, user_id: int) -> int:
-        rec = self.state["sell_day"].get(str(user_id), {})
-        if rec.get("date") != today_str():
-            return 0
-        return int(rec.get("earned", 0))
+        return int(self._sell_day_rec(user_id).get("earned", 0))
 
     def _add_sell_earned(self, user_id: int, pts: int):
-        key = str(user_id)
-        rec = self.state["sell_day"].get(key, {})
-        if rec.get("date") != today_str():
-            rec = {"date": today_str(), "earned": 0}
+        rec = self._sell_day_rec(user_id)
         rec["earned"] = int(rec.get("earned", 0)) + pts
-        self.state["sell_day"][key] = rec
+        self.state["sell_day"][str(user_id)] = rec
 
     def _clear_sell_day(self, user_id: int) -> int:
         """Wipe today's sell earnings. Returns how many points were cleared."""
