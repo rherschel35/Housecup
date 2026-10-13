@@ -101,6 +101,7 @@ from cogs.velmora_channels import (
     STUDY_HALL_CHANNEL_ID,
     SWARM_PRACTICE_CHANNEL_IDS,
 )
+from cogs.point_share import kill_share_awards
 from cogs.world_engine import today
 
 # Summon/practice rooms — Attack waves never flood these (except everything
@@ -211,31 +212,6 @@ def _attack_ping_role_names() -> list[str]:
     if raw:
         return [p.strip() for p in raw.split(",") if p.strip()]
     return list(_DEFAULT_PING_NAMES)
-
-
-def kill_share_awards(
-    by_kills: list[dict],
-    *,
-    pool: int,
-    top_n: int,
-    total_kills: int,
-) -> dict[int, int]:
-    """Top ``top_n`` by kills: floor((kills / total_swarm_kills) × pool).
-
-    Only the cut is paid; leftover from rounding or from kills outside the
-    top N stays unspent.
-    """
-    if pool <= 0 or total_kills <= 0 or top_n <= 0:
-        return {}
-    out: dict[int, int] = {}
-    for r in by_kills[:top_n]:
-        kills = int(r.get("kills") or 0)
-        if kills <= 0:
-            continue
-        pts = int(pool * kills / total_kills)  # truncate like 17.5 → 17
-        if pts > 0:
-            out[int(r["uid"])] = pts
-    return out
 
 
 def format_kill_footer(

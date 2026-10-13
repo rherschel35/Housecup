@@ -36,3 +36,8 @@ jobs:
         run: python scripts/test_explore_kill_points.py
         env:
           DISCORD_TOKEN: ""
+
+      - name: Duel Night pool payout
+        run: python scripts/test_duel_night.py
+        env:
+          DISCORD_TOKEN: ""

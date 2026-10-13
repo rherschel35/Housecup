@@ -24,7 +24,7 @@ HELP = {
         "title": "Play",
         "staff": False,
         "entries": [
-            ("duel", "Challenge someone. Best of 3 = 1 win; best of 5/7/9/51 = series of first-to-2 sets banking 3/4/5/26 wins (sets you take still fill your daily duel checklist/points even if you lose the series). Duel Night pays the full bank at double points."),
+            ("duel", "Challenge someone. Best of 3 = 1 win; best of 5/7/9/51 = series of first-to-2 sets banking 3/4/5/26 wins (sets you take still fill your daily duel checklist/points even if you lose the series). During Duel Night, cross-house wins tally for an end-of-night pool instead of paying on the spot."),
             ("trio scramble", "Open a casual 3v3 trio duel — any houses, join either side. House points: 5 wins/day for the house → +5 once."),
             ("trio housematch", "Open a house-vs-house 3v3 trio duel (house role gated). Same house daily set: 5 wins → +5."),
             ("grand", "Challenge someone to a Grand Duel (both need 50+ 1v1 wins)."),
@@ -291,7 +291,7 @@ HELP = {
             ("staffgame bingo end", "End the open Wizard Bingo round."),
             ("staffgame bingo winners", "List BINGO winners for the open round."),
             ("staffgame frog prize", "Award any Chocolate Frog card as a prize/reward (incl. mythic Lumen Aegis)."),
-            ("staffgame duels night", "Start or end House Duel Night — pick 30 minutes or 1 hour; double points, no daily cap; best-of series bank in full; end-night house/MVP bonuses."),
+            ("staffgame duels night", "Start or end House Duel Night — pick 30 minutes or 1 hour. Cross-house wins tally until the end (no on-the-spot pay, no rematch limit); top 7 split the pool, plus MVP, house-share, and most-duelists bonuses."),
             ("staffgame duels nightschedule", "Schedule 1–3 weekly Duel Nights (30 min or 1 hr) — each with its own Chicago day + time."),
             ("staffgame duels nightscheduleoff", "Turn off the weekly Duel Night schedule."),
             ("staffgame duels nightscheduleroles", "Set Champions + WIZARDS AND WITCHES for Duel Night warn + start pings."),
