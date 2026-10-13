@@ -55,6 +55,16 @@ PLACE_CHOICES = [
     app_commands.Choice(name="🔭 The Observatory", value="observatory"),
     app_commands.Choice(name="🌲 The Forbidden Woods", value="forbidden_woods"),
 ]
+# Same values as PLACE_CHOICES, without emoji, so /staffworld stays under
+# Discord's 8000-character command limit. Player /explore and /forage keep
+# PLACE_CHOICES.
+STAFF_PLACE_CHOICES = [
+    app_commands.Choice(name="Garden", value="garden"),
+    app_commands.Choice(name="Library", value="library"),
+    app_commands.Choice(name="Dungeons", value="dungeons"),
+    app_commands.Choice(name="Observatory", value="observatory"),
+    app_commands.Choice(name="Forbidden Woods", value="forbidden_woods"),
+]
 
 # Places where searching around risks a Wild Threat showing up right there.
 DANGEROUS_PLACES = {"dungeons", "forbidden_woods"}
@@ -64,15 +74,15 @@ DEFAULT_LIMITS = {"explore": 10, "forage": 5}
 HERE_MINUTES = 60          # how long you count as "in" a place after exploring it
 GREEN, NIGHT_COLOR = 0x3E8E5A, 0x2B3A2E
 EVENT_CHOICES = [
-    app_commands.Choice(name="🚪 Door behind the roses", value="door"),
-    app_commands.Choice(name="🥀 Flowers turn black", value="black_flowers"),
-    app_commands.Choice(name="🐸 Golden frog trades", value="frog"),
-    app_commands.Choice(name="💧 A name from the Pool", value="whisper"),
-    app_commands.Choice(name="🌳 The Ancient Tree glows", value="tree_glow"),
-    app_commands.Choice(name="🦋 Moon moths", value="moths"),
-    app_commands.Choice(name="🗝️ Key beneath the bench", value="key"),
-    app_commands.Choice(name="🌿 An unexplored path", value="path"),
-    app_commands.Choice(name="🏡 The Garden takes an interest in a House", value="strange_house"),
+    app_commands.Choice(name="Door behind roses", value="door"),
+    app_commands.Choice(name="Flowers turn black", value="black_flowers"),
+    app_commands.Choice(name="Golden frog trades", value="frog"),
+    app_commands.Choice(name="Name from the Pool", value="whisper"),
+    app_commands.Choice(name="Ancient Tree glows", value="tree_glow"),
+    app_commands.Choice(name="Moon moths", value="moths"),
+    app_commands.Choice(name="Key under bench", value="key"),
+    app_commands.Choice(name="Unexplored path", value="path"),
+    app_commands.Choice(name="Garden favors House", value="strange_house"),
 ]
 HOUSE_CHOICES = [app_commands.Choice(name=n, value=k) for k, n in HOUSE_NAMES.items()]
 
@@ -137,7 +147,7 @@ class ChoiceView(discord.ui.View):
 class WorldCog(commands.Cog, name="World"):
     # Nested under /staff after load (see staff_groups.nest_pure_staff_groups).
     world_group = app_commands.Group(
-        name="world", description="Run Velmora's places and events.",
+        name="world", description="Places and events.",
     )
 
     def __init__(self, bot: commands.Bot):
@@ -588,9 +598,9 @@ class WorldCog(commands.Cog, name="World"):
         await interaction.response.send_message("That's for staff.", ephemeral=True)
         return False
 
-    @world_group.command(name="eventstart", description="(staff) Start an event somewhere now.")
-    @app_commands.describe(event="Which event", minutes="How long (empty = random)", house="For the House event")
-    @app_commands.choices(place=PLACE_CHOICES, event=EVENT_CHOICES, house=HOUSE_CHOICES)
+    @world_group.command(name="eventstart", description="Start event.")
+    @app_commands.describe(place="Place", event="Event", minutes="Minutes", house="House")
+    @app_commands.choices(place=STAFF_PLACE_CHOICES, event=EVENT_CHOICES, house=HOUSE_CHOICES)
     async def eventstart(self, interaction: discord.Interaction, place: str, event: str,
                          minutes: Optional[app_commands.Range[int, 5, 10080]] = None,
                          house: Optional[str] = None):
@@ -610,8 +620,9 @@ class WorldCog(commands.Cog, name="World"):
             await self.announce(place, ended)
         await self.announce(place, ev["announce"])
 
-    @world_group.command(name="eventend", description="(staff) End the event happening somewhere.")
-    @app_commands.choices(place=PLACE_CHOICES)
+    @world_group.command(name="eventend", description="End event.")
+    @app_commands.describe(place="Place")
+    @app_commands.choices(place=STAFF_PLACE_CHOICES)
     async def eventend(self, interaction: discord.Interaction, place: str):
         if not await self._staff(interaction):
             return
@@ -622,7 +633,7 @@ class WorldCog(commands.Cog, name="World"):
         if ended:
             await self.announce(place, ended)
 
-    @world_group.command(name="eventstatus", description="(staff) What's happening around Velmora?")
+    @world_group.command(name="eventstatus", description="Event status.")
     async def eventstatus(self, interaction: discord.Interaction):
         if not await self._staff(interaction):
             return
@@ -639,8 +650,8 @@ class WorldCog(commands.Cog, name="World"):
         lines.append(f"Academy events on: {academy}")
         await interaction.response.send_message("\n".join(lines), ephemeral=True)
 
-    @world_group.command(name="academy", description="(staff) Switch an academy-wide event on or off (e.g. tournament).")
-    @app_commands.describe(name="Short name, e.g. tournament", on="On or off")
+    @world_group.command(name="academy", description="Academy event.")
+    @app_commands.describe(name="Name", on="On")
     async def academy(self, interaction: discord.Interaction, name: str, on: bool):
         if not await self._staff(interaction):
             return
@@ -656,7 +667,8 @@ class WorldCog(commands.Cog, name="World"):
             f"Academy event **{name}** is now **{'on' if on else 'off'}**. Now on: {', '.join(ac) or 'none'}.",
             ephemeral=True)
 
-    @world_group.command(name="rep", description="(staff) How a place feels about someone.")
+    @world_group.command(name="rep", description="Place rep.")
+    @app_commands.describe(member="Who")
     async def rep(self, interaction: discord.Interaction, member: discord.Member):
         if not await self._staff(interaction):
             return
@@ -670,7 +682,8 @@ class WorldCog(commands.Cog, name="World"):
             f"**{member.display_name}** - {reps}\n{sum(s.get('items', {}).values())} items · "
             f"secrets: {', '.join(secrets_found) or 'none'}", ephemeral=True)
 
-    @world_group.command(name="give", description="(staff) Put an item in someone's satchel.")
+    @world_group.command(name="give", description="Give item.")
+    @app_commands.describe(member="Who", item="Item", count="Count")
     async def give(self, interaction: discord.Interaction, member: discord.Member, item: str,
                    count: app_commands.Range[int, 1, 20] = 1):
         if not await self._staff(interaction):
@@ -688,8 +701,9 @@ class WorldCog(commands.Cog, name="World"):
         return [app_commands.Choice(name=f"{v['name']} ({RARITY_LABEL[v['rarity']]})", value=k)
                 for k, v in self.world.items.items() if current.lower() in v["name"].lower()][:25]
 
-    @world_group.command(name="channel", description="(staff) Set which channel a place lives in.")
-    @app_commands.choices(place=PLACE_CHOICES)
+    @world_group.command(name="channel", description="Set channel.")
+    @app_commands.describe(place="Place", channel="Channel")
+    @app_commands.choices(place=STAFF_PLACE_CHOICES)
     async def channel(self, interaction: discord.Interaction, place: str, channel: discord.TextChannel):
         if not await self._staff(interaction):
             return
@@ -698,7 +712,7 @@ class WorldCog(commands.Cog, name="World"):
         await interaction.response.send_message(f"{self.world.places[place].name.capitalize()} now lives in {channel.mention}.",
                                                 ephemeral=True)
 
-    @world_group.command(name="reload", description="(staff) Reload the places' writing without restarting.")
+    @world_group.command(name="reload", description="Reload text.")
     async def reload(self, interaction: discord.Interaction):
         if not await self._staff(interaction):
             return
