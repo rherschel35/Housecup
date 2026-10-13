@@ -251,6 +251,7 @@ class Checklist(commands.Cog):
             from cogs.world_engine import POINTS_PER_DAY
             student = world_cog.student(member)
             day = world_cog.world.day(student, now)
+            # Shared cap: rare finds, secrets, item uses, and /explore monster kills.
             pts_used = int(day.get("points", 0))
             pts_left = max(0, POINTS_PER_DAY - pts_used)
             explore_cap = DEFAULT_LIMITS.get("explore", 10)

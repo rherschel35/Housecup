@@ -291,19 +291,22 @@ class WorldCog(commands.Cog, name="World"):
         return f"\n\n🥀 **{delta}** from {h['emoji']} {h['name']}. It was noticed."
 
     async def maybe_spawn_monster(self, place: str, channel_id: int,
-                                  finder_id: int | None = None) -> bool:
+                                  finder_id: int | None = None, *,
+                                  pay_explore_points: bool = False) -> bool:
         """Searching somewhere dangerous risks a Wild Threat turning up right
         there. Quietly does nothing if that place isn't dangerous, the roll
         misses, the Dementors cog isn't loaded, or something's already loose
         (never steals an encounter out from under another channel).
         finder_id is the student who stirred it — they get a short exclusive
-        cast window before anyone else can try."""
+        cast window before anyone else can try. pay_explore_points is set
+        only by /explore, so that kill counts toward the daily explore cap."""
         if place not in DANGEROUS_PLACES or self.world.rng.random() >= MONSTER_CHANCE:
             return False
         dementors = self.bot.get_cog("Dementors")
         if not dementors:
             return False
-        return await dementors.try_ambient_spawn(channel_id, finder_id=finder_id)
+        return await dementors.try_ambient_spawn(
+            channel_id, finder_id=finder_id, pay_explore_points=pay_explore_points)
 
     # ------------------------------------------------------------ player commands
 
@@ -337,7 +340,8 @@ class WorldCog(commands.Cog, name="World"):
         if reveal:
             text += f"\n\n{reveal}"
         monster = await self.maybe_spawn_monster(place, interaction.channel_id,
-                                                 finder_id=interaction.user.id)
+                                                 finder_id=interaction.user.id,
+                                                 pay_explore_points=True)
         if monster:
             text += ("\n\n⚠️ Something else was already here. "
                      "You have **25 seconds** to `/cast` before anyone else can try.")
@@ -400,6 +404,8 @@ class WorldCog(commands.Cog, name="World"):
             text += f"\n💍 {why}: {self.world.item_line(item)}"
         text += await self.points(ctx.student, interaction.user, self.world.reward_points(res["item"]),
                                   f"🌱 foraged something rare in {P.name}")
+        # Forage can stir a threat too. That kill keeps its own house-point
+        # payout. Only /explore routes the kill through the explore-points cap.
         monster = await self.maybe_spawn_monster(place, interaction.channel_id,
                                                  finder_id=interaction.user.id)
         if monster:

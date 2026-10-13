@@ -31,3 +31,8 @@ jobs:
         run: python scripts/check_command_payload.py
         env:
           DISCORD_TOKEN: ""
+
+      - name: Explore kill points share the daily cap
+        run: python scripts/test_explore_kill_points.py
+        env:
+          DISCORD_TOKEN: ""
