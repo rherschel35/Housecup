@@ -176,8 +176,8 @@ WEEKDAY_LABELS = (
     "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
 )
 ATTACK_LENGTH_CHOICES = [
-    app_commands.Choice(name="5 minutes — top 7 share 100", value=5),
-    app_commands.Choice(name="10 minutes — top 10 share 300", value=10),
+    app_commands.Choice(name="5 min", value=5),
+    app_commands.Choice(name="10 min", value=10),
 ]
 
 
@@ -392,6 +392,11 @@ class SpellPick:
         self.name = SPELL_LABEL.get(value, value.title())
 
 
+def _unknown_interaction(exc: BaseException) -> bool:
+    """Discord 10062: the click arrived after the interaction token expired."""
+    return isinstance(exc, discord.NotFound) and getattr(exc, "code", None) == 10062
+
+
 class CastSpellButton(discord.ui.Button):
     def __init__(self, spell_value: str):
         label = SPELL_LABEL.get(spell_value, spell_value.title())
@@ -401,7 +406,13 @@ class CastSpellButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         view: CastSpellView = self.view  # type: ignore[assignment]
         if interaction.user.id != view.owner_id:
-            await interaction.response.send_message("Those aren't your spells.", ephemeral=True)
+            try:
+                await interaction.response.send_message("Those aren't your spells.", ephemeral=True)
+            except discord.NotFound as exc:
+                if _unknown_interaction(exc):
+                    log.debug("Spell button skipped; interaction expired.")
+                    return
+                raise
             return
         view.stop()
         for item in view.children:
@@ -410,7 +421,19 @@ class CastSpellButton(discord.ui.Button):
             await interaction.message.edit(view=view)
         except discord.DiscordException:
             pass
-        await view.cog.resolve_cast(interaction, SpellPick(self.spell_value))
+        try:
+            await view.cog.resolve_cast(interaction, SpellPick(self.spell_value))
+        except discord.NotFound as exc:
+            if _unknown_interaction(exc):
+                # Token already dead (view timed out, or Discord gave up). The
+                # cast path raises here only on the reply, so a hit that was
+                # already saved stays saved.
+                log.debug(
+                    "Spell button skipped; interaction expired (spell=%s).",
+                    self.spell_value,
+                )
+                return
+            raise
 
 
 class CastSpellView(discord.ui.View):
@@ -425,6 +448,15 @@ class CastSpellView(discord.ui.View):
         for item in self.children:
             item.disabled = True
 
+    async def on_error(self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item):
+        if _unknown_interaction(error):
+            log.debug(
+                "Spell button skipped; interaction expired (spell=%s).",
+                getattr(item, "spell_value", None),
+            )
+            return
+        await super().on_error(interaction, error, item)
+
 
 def _article(word: str) -> str:
     return "an" if word[:1].lower() in "aeiou" else "a"
@@ -434,7 +466,7 @@ class Dementors(commands.Cog):
     # Nested under /staff after load (see staff_groups.nest_pure_staff_groups).
     group = app_commands.Group(
         name="dementor",
-        description="Run the Wild Threats system.",
+        description="Wild Threats.",
     )
 
     def __init__(self, bot: commands.Bot):
@@ -1740,10 +1772,10 @@ class Dementors(commands.Cog):
         await interaction.response.send_message("That's for staff.", ephemeral=True)
         return False
 
-    @group.command(name="channels", description="(staff) Set the channels a threat can appear in.")
+    @group.command(name="channels", description="Set channels.")
     @app_commands.describe(
-        a="First channel", b="Second channel", c="Third channel", d="Fourth channel",
-        e="Optional fifth channel",
+        a="Channel", b="Channel", c="Channel", d="Channel",
+        e="Optional",
     )
     async def channels(self, interaction: discord.Interaction, a: discord.TextChannel,
                         b: discord.TextChannel, c: discord.TextChannel, d: discord.TextChannel,
@@ -1798,13 +1830,10 @@ class Dementors(commands.Cog):
             return True
         return channel_id in self._configured_channel_ids()
 
-    @group.command(name="summon", description="(staff) Make one appear right now.")
+    @group.command(name="summon", description="Summon now.")
     @app_commands.describe(
-        channel=(
-            "Where (blank = random event channel; study hall, shared games "
-            "lounge, and swarm practice room are practice-only)"
-        ),
-        creature="Which one (leave blank for a Dementor)",
+        channel="Channel",
+        creature="Creature",
     )
     @app_commands.choices(creature=CREATURE_CHOICES)
     async def summon(self, interaction: discord.Interaction, channel: discord.TextChannel = None,
@@ -1849,7 +1878,7 @@ class Dementors(commands.Cog):
         name = CREATURES[creature.value]["name"] if creature else "Dementor"
         await interaction.response.send_message(f"Summoned a {name} in {landed.mention}.", ephemeral=True)
 
-    @group.command(name="status", description="(staff) What's configured and what's active.")
+    @group.command(name="status", description="Status.")
     async def status(self, interaction: discord.Interaction):
         if not await self._staff(interaction):
             return
@@ -1886,15 +1915,12 @@ class Dementors(commands.Cog):
 
     # -------------------------------------------------------- staff: event
 
-    @group.command(name="eventstart", description="(staff) Start Attack on Velmora — pick 5 or 10 minutes.")
+    @group.command(name="eventstart", description="Start Attack.")
     @app_commands.describe(
-        length="5-minute (top 7 share 100) or 10-minute (top 10 share 300)",
-        name="What to call it",
+        length="5 or 10",
+        name="Name",
     )
-    @app_commands.choices(length=[
-        app_commands.Choice(name="5 minutes — top 7 share 100 kill pts", value=5),
-        app_commands.Choice(name="10 minutes — top 10 share 300 kill pts", value=10),
-    ])
+    @app_commands.choices(length=ATTACK_LENGTH_CHOICES)
     async def eventstart(
         self,
         interaction: discord.Interaction,
@@ -1929,21 +1955,21 @@ class Dementors(commands.Cog):
 
     @group.command(
         name="eventschedule",
-        description="(staff) Schedule 1–3 weekly Attacks — each with its own Chicago time + length.",
+        description="Weekly Attacks.",
     )
     @app_commands.describe(
-        day_a="First Attack weekday (required)",
-        hour_a="Hour for first Attack (America/Chicago, 0-23)",
-        length_a="5- or 10-minute swarm for the first Attack",
-        minute_a="Minute for first Attack (0-59)",
-        day_b="Optional second Attack weekday",
-        hour_b="Hour for second Attack (required if day_b is set)",
-        length_b="5- or 10-minute swarm for the second Attack (required if day_b is set)",
-        minute_b="Minute for second Attack (0-59)",
-        day_c="Optional third Attack weekday",
-        hour_c="Hour for third Attack (required if day_c is set)",
-        length_c="5- or 10-minute swarm for the third Attack (required if day_c is set)",
-        minute_c="Minute for third Attack (0-59)",
+        day_a="0 Mon-6 Sun",
+        hour_a="Hour 0-23",
+        length_a="5 or 10",
+        minute_a="Minute",
+        day_b="2nd day",
+        hour_b="2nd hour",
+        length_b="2nd length",
+        minute_b="2nd min",
+        day_c="3rd day",
+        hour_c="3rd hour",
+        length_c="3rd length",
+        minute_c="3rd min",
     )
     @app_commands.choices(
         day_a=WEEKDAY_CHOICES,
@@ -2074,7 +2100,7 @@ class Dementors(commands.Cog):
 
     @group.command(
         name="eventscheduleoff",
-        description="(staff) Turn off the weekly Attack schedule.",
+        description="Schedule off.",
     )
     async def eventscheduleoff(self, interaction: discord.Interaction):
         if not await self._staff(interaction):
@@ -2091,11 +2117,11 @@ class Dementors(commands.Cog):
 
     @group.command(
         name="eventscheduleroles",
-        description="(staff) Roles pinged 5 min before and at Attack start.",
+        description="Ping roles.",
     )
     @app_commands.describe(
-        champions="Champions role",
-        wizards_and_witches="WIZARDS AND WITCHES role (combined community ping)",
+        champions="Champions",
+        wizards_and_witches="Witches role",
     )
     async def eventscheduleroles(
         self,
@@ -2122,7 +2148,7 @@ class Dementors(commands.Cog):
 
     @group.command(
         name="eventschedulestatus",
-        description="(staff) Show the weekly Attack schedule.",
+        description="Show schedule.",
     )
     async def eventschedulestatus(self, interaction: discord.Interaction):
         if not await self._staff(interaction):
@@ -2173,17 +2199,11 @@ class Dementors(commands.Cog):
 
     @group.command(
         name="practice",
-        description="(staff / Presidents) House practice swarm — no points or rewards.",
+        description="Practice swarm.",
     )
     @app_commands.describe(
-        channel=(
-            "Channel to flood (default: this channel; swarm practice room, "
-            "study hall, house channels OK)"
-        ),
-        minutes=(
-            f"Length in minutes — any value 1–{EVENT_MAX_MINUTES} "
-            f"(not limited to 5/10; default {EVENT_DEFAULT_MINUTES})"
-        ),
+        channel="Channel",
+        minutes="Minutes",
     )
     async def practice(
         self,
@@ -2317,7 +2337,7 @@ class Dementors(commands.Cog):
                 continue
         await self._deliver_wave(started_at, payloads)
 
-    @group.command(name="eventend", description="(staff) End the running event early and tally it up.")
+    @group.command(name="eventend", description="End event.")
     async def eventend(self, interaction: discord.Interaction):
         if not await self._staff(interaction):
             return
@@ -2330,7 +2350,7 @@ class Dementors(commands.Cog):
         await interaction.response.send_message(ended, ephemeral=True)
         await self._finalize_event(event)
 
-    @group.command(name="eventstatus", description="(staff) How the current event is going.")
+    @group.command(name="eventstatus", description="Event status.")
     async def eventstatus(self, interaction: discord.Interaction):
         if not await self._staff(interaction):
             return

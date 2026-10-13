@@ -26,6 +26,26 @@ HEX_CHOICES = [
     app_commands.Choice(name=v["name"], value=k) for k, v in EFFECTS.items()
 ]
 
+_WEEKDAY_NAMES = (
+    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+)
+_DUEL_NIGHT_LENGTHS = (30, 60)
+_CHALLENGE_TIERS = ("daily", "trial", "rite")
+
+
+def _choice(value, name=None):
+    """Rebuild the Choice object cogs already read `.value` from."""
+    return app_commands.Choice(
+        name=str(value) if name is None else name,
+        value=value,
+    )
+
+
+def _weekday_choice(day: int | None):
+    if day is None:
+        return None
+    return _choice(day, _WEEKDAY_NAMES[day])
+
 
 class Staff(commands.Cog):
     """Owns the staff slash trees (subgroups are shared Group objects)."""
@@ -277,8 +297,8 @@ class Staff(commands.Cog):
 
     # -------------------------------------------------------------- descent
 
-    @descent.command(name="reset", description="Wipe someone's Descent progress back to floor 1.")
-    @app_commands.describe(member="Whose progress to reset (leave blank for your own)")
+    @descent.command(name="reset", description="Reset.")
+    @app_commands.describe(member="Who")
     async def descent_reset(self, interaction: discord.Interaction, member: discord.Member = None):
         cog = self._cog("Descent")
         if not cog:
@@ -286,8 +306,8 @@ class Staff(commands.Cog):
             return
         await cog.descentreset(interaction, member)
 
-    @descent.command(name="unlock", description="Clear the 3-loss lockout without wiping progress.")
-    @app_commands.describe(member="Whose lockout to clear (leave blank for your own)")
+    @descent.command(name="unlock", description="Unlock.")
+    @app_commands.describe(member="Who")
     async def descent_unlock(self, interaction: discord.Interaction, member: discord.Member = None):
         cog = self._cog("Descent")
         if not cog:
@@ -295,12 +315,12 @@ class Staff(commands.Cog):
             return
         await cog.descentunlock(interaction, member)
 
-    @descent.command(name="boost", description="Add Descent HP / Attack / Defense points to a player.")
+    @descent.command(name="boost", description="Boost.")
     @app_commands.describe(
-        member="Who to boost",
-        hp="Stat points to add to Max HP (12 HP each). Can be negative.",
-        attack="Stat points to add to Attack (2 ATK each). Can be negative.",
-        defense="Stat points to add to Defense (1 DEF each). Can be negative.",
+        member="Who",
+        hp="HP pts",
+        attack="ATK pts",
+        defense="DEF pts",
     )
     async def descent_boost(
         self,
@@ -318,13 +338,13 @@ class Staff(commands.Cog):
 
     @descent.command(
         name="set",
-        description="Set a player's Descent HP / Attack / Defense to exact combat totals.",
+        description="Stats.",
     )
     @app_commands.describe(
-        member="Whose stats to set",
-        hp="Combat Max HP to set (same number as on /descentstatus or a broke report)",
-        attack="Combat Attack to set",
-        defense="Combat Defense to set",
+        member="Who",
+        hp="Max HP",
+        attack="ATK",
+        defense="DEF",
     )
     async def descent_set(
         self,
@@ -342,10 +362,10 @@ class Staff(commands.Cog):
 
     @descent.command(
         name="backfill",
-        description="Add missing army + boss trophies from cleared depth (never replaces army).",
+        description="Army.",
     )
     @app_commands.describe(
-        member="Who to backfill (pre-tracking Descent progress → army/bosses)",
+        member="Who",
     )
     async def descent_backfill(self, interaction: discord.Interaction, member: discord.Member):
         cog = self._cog("Descent")
@@ -356,12 +376,12 @@ class Staff(commands.Cog):
 
     @descent.command(
         name="restore",
-        description="Rebuild wiped Descent progress to a cleared floor (stats + AP + army).",
+        description="Restore.",
     )
     @app_commands.describe(
-        member="Whose progress to restore",
-        floor="Deepest floor they had cleared (1–100)",
-        backfill_army="Fill army + boss trophies for that depth (default: True)",
+        member="Who",
+        floor="Floor",
+        backfill_army="Army",
     )
     async def descent_restore(
         self,
@@ -378,10 +398,10 @@ class Staff(commands.Cog):
 
     @descent.command(
         name="recover",
-        description="Scan the volume for Descent backups and reload everyone if one exists.",
+        description="Backups.",
     )
     @app_commands.describe(
-        apply="If True (default), load the best backup into live state. False = report only.",
+        apply="Apply",
     )
     async def descent_recover(self, interaction: discord.Interaction, apply: bool = True):
         cog = self._cog("Descent")
@@ -392,14 +412,11 @@ class Staff(commands.Cog):
 
     @descent.command(
         name="restorebulk",
-        description="Restore many wiped Descent players at once from a floor list.",
+        description="Bulk.",
     )
     @app_commands.describe(
-        mapping=(
-            "Paste lines: `user_id floor` or `<@id> floor`, or JSON "
-            '{"123": 47, "456": 12}'
-        ),
-        backfill_army="Fill army + boss trophies for each depth (default: True)",
+        mapping="Lines",
+        backfill_army="Army",
     )
     async def descent_restorebulk(
         self,
@@ -415,7 +432,7 @@ class Staff(commands.Cog):
 
     @descent.command(
         name="claims",
-        description="List pending /descentclaim wipe-restore reports.",
+        description="Claims.",
     )
     async def descent_claims(self, interaction: discord.Interaction):
         cog = self._cog("Descent")
@@ -426,10 +443,10 @@ class Staff(commands.Cog):
 
     @descent.command(
         name="fixap",
-        description="Correct everyone's Max AP from cleared floors (+1 per 10).",
+        description="Fix AP.",
     )
     @app_commands.describe(
-        only_wrong="Only change players whose Max AP is wrong (default: True)",
+        only_wrong="Wrong",
     )
     async def descent_fixap(
         self,
@@ -444,11 +461,11 @@ class Staff(commands.Cog):
 
     @descent.command(
         name="approveclaims",
-        description="Restore floors/army + Max AP (+1 per 10 floors); combat stats untouched.",
+        description="Approve.",
     )
     @app_commands.describe(
-        backfill_army="Fill army + boss trophies (default: True)",
-        clear="Clear the claim list after restore (default: True)",
+        backfill_army="Army",
+        clear="Clear",
     )
     async def descent_approveclaims(
         self,
@@ -464,11 +481,11 @@ class Staff(commands.Cog):
 
     @descent.command(
         name="restorespire",
-        description="Restore Spireheart owners to at least floor 90 (or chosen floor).",
+        description="Spire.",
     )
     @app_commands.describe(
-        floor="Cleared floor to grant (default 90)",
-        backfill_army="Fill army + boss trophies (default: True)",
+        floor="Floor",
+        backfill_army="Army",
     )
     async def descent_restorespire(
         self,
@@ -486,7 +503,7 @@ class Staff(commands.Cog):
 
     @castles.command(
         name="unlock",
-        description="Clear all castle lock timers and allow sieges any day (skip Wed/Sat).",
+        description="Unlock.",
     )
     async def castles_unlock(self, interaction: discord.Interaction):
         cog = self._cog("Castles")
@@ -497,7 +514,7 @@ class Staff(commands.Cog):
 
     @castles.command(
         name="schedule",
-        description="Restore normal Wed/Sat siege days (turn off staff unlock).",
+        description="Days.",
     )
     async def castles_schedule(self, interaction: discord.Interaction):
         cog = self._cog("Castles")
@@ -508,9 +525,9 @@ class Staff(commands.Cog):
 
     @castles.command(
         name="pvplive",
-        description="Turn the 200/day army bind cap on (season live) or off (pre-season uncapped).",
+        description="Cap.",
     )
-    @app_commands.describe(live="True = PvP season live (200 binds/day). False = uncapped binds.")
+    @app_commands.describe(live="Cap on")
     async def castles_pvplive(self, interaction: discord.Interaction, live: bool):
         cog = self._cog("Castles")
         if not cog:
@@ -520,13 +537,13 @@ class Staff(commands.Cog):
 
     @castles.command(
         name="seedarmy",
-        description="Staff test: add fake Descent army troops to a player.",
+        description="Seed.",
     )
     @app_commands.describe(
-        member="Who gets the troops",
-        count="How many to add (default 350, max 2000)",
-        floor="Descent floor stats to use (default 69)",
-        clear="Wipe their home army first, then seed",
+        member="Who",
+        count="Count",
+        floor="Floor",
+        clear="Wipe",
     )
     async def castles_seedarmy(
         self,
@@ -544,8 +561,8 @@ class Staff(commands.Cog):
 
     # ----------------------------------------------------------------- raid
 
-    @raid.command(name="reset", description="Clear weekly lockout or end the active raid.")
-    @app_commands.describe(member="Clear this player's weekly lockout", end_run="Force-end the active raid")
+    @raid.command(name="reset", description="Reset.")
+    @app_commands.describe(member="Who", end_run="End")
     async def raid_reset(self, interaction: discord.Interaction,
                          member: discord.Member = None, end_run: bool = False):
         cog = self._cog("ThreeRaid")
@@ -556,7 +573,7 @@ class Staff(commands.Cog):
 
     @raid.command(
         name="unstick",
-        description="Unfreeze a 3Raid board stuck on Resolving… (keeps the run).",
+        description="Unstick.",
     )
     async def raid_unstick(self, interaction: discord.Interaction):
         cog = self._cog("ThreeRaid")
@@ -567,92 +584,64 @@ class Staff(commands.Cog):
 
     # ---------------------------------------------------------------- duels
 
-    @duels.command(name="night", description="Start or end House Duel Night — 30 minutes or 1 hour.")
+    @duels.command(name="night", description="Night.")
     @app_commands.describe(
-        action="Start or end it",
-        length="Required to start: 30 minutes or 1 hour",
+        action="Action",
+        length="Mins",
     )
-    @app_commands.choices(action=[
-        app_commands.Choice(name="start", value="start"),
-        app_commands.Choice(name="end", value="end"),
-    ])
-    @app_commands.choices(length=[
-        app_commands.Choice(name="30 minutes", value=30),
-        app_commands.Choice(name="1 hour", value=60),
-    ])
     async def duels_night(
         self,
         interaction: discord.Interaction,
-        action: app_commands.Choice[str],
-        length: app_commands.Choice[int] = None,
+        action: str,
+        length: int = None,
     ):
         cog = self._cog("Duels")
         if not cog:
             await interaction.response.send_message("Duels isn't loaded.", ephemeral=True)
             return
-        await cog.duelnight(interaction, action, length)
+        if action not in ("start", "end"):
+            await interaction.response.send_message(
+                "Action must be start or end.", ephemeral=True,
+            )
+            return
+        length_choice = None
+        if length is not None:
+            if length not in _DUEL_NIGHT_LENGTHS:
+                await interaction.response.send_message(
+                    "Pick a length: **30 minutes** or **1 hour**.", ephemeral=True,
+                )
+                return
+            length_choice = _choice(length, "30 minutes" if length == 30 else "1 hour")
+        await cog.duelnight(interaction, _choice(action), length_choice)
 
     @duels.command(
         name="nightschedule",
-        description="Schedule 1–3 weekly Duel Nights — each with its own Chicago time.",
+        description="Nights.",
     )
     @app_commands.describe(
-        day_a="First night weekday (required)",
-        hour_a="Hour for first night (America/Chicago, 0-23)",
-        length="30 minutes or 1 hour for every scheduled night",
-        minute_a="Minute for first night (0-59)",
-        day_b="Optional second night weekday",
-        hour_b="Hour for second night (required if day_b is set)",
-        minute_b="Minute for second night (0-59)",
-        day_c="Optional third night weekday",
-        hour_c="Hour for third night (required if day_c is set)",
-        minute_c="Minute for third night (0-59)",
-        channel="Ignored — warn / start / results always post to the event announce channel",
-    )
-    @app_commands.choices(
-        day_a=[
-            app_commands.Choice(name="Monday", value=0),
-            app_commands.Choice(name="Tuesday", value=1),
-            app_commands.Choice(name="Wednesday", value=2),
-            app_commands.Choice(name="Thursday", value=3),
-            app_commands.Choice(name="Friday", value=4),
-            app_commands.Choice(name="Saturday", value=5),
-            app_commands.Choice(name="Sunday", value=6),
-        ],
-        day_b=[
-            app_commands.Choice(name="Monday", value=0),
-            app_commands.Choice(name="Tuesday", value=1),
-            app_commands.Choice(name="Wednesday", value=2),
-            app_commands.Choice(name="Thursday", value=3),
-            app_commands.Choice(name="Friday", value=4),
-            app_commands.Choice(name="Saturday", value=5),
-            app_commands.Choice(name="Sunday", value=6),
-        ],
-        day_c=[
-            app_commands.Choice(name="Monday", value=0),
-            app_commands.Choice(name="Tuesday", value=1),
-            app_commands.Choice(name="Wednesday", value=2),
-            app_commands.Choice(name="Thursday", value=3),
-            app_commands.Choice(name="Friday", value=4),
-            app_commands.Choice(name="Saturday", value=5),
-            app_commands.Choice(name="Sunday", value=6),
-        ],
-        length=[
-            app_commands.Choice(name="30 minutes", value=30),
-            app_commands.Choice(name="1 hour", value=60),
-        ],
+        day_a="0-6",
+        hour_a="Hour",
+        length="Mins",
+        minute_a="Minute",
+        day_b="2nd day",
+        hour_b="Hour",
+        minute_b="2nd min",
+        day_c="3rd day",
+        hour_c="Hour",
+        minute_c="3rd min",
+        channel="Skip",
     )
     async def duels_nightschedule(
         self,
         interaction: discord.Interaction,
-        day_a: app_commands.Choice[int],
+        day_a: app_commands.Range[int, 0, 6],
         hour_a: app_commands.Range[int, 0, 23],
-        length: app_commands.Choice[int],
+        length: int,
         minute_a: app_commands.Range[int, 0, 59] = 0,
-        day_b: app_commands.Choice[int] = None,
+        day_b: app_commands.Range[int, 0, 6] = None,
         hour_b: app_commands.Range[int, 0, 23] = None,
         minute_b: app_commands.Range[int, 0, 59] = 0,
-        day_c: app_commands.Choice[int] = None,
+        day_c: app_commands.Range[int, 0, 6] = None,
         hour_c: app_commands.Range[int, 0, 23] = None,
         minute_c: app_commands.Range[int, 0, 59] = 0,
         channel: discord.TextChannel = None,
@@ -661,15 +650,21 @@ class Staff(commands.Cog):
         if not cog:
             await interaction.response.send_message("Duels isn't loaded.", ephemeral=True)
             return
+        if length not in _DUEL_NIGHT_LENGTHS:
+            await interaction.response.send_message(
+                "Pick a length: **30 minutes** or **1 hour**.", ephemeral=True,
+            )
+            return
         await cog.nightschedule(
             interaction,
-            day_a, hour_a, minute_a,
-            day_b, hour_b, minute_b,
-            day_c, hour_c, minute_c,
-            length, channel,
+            _weekday_choice(day_a), hour_a, minute_a,
+            _weekday_choice(day_b), hour_b, minute_b,
+            _weekday_choice(day_c), hour_c, minute_c,
+            _choice(length, "30 minutes" if length == 30 else "1 hour"),
+            channel,
         )
 
-    @duels.command(name="nightscheduleoff", description="Turn off the weekly Duel Night schedule.")
+    @duels.command(name="nightscheduleoff", description="Off.")
     async def duels_nightscheduleoff(self, interaction: discord.Interaction):
         cog = self._cog("Duels")
         if not cog:
@@ -679,11 +674,11 @@ class Staff(commands.Cog):
 
     @duels.command(
         name="nightscheduleroles",
-        description="Roles pinged 5 min before and at Duel Night start.",
+        description="Roles.",
     )
     @app_commands.describe(
-        champions="Champions role",
-        wizards_and_witches="WIZARDS AND WITCHES role (combined community ping)",
+        champions="Role",
+        wizards_and_witches="Role",
     )
     async def duels_nightscheduleroles(
         self,
@@ -697,7 +692,7 @@ class Staff(commands.Cog):
             return
         await cog.nightscheduleroles(interaction, champions, wizards_and_witches)
 
-    @duels.command(name="nightschedulestatus", description="Show the weekly Duel Night schedule.")
+    @duels.command(name="nightschedulestatus", description="Status.")
     async def duels_nightschedulestatus(self, interaction: discord.Interaction):
         cog = self._cog("Duels")
         if not cog:
@@ -707,7 +702,7 @@ class Staff(commands.Cog):
 
     @duels.command(
         name="housedaygrant",
-        description="Complete every house's trio + Quidditch daily sets for today (+5 each if unpaid).",
+        description="Dailies.",
     )
     async def duels_housedaygrant(self, interaction: discord.Interaction):
         store = self._cog("Store")
@@ -768,53 +763,49 @@ class Staff(commands.Cog):
 
     # ------------------------------------------------------------ challenge
 
-    @challenge.command(name="post", description="Post a challenge to the channel right now.")
-    @app_commands.describe(tier="Which challenge to post")
-    @app_commands.choices(tier=[
-        app_commands.Choice(name="Daily (1 point)", value="daily"),
-        app_commands.Choice(name="Trial (3 points)", value="trial"),
-        app_commands.Choice(name="Weekly Rite (5 points)", value="rite"),
-    ])
-    async def challenge_post(self, interaction: discord.Interaction, tier: app_commands.Choice[str]):
+    @challenge.command(name="post", description="Post.")
+    @app_commands.describe(tier="Tier")
+    async def challenge_post(self, interaction: discord.Interaction, tier: str):
         cog = self._cog("Quests")
         if not cog:
             await interaction.response.send_message("Quests isn't loaded.", ephemeral=True)
             return
-        await cog.challenge(interaction, tier)
+        if tier not in _CHALLENGE_TIERS:
+            await interaction.response.send_message(
+                "Tier must be daily, trial, or rite.", ephemeral=True,
+            )
+            return
+        await cog.challenge(interaction, _choice(tier))
 
-    @challenge.command(name="config", description="Set where and when challenges post automatically.")
-    @app_commands.describe(channel="Where challenges should appear",
-                           hour="Hour in UTC, 0-23", weekday="Which day the weekly Rite lands on")
-    @app_commands.choices(weekday=[
-        app_commands.Choice(name=d, value=i) for i, d in enumerate(
-            ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
-    ])
+    @challenge.command(name="config", description="Auto.")
+    @app_commands.describe(channel="Channel",
+                           hour="Hour", weekday="0-6")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def challenge_config(self, interaction: discord.Interaction,
                                channel: discord.TextChannel, hour: int = 18,
-                               weekday: app_commands.Choice[int] = None):
+                               weekday: app_commands.Range[int, 0, 6] = None):
         cog = self._cog("Quests")
         if not cog:
             await interaction.response.send_message("Quests isn't loaded.", ephemeral=True)
             return
-        await cog.challengeconfig(interaction, channel, hour, weekday)
+        await cog.challengeconfig(interaction, channel, hour, _weekday_choice(weekday))
 
     # ------------------------------------------------------------------ hex
 
-    @hex_g.command(name="cast", description="(Headmaster / President) Curse a student with a prank hex.")
-    @app_commands.describe(member="Who to hex", effect="Which curse to cast",
-                           duration="How many minutes it lasts (0 = until lifted; Limp Wand is always 60)")
-    @app_commands.choices(effect=HEX_CHOICES)
+    @hex_g.command(name="cast", description="Cast.")
+    @app_commands.describe(member="Who", effect="Id",
+                           duration="Mins")
     async def hex_cast(self, interaction: discord.Interaction, member: discord.Member,
-                       effect: app_commands.Choice[str], duration: app_commands.Range[int, 0, 10080]):
+                       effect: str, duration: app_commands.Range[int, 0, 10080]):
         cog = self._cog("Hexes")
         if not cog:
             await interaction.response.send_message("Hexes isn't loaded.", ephemeral=True)
             return
-        await cog.hex(interaction, member, effect, duration)
+        known = next((c for c in HEX_CHOICES if c.value == effect), None)
+        await cog.hex(interaction, member, known or _choice(effect), duration)
 
-    @hex_g.command(name="lift", description="(Headmaster / President) Lift a hex early.")
-    @app_commands.describe(member="Whose hex to lift")
+    @hex_g.command(name="lift", description="Lift.")
+    @app_commands.describe(member="Who")
     async def hex_lift(self, interaction: discord.Interaction, member: discord.Member):
         cog = self._cog("Hexes")
         if not cog:
@@ -822,7 +813,7 @@ class Staff(commands.Cog):
             return
         await cog.unhex(interaction, member)
 
-    @hex_g.command(name="list", description="(Headmaster / President) Show who's currently hexed.")
+    @hex_g.command(name="list", description="List.")
     async def hex_list(self, interaction: discord.Interaction):
         cog = self._cog("Hexes")
         if not cog:
@@ -832,24 +823,16 @@ class Staff(commands.Cog):
 
     # --------------------------------------------------------------- bingo
 
-    @bingo.command(name="start", description="Open a Wizard Bingo lobby (Join + Start) in the bingo channel.")
+    @bingo.command(name="start", description="Start.")
     @app_commands.describe(
-        mode="Win condition — Traditional, 4 Corners, Diagonals, or a random pattern",
-        name="Optional round name",
-        channel="Ignored — Bingo always runs in the bingo channel",
-    )
-    @app_commands.choices(
-        mode=[
-            app_commands.Choice(name="Traditional — any line", value="traditional"),
-            app_commands.Choice(name="4 Corners", value="corners"),
-            app_commands.Choice(name="Diagonals only", value="diagonals"),
-            app_commands.Choice(name="Random pattern", value="random_pattern"),
-        ]
+        mode="Mode",
+        name="Name",
+        channel="Skip",
     )
     async def bingo_start(
         self,
         interaction: discord.Interaction,
-        mode: app_commands.Choice[str],
+        mode: str,
         name: str = None,
         channel: discord.TextChannel = None,
     ):
@@ -857,11 +840,10 @@ class Staff(commands.Cog):
         if not cog:
             await interaction.response.send_message("Bingo isn't loaded.", ephemeral=True)
             return
-        mode_val = mode.value if isinstance(mode, app_commands.Choice) else mode
-        await cog.staff_start(interaction, name=name, mode=mode_val, channel=channel)
+        await cog.staff_start(interaction, name=name, mode=mode, channel=channel)
 
-    @bingo.command(name="call", description="Manually call a square (optional — auto-calls every 20s after Start).")
-    @app_commands.describe(square="Which square to call (start typing to search)")
+    @bingo.command(name="call", description="Call.")
+    @app_commands.describe(square="Square")
     async def bingo_call(self, interaction: discord.Interaction, square: str):
         cog = self._cog("Bingo")
         if not cog:
@@ -876,7 +858,7 @@ class Staff(commands.Cog):
             return []
         return await cog.call_autocomplete(interaction, current)
 
-    @bingo.command(name="end", description="End the open Wizard Bingo round.")
+    @bingo.command(name="end", description="End.")
     async def bingo_end(self, interaction: discord.Interaction):
         cog = self._cog("Bingo")
         if not cog:
@@ -884,7 +866,7 @@ class Staff(commands.Cog):
             return
         await cog.staff_end(interaction)
 
-    @bingo.command(name="winners", description="List BINGO winners for the open round.")
+    @bingo.command(name="winners", description="Winners.")
     async def bingo_winners(self, interaction: discord.Interaction):
         cog = self._cog("Bingo")
         if not cog:
@@ -894,8 +876,8 @@ class Staff(commands.Cog):
 
     # --------------------------------------------------------------- frog prizes
 
-    @frog.command(name="prize", description="Award a Chocolate Frog card as a prize or reward.")
-    @app_commands.describe(member="Who receives the card", card="Which card (start typing to search)")
+    @frog.command(name="prize", description="Card.")
+    @app_commands.describe(member="Who", card="Card")
     async def frog_prize(
         self, interaction: discord.Interaction, member: discord.Member, card: str
     ):
@@ -914,8 +896,8 @@ class Staff(commands.Cog):
 
     # --------------------------------------------------------------- market
 
-    @market.command(name="sellreset", description="Clear someone's daily Marketplace sell-points cap.")
-    @app_commands.describe(member="Whose sell attempts to reset")
+    @market.command(name="sellreset", description="Cap.")
+    @app_commands.describe(member="Who")
     async def market_sellreset(self, interaction: discord.Interaction, member: discord.Member):
         cog = self._cog("Marketplace")
         if not cog:
@@ -923,34 +905,24 @@ class Staff(commands.Cog):
             return
         await cog.sellreset(interaction, member)
 
-    @market.command(name="setprice", description="Set the point price for a Marketplace item.")
+    @market.command(name="setprice", description="Price.")
     @app_commands.describe(
-        item="What to reprice",
-        points="New price in house points",
+        item="Key",
+        points="Points",
     )
-    @app_commands.choices(item=[
-        app_commands.Choice(name="Buy common ingredient", value="buy_common"),
-        app_commands.Choice(name="Buy uncommon ingredient", value="buy_uncommon"),
-        app_commands.Choice(name="Sell payout per batch", value="sell_payout"),
-        app_commands.Choice(name="Daily sell-points cap", value="sell_daily_cap"),
-        app_commands.Choice(name="Hex Scroll", value="scroll"),
-        app_commands.Choice(name="Shop title", value="title"),
-        app_commands.Choice(name="Room of Requirement", value="room"),
-        app_commands.Choice(name="Broom upgrade token", value="broom_token"),
-    ])
     async def market_setprice(
         self,
         interaction: discord.Interaction,
-        item: app_commands.Choice[str],
+        item: str,
         points: app_commands.Range[int, 0, 100_000],
     ):
         cog = self._cog("Marketplace")
         if not cog:
             await interaction.response.send_message("Marketplace isn't loaded.", ephemeral=True)
             return
-        await cog.staff_setprice(interaction, item.value, int(points))
+        await cog.staff_setprice(interaction, item, int(points))
 
-    @market.command(name="prices", description="Show current Marketplace prices (including staff overrides).")
+    @market.command(name="prices", description="Prices.")
     async def market_prices(self, interaction: discord.Interaction):
         cog = self._cog("Marketplace")
         if not cog:

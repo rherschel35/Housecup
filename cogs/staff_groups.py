@@ -27,11 +27,11 @@ staff = app_commands.Group(
 )
 staffworld = app_commands.Group(
     name="staffworld",
-    description="Staff: world events and dementors.",
+    description="World and threats.",
 )
 staffgame = app_commands.Group(
     name="staffgame",
-    description="Staff: descent, castles, duels, hex, market.",
+    description="Games.",
 )
 staffops = app_commands.Group(
     name="staffops",
@@ -53,31 +53,31 @@ identity = app_commands.Group(
     description="Wand, broom, patronus, and Animagus staff tools.",
 )
 descent = app_commands.Group(
-    name="descent", parent=staffgame, description="Descent staff tools."
+    name="descent", parent=staffgame, description="Descent."
 )
 castles = app_commands.Group(
-    name="castles", parent=staffgame, description="Castle / army PvP staff tools."
+    name="castles", parent=staffgame, description="Castles."
 )
 raid = app_commands.Group(
-    name="raid", parent=staffgame, description="3Raid staff tools."
+    name="raid", parent=staffgame, description="Raids."
 )
 duels = app_commands.Group(
-    name="duels", parent=staffgame, description="Duel staff tools."
+    name="duels", parent=staffgame, description="Duels."
 )
 challenge = app_commands.Group(
-    name="challenge", parent=staffgame, description="Challenge staff tools."
+    name="challenge", parent=staffgame, description="Tasks."
 )
 hexes = app_commands.Group(
-    name="hex", parent=staffgame, description="Headmaster / President hexes."
+    name="hex", parent=staffgame, description="Hexes."
 )
 bingo = app_commands.Group(
-    name="bingo", parent=staffgame, description="Wizard Bingo staff tools."
+    name="bingo", parent=staffgame, description="Bingo."
 )
 frog = app_commands.Group(
-    name="frog", parent=staffgame, description="Chocolate Frog staff prizes."
+    name="frog", parent=staffgame, description="Frogs."
 )
 market = app_commands.Group(
-    name="market", parent=staffgame, description="Marketplace staff tools."
+    name="market", parent=staffgame, description="Market."
 )
 usage = app_commands.Group(
     name="usage", parent=staff, description="Slash-command usage stats."

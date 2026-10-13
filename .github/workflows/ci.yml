@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install requirements
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+
+      - name: Compile and import without a Discord token
+        run: python scripts/check_imports.py
+        env:
+          DISCORD_TOKEN: ""
+
+      - name: Top-level slash command count
+        run: python scripts/check_slash_budget.py
+        env:
+          DISCORD_TOKEN: ""
+
+      - name: Slash command payload size
+        run: python scripts/check_command_payload.py
+        env:
+          DISCORD_TOKEN: ""
