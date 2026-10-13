@@ -89,19 +89,6 @@ TITLE_SCORE = {
     "Married In The Eyes Of The Circle": 71, "The Longest Grudge": 56,
     "Mutual Destruction Pact": 46, "We Need To Stop Meeting Like This": 36,
     "Calendar Nemeses": 29, "Scheduled Enemies": 21,
-    # Wizard's Chess
-    "God-Emperor of the 64 Squares": 88, "International Menace to Casual Gaming": 88,
-    "Board Certified War Criminal": 64, "The Unnecessarily Sweaty Grandmaster": 64,
-    "Department Head of Psychological Warfare": 64,
-    "The Forklift Certified Bishop": 48, "Assistant Manager of Checkmate": 48,
-    "Pawn Star": 30, "Knight Shift Supervisor": 30, "Certified Board Menace": 30,
-    # Wizard's Checkers
-    "The Final Boss of Cracker Barrel": 88, "He Who Has Never Touched Grass": 88,
-    "Supreme Overlord of Checkers & Poor Sportsmanship": 88,
-    "Supreme Chancellor of Tiny Wooden Violence": 64, "King of Ruined Friendships": 64,
-    "Regional Threat to Game Night": 48, "Grandmaster of Bad Intentions": 48,
-    "Destroyer of Friendly Competition": 48,
-    "Checker Wrecker": 30, "Minor Strategic Nuisance": 30,
     # Marketplace (shop exclusive)
     "Accio Self-Respect (No Response)": 40,
     "The Sorting Hat Asked Me to Leave": 40,
@@ -569,12 +556,6 @@ class Adornments(commands.Cog):
         tw = self.bot.get_cog("TriWizard")
         if tw and tw.titles_of(uid):
             out.append("Tri-Wizard Champion")
-        chess_cog = self.bot.get_cog("Chess")
-        if chess_cog:
-            out += chess_cog.titles_of(uid)
-        checkers_cog = self.bot.get_cog("Checkers")
-        if checkers_cog:
-            out += checkers_cog.titles_of(uid)
         market = self.bot.get_cog("Marketplace")
         if market:
             out += market.titles_of(uid)

@@ -10,5 +10,4 @@ tools/
 data/castles_state.json
 data/wizard_assets/
 mirror_test*.png
-chess_ui_*.png
 *.md

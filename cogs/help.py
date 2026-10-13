@@ -138,28 +138,6 @@ HELP = {
             ("broomrace", "Private broom races / challenges on this pitch (see Brooms for daily caps)."),
         ],
     },
-    "board_games": {
-        "title": "Chess & Checkers",
-        "staff": False,
-        "note": (
-            "Chess and Checkers share the board-games channel. Challenge → Accept → "
-            "Make move (piece, then square). Captures are mandatory in checkers; "
-            "multi-jumps stay on the same piece. Wins count for record and titles "
-            "only — no House Cup points."
-        ),
-        "entries": [
-            ("chess challenge", "Challenge someone to Wizard's Chess (chess channel)."),
-            ("chess move", "Make a chess move by squares (or use Make move on the board)."),
-            ("chess resign", "Concede a chess match."),
-            ("chess stats", "Chess wins, losses, draws, and active games."),
-            ("checkers challenge", "Challenge someone to Wizard's Checkers (checkers channel)."),
-            ("checkers move", "Make a checkers move by squares (or use Make move on the board)."),
-            ("checkers resign", "Concede a checkers match."),
-            ("checkers stats", "Checkers wins, losses, and active games."),
-            ("chess reset", "(staff) Wipe someone's chess record."),
-            ("checkers reset", "(staff) Wipe someone's checkers record."),
-        ],
-    },
     "brooms": {
         "title": "Brooms",
         "staff": False,
