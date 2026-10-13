@@ -299,7 +299,7 @@ class WorldCog(commands.Cog, name="World"):
         (never steals an encounter out from under another channel).
         finder_id is the student who stirred it — they get a short exclusive
         cast window before anyone else can try. pay_explore_points is set
-        only by /explore, so that kill counts toward the daily explore cap."""
+        only by /explore, so that kill also counts on the Explore points checklist."""
         if place not in DANGEROUS_PLACES or self.world.rng.random() >= MONSTER_CHANCE:
             return False
         dementors = self.bot.get_cog("Dementors")
@@ -404,8 +404,8 @@ class WorldCog(commands.Cog, name="World"):
             text += f"\n💍 {why}: {self.world.item_line(item)}"
         text += await self.points(ctx.student, interaction.user, self.world.reward_points(res["item"]),
                                   f"🌱 foraged something rare in {P.name}")
-        # Forage can stir a threat too. That kill keeps its own house-point
-        # payout. Only /explore routes the kill through the explore-points cap.
+        # Forage can stir a threat too. Only /explore counts the kill on the
+        # Explore points checklist. The house-point payout is unchanged either way.
         monster = await self.maybe_spawn_monster(place, interaction.channel_id,
                                                  finder_id=interaction.user.id)
         if monster:

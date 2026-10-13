@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Explore-stirred monster kills share the daily explore-points cap.
+"""Explore-stirred monster kills fill the Explore points checklist.
 
-The checklist line "Explore points — x/3 pts left" reads student day["points"],
-capped by POINTS_PER_DAY and reset at America/Chicago midnight. A kill stirred
-by /explore must go through that same counter. Other kills must not.
+The checklist line "Explore points — x/3 pts left" reads student day["points"]
+and resets at America/Chicago midnight. A kill stirred by /explore still pays
+its full house points, and those points also fill that line up to 3. Later
+kills keep paying in full. The checklist credit is not a second payout.
 """
 
 from __future__ import annotations
@@ -112,19 +113,16 @@ async def main() -> None:
     assert reset_student["day"]["date"] == "2026-10-14"
     assert reset_student["day"]["points"] == 3
 
-    # Footers keep the old wording, and say when the cap blocked a kill.
-    assert format_kill_footer([(3, "caldrin", False)]) == "+3 for House Caldrin"
-    assert format_kill_footer([(3, "caldrin", False)], points_word=True) == (
+    # Defeat footers stay the full creature amount.
+    assert format_kill_footer([(3, "caldrin")]) == "+3 for House Caldrin"
+    assert format_kill_footer([(3, "caldrin")], points_word=True) == (
         "+3 points for House Caldrin"
     )
-    assert format_kill_footer([(4, "caldrin", False), (4, "thornmere", False)]) == (
+    assert format_kill_footer([(4, "caldrin"), (4, "thornmere")]) == (
         "+4 for House Caldrin • +4 for House Thornmere"
     )
-    assert format_kill_footer([(0, "caldrin", True)]) == "Explore points for today are used up"
-    assert format_kill_footer([(1, "thornmere", False), (0, "veyren", True)]) == (
-        "+1 for House Thornmere • Explore points for today are used up"
-    )
-    assert format_kill_footer([(0, None, False)]) == ""
+    assert format_kill_footer([(5, "caldrin")]) == "+5 for House Caldrin"
+    assert format_kill_footer([(0, None)]) == ""
 
     # /explore marks the spawn; /forage does not. Wandering keeps the mark.
     assert await threats.try_ambient_spawn(111, "dementor", finder_id=1, pay_explore_points=True)
@@ -147,71 +145,80 @@ async def main() -> None:
     assert threats.state["active"].get("pay_explore_points") is True
     assert "finder_id" not in threats.state["active"]
 
-    # A non-explore kill pays the full creature amount and leaves the tally alone.
-    # An explore kill then uses the cap, and a second one pays nothing.
+    # A non-explore kill pays in full and leaves the checklist alone.
+    # An explore kill pays in full AND fills the line (a 5-point sprite
+    # still pays 5; the line clamps at 3). A later kill pays in full too.
     hunter = Member(20, "Hunter")
     store.state["overrides"][str(hunter.id)] = "caldrin"
     hunter_student = world.student(hunter)
     before = len(store.state["ledger"])
-    awarded, house, capped = await threats._award_kill_points(
+    awarded, house = await threats._award_kill_points(
         hunter, CREATURES["storm_sprite"]["points"], "Defeated a Storm Sprite", explore=False,
     )
-    assert (awarded, house, capped) == (5, "caldrin", False)
+    assert (awarded, house) == (5, "caldrin")
     assert hunter_student.get("day", {}).get("points", 0) == 0
     assert checklist_detail(hunter_student) == "**3/3** pts left"
-    awarded, house, capped = await threats._award_kill_points(
+    awarded, house = await threats._award_kill_points(
         hunter, CREATURES["storm_sprite"]["points"], "Defeated a Storm Sprite", explore=True,
     )
-    assert (awarded, house, capped) == (3, "caldrin", False)
+    assert (awarded, house) == (5, "caldrin")
     assert hunter_student["day"]["points"] == 3
     assert checklist_detail(hunter_student) == "**0/3** pts left"
-    awarded, house, capped = await threats._award_kill_points(
+    awarded, house = await threats._award_kill_points(
         hunter, CREATURES["dementor"]["points"], "Banished a Dementor", explore=True,
     )
-    assert (awarded, house, capped) == (0, "caldrin", True)
+    assert (awarded, house) == (3, "caldrin")
     assert hunter_student["day"]["points"] == 3
-    assert ledger_deltas(store)[before:] == [5, 3]
-    assert store.state["ledger"][-1]["reason"] == "Defeated a Storm Sprite"
-    # allow_points writes no ledger row. Hunter was paid 5 outside the cap
-    # plus a clipped 3 through it — not 5 + 5 + 3.
-    assert store.state["totals"]["season"]["houses"]["caldrin"] == 8
-    assert store.state["totals"]["season"]["members"][str(hunter.id)] == 8
+    assert checklist_detail(hunter_student) == "**0/3** pts left"
+    assert world.world.allow_points(hunter_student, 2) == 0
+    assert ledger_deltas(store)[before:] == [5, 5, 3]
+    assert [row["reason"] for row in store.state["ledger"][before:]] == [
+        "Defeated a Storm Sprite",
+        "Defeated a Storm Sprite",
+        "Banished a Dementor",
+    ]
+    # One ledger row per kill, at the full creature amount. 5 + 5 + 3.
+    assert store.state["totals"]["season"]["houses"]["caldrin"] == 13
+    assert store.state["totals"]["season"]["members"][str(hunter.id)] == 13
 
-    # Two explore points already earned (a legendary find is +2) leave room for 1.
+    # Checklist progress already at 2. A 4-point explore kill still pays 4
+    # and only moves the line from 2 to 3.
     finder = Member(30, "Finder")
     store.state["overrides"][str(finder.id)] = "thornmere"
     finder_student = world.student(finder)
     assert world.world.allow_points(finder_student, 2) == 2
-    awarded, house, capped = await threats._award_kill_points(
+    assert checklist_detail(finder_student) == "**1/3** pts left"
+    awarded, house = await threats._award_kill_points(
         finder, CREATURES["stone_golem"]["points"], "Defeated a Stone Golem", explore=True,
     )
-    assert (awarded, house, capped) == (1, "thornmere", False)
+    assert (awarded, house) == (4, "thornmere")
     assert finder_student["day"]["points"] == 3
     assert checklist_detail(finder_student) == "**0/3** pts left"
-    assert store.state["ledger"][-1]["delta"] == 1
+    assert store.state["ledger"][-1]["delta"] == 4
     assert store.state["ledger"][-1]["reason"] == "Defeated a Stone Golem"
+    assert world.world.note_explore_kill(finder_student, 5) == 0
 
-    # A full cap from yesterday does not block today's explore kill.
+    # Yesterday's finished line does not block today's explore kill.
     stale = Member(40, "Stale")
     store.state["overrides"][str(stale.id)] = "veyren"
     stale_student = world.student(stale)
     stale_student["day"] = {"date": "2000-01-01", "points": 3}
-    awarded, house, capped = await threats._award_kill_points(
+    awarded, house = await threats._award_kill_points(
         stale, CREATURES["wisp_swarm"]["points"], "Defeated a Wisp Swarm", explore=True,
     )
-    assert (awarded, house, capped) == (3, "veyren", False)
+    assert (awarded, house) == (3, "veyren")
     assert stale_student["day"]["date"] == today()
     assert stale_student["day"]["points"] == 3
     assert checklist_detail(stale_student) == "**0/3** pts left"
 
-    # No house: nothing is paid and the tally does not move.
+    # No house: nothing is paid and the checklist does not move.
     stranger = Member(50, "Stranger")
     stranger_student = world.student(stranger)
     rows = len(store.state["ledger"])
-    awarded, house, capped = await threats._award_kill_points(
+    awarded, house = await threats._award_kill_points(
         stranger, 3, "Defeated a Shadow Wolf", explore=True,
     )
-    assert (awarded, house, capped) == (0, None, False)
+    assert (awarded, house) == (0, None)
     assert stranger_student.get("day", {}).get("points", 0) == 0
     assert len(store.state["ledger"]) == rows
 
