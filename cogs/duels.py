@@ -32,9 +32,13 @@ members of the SAME house never award points - otherwise two housemates
 could simply trade wins and mint points for their house. Same-house wins
 also never grow a win streak or pay a streak-bounty bonus.
 
-House Duel Night doubles every cross-house win with no daily cap, tracks a
-night tally, and when it ends crowns the winning house (plus an MVP bonus)
-the same way a Wild Threat Attack tallies up.
+House Duel Night tallies every cross-house win (best-of series still bank
+3/4/5/26, and the other duelist's set wins count too). Nothing is paid when
+the duel ends — no double pay, no rival double — and there is no rematch
+limit. Forfeits and instant ends with no finished game do not count.
+When the night ends, the top 7 by wins split a pool, the MVP and anyone
+who took most of their house's wins get a bonus, and the house with the
+most distinct duelists gets a bonus. Same-house duels still never count.
 
 Wands are cosmetic: they're shown in the duel, but they don't affect it.
 
@@ -58,6 +62,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
+from cogs.point_share import kill_share_awards
 from cogs.velmora_channels import (
     EVENT_ANNOUNCE_CHANNEL_ID,
     channel_mentions,
@@ -441,14 +446,22 @@ GIFT_POINTS = 3
 
 WEEKLY_POINTS = 5            # Duelist of the Week's house bonus
 CHAMPION_ROLE_NAME = os.getenv("DUEL_CHAMPION_ROLE_NAME", "Champion of the Circle")
-DUEL_NIGHT_MULTIPLIER = 2
 # Staff pick 30 or 60 minutes when starting; auto-ends at ends_at.
+# Points are not paid per win. At the end, the top cut splits a pool.
 DUEL_NIGHT_PRESETS = {
     30: "30 minutes",
     60: "1 hour",
 }
-DUEL_NIGHT_MVP_BONUS = 5     # like Wild Threat Attack MVP bonus
-DUEL_NIGHT_HOUSE_BONUS = 10  # winning house bonus at end of night
+DUEL_NIGHT_POOL_BY_MINUTES = {
+    30: 250,
+    60: 400,
+}
+DUEL_NIGHT_TOP_N = 7
+DUEL_NIGHT_POOL_MAX = 75     # max one player takes from the pool
+DUEL_NIGHT_MVP_BONUS = 10    # most wins; every player tied for most gets it
+DUEL_NIGHT_HOUSE_SHARE_PCT = 85   # >= this percent of your house's night wins
+DUEL_NIGHT_HOUSE_SHARE_BONUS = 10
+DUEL_NIGHT_HOUSE_BONUS = 10  # house(s) with the most distinct duelists
 DUEL_NIGHT_COLOR = 0xB8434F
 DUEL_NIGHT_WARN_MINUTES = 5
 DUEL_NIGHT_SCHEDULE_MAX = 3
@@ -484,6 +497,101 @@ except Exception:  # pragma: no cover
 
 def _chicago_now(ts: float | None = None) -> dt.datetime:
     return dt.datetime.fromtimestamp(ts if ts is not None else time.time(), TZ)
+
+
+def duel_night_pool(minutes: int) -> int:
+    """Point pool for a Duel Night length. Unknown lengths pay no pool."""
+    return int(DUEL_NIGHT_POOL_BY_MINUTES.get(int(minutes), 0))
+
+
+def duel_night_payout(rows: list[dict], *, minutes: int) -> dict:
+    """End-of-night awards from a wins tally.
+
+    ``rows`` are ``{uid, wins, house}``. The top ``DUEL_NIGHT_TOP_N`` by wins
+    (tie-break: lower user id) split ``duel_night_pool(minutes)``:
+
+        floor(player_wins / all night wins × pool), capped at DUEL_NIGHT_POOL_MAX
+
+    Wins outside the top cut stay in the denominator and are not paid from
+    the pool. MVP is most wins (+bonus each on a tie). A player with at least
+    DUEL_NIGHT_HOUSE_SHARE_PCT of their own house's night wins gets the share
+    bonus (a solo duelist is 100%). Each house tied for the most distinct
+    duelists gets the house bonus. Player totals are pool + MVP + share.
+    House totals add the house bonus on top of those player totals.
+    """
+    cleaned: list[dict] = []
+    for raw in rows:
+        wins = int(raw.get("wins") or 0)
+        if wins <= 0:
+            continue
+        house = raw.get("house") or None
+        cleaned.append({"uid": int(raw["uid"]), "wins": wins, "house": house})
+    cleaned.sort(key=lambda r: (-r["wins"], r["uid"]))
+    total_wins = sum(r["wins"] for r in cleaned)
+    pool_size = duel_night_pool(minutes)
+    pool = kill_share_awards(
+        [{"uid": r["uid"], "kills": r["wins"]} for r in cleaned],
+        pool=pool_size,
+        top_n=DUEL_NIGHT_TOP_N,
+        total_kills=total_wins,
+        max_each=DUEL_NIGHT_POOL_MAX,
+    )
+    top_wins = cleaned[0]["wins"] if cleaned else 0
+    mvp_uids = {r["uid"] for r in cleaned if top_wins > 0 and r["wins"] == top_wins}
+
+    house_wins: dict[str, int] = {}
+    house_players: dict[str, set[int]] = {}
+    for r in cleaned:
+        house = r["house"]
+        if not house:
+            continue
+        house_wins[house] = house_wins.get(house, 0) + r["wins"]
+        house_players.setdefault(house, set()).add(r["uid"])
+
+    share_uids: set[int] = set()
+    for r in cleaned:
+        house = r["house"]
+        owned = house_wins.get(house or "", 0)
+        if house and owned > 0 and r["wins"] * 100 >= DUEL_NIGHT_HOUSE_SHARE_PCT * owned:
+            share_uids.add(r["uid"])
+
+    best_turnout = max((len(uids) for uids in house_players.values()), default=0)
+    active_houses = {
+        house for house, uids in house_players.items()
+        if best_turnout > 0 and len(uids) == best_turnout
+    }
+
+    player_total: dict[int, int] = {}
+    for r in cleaned:
+        uid = r["uid"]
+        total = pool.get(uid, 0)
+        if uid in mvp_uids:
+            total += DUEL_NIGHT_MVP_BONUS
+        if uid in share_uids:
+            total += DUEL_NIGHT_HOUSE_SHARE_BONUS
+        player_total[uid] = total
+
+    house_total: dict[str, int] = {}
+    for r in cleaned:
+        house = r["house"]
+        if not house:
+            continue
+        house_total[house] = house_total.get(house, 0) + player_total.get(r["uid"], 0)
+    for house in active_houses:
+        house_total[house] = house_total.get(house, 0) + DUEL_NIGHT_HOUSE_BONUS
+
+    return {
+        "rows": cleaned,
+        "pool": pool,
+        "pool_size": pool_size,
+        "mvp_uids": mvp_uids,
+        "share_uids": share_uids,
+        "active_houses": active_houses,
+        "player_total": player_total,
+        "house_total": house_total,
+        "total_wins": total_wins,
+        "best_turnout": best_turnout,
+    }
 
 
 def _night_ping_role_names() -> list[str]:
@@ -568,6 +676,7 @@ class Duels(commands.Cog):
         self.state = self._load()
         self.busy: set[int] = set()   # members currently in a duel / trio / grand
         self.active: dict[int, object] = {}  # user_id -> Duel / GrandDuel / etc.
+        self._night_lock = asyncio.Lock()
 
     async def cog_load(self):
         self.weekly.start()
@@ -997,22 +1106,28 @@ class Duels(commands.Cog):
         self.save()
         return night
 
+    async def _take_expired_duel_night(self, now: float = None) -> dict | None:
+        """Pop an expired night. One caller wins if the 30s tick and the weekly loop overlap."""
+        async with self._night_lock:
+            return self.pop_expired_duel_night(now)
+
     def _credit_duel_night(
         self,
         winner_id: int,
         house: str,
-        pts: int,
+        pts: int = 0,
         *,
         wins: int = 1,
     ) -> None:
-        """Add banked duel wins + points to the live Duel Night scoreboard.
+        """Add banked duel wins to the live Duel Night scoreboard.
 
         ``wins`` is how many record/series wins this result is worth (1 for a
-        normal duel; 3/4/5/26 for best-of 5/7/9/51). Points should already
-        include the night multiplier (and rival bonus, if any).
+        normal duel; 3/4/5/26 for best-of 5/7/9/51; the other duelist's set
+        wins too). Points are not paid here — the pool is split when the
+        night ends — so ``pts`` stays 0.
         """
         night = self.state.get("duel_night")
-        if not night or pts <= 0 or not house:
+        if not night or not house or not self.duel_night_on():
             return
         win_n = max(0, int(wins))
         if win_n <= 0:
@@ -1021,7 +1136,8 @@ class Duels(commands.Cog):
             str(winner_id), {"wins": 0, "pts": 0, "house": house}
         )
         entry["wins"] = int(entry.get("wins", 0)) + win_n
-        entry["pts"] = int(entry.get("pts", 0)) + int(pts)
+        if int(pts) > 0:
+            entry["pts"] = int(entry.get("pts", 0)) + int(pts)
         entry["house"] = house
 
     def note_round_win(self, user_id: int, spell: str) -> None:
@@ -1060,6 +1176,7 @@ class Duels(commands.Cog):
         now: float,
         series: bool,
         role: str,
+        count_night: bool = True,
     ) -> tuple[int, str | None]:
         """Pay house points for banked set/series wins. Returns (pts, reason).
 
@@ -1067,8 +1184,24 @@ class Duels(commands.Cog):
         in a best-of series even if they lost the series). Off-night payouts
         fill the daily duel checklist (``rewarded`` stamps) up to
         ``REWARDED_PER_DAY``.
+
+        During Duel Night nothing is paid and the rival double does not apply.
+        Cross-house banks are only added to the night tally (``count_night``
+        is false for a forfeit / instant end with no finished game). The daily
+        checklist is not stamped, so those paid-win slots still work after the
+        night, and outside the night the stamp path is unchanged.
         """
         banks = max(0, int(banks))
+        if night:
+            if not store or not house:
+                return 0, "no-house"
+            if same_house:
+                return 0, "same-house"
+            if not count_night or banks <= 0:
+                return 0, "no-play"
+            self._credit_duel_night(member.id, house, 0, wins=banks)
+            return 0, "night"
+
         if banks <= 0:
             return 0, None
         if not store or not house:
@@ -1083,17 +1216,6 @@ class Duels(commands.Cog):
             why = f"Duel set wins vs {opponent_name}"
         if series:
             why += f" (best-of series ×{banks})"
-
-        if night:
-            per_bank = 2 if rivals else 1
-            paid_units = banks * per_bank
-            total_pts = paid_units * REWARD_POINTS * DUEL_NIGHT_MULTIPLIER
-            self._credit_duel_night(member.id, house, total_pts, wins=banks)
-            if rivals:
-                why += " (rival)"
-            why += " (Duel Night)"
-            self._award(store, house, total_pts, member.id, why)
-            return total_pts, None
 
         total_pts = 0
         paid_units = 0
@@ -1113,7 +1235,9 @@ class Duels(commands.Cog):
         return 0, "daily-cap"
 
     def settle(self, winner, loser, now: float = None, *, match_wins: int = 1,
-               winner_sets: int | None = None, loser_sets: int | None = None) -> dict:
+               winner_sets: int | None = None, loser_sets: int | None = None,
+               forfeit: bool = False, played_winner_sets: int | None = None,
+               played_loser_sets: int | None = None) -> dict:
         """Record the result, award points, and work out every reward it
         triggers. Returns what happened so the announcement can say so.
 
@@ -1127,6 +1251,11 @@ class Duels(commands.Cog):
 
         In a best-of series, the loser's set wins also fill their daily duel
         checklist / house points (same daily cap as a normal duel win).
+        During Duel Night those banks are tallied instead of paid.
+
+        ``forfeit`` with ``played_*_sets`` of 0 is an instant end with no
+        finished game: it does not join the night tally. Sets already won
+        before a forfeit still count; the unplayed series bank does not.
         """
         now = now if now is not None else time.time()
         match_wins = max(1, int(match_wins))
@@ -1170,10 +1299,22 @@ class Duels(commands.Cog):
                 )
 
         # ------------------------------------------------ house points (per banked win, capped)
+        # Off-night: pay match_wins / loser_sets exactly as before, including a
+        # forfeit. During the night, only finished games join the tally.
         series = match_wins > 1 or winner_sets > 1 or loser_sets > 0
+        if night and forfeit:
+            w_bank = max(0, int(played_winner_sets or 0))
+            l_bank = max(0, int(played_loser_sets or 0))
+            w_count = w_bank > 0
+            l_count = l_bank > 0
+        else:
+            w_bank = match_wins
+            l_bank = loser_sets
+            w_count = True
+            l_count = True
         w_pts, w_reason = self._pay_banked_wins(
             store, winner, w_house,
-            banks=match_wins,
+            banks=w_bank,
             opponent_name=loser.display_name,
             same_house=same_house,
             night=night,
@@ -1181,14 +1322,16 @@ class Duels(commands.Cog):
             now=now,
             series=series and match_wins > 1,
             role="win",
+            count_night=w_count,
         )
         # Best-of: sets the loser took still count toward their daily duel
-        # checklist + house points (capped like a normal win).
+        # checklist + house points (capped like a normal win). During Duel
+        # Night they count on the night tally instead.
         l_pts, l_reason = (0, None)
-        if loser_sets > 0 and (match_wins > 1 or winner_sets > 1):
+        if l_bank > 0 and loser_sets > 0 and (match_wins > 1 or winner_sets > 1):
             l_pts, l_reason = self._pay_banked_wins(
                 store, loser, l_house,
-                banks=loser_sets,
+                banks=l_bank,
                 opponent_name=winner.display_name,
                 same_house=same_house,
                 night=night,
@@ -1196,12 +1339,15 @@ class Duels(commands.Cog):
                 now=now,
                 series=True,
                 role="sets",
+                count_night=l_count,
             )
         outcome = {
             "awarded": w_pts, "reason": w_reason, "house": w_house, "notes": notes,
             "night": night, "rival": rivals, "match_wins": match_wins,
             "winner_sets": winner_sets, "loser_sets": loser_sets,
             "loser_awarded": l_pts, "loser_reason": l_reason, "loser_house": l_house,
+            "night_wins": w_bank if w_reason == "night" else 0,
+            "loser_night_wins": l_bank if l_reason == "night" else 0,
         }
 
         # ------------------------------------------------ Triple Tithe castle perk
@@ -1366,8 +1512,8 @@ class Duels(commands.Cog):
             if pending:
                 self.save()
                 await self._crown(pending)
-            # a forgotten duel night times out and gets tallied like a swarm Attack
-            finished_night = self.pop_expired_duel_night()
+            # Backup for the 30s night tick if that loop was down.
+            finished_night = await self._take_expired_duel_night()
             if finished_night:
                 await self._finalize_duel_night(finished_night, reason="time")
         except Exception:
@@ -1605,7 +1751,7 @@ class Duels(commands.Cog):
             f"{grand_left}/{GRAND_REWARDED_PER_DAY} grand points left today"
         )
         if self.duel_night_on():
-            footer += " • ⚔️ Duel Night: double points, no daily cap, no same-house points"
+            footer += " • ⚔️ Duel Night: wins tally now, points pay at the end"
         embed.set_footer(text=footer)
         await interaction.response.send_message(embed=embed)
 
@@ -1643,18 +1789,26 @@ class Duels(commands.Cog):
 
     def _duel_night_intro_embed(self, minutes: int) -> discord.Embed:
         label = DUEL_NIGHT_PRESETS.get(minutes) or f"{minutes} minutes"
+        pool = duel_night_pool(minutes)
         return discord.Embed(
             title="⚔️ House Duel Night",
             description=(
-                f"**{label}** — every **cross-house** duel win counts **double** "
-                f"for your house with **no daily win cap**. Same-house duels earn "
-                f"**no** house points.\n\n"
-                f"**Best-of** series count in full: win a best of 5/7/9/51 and the "
-                f"night scoreboard banks **3 / 4 / 5 / 26** wins (and double points "
-                f"for each).\n\n"
-                f"When the night ends, the house with the most points gets a "
-                f"**+{DUEL_NIGHT_HOUSE_BONUS}** bonus, and the night's MVP gets "
-                f"**+{DUEL_NIGHT_MVP_BONUS}**.\n\n"
+                f"**{label}.** Every **cross-house** win goes on the night tally, "
+                f"including every game won inside a best-of series. "
+                f"A best of 5/7/9/51 still banks **3 / 4 / 5 / 26** for the series "
+                f"winner, and sets the other duelist takes count too. "
+                f"Same-house duels do not count. There is **no rematch limit**. "
+                f"Forfeits and instant ends with no finished game do not count.\n\n"
+                f"**Nothing is paid when the duel ends** — no double points and no "
+                f"rival bonus. Daily duel points outside this night are unchanged.\n\n"
+                f"When the night ends, the **top {DUEL_NIGHT_TOP_N}** by wins split a "
+                f"**{pool}**-point pool: floor(your wins ÷ every night win × {pool}), "
+                f"capped at **{DUEL_NIGHT_POOL_MAX}** each. "
+                f"The MVP (most wins; ties included) gets **+{DUEL_NIGHT_MVP_BONUS}**. "
+                f"Anyone with at least **{DUEL_NIGHT_HOUSE_SHARE_PCT}%** of their house's "
+                f"night wins gets **+{DUEL_NIGHT_HOUSE_SHARE_BONUS}** (a solo duelist counts). "
+                f"The house with the most distinct duelists gets "
+                f"**+{DUEL_NIGHT_HOUSE_BONUS}** (ties included).\n\n"
                 f"Ends in **{label}**, or when staff call it early."
             ),
             color=DUEL_NIGHT_COLOR,
@@ -1703,12 +1857,18 @@ class Duels(commands.Cog):
                     "Pick a length: **30 minutes** or **1 hour**.", ephemeral=True
                 )
                 return
-            ok, msg, _night = self._begin_duel_night(
-                minutes=int(length.value),
-                by=interaction.user.id,
-                channel_id=interaction.channel_id,
-                guild_id=interaction.guild_id,
-            )
+            async with self._night_lock:
+                expired = None
+                if self.state.get("duel_night") and not self.duel_night_on():
+                    expired = self.pop_expired_duel_night()
+                ok, msg, _night = self._begin_duel_night(
+                    minutes=int(length.value),
+                    by=interaction.user.id,
+                    channel_id=interaction.channel_id,
+                    guild_id=interaction.guild_id,
+                )
+            if expired:
+                await self._finalize_duel_night(expired, reason="time")
             if not ok:
                 await interaction.response.send_message(msg, ephemeral=True)
                 return
@@ -1716,16 +1876,19 @@ class Duels(commands.Cog):
                 embed=self._duel_night_intro_embed(int(length.value)),
             )
         else:
-            night = self.state.get("duel_night")
+            async with self._night_lock:
+                night = self.state.get("duel_night")
+                if night:
+                    self.state["duel_night"] = None
+                    self.save()
             if not night:
                 await interaction.response.send_message(
                     "There's no Duel Night running.", ephemeral=True)
                 return
-            self.state["duel_night"] = None
-            self.save()
             await interaction.response.defer(ephemeral=False)
-            embed = await self._finalize_duel_night(night, reason="staff")
-            await interaction.followup.send(embed=embed)
+            embeds = await self._finalize_duel_night(night, reason="staff")
+            for i in range(0, len(embeds), 10):
+                await interaction.followup.send(embeds=embeds[i:i + 10])
 
     def _resolve_night_ping_roles(self, guild: discord.Guild | None) -> list[discord.Role]:
         if guild is None:
@@ -1819,6 +1982,14 @@ class Duels(commands.Cog):
 
     @tasks.loop(seconds=30)
     async def night_schedule_tick(self):
+        # Expire even when the weekly schedule is off — staff can start a night by hand.
+        try:
+            finished = await self._take_expired_duel_night()
+            if finished:
+                log.info("Duel Night reached ends_at; finalizing")
+                await self._finalize_duel_night(finished, reason="time")
+        except Exception:
+            log.exception("Duel Night expiry check failed")
         sched = self._night_schedule()
         if not sched.get("enabled"):
             return
@@ -1832,6 +2003,7 @@ class Duels(commands.Cog):
         if minutes not in DUEL_NIGHT_PRESETS:
             minutes = 60
         label = DUEL_NIGHT_PRESETS[minutes]
+        pool = duel_night_pool(minutes)
         channel_id = self._night_announce_channel_id()
         guild = self.bot.guilds[0] if self.bot.guilds else None
 
@@ -1841,7 +2013,9 @@ class Duels(commands.Cog):
                 description=(
                     f"Duel Night opens <t:{int(target.timestamp())}:t> "
                     f"(<t:{int(target.timestamp())}:R>) for **{label}**. "
-                    f"Cross-house wins pay double — get ready."
+                    f"Cross-house wins tally toward a **{pool}**-pt pool "
+                    f"(top {DUEL_NIGHT_TOP_N}, max {DUEL_NIGHT_POOL_MAX} each). "
+                    f"Nothing is paid until it ends. Rematch as much as you want."
                 ),
                 color=DUEL_NIGHT_COLOR,
             )
@@ -1854,14 +2028,15 @@ class Duels(commands.Cog):
 
         if target <= now < target + dt.timedelta(seconds=120) and sched.get("last_start_key") != key:
             by = self.bot.user.id if self.bot.user else 0
-            ok, msg, _night = self._begin_duel_night(
-                minutes=minutes,
-                by=by,
-                channel_id=channel_id,
-                guild_id=guild.id if guild else None,
-            )
-            sched["last_start_key"] = key
-            self.save()
+            async with self._night_lock:
+                ok, msg, _night = self._begin_duel_night(
+                    minutes=minutes,
+                    by=by,
+                    channel_id=channel_id,
+                    guild_id=guild.id if guild else None,
+                )
+                sched["last_start_key"] = key
+                self.save()
             if ok:
                 await self._post_night_notice(
                     guild=guild,
@@ -2047,110 +2222,181 @@ class Duels(commands.Cog):
             ephemeral=True,
         )
 
-    async def _finalize_duel_night(self, night: dict, *, reason: str = "staff") -> discord.Embed:
-        """End-of-night scoreboard + MVP / winning-house bonuses (swarm Attack style)."""
+    def _duel_night_score_lines(self, night: dict, *, reason: str) -> tuple[list[str], dict]:
+        """Scoreboard lines plus the payout dict. Does not write the ledger."""
         from cogs.store import HOUSES
 
-        store = self.bot.get_cog("Store")
         tally = night.get("tally") or {}
-        rows = []
+        raw_rows = []
         for uid_str, entry in tally.items():
             try:
                 uid = int(uid_str)
             except (TypeError, ValueError):
                 continue
-            house = entry.get("house")
-            rows.append({
+            raw_rows.append({
                 "uid": uid,
-                "wins": int(entry.get("wins", 0)),
-                "pts": int(entry.get("pts", 0)),
-                "house": house,
+                "wins": int(entry.get("wins", 0) or 0),
+                "house": entry.get("house"),
             })
-        rows.sort(key=lambda r: (-r["pts"], -r["wins"], r["uid"]))
-
-        house_totals: dict[str, int] = {}
-        for r in rows:
-            if r["house"]:
-                house_totals[r["house"]] = house_totals.get(r["house"], 0) + r["pts"]
-
-        top_pts = rows[0]["pts"] if rows else 0
-        mvp_uids = {r["uid"] for r in rows if r["pts"] == top_pts and r["pts"] > 0}
-        top_house_pts = max(house_totals.values()) if house_totals else 0
-        winning_houses = {h for h, p in house_totals.items() if p == top_house_pts and p > 0}
-
-        # Bonus payouts (credited on top of points already earned during the night)
-        if store and rows:
-            actor = self.bot.user.id if self.bot.user else 0
-            for r in rows:
-                if r["uid"] in mvp_uids and r["house"]:
-                    store.record(
-                        house=r["house"],
-                        delta=DUEL_NIGHT_MVP_BONUS,
-                        actor_id=actor,
-                        target_id=r["uid"],
-                        reason="Duel Night MVP bonus",
-                    )
-                    house_totals[r["house"]] = house_totals.get(r["house"], 0) + DUEL_NIGHT_MVP_BONUS
-            for house in winning_houses:
-                # Credit the house bonus through that house's top earner tonight.
-                top = next((r for r in rows if r["house"] == house), None)
-                if not top:
-                    continue
-                store.record(
-                    house=house,
-                    delta=DUEL_NIGHT_HOUSE_BONUS,
-                    actor_id=actor,
-                    target_id=top["uid"],
-                    reason="Duel Night winning house bonus",
-                )
-                house_totals[house] = house_totals.get(house, 0) + DUEL_NIGHT_HOUSE_BONUS
-
         minutes = int(night.get("minutes") or 0)
+        payout = duel_night_payout(raw_rows, minutes=minutes)
+        rows = payout["rows"]
         label = DUEL_NIGHT_PRESETS.get(minutes) or (f"{minutes} minutes" if minutes else "time")
         how = "Staff ended the night" if reason == "staff" else f"Time's up ({label})"
         lines = [
-            f"{how}. Cross-house wins paid double all night — same-house duels never did. "
-            f"Best-of series banked in full (3/4/5/26 for best of 5/7/9/51)."
+            f"{how}. Cross-house wins were tallied all night and paid now. "
+            f"Nothing was paid when each duel ended — no double points, no rival bonus. "
+            f"Same-house duels did not count. "
+            f"Best-of series banked in full (3/4/5/26 for best of 5/7/9/51), "
+            f"and the other duelist's set wins counted too. "
+            f"Forfeits and instant ends with no finished game did not count. "
+            f"No rematch limit."
         ]
-        if rows:
-            lines.append("")
-            lines.append(f"**{sum(r['wins'] for r in rows)}** banked win(s) by **{len(rows)}** duelist(s).")
-            lines.append("")
-            for r in rows[:10]:
-                crown = "👑 " if r["uid"] in mvp_uids else ""
-                bonus_note = f" (+{DUEL_NIGHT_MVP_BONUS} MVP)" if r["uid"] in mvp_uids else ""
-                house_note = (
-                    f" — {HOUSES[r['house']]['emoji']} {HOUSES[r['house']]['name']}"
-                    if r["house"] and r["house"] in HOUSES else " — no house"
-                )
-                lines.append(
-                    f"{crown}<@{r['uid']}>: **{r['pts']}** pts, {r['wins']} win(s)"
-                    f"{house_note}{bonus_note}"
-                )
-        else:
+        if not rows:
             lines.append("")
             lines.append("Nobody banked a cross-house win. The Circle goes quiet.")
+            return lines, payout
 
-        if house_totals:
-            lines.append("")
-            ranked = sorted(house_totals.items(), key=lambda kv: -kv[1])
-            lines.append(" • ".join(
-                f"{'🏆 ' if h in winning_houses else ''}"
-                f"{HOUSES[h]['emoji']} {HOUSES[h]['name']}: **+{p}**"
-                for h, p in ranked if h in HOUSES
-            ))
-            if winning_houses:
-                names = ", ".join(HOUSES[h]["name"] for h in winning_houses if h in HOUSES)
-                lines.append(
-                    f"\n🏆 **{names}** take the night "
-                    f"(+{DUEL_NIGHT_HOUSE_BONUS} winning-house bonus)."
-                )
-
-        embed = discord.Embed(
-            title="🏳️ House Duel Night has ended",
-            description="\n".join(lines),
-            color=DUEL_NIGHT_COLOR,
+        lines.append("")
+        lines.append(
+            f"**{payout['total_wins']}** win(s) by **{len(rows)}** duelist(s). "
+            f"Top **{DUEL_NIGHT_TOP_N}** share a **{payout['pool_size']}**-pt pool "
+            f"(wins ÷ all night wins, max **{DUEL_NIGHT_POOL_MAX}** each)."
         )
+        lines.append("")
+        total_wins = payout["total_wins"] or 1
+        for index, r in enumerate(rows):
+            uid = r["uid"]
+            wins = r["wins"]
+            pool_pts = payout["pool"].get(uid, 0)
+            raw_share = int(payout["pool_size"] * wins / total_wins)
+            pool_txt = f"pool **+{pool_pts}**"
+            if index >= DUEL_NIGHT_TOP_N:
+                pool_txt += f" (outside top {DUEL_NIGHT_TOP_N})"
+            elif uid in payout["pool"] and raw_share > pool_pts:
+                pool_txt += " (cap)"
+            bits = [pool_txt]
+            if uid in payout["mvp_uids"]:
+                bits.append(f"MVP **+{DUEL_NIGHT_MVP_BONUS}**")
+            if uid in payout["share_uids"]:
+                bits.append(f"house share **+{DUEL_NIGHT_HOUSE_SHARE_BONUS}**")
+            total = payout["player_total"].get(uid, 0)
+            if r["house"] in HOUSES:
+                meta = HOUSES[r["house"]]
+                house_note = f"{meta['emoji']} {meta['name']}"
+            elif r["house"]:
+                house_note = str(r["house"])
+            else:
+                house_note = "no house"
+            crown = "👑 " if uid in payout["mvp_uids"] else ""
+            lines.append(
+                f"{crown}<@{uid}>: **{wins}** wins, {', '.join(bits)} = **{total}** — {house_note}"
+            )
+
+        ranked = sorted(
+            payout["house_total"].items(),
+            key=lambda kv: (-kv[1], HOUSES.get(kv[0], {}).get("name", kv[0])),
+        )
+        shown = [(h, p) for h, p in ranked if h in HOUSES]
+        if shown:
+            lines.append("")
+            lines.append(" • ".join(
+                f"{'🏆 ' if h in payout['active_houses'] else ''}"
+                f"{HOUSES[h]['emoji']} {HOUSES[h]['name']}: **+{p}**"
+                for h, p in shown
+            ))
+        if payout["active_houses"]:
+            names = ", ".join(
+                HOUSES[h]["name"] for h in sorted(
+                    payout["active_houses"],
+                    key=lambda key: HOUSES.get(key, {}).get("name", key),
+                )
+                if h in HOUSES
+            )
+            if names:
+                lines.append(
+                    f"Most distinct duelists: **{names}** "
+                    f"(+{DUEL_NIGHT_HOUSE_BONUS})."
+                )
+        return lines, payout
+
+    @staticmethod
+    def _night_result_embeds(lines: list[str]) -> list[discord.Embed]:
+        title = "🏳️ House Duel Night has ended"
+        chunks: list[str] = []
+        cur: list[str] = []
+        size = 0
+        limit = 3900
+        for line in lines:
+            add = len(line) + (1 if cur else 0)
+            if cur and size + add > limit:
+                chunks.append("\n".join(cur))
+                cur = [line]
+                size = len(line)
+            else:
+                cur.append(line)
+                size += add
+        if cur:
+            chunks.append("\n".join(cur))
+        if not chunks:
+            chunks = [""]
+        embeds: list[discord.Embed] = []
+        for i, desc in enumerate(chunks):
+            embeds.append(discord.Embed(
+                title=title if i == 0 else f"{title} (cont.)",
+                description=desc[:4096],
+                color=DUEL_NIGHT_COLOR,
+            ))
+        return embeds
+
+    def _record_duel_night_payout(self, payout: dict) -> None:
+        """Write pool, MVP, house-share, and most-duelists awards. Atomic via store.record."""
+        from cogs.store import HOUSES
+
+        store = self.bot.get_cog("Store")
+        if not store:
+            return
+        actor = self.bot.user.id if self.bot.user else 0
+
+        def _record(house: str | None, delta: int, target_id: int, reason: str) -> None:
+            if not house or house not in HOUSES or delta <= 0:
+                return
+            store.record(
+                house=house,
+                delta=delta,
+                actor_id=actor,
+                target_id=target_id,
+                reason=reason,
+            )
+
+        for r in payout["rows"]:
+            uid = r["uid"]
+            house = r["house"]
+            pool_pts = payout["pool"].get(uid, 0)
+            if pool_pts:
+                _record(house, pool_pts, uid, "Duel Night pool share")
+            if uid in payout["mvp_uids"]:
+                _record(house, DUEL_NIGHT_MVP_BONUS, uid, "Duel Night MVP bonus")
+            if uid in payout["share_uids"]:
+                _record(house, DUEL_NIGHT_HOUSE_SHARE_BONUS, uid, "Duel Night house share bonus")
+        for house in sorted(payout["active_houses"]):
+            members = [r for r in payout["rows"] if r["house"] == house]
+            if not members:
+                continue
+            # Most wins, then lowest user id — same tie-break as the pool cut.
+            top = min(members, key=lambda r: (-r["wins"], r["uid"]))
+            _record(
+                house,
+                DUEL_NIGHT_HOUSE_BONUS,
+                top["uid"],
+                "Duel Night most active house",
+            )
+
+    async def _finalize_duel_night(self, night: dict, *, reason: str = "staff") -> list[discord.Embed]:
+        """End-of-night scoreboard. Pays the pool and bonuses through store.record."""
+        lines, payout = self._duel_night_score_lines(night, reason=reason)
+        self._record_duel_night_payout(payout)
+        embeds = self._night_result_embeds(lines)
 
         # Auto-expire posts to the shared event announce board.
         channel_id = night.get("channel_id") or self._night_announce_channel_id()
@@ -2158,10 +2404,11 @@ class Duels(commands.Cog):
             channel = self.bot.get_channel(channel_id)
             if channel is not None:
                 try:
-                    await channel.send(embed=embed)
+                    for i in range(0, len(embeds), 10):
+                        await channel.send(embeds=embeds[i:i + 10])
                 except discord.DiscordException:
                     log.exception("Could not post Duel Night finale.")
-        return embed
+        return embeds
 
     # -------------------------------------------------------- trio / grand settle
 
@@ -2253,25 +2500,21 @@ class Duels(commands.Cog):
         store = self.bot.get_cog("Store")
         w_house = store.member_house(winner) if store else None
         l_house = store.member_house(loser) if store else None
-        night = self.duel_night_on(now)
         awarded = 0
         reason = None
+        # Grand keeps its daily cap during Duel Night. It is not doubled and
+        # does not join the night pool, so the Grand checklist line still fills.
         if not store or not w_house:
             reason = "no-house"
         elif w_house == l_house:
             reason = "same-house"
-        elif (not night) and self.grand_rewarded_today(winner.id, now) >= GRAND_REWARDED_PER_DAY:
+        elif self.grand_rewarded_today(winner.id, now) >= GRAND_REWARDED_PER_DAY:
             reason = "daily-cap"
         else:
-            pts = GRAND_REWARD_POINTS * (DUEL_NIGHT_MULTIPLIER if night else 1)
+            pts = GRAND_REWARD_POINTS
             why = f"Grand Duel win over {loser.display_name}"
-            if night:
-                why += " (Duel Night)"
             self._award(store, w_house, pts, winner.id, why)
-            if night:
-                self._credit_duel_night(winner.id, w_house, pts)
-            else:
-                self.state["grand_rewarded"].setdefault(str(winner.id), []).append(now)
+            self.state["grand_rewarded"].setdefault(str(winner.id), []).append(now)
             awarded = pts
 
         wins = self.record_of(winner.id)["grand_w"]
@@ -2283,7 +2526,7 @@ class Duels(commands.Cog):
         self.save()
         return {
             "awarded": awarded, "reason": reason, "house": w_house,
-            "night": night, "notes": notes,
+            "night": False, "notes": notes,
         }
 
     # ---------------------------------------------------------------- trio
@@ -2773,6 +3016,10 @@ class Duel:
         self.cog.release_match(self)
         winner_sets = int(self.set_score.get(winner.id, 0) or 0)
         loser_sets = int(self.set_score.get(loser.id, 0) or 0)
+        # Sets actually finished before this call. A timeout forfeit with none
+        # of these is an instant end: it must not join the Duel Night tally.
+        played_winner_sets = winner_sets
+        played_loser_sets = loser_sets
         # Normal first-to-2: one set played → 1–0. Series: use the real set tally
         # so a 4–1 best-of-7 banks +4W/+1L for the champ and +1W/+4L for the other.
         if self.series_to_win <= 1:
@@ -2783,19 +3030,33 @@ class Duel:
             match_wins=self.match_wins,
             winner_sets=winner_sets,
             loser_sets=loser_sets,
+            forfeit=forfeit,
+            played_winner_sets=played_winner_sets,
+            played_loser_sets=played_loser_sets,
         )
 
         from cogs.store import HOUSES
         if outcome.get("flourish"):
             self.history.append(f"*{outcome['flourish']}*")
 
-        def _points_bit(member, awarded, reason, house_key) -> str:
+        def _points_bit(member, awarded, reason, house_key, night_wins=0) -> str:
+            if reason == "night":
+                tallied = (
+                    f"{member.display_name}: {night_wins} win(s) on the Duel Night board "
+                    f"(paid when the night ends)"
+                )
+                if awarded and house_key and house_key in HOUSES:
+                    h = HOUSES[house_key]
+                    return f"+{awarded} to {h['emoji']} {h['name']} • {tallied}"
+                return tallied
+            if reason == "no-play":
+                return (
+                    f"{member.display_name}: no finished game — "
+                    f"doesn't count for Duel Night"
+                )
             if awarded and house_key and house_key in HOUSES:
                 h = HOUSES[house_key]
-                bit = f"+{awarded} to {h['emoji']} {h['name']}"
-                if outcome.get("night"):
-                    bit += " (Duel Night!)"
-                return bit
+                return f"+{awarded} to {h['emoji']} {h['name']}"
             if reason == "same-house":
                 return "Housemates — no points change hands"
             if reason == "daily-cap":
@@ -2813,15 +3074,20 @@ class Duel:
                 outcome.get("awarded") or 0,
                 outcome.get("reason"),
                 outcome.get("house"),
+                outcome.get("night_wins") or 0,
             )
         ]
         # Best-of series: mention the loser's set-win payout / cap separately.
-        if (outcome.get("loser_sets") or 0) > 0 and self.match_wins > 1:
+        if (
+            ((outcome.get("loser_sets") or 0) > 0 and self.match_wins > 1)
+            or (outcome.get("loser_night_wins") or 0) > 0
+        ):
             loser_bit = _points_bit(
                 loser,
                 outcome.get("loser_awarded") or 0,
                 outcome.get("loser_reason"),
                 outcome.get("loser_house"),
+                outcome.get("loser_night_wins") or 0,
             )
             if loser_bit and loser_bit != bits[0]:
                 # Same-house already said once; otherwise append set credit.
