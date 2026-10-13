@@ -36,25 +36,15 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.config import DEFAULT_PRICES, HEADMASTER_ROLE_NAME
+
 log = logging.getLogger("velmora.marketplace")
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "marketplace.json"
 
-HEADMASTER_ROLE_NAME = "headmasters"
-
 # Defaults — live values live in marketplace.json under "prices" (staff can change).
-DEFAULT_PRICES = {
-    "buy_common": 3,
-    "buy_uncommon": 6,
-    "sell_payout": 3,
-    "sell_daily_cap": 6,
-    "scroll": 30,
-    "title": 50,
-    "room": 500,
-    "broom_token": 50,
-}
 PRICE_LABELS = {
     "buy_common": "Buy common ingredient",
     "buy_uncommon": "Buy uncommon ingredient",

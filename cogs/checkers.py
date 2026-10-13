@@ -44,6 +44,11 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from cogs.checkers_board import describe_move, piece_label, render_board, square_name as board_square_name
+from cogs.config import (
+    BOARD_GAME_POINTS_PER_WIN as POINTS_PER_WIN,
+    BOARD_GAME_WEEKLY_WIN_CAP as WEEKLY_WIN_CAP,
+    CHECKERS_CHANNEL_ID,
+)
 
 log = logging.getLogger("velmora.checkers")
 
@@ -54,11 +59,8 @@ STATE_PATH = STATE_DIR / "checkers_state.json"
 # Same board-games channel as Wizard's Chess.
 from cogs.velmora_channels import OPEN_LOUNGE_CHANNEL_IDS, channel_mentions
 
-CHECKERS_CHANNEL_ID = 1553832675993985024
 CHECKERS_CHANNEL_IDS = frozenset({CHECKERS_CHANNEL_ID, *OPEN_LOUNGE_CHANNEL_IDS})
 
-POINTS_PER_WIN = 0  # board games do not award House Cup points
-WEEKLY_WIN_CAP = 0
 TIMEOUT_SECONDS = 24 * 3600
 CHALLENGE_TIMEOUT_SECONDS = 60
 # Back-compat alias for anything that still imports the old name.

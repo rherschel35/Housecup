@@ -28,6 +28,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.config import FROG_DECADE_PTS as DECADE_PTS, FROG_MYTHIC_PTS as MYTHIC_PTS
 from cogs.frog_card_art import render_card_png as _compose_card_png
 from cogs.world_engine import today
 
@@ -40,9 +41,6 @@ STATE_PATH = STATE_DIR / "frogs_state.json"
 # Ultra-rare: ~1 in N opens (default 250). Env override for testing.
 MYTHIC_ODDS = max(50, int(os.getenv("FROG_MYTHIC_ODDS", "250")))
 MYTHIC_ID = "lumen_aegis"
-DECADE_PTS = 10
-MYTHIC_PTS = 25
-
 RARITY_ORDER = ("common", "uncommon", "rare", "legendary", "mythic")
 RARITY_WEIGHT = {
     "common": 55,

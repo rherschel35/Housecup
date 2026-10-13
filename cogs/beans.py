@@ -22,14 +22,14 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.config import BEAN_COST as COST, BEANS_PER_DAY
+
 log = logging.getLogger("velmora.beans")
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 BEANS_PATH = STATE_DIR / "beans.json"
 
-COST = 1
-BEANS_PER_DAY = 3
 WINDOW = 24 * 3600
 
 # (weight, net change including the bean's cost, verdict, flavours)

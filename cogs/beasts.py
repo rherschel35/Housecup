@@ -47,6 +47,13 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
+from cogs.config import (
+    BEAST_BEFRIEND_COMPLETION_POINTS as BEFRIEND_COMPLETION_POINTS,
+    BEAST_BEFRIEND_GOAL as BEFRIEND_GOAL,
+    BEAST_CHANNEL_ID_DEFAULT,
+    BEAST_JOURNAL_COMPLETE_POINTS as JOURNAL_COMPLETE_POINTS,
+    BEAST_RARITY_POINTS as RARITY_POINTS,
+)
 from cogs.world_engine import is_night
 
 log = logging.getLogger("velmora.beasts")
@@ -57,7 +64,7 @@ STATE_PATH = STATE_DIR / "beasts_state.json"
 BEASTS_PATH = DATA_DIR / "beasts.json"
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "beast_art_assets"
 
-DEFAULT_CHANNEL_ID = int(os.getenv("BEAST_CHANNEL_ID", "1552403888890576916") or 0)  # #explore-velmora
+DEFAULT_CHANNEL_ID = int(os.getenv("BEAST_CHANNEL_ID", BEAST_CHANNEL_ID_DEFAULT) or 0)  # #explore-velmora
 
 # Timing: 5-6 sightings a day across the whole server.
 GAP_MIN_HOURS = 2.5
@@ -66,19 +73,15 @@ STAY_MINUTES = 10
 APPROACH_CLAIM_SECONDS = 60  # first /approach gets exclusive dibs this long
 
 RARITY_WEIGHTS = {"common": 50, "uncommon": 30, "rare": 15, "legendary": 5}
-RARITY_POINTS = {"common": 1, "uncommon": 2, "rare": 3, "legendary": 5}  # legacy
 RARITY_COLORS = {"common": 0x7FA66A, "uncommon": 0x4F8FC0, "rare": 0x9B59B6, "legendary": 0xE0A526}
 SIGHTING_COLOR = 0x2E8B44  # every "X appears!" alert, regardless of rarity, so it never blends in
 RARITY_LABEL = {"common": "Common", "uncommon": "Uncommon", "rare": "Rare", "legendary": "Legendary"}
-BEFRIEND_GOAL = 5
-BEFRIEND_COMPLETION_POINTS = 3
 DAILY_POINT_CAP = BEFRIEND_GOAL  # checklist / back-compat alias
 WINDOW = 24 * 3600  # legacy rolling window (journal / old paid rows)
 SUMMON_COOLDOWN = 60
 LINGER_GRACE = 120           # Lingering Charm: wearers can still approach this long after a beast leaves
 JOURNAL_PAGES = 3            # studies needed to complete one beast's journal entry
 STUDY_WINDOW = 24 * 3600     # one study action per student per day
-JOURNAL_COMPLETE_POINTS = 5  # house points when a beast's journal is finished (once)
 
 PLACES = {
     "garden": "The Garden",

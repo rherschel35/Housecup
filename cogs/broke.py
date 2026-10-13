@@ -16,11 +16,13 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.config import BROKE_REPORT_CHANNEL_ID_DEFAULT
+
 log = logging.getLogger("velmora.broke")
 
 # Staff inbox for "something broke" tickets.
 REPORT_CHANNEL_ID = int(
-    os.getenv("BROKE_REPORT_CHANNEL_ID", "1555383179802579005") or 0
+    os.getenv("BROKE_REPORT_CHANNEL_ID", BROKE_REPORT_CHANNEL_ID_DEFAULT) or 0
 )
 
 COOLDOWN_SECONDS = 120

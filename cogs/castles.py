@@ -24,6 +24,13 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
+from cogs.config import (
+    BANNERHALL_PER_CASTLE,
+    BIND_BONUS_GOAL,
+    BIND_BONUS_MIN_FLOOR,
+    BIND_BONUS_POINTS,
+    SUNDAY_CASTLE_POINTS,
+)
 from cogs.descent import DESCENT_CHANNEL_IDS
 from cogs.velmora_channels import CASTLES_CHANNEL_IDS, channel_mentions
 
@@ -71,13 +78,6 @@ BOSS_WALL_DEF_MULT = 1.75  # Bannerhall boss wall
 DAILY_RECRUIT_CAP = 200
 ARMY_CAP = 5000  # total monsters (home + garrison + march) — only while PvP is live
 ARMY_PAGE_SIZE = 12  # units listed per /army page
-SUNDAY_CASTLE_POINTS = 50
-BANNERHALL_PER_CASTLE = 30
-# Daily house-point bonus: bind this many floor-40+ monsters (Chicago day).
-BIND_BONUS_GOAL = 200
-BIND_BONUS_POINTS = 10
-BIND_BONUS_MIN_FLOOR = 40
-
 SIEGE_WEEKDAYS = {2, 5}  # Wed=2, Sat=5 in datetime
 
 ELEMENTS = ("poison", "fire", "ice", "lightning", "light")

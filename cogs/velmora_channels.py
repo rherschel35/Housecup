@@ -10,70 +10,26 @@ Everything lounges are open lounges that also allow explore, Wild Threats,
 practice swarms, and Bingo. Still not castle PvP or 3Raid.
 """
 
-STUDY_HALL_CHANNEL_ID = 1555035151208153209  # new-student study hall
-
-# Shared Potions/Duels room — also one of the multi-game open lounges.
-DUELS_POTIONS_CHANNEL_ID = 1555554825616236726
-
-# Full multi-game lounge: everything except castle PvP and 3Raid.
-EVERYTHING_LOUNGE_CHANNEL_ID = 1558611215054282822
-EVERYTHING_LOUNGE_CHANNEL_IDS = frozenset({EVERYTHING_LOUNGE_CHANNEL_ID})
-
-# Multi-game lounges — duels, potions, Descent, Quidditch/broom, chess/checkers.
-# Not: Wild Threat spawns, exploring, castle PvP, or 3Raid
-# (except channels also listed in EVERYTHING_LOUNGE_CHANNEL_IDS).
-OPEN_LOUNGE_CHANNEL_IDS = frozenset({
-    1557137090058395768,
-    DUELS_POTIONS_CHANNEL_ID,
-    *EVERYTHING_LOUNGE_CHANNEL_IDS,
-})
-
-# Open lounges that keep explore / threats / practice swarms out.
-RESTRICTED_OPEN_LOUNGE_CHANNEL_IDS = frozenset(
-    OPEN_LOUNGE_CHANNEL_IDS - EVERYTHING_LOUNGE_CHANNEL_IDS
-)
-
-# Lounge where duels, potions, Quidditch, broom races, and practice
-# Wild Threat summons all run (Attack waves never flood this room).
-SHARED_GAMES_CHANNEL_ID = 1556100254082924595
-SHARED_GAMES_CHANNEL_IDS = frozenset({SHARED_GAMES_CHANNEL_ID})
-
-# Dedicated house practice swarm rooms (Attack waves never flood these).
-SWARM_PRACTICE_CHANNEL_ID = 1558467851587817472
-SWARM_PRACTICE_CHANNEL_IDS = frozenset({
-    SWARM_PRACTICE_CHANNEL_ID,
-    1558543500742623375,
-    1558543550247993374,
-    1558543590819631227,
-})
-
-# Castle / army PvP — sieges, map board, battle reports.
-CASTLES_CHANNEL_ID = 1556398769275404441
-CASTLES_CHANNEL_IDS = frozenset({CASTLES_CHANNEL_ID})
-
-# Wizard Bingo — primary room, plus everything lounges.
-BINGO_CHANNEL_ID = 1558313269800734740
-BINGO_CHANNEL_IDS = frozenset({
+from cogs.config import (
     BINGO_CHANNEL_ID,
-    *EVERYTHING_LOUNGE_CHANNEL_IDS,
-})
-
-# Extra rooms where /duel is allowed (in addition to DUEL_CHANNEL_ID,
-# study hall, the shared Potions/Duels room, and SHARED_GAMES_CHANNEL_ID).
-EXTRA_DUEL_CHANNEL_IDS = frozenset({
-    1556111133314916476,
-    1556111252713902172,
-})
-
-# Warn / start / results board for scheduled Attack swarms and Duel Night.
-# Override with env EVENT_ANNOUNCE_CHANNEL_ID if needed.
-EVENT_ANNOUNCE_CHANNEL_ID = 1542575004313722921
-
-# Living weekly Attack / Duel Night / Challenge schedule board.
-# Override with env EVENT_BOARD_CHANNEL_ID if needed.
-EVENT_BOARD_CHANNEL_ID = 1551945597362241658
-# Scratch room for trying the board before the official post.
-EVENT_BOARD_TEST_CHANNEL_ID = 1552401261184155648
+    BINGO_CHANNEL_IDS,
+    CASTLES_CHANNEL_ID,
+    CASTLES_CHANNEL_IDS,
+    DUELS_POTIONS_CHANNEL_ID,
+    EVENT_ANNOUNCE_CHANNEL_ID,
+    EVENT_BOARD_CHANNEL_ID,
+    EVENT_BOARD_TEST_CHANNEL_ID,
+    EVERYTHING_LOUNGE_CHANNEL_ID,
+    EVERYTHING_LOUNGE_CHANNEL_IDS,
+    EXTRA_DUEL_CHANNEL_IDS,
+    OPEN_LOUNGE_CHANNEL_IDS,
+    RESTRICTED_OPEN_LOUNGE_CHANNEL_IDS,
+    SHARED_GAMES_CHANNEL_ID,
+    SHARED_GAMES_CHANNEL_IDS,
+    STUDY_HALL_CHANNEL_ID,
+    SWARM_PRACTICE_CHANNEL_ID,
+    SWARM_PRACTICE_CHANNEL_IDS,
+)
 
 
 def with_open_lounges(*channel_ids: int) -> frozenset[int]:

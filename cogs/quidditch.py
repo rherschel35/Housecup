@@ -41,6 +41,11 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.config import (
+    QUIDDITCH_CHANNEL_ID,
+    QUIDDITCH_HOUSE_COMPLETION_POINTS as HOUSE_COMPLETION_POINTS,
+    QUIDDITCH_HOUSE_WIN_GOAL as HOUSE_WIN_GOAL,
+)
 from cogs.store import HOUSE_KEYS, HOUSES as STORE_HOUSES
 from cogs.velmora_channels import channel_mentions, with_pitch_homes
 
@@ -51,7 +56,6 @@ STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "quidditch_state.json"
 
 # Quidditch pitch + study hall + shared games lounge.
-QUIDDITCH_CHANNEL_ID = 1553089438933065913
 QUIDDITCH_CHANNEL_IDS = with_pitch_homes(QUIDDITCH_CHANNEL_ID)
 
 
@@ -85,8 +89,6 @@ SNITCH_CHANCE_PER_CHASER = 0.12   # per chaser, per round
 SNITCH_BONUS = 30                 # added to the catcher's side's score
 
 # House-level daily set: 5 house-match wins for that house → +5 once.
-HOUSE_WIN_GOAL = 5
-HOUSE_COMPLETION_POINTS = 5
 HOUSE_POINTS_PER_WIN = HOUSE_COMPLETION_POINTS  # legacy alias
 DAILY_HOUSE_WIN_CAP = HOUSE_WIN_GOAL  # legacy alias / checklist
 

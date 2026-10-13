@@ -38,6 +38,7 @@ from cogs.bingo_patterns import (
     pick_random_pattern,
     preview_for_round,
 )
+from cogs.config import BINGO_MAX_WINNERS as MAX_WINNERS, BINGO_POINTS
 from cogs.velmora_channels import (
     BINGO_CHANNEL_ID,
     BINGO_CHANNEL_IDS,
@@ -52,8 +53,6 @@ STATE_PATH = STATE_DIR / "bingo_state.json"
 SQUARES_PATH = DATA_DIR / "bingo_squares.json"
 
 GOLD = 0xD4A84A
-BINGO_POINTS = 5
-MAX_WINNERS = 5
 ROWS = COLS = 5
 CALL_INTERVAL_SEC = 20
 PHASE_LOBBY = "lobby"

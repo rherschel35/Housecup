@@ -28,6 +28,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
+from cogs.config import HEADMASTER_USER_ID_DEFAULT
+
 log = logging.getLogger("velmora.animagus")
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -44,7 +46,7 @@ GOLD = 0xC9A24A
 # Headmaster: always become this animal on first /animagus (any three words).
 # Same default Discord id as CAST_AUTO_USER_ID. Override with ANIMAGUS_FORCE_USER_ID;
 # unset/0 disables. Animal override: ANIMAGUS_FORCE_ANIMAL (must be a FORMS key).
-_raw_force_uid = os.getenv("ANIMAGUS_FORCE_USER_ID", "555141900802457630")
+_raw_force_uid = os.getenv("ANIMAGUS_FORCE_USER_ID", HEADMASTER_USER_ID_DEFAULT)
 FORCE_USER_ID = (
     int(_raw_force_uid) if _raw_force_uid and str(_raw_force_uid).isdigit() else None
 )

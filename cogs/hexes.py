@@ -31,13 +31,14 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
+from cogs.config import HEADMASTER_ROLE_NAME
+
 log = logging.getLogger("velmora.hexes")
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "hexes_state.json"
 
-HEADMASTER_ROLE_NAME = "headmasters"  # matched case-insensitively; rename here if the role's name changes
 RELAY_WEBHOOK_NAME = "Velmora Hex Relay"
 
 WORD = re.compile(r"[A-Za-z']+")

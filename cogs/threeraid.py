@@ -28,6 +28,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.config import THREERAID_CHANNEL_ID, THREERAID_POINTS_ON_CLEAR as POINTS_ON_CLEAR
+
 log = logging.getLogger("velmora.threeraid")
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -35,12 +37,9 @@ STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "threeraid_state.json"
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "3raid_art_assets"
 
-THREERAID_CHANNEL_ID = 1553925340043157504
-
 PARTY_SIZE = 3
 SKILL_BUDGET = 6
 SKILL_MAX = 2
-POINTS_ON_CLEAR = 25
 ROUND_TIMEOUT = 90
 SIGNUP_TIMEOUT = 1800
 FIGHT_VIEW_TIMEOUT = 1800

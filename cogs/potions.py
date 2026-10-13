@@ -33,6 +33,12 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.config import (
+    BREW_COMPLETION_POINTS,
+    BREW_GOAL,
+    EVENT_BOARD_TEST_CHANNEL_ID,
+    POTIONS_CHANNEL_ID,
+)
 from cogs.velmora_channels import channel_mentions, with_study_hall_and_duels_potions
 
 log = logging.getLogger("velmora.potions")
@@ -43,11 +49,9 @@ STATE_PATH = STATE_DIR / "potions_state.json"
 
 # Potions classroom + scratch/test room + study hall / open lounges.
 POTIONS_CHANNEL_IDS = with_study_hall_and_duels_potions(
-    1553253009398693958,
-    1552401261184155648,
+    POTIONS_CHANNEL_ID,
+    EVENT_BOARD_TEST_CHANNEL_ID,
 )
-# Kept for any older references / embeds that expect a single home channel.
-POTIONS_CHANNEL_ID = 1553253009398693958
 
 # ------------------------------------------------------------- Potion Rep
 
@@ -433,10 +437,6 @@ def next_rank(idx: int) -> Optional[tuple[int, str]]:
     if idx + 1 >= len(REP_RANKS):
         return None
     return REP_RANKS[idx + 1][0], REP_RANKS[idx + 1][1]
-
-
-BREW_GOAL = 5
-BREW_COMPLETION_POINTS = 3
 
 
 def _utc_day() -> str:

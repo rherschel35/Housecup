@@ -34,6 +34,13 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.config import (
+    BROOM_CHALLENGE_POINT_CAP as CHALLENGE_POINT_CAP,
+    BROOM_CHALLENGE_POINTS as CHALLENGE_POINTS,
+    BROOM_SOLO_COMPLETION_POINTS as SOLO_COMPLETION_POINTS,
+    BROOM_SOLO_DAILY_CAP as SOLO_DAILY_CAP,
+    QUIDDITCH_CHANNEL_ID,
+)
 from cogs.velmora_channels import channel_mentions, with_pitch_homes
 
 log = logging.getLogger("velmora.broom_race")
@@ -44,18 +51,12 @@ COURSES_PATH = DATA_DIR / "broom_courses.json"
 STATE_PATH = STATE_DIR / "broom_races.json"
 
 # Same pitch as team Quidditch, plus study hall + shared games lounge.
-QUIDDITCH_CHANNEL_ID = 1553089438933065913
 QUIDDITCH_CHANNEL_IDS = with_pitch_homes(QUIDDITCH_CHANNEL_ID)
 
 RACE_COLOR = 0x2E6B4F
 STAGE_TIMEOUT = 90
 ACCEPT_TIMEOUT = 60
 STAGES = 6
-
-SOLO_DAILY_CAP = 5
-SOLO_COMPLETION_POINTS = 3  # once for finishing all 5 solo races in a day
-CHALLENGE_POINT_CAP = 3
-CHALLENGE_POINTS = 3
 
 
 def today_str() -> str:

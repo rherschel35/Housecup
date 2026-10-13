@@ -27,6 +27,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.config import FAMILIAR_FRIENDSHIP_CAP as FRIENDSHIP_CAP
 from cogs.world_engine import today
 
 log = logging.getLogger("velmora.familiars")
@@ -37,7 +38,6 @@ STATE_PATH = STATE_DIR / "familiars.json"
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "familiar_art_assets"
 
 FRIENDSHIP_PER_ACTION = 2
-FRIENDSHIP_CAP = 100
 SCOUT_POINT_CHANCE = 0.12
 NAME_MAX_LEN = 24
 

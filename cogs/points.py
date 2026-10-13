@@ -15,13 +15,10 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.config import MAX_PER_AWARD
 from cogs.store import HOUSES, house_display
 
 log = logging.getLogger("velmora.points")
-
-# The most a single command can move, so a slip of the keyboard can't hand
-# one house ten thousand points.
-MAX_PER_AWARD = 500
 
 HOUSE_CHOICES = [
     app_commands.Choice(name=f"House {meta['name']}", value=key)

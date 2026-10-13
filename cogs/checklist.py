@@ -26,14 +26,17 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.config import (
+    CHECKLIST_FULL_CLEAR_BONUS_EVERY as FULL_CLEAR_BONUS_EVERY,
+    CHECKLIST_FULL_CLEAR_BONUS_POINTS as FULL_CLEAR_BONUS_POINTS,
+)
+
 log = logging.getLogger("velmora.checklist")
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_DIR = Path(os.getenv("STATE_DIR", str(DATA_DIR)))
 STATE_PATH = STATE_DIR / "checklist_state.json"
 
-FULL_CLEAR_BONUS_EVERY = 10
-FULL_CLEAR_BONUS_POINTS = 5
 GPA_RANK_LIMIT = 25
 
 try:

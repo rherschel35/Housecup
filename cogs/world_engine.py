@@ -36,6 +36,12 @@ import re
 import time
 import uuid
 
+from cogs.config import (
+    EXPLORE_CHOICE_REP_PER_DAY as CHOICE_REP_PER_DAY,
+    EXPLORE_OFFER_REP_PER_DAY as OFFER_REP_PER_DAY,
+    EXPLORE_POINTS_PER_DAY as POINTS_PER_DAY,
+)
+
 try:
     from zoneinfo import ZoneInfo
     TZ = ZoneInfo("America/Chicago")
@@ -57,9 +63,6 @@ TIERS = [(-999, "hostile"), (-7, "wary"), (-2, "neutral"), (5, "friendly"), (15,
 HISTORY_FRACTION = 0.65
 POOLS = ("areas", "atmospheres", "creatures", "actions", "objects", "discoveries", "outcomes", "templates")
 
-POINTS_PER_DAY = 3            # most house points exploration gives one person a day
-CHOICE_REP_PER_DAY = 3
-OFFER_REP_PER_DAY = 4
 FROG_TRADES_PER_EVENT = 3
 EVENT_TICK_CHANCE = 0.05      # per 5-minute tick while a place is quiet
 EVENT_COOLDOWN = 2 * 3600
