@@ -6,3 +6,8 @@ chess_ui_*.png
 cogs/__pycache__/
 __pycache__/
 *.pyc
+
+# Netlify drag-and-drop bundles. The sites themselves live in
+# compendium_site/ and sorting_site/. Rebuild a drop zip from those
+# directories when you need one; do not commit it.
+*.zip

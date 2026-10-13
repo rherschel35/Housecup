@@ -1,0 +1,11 @@
+# Bot art and other runtime assets stay as normal Git blobs.
+#
+# Velmora-House-Points on Railway builds this repo with Railpack from the
+# GitHub archive (build log: "unpacking archive"). That snapshot does not
+# smudge Git LFS, and .dockerignore drops .git, so a build-step
+# `git lfs pull` cannot recover the bytes. Tracking these paths with LFS
+# would deploy pointer text in place of the images the bot sends.
+#
+# Do not add patterns here for png/jpg/webp/gif/ttf (or the art directories)
+# unless the Railway service is changed to a delivery path that actually
+# fetches LFS objects before the process starts.

@@ -1,3 +1,3 @@
 # Netlify / manual deploy drops. Not required at runtime.
+# Rebuild from compendium_site/ when a drag-and-drop zip is needed.
 *.zip
-!velmora-compendium-site.zip
