@@ -82,7 +82,7 @@
         "broom course",
         "quidditch broom race"
       ],
-      "answer": "`/broomrace` on the Quidditch pitch — private 6-stage picks on one o' 100 courses. Every stage shows the full set o' lines — no spoon-feedin'. Ye gotta read; Speed/Altitude only help ye hold a clean line. Wrong picks add time; traps double it. Solo: 5 learning races a day (UTC) that unlock study notes. Challenge someone with `/broomrace opponent:@member` on the same track anytime — lowest time lost wins; winner gets 3 house points up to 3 awards/day, then free play with no points. A perfect +0s finish pays those 3 pts even on a tie (both can, if both hit +0s). Finish all 5 solo learning races in a day for +3 house points once. Stuck mid-race or \"already mid-race\"? `/broomraceend` clears the lock — yours or anyone else's. Check leftovers on `/checklist`.",
+      "answer": "`/broomrace` on the Quidditch pitch — private 6-stage picks on one o' 100 courses. Every stage shows the full set o' lines — no spoon-feedin'. Ye gotta read; Speed/Altitude only help ye hold a clean line. Wrong picks add time; traps double it. Solo: 5 learning races a day (Central) that unlock study notes. Challenge someone with `/broomrace opponent:@member` on the same track anytime — lowest time lost wins; winner gets 3 house points up to 3 awards/day, then free play with no points. A perfect +0s finish pays those 3 pts even on a tie (both can, if both hit +0s). Finish all 5 solo learning races in a day for +3 house points once. Stuck mid-race or \"already mid-race\"? `/broomraceend` clears the lock — yours or anyone else's. Check leftovers on `/checklist`.",
       "link": "https://everything-velmora.netlify.app/quidditch"
     },
     {

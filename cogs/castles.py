@@ -170,7 +170,9 @@ def _chicago_now(ts: Optional[float] = None) -> dt.datetime:
 
 
 def chicago_day(ts: Optional[float] = None) -> str:
-    return _chicago_now(ts).strftime("%Y-%m-%d")
+    """Central day key — shared with checklist (includes one-time tomorrow-night hold)."""
+    from cogs.world_engine import today as chi_day
+    return chi_day(ts)
 
 
 def is_siege_day(ts: Optional[float] = None) -> bool:
