@@ -18,7 +18,7 @@ Rewards:
       house points, no loot - mixed-house teams have no single house to
       credit.
     - House match win: updates your personal record. House points are
-      house-level only: 5 house-match wins in a UTC day for that house
+      house-level only: 5 house-match wins in a Central day for that house
       pay +5 house points once (who played doesn't matter). Personal
       win record and titles still climb past that.
     - Titles (shown via /quidditch stats): a ladder based on total house
@@ -100,7 +100,9 @@ TITLE_THRESHOLDS = [
 
 
 def today_str() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+    """Central (America/Chicago) calendar day for house-match daily sets."""
+    from cogs.world_engine import today as chi_day
+    return chi_day()
 
 
 def blank_player() -> dict:
@@ -294,7 +296,7 @@ class Quidditch(commands.Cog):
     def grant_all_houses_set_today(self, actor_id: int) -> list[dict]:
         """Mark every house's Quidditch set complete for today; award +5 if unpaid.
 
-        UTC midnight naturally starts a fresh day (wins/bonus reset on date mismatch).
+        Midnight Central naturally starts a fresh day (wins/bonus reset on date mismatch).
         """
         store = self.bot.get_cog("Store")
         results: list[dict] = []

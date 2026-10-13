@@ -758,13 +758,17 @@ class Duels(commands.Cog):
         return self._rewarded_count("trio_rewarded", user_id, now)
 
     @staticmethod
-    def _utc_day(now: float | None = None) -> str:
-        ts = now if now is not None else time.time()
-        return dt.datetime.fromtimestamp(ts, dt.timezone.utc).strftime("%Y-%m-%d")
+    def _day_key(now: float | None = None) -> str:
+        """Central (America/Chicago) calendar day for daily duel / trio caps."""
+        from cogs.world_engine import today as chi_day
+        return chi_day(now)
+
+    # Back-compat alias
+    _utc_day = _day_key
 
     def trio_house_day_rec(self, house: str, now: float | None = None) -> dict:
         bag = self.state.setdefault("trio_house_day", {})
-        day = self._utc_day(now)
+        day = self._day_key(now)
         rec = bag.get(house) or {}
         if rec.get("date") != day:
             rec = {"date": day, "wins": 0, "bonus": False}
@@ -782,7 +786,7 @@ class Duels(commands.Cog):
     def grant_all_houses_trio_set_today(self, actor_id: int) -> list[dict]:
         """Mark every house's trio set complete for today; award +5 if unpaid.
 
-        UTC midnight naturally starts a fresh day (wins/bonus reset on date mismatch).
+        Midnight Central naturally starts a fresh day (wins/bonus reset on date mismatch).
         """
         from cogs.store import HOUSE_KEYS, HOUSES
 
@@ -818,8 +822,13 @@ class Duels(commands.Cog):
         return self._rewarded_count("grand_rewarded", user_id, now)
 
     def _rewarded_count(self, bucket: str, user_id: int, now: float = None) -> int:
+        """Paid wins on the current Central calendar day (not a rolling 24h window)."""
         now = now if now is not None else time.time()
-        stamps = [t for t in self.state[bucket].get(str(user_id), []) if now - t < WINDOW]
+        day = self._day_key(now)
+        stamps = [
+            t for t in self.state[bucket].get(str(user_id), [])
+            if self._day_key(t) == day
+        ]
         self.state[bucket][str(user_id)] = stamps
         return len(stamps)
 

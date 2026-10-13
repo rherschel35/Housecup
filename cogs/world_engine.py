@@ -72,7 +72,17 @@ def now_local(now=None):
 
 
 def today(now=None) -> str:
+    """Calendar day in America/Chicago (midnight Central resets)."""
     return now_local(now).date().isoformat()
+
+
+def next_midnight_ts(now=None) -> int:
+    """Unix timestamp of the next America/Chicago midnight."""
+    n = now_local(now)
+    nxt = (n + dt.timedelta(days=1)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    return int(nxt.timestamp())
 
 
 def is_night(now=None) -> bool:

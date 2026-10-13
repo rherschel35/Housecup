@@ -440,7 +440,12 @@ BREW_COMPLETION_POINTS = 3
 
 
 def _utc_day() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+    """Central (America/Chicago) calendar day for brew-set progress.
+
+    Name kept for call-site compatibility; day key is no longer UTC.
+    """
+    from cogs.world_engine import today as chi_day
+    return chi_day()
 
 
 def blank_player() -> dict:

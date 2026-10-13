@@ -204,7 +204,9 @@ BROOM_TOKEN_LABELS = {
 
 
 def today_str() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+    """Central (America/Chicago) calendar day for sell-points cap."""
+    from cogs.world_engine import today as chi_day
+    return chi_day()
 
 
 class Marketplace(commands.Cog):

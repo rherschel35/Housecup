@@ -4,8 +4,7 @@
 /gpa - school-wide GPA ranking from those averages.
 
 Pulls live counters from the other cogs (beans, duels, explore, boards…).
-Calendar days use Discord relative timestamps for the next midnight;
-rolling 24h caps show when the next slot frees.
+Every checklist counter shares one timer: midnight America/Chicago (Central).
 
 Every fully completed checklist day counts toward a streak of clears;
 every 10 full clears awards +5 house points once.
@@ -49,45 +48,23 @@ def _next_midnight(tz: dt.tzinfo, now: Optional[float] = None) -> int:
     return int(nxt.timestamp())
 
 
-def _next_utc_midnight(now: Optional[float] = None) -> int:
-    return _next_midnight(dt.timezone.utc, now)
-
-
 def _next_chicago_midnight(now: Optional[float] = None) -> int:
-    return _next_midnight(CHICAGO, now)
+    try:
+        from cogs.world_engine import next_midnight_ts
+        return next_midnight_ts(now)
+    except Exception:
+        return _next_midnight(CHICAGO, now)
 
 
-def _next_rolling_slot(stamps: list[float], window: float, cap: int, now: float) -> Optional[int]:
-    """When the next slot frees under a rolling window (at cap), else when
-    the oldest stamp clears (if any), else None (never used)."""
-    live = sorted(t for t in stamps if now - t < window)
-    if not live:
-        return None
-    if len(live) >= cap:
-        return int(live[0] + window)
-    return int(live[0] + window)
+def checklist_day(now: Optional[float] = None) -> str:
+    """Shared checklist calendar day — midnight Central (America/Chicago)."""
+    from cogs.world_engine import today as chi_day
+    return chi_day(now)
 
 
-def _when_points_free(payments: list[tuple[float, int]], window: float,
-                      cap: int, now: float) -> Optional[int]:
-    """For a rolling points cap: when enough of the oldest payments age out
-    that at least 1 point of room opens (if currently at cap)."""
-    live = sorted(((t, p) for t, p in payments if now - t < window), key=lambda r: r[0])
-    used = sum(p for _, p in live)
-    if used < cap:
-        return int(live[0][0] + window) if live else None
-    running = used
-    for t, p in live:
-        running -= p
-        if running < cap:
-            return int(t + window)
-    return int(live[0][0] + window) if live else None
-
-
-def utc_day(now: Optional[float] = None) -> str:
-    return dt.datetime.fromtimestamp(
-        now if now is not None else time.time(), dt.timezone.utc
-    ).strftime("%Y-%m-%d")
+# Back-compat aliases (older call sites / imports).
+utc_day = checklist_day
+_next_utc_midnight = _next_chicago_midnight
 
 
 def letter_grade(pct: float) -> str:
@@ -182,7 +159,7 @@ class Checklist(commands.Cog):
 
     def average_pct(self, user_id: int, now: Optional[float] = None) -> float:
         rec = self.player(user_id)
-        day = utc_day(now)
+        day = checklist_day(now)
         total = float(rec.get("pct_sum") or 0)
         n = int(rec.get("day_count") or 0)
         today = rec.get("today") or {}
@@ -210,7 +187,7 @@ class Checklist(commands.Cog):
         Returns a small status dict for UI (bonus_pts, newly_full, …).
         """
         now = time.time() if now is None else now
-        day = utc_day(now)
+        day = checklist_day(now)
         items = self._collect(member, now)
         done, total, pct = _score(items)
         full = total > 0 and done >= total
@@ -277,10 +254,10 @@ class Checklist(commands.Cog):
 
     def _collect(self, member: discord.Member, now: float) -> list[CheckItem]:
         items: list[CheckItem] = []
-        utc_reset = _next_utc_midnight(now)
-        chi_reset = _next_chicago_midnight(now)
+        # One timer for every checklist row: midnight Central.
+        day_reset = _next_chicago_midnight(now)
 
-        # ---- Explore (calendar Central) ----
+        # ---- Explore ----
         world_cog = self.bot.get_cog("World")
         if world_cog:
             from cogs.world import DEFAULT_LIMITS
@@ -295,27 +272,25 @@ class Checklist(commands.Cog):
             forage_left = max(0, forage_cap - int(day.get("forage", 0)))
             items.append(CheckItem(
                 "Explore points", pts_left == 0,
-                f"**{pts_left}/{POINTS_PER_DAY}** pts left", chi_reset, "day resets"))
+                f"**{pts_left}/{POINTS_PER_DAY}** pts left", day_reset, "day resets"))
             items.append(CheckItem(
                 "Explore visits", explore_left == 0,
-                f"**{explore_left}/{explore_cap}** left", chi_reset, "day resets"))
+                f"**{explore_left}/{explore_cap}** left", day_reset, "day resets"))
             items.append(CheckItem(
                 "Forage", forage_left == 0,
-                f"**{forage_left}/{forage_cap}** left", chi_reset, "day resets"))
+                f"**{forage_left}/{forage_cap}** left", day_reset, "day resets"))
 
-        # ---- Beans (rolling 24h) ----
+        # ---- Beans ----
         beans = self.bot.get_cog("Beans")
         if beans:
-            from cogs.beans import BEANS_PER_DAY, WINDOW
+            from cogs.beans import BEANS_PER_DAY
             eaten = beans.recent(member.id, now)
             left = max(0, BEANS_PER_DAY - len(eaten))
-            reset = _next_rolling_slot(eaten, WINDOW, BEANS_PER_DAY, now)
             items.append(CheckItem(
                 "Beans", left == 0,
-                f"**{left}/{BEANS_PER_DAY}** left", reset,
-                "next bean" if left == 0 else "oldest clears"))
+                f"**{left}/{BEANS_PER_DAY}** left", day_reset, "day resets"))
 
-        # ---- Duels (rolling 24h 1v1/grand; UTC house trio set) ----
+        # ---- Duels (1v1 / grand / house trio) ----
         store = self.bot.get_cog("Store")
         member_house = store.member_house(member) if store else None
         from cogs.store import HOUSES as STORE_HOUSES
@@ -332,20 +307,16 @@ class Checklist(commands.Cog):
                 REWARDED_PER_DAY,
                 TRIO_HOUSE_COMPLETION_POINTS,
                 TRIO_HOUSE_WIN_GOAL,
-                WINDOW,
             )
-            for label, bucket, cap in (
-                ("Duels (1v1)", "rewarded", REWARDED_PER_DAY),
-                ("Grand duels", "grand_rewarded", GRAND_REWARDED_PER_DAY),
+            for label, count_fn, cap in (
+                ("Duels (1v1)", duels.rewarded_today, REWARDED_PER_DAY),
+                ("Grand duels", duels.grand_rewarded_today, GRAND_REWARDED_PER_DAY),
             ):
-                stamps = [t for t in duels.state.get(bucket, {}).get(str(member.id), [])
-                          if now - t < WINDOW]
-                left = max(0, cap - len(stamps))
-                reset = _next_rolling_slot(stamps, WINDOW, cap, now)
+                used = int(count_fn(member.id, now))
+                left = max(0, cap - used)
                 items.append(CheckItem(
                     label, left == 0,
-                    f"**{left}/{cap}** paid wins left", reset,
-                    "next slot" if left == 0 else "oldest clears"))
+                    f"**{left}/{cap}** paid wins left", day_reset, "day resets"))
 
             if member_house:
                 twin = duels.trio_house_wins_today(member_house)
@@ -359,7 +330,7 @@ class Checklist(commands.Cog):
                         if tbonus
                         else f"+{TRIO_HOUSE_COMPLETION_POINTS} pts at {TRIO_HOUSE_WIN_GOAL}"
                     ),
-                    utc_reset, "day resets"))
+                    day_reset, "day resets"))
             else:
                 items.append(CheckItem(
                     "Trio (house)", False,
@@ -368,38 +339,32 @@ class Checklist(commands.Cog):
                     raw="⬜ **Trio (house)** — join a house to share the daily trio set",
                 ))
 
-        # ---- Chess / Checkers (UTC week, Mon–Sun) ----
+        # ---- Chess / Checkers (0 pts; still show the shared day timer) ----
         chess = self.bot.get_cog("Chess")
         if chess:
-            from cogs.chess import (
-                WEEKLY_WIN_CAP, week_str, POINTS_PER_WIN, next_week_reset_ts,
-            )
+            from cogs.chess import WEEKLY_WIN_CAP, week_str, POINTS_PER_WIN
             rec = chess.state.get("players", {}).get(str(member.id), {})
             weekly = rec.get("weekly") or {}
             used = int(weekly.get("count", 0)) if weekly.get("week") == week_str() else 0
             left = max(0, WEEKLY_WIN_CAP - used)
-            week_reset = next_week_reset_ts(now)
             items.append(CheckItem(
                 "Chess", left == 0,
                 f"**{left}/{WEEKLY_WIN_CAP}** point wins left ({POINTS_PER_WIN} pts each)",
-                week_reset, "week resets"))
+                day_reset, "day resets"))
 
         checkers = self.bot.get_cog("Checkers")
         if checkers:
-            from cogs.checkers import (
-                WEEKLY_WIN_CAP, week_str, POINTS_PER_WIN, next_week_reset_ts,
-            )
+            from cogs.checkers import WEEKLY_WIN_CAP, week_str, POINTS_PER_WIN
             rec = checkers.state.get("players", {}).get(str(member.id), {})
             weekly = rec.get("weekly") or {}
             used = int(weekly.get("count", 0)) if weekly.get("week") == week_str() else 0
             left = max(0, WEEKLY_WIN_CAP - used)
-            week_reset = next_week_reset_ts(now)
             items.append(CheckItem(
                 "Checkers", left == 0,
                 f"**{left}/{WEEKLY_WIN_CAP}** point wins left ({POINTS_PER_WIN} pt each)",
-                week_reset, "week resets"))
+                day_reset, "day resets"))
 
-        # ---- Quidditch house matches (UTC house set) ----
+        # ---- Quidditch house matches ----
         quidditch = self.bot.get_cog("Quidditch")
         if quidditch:
             from cogs.quidditch import HOUSE_COMPLETION_POINTS, HOUSE_WIN_GOAL
@@ -415,7 +380,7 @@ class Checklist(commands.Cog):
                         if qbonus
                         else f"+{HOUSE_COMPLETION_POINTS} pts at {HOUSE_WIN_GOAL}"
                     ),
-                    utc_reset, "day resets"))
+                    day_reset, "day resets"))
             else:
                 items.append(CheckItem(
                     "Quidditch (house)", False,
@@ -424,7 +389,7 @@ class Checklist(commands.Cog):
                     raw="⬜ **Quidditch (house)** — join a house to share the daily house-match set",
                 ))
 
-        # ---- Broom races (UTC calendar) ----
+        # ---- Broom races ----
         broom_race = self.bot.get_cog("BroomRace")
         if broom_race:
             from cogs.broom_race import (
@@ -435,7 +400,6 @@ class Checklist(commands.Cog):
             )
             # Retry +3 if they finished all 5 but an earlier payout missed.
             broom_race.try_award_solo_completion(member)
-            solo_left = broom_race.solo_left(member.id)
             solo_done = broom_race.solo_used(member.id)
             solo_bonus = bool(broom_race.daily_rec(member.id).get("solo_bonus"))
             chall_left = broom_race.challenge_pts_left(member.id)
@@ -450,22 +414,21 @@ class Checklist(commands.Cog):
             solo_detail = f"**{solo_done}/{SOLO_DAILY_CAP}** finished · {solo_tail}"
             items.append(CheckItem(
                 "Broom race (solo)", solo_bonus,
-                solo_detail, utc_reset, "day resets"))
+                solo_detail, day_reset, "day resets"))
             items.append(CheckItem(
                 "Broom race (challenge wins)", chall_left == 0,
                 f"**{chall_left}/{CHALLENGE_POINT_CAP}** point awards left "
                 f"({CHALLENGE_POINTS} pts each · win or +0s tie · always open)",
-                utc_reset, "day resets"))
+                day_reset, "day resets"))
 
-        # ---- Beasts (UTC day befriend set + study) ----
+        # ---- Beasts ----
         beasts = self.bot.get_cog("Beasts")
         if beasts:
             from cogs.beasts import (
                 BEFRIEND_COMPLETION_POINTS,
                 BEFRIEND_GOAL,
-                STUDY_WINDOW,
             )
-            day = beasts.befriend_day_rec(member.id)
+            day = beasts.befriend_day_rec(member.id, now)
             done = int(day.get("count") or 0)
             bonus = bool(day.get("bonus"))
             detail = (
@@ -477,18 +440,16 @@ class Checklist(commands.Cog):
                 )
             )
             items.append(CheckItem(
-                "Beast befriends", bonus, detail, utc_reset, "day resets"))
+                "Beast befriends", bonus, detail, day_reset, "day resets"))
 
-            study_rec = beasts.state.get("study_day", {}).get(str(member.id), {})
-            last_study = float(study_rec.get("at", 0) or 0)
-            study_ready = (now - last_study) >= STUDY_WINDOW or last_study <= 0
-            study_reset = None if study_ready else int(last_study + STUDY_WINDOW)
+            study_ready = not beasts._studied_today(member.id, now)
             items.append(CheckItem(
                 "Beast study", not study_ready,
                 "ready (`/study`)" if study_ready else "done for now",
-                study_reset, "ready"))
+                None if study_ready else day_reset,
+                "day resets"))
 
-        # ---- Market sell (UTC calendar) ----
+        # ---- Market sell ----
         market = self.bot.get_cog("Marketplace")
         if market:
             from cogs.marketplace import SELL_DAILY_CAP
@@ -497,9 +458,9 @@ class Checklist(commands.Cog):
             items.append(CheckItem(
                 "Market sell", left == 0,
                 f"**{left}/{SELL_DAILY_CAP}** pts left from selling",
-                utc_reset, "day resets"))
+                day_reset, "day resets"))
 
-        # ---- Potions (UTC day brew set) ----
+        # ---- Potions ----
         potions = self.bot.get_cog("Potions")
         if potions:
             from cogs.potions import BREW_COMPLETION_POINTS, BREW_GOAL
@@ -516,7 +477,7 @@ class Checklist(commands.Cog):
                 )
             )
             items.append(CheckItem(
-                "Potion brews", brew_bonus, brew_detail, utc_reset, "day resets"))
+                "Potion brews", brew_bonus, brew_detail, day_reset, "day resets"))
 
         # ---- Familiar care / scout ----
         familiars = self.bot.get_cog("Familiars")
@@ -532,11 +493,11 @@ class Checklist(commands.Cog):
                 items.append(CheckItem(
                     "Familiar care", care_left == 0,
                     f"**{care_left}/3** left (`/familiar` feed·pet·play)",
-                    chi_reset, "day resets"))
+                    day_reset, "day resets"))
                 items.append(CheckItem(
                     "Familiar scout", not scout_ready,
                     "ready (small chance of bonus pts)" if scout_ready else "already sent",
-                    chi_reset, "day resets"))
+                    day_reset, "day resets"))
             else:
                 items.append(CheckItem(
                     "Familiar", False, "none yet · `/familiar adopt`",
@@ -563,9 +524,9 @@ class Checklist(commands.Cog):
                 )
             )
             items.append(CheckItem(
-                "Army binds (F40+)", claimed, detail, chi_reset, "day resets"))
+                "Army binds (F40+)", claimed, detail, day_reset, "day resets"))
 
-        # ---- Frog / fire (Chicago calendar) ----
+        # ---- Frog / fire ----
         frogs = self.bot.get_cog("Frogs")
         if frogs:
             from cogs.world_engine import today as chi_today
@@ -574,7 +535,7 @@ class Checklist(commands.Cog):
             items.append(CheckItem(
                 "Frog", opened,
                 "Chocolate Frog opened today" if opened else "ready — `/frog open`",
-                chi_reset, "day resets"))
+                day_reset, "day resets"))
 
         fire = self.bot.get_cog("HouseFire")
         if fire:
@@ -586,7 +547,7 @@ class Checklist(commands.Cog):
                 items.append(CheckItem(
                     "House fire", stoked,
                     "stoked today" if stoked else "ready — `/stoke`",
-                    chi_reset, "day resets"))
+                    day_reset, "day resets"))
 
         return items
 
@@ -633,9 +594,7 @@ class Checklist(commands.Cog):
             color=0x6C5CE7,
         )
         embed.set_footer(
-            text="Explore/familiar/frog/fire/army-binds day = Central · "
-                 "Chess/Checkers = UTC week (Mon) · Market/Quidditch = UTC midnight · "
-                 "Duels/beans = rolling 24h · Report-card day = UTC"
+            text="Everything on this checklist resets together at midnight Central (America/Chicago)."
         )
         return embed
 
@@ -646,7 +605,7 @@ class Checklist(commands.Cog):
         full_n = int(rec.get("full_completions") or 0)
         day_n = int(rec.get("day_count") or 0)
         today = rec.get("today") or {}
-        if today.get("date") == utc_day() and int(today.get("total") or 0) > 0:
+        if today.get("date") == checklist_day() and int(today.get("total") or 0) > 0:
             day_n += 1
         next_at = ((full_n // FULL_CLEAR_BONUS_EVERY) + 1) * FULL_CLEAR_BONUS_EVERY
         toward = full_n % FULL_CLEAR_BONUS_EVERY
@@ -702,7 +661,7 @@ class Checklist(commands.Cog):
                 continue
             day_n = int(rec.get("day_count") or 0)
             today = rec.get("today") or {}
-            if today.get("date") == utc_day(now) and int(today.get("total") or 0) > 0:
+            if today.get("date") == checklist_day(now) and int(today.get("total") or 0) > 0:
                 day_n += 1
             if day_n <= 0:
                 continue
@@ -750,7 +709,7 @@ class Checklist(commands.Cog):
             title="GPA ranking",
             description=desc,
             color=0xF1C40F,
-        ).set_footer(text="Based on average % of daily checklist items completed (UTC days)")
+        ).set_footer(text="Based on average % of daily checklist items completed (Central days)")
 
     @app_commands.command(
         name="checklist",

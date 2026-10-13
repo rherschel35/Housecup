@@ -20,7 +20,7 @@ window anyone can try. Items are used up on a successful befriend. It
 slips away after 10 minutes if nobody does.
 
 Rarer beasts turn up less often, and a few only appear after dark
-(8 PM - 6 AM, Velmora time). Completing **5 befriends in a UTC day**
+(8 PM - 6 AM, Velmora time). Completing **5 befriends in a Central day**
 pays **+3 house points** once (repeats count). /summon is purely for
 fun: no points, no advantage.
 
@@ -197,11 +197,24 @@ class Beasts(commands.Cog):
         return journal[key]
 
     def _studied_today(self, user_id: int, now: float) -> bool:
+        """One study per Central calendar day."""
         rec = self.state["study_day"].get(str(user_id), {})
-        return bool(rec) and (now - float(rec.get("at", 0))) < STUDY_WINDOW
+        if not rec:
+            return False
+        day = self._day_key(now)
+        if rec.get("date"):
+            return rec["date"] == day
+        # Legacy rolling-window records: count if the stamp is still today Central.
+        try:
+            return self._day_key(float(rec.get("at", 0) or 0)) == day
+        except (TypeError, ValueError):
+            return False
 
     def _mark_studied(self, user_id: int, now: float):
-        self.state["study_day"][str(user_id)] = {"at": now}
+        self.state["study_day"][str(user_id)] = {
+            "at": now,
+            "date": self._day_key(now),
+        }
 
     def _page_text(self, key: str, page: int) -> str:
         """Build journal page text from beast data (no per-beast lore bank needed)."""
@@ -259,14 +272,19 @@ class Beasts(commands.Cog):
         return sum(r[1] for r in rows)
 
     @staticmethod
-    def _utc_day() -> str:
-        return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+    def _day_key(now: float | None = None) -> str:
+        """Central (America/Chicago) calendar day for befriend / study caps."""
+        from cogs.world_engine import today as chi_day
+        return chi_day(now)
 
-    def befriend_day_rec(self, user_id: int) -> dict:
+    # Back-compat alias
+    _utc_day = _day_key
+
+    def befriend_day_rec(self, user_id: int, now: float | None = None) -> dict:
         key = str(user_id)
         bag = self.state.setdefault("befriend_day", {})
         rec = bag.get(key) or {}
-        day = self._utc_day()
+        day = self._day_key(now)
         if rec.get("date") != day:
             rec = {"date": day, "count": 0, "bonus": False}
             bag[key] = rec
@@ -446,7 +464,7 @@ class Beasts(commands.Cog):
     # ----------------------------------------------------------- befriending
 
     def befriend(self, member, key: str, now: float) -> dict:
-        """Record the friendship; +3 once for 5 befriends in a UTC day."""
+        """Record the friendship; +3 once for 5 befriends in a Central day."""
         uid = str(member.id)
         b = self.beasts[key]
         col = self.state["collections"].setdefault(uid, {})

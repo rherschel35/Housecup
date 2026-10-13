@@ -114,7 +114,7 @@
         "what can I still do",
         "what can i still do"
       ],
-      "answer": "`/checklist` is yer daily points board — what's left for house points an' habits, with reset timers. Finish every scored box for a full clear; every 10 full clears pays +5 house points. `/reportcard` shows a big letter grade from yer average % complete (GPA = that % × 4.0). `/gpa` ranks the school. Includes 1v1/grand duels, house trio (5 wins → +5), house Quidditch (5 wins → +5), broom solo (5/day, +3 for finishing all 5), broom challenge (3 awards/day at 3 pts — win or +0s tie), beast befriends (+3 for 5), potion brews (+3 for 5), army binds (200 floor-40+ for +10), Chocolate Frog (`/frog open`), house fire, market sells, an' more.",
+      "answer": "`/checklist` is yer daily points board — what's left for house points an' habits. **Everything on it resets together at midnight Central** (America/Chicago). Finish every scored box for a full clear; every 10 full clears pays +5 house points. `/reportcard` shows a big letter grade from yer average % complete (GPA = that % × 4.0). `/gpa` ranks the school. Includes 1v1/grand duels, house trio (5 wins → +5), house Quidditch (5 wins → +5), broom solo (5/day, +3 for finishing all 5), broom challenge (3 awards/day at 3 pts — win or +0s tie), beast befriends (+3 for 5), potion brews (+3 for 5), army binds (200 floor-40+ for +10), Chocolate Frog (`/frog open`), house fire, market sells, an' more.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {
@@ -198,7 +198,7 @@
         "catch a beast",
         "find a beast"
       ],
-      "answer": "Beasts wander into the explore channel an' say what they want. First to `/approach` with those things befriends 'em. Five befriends in a UTC day pay +3 house points once (repeats count). See yer collection with `/bestiary`, show one off with `/summon`. Want notes on one ye already have? That's `/study`.",
+      "answer": "Beasts wander into the explore channel an' say what they want. First to `/approach` with those things befriends 'em. Five befriends in a Central day pay +3 house points once (repeats count). See yer collection with `/bestiary`, show one off with `/summon`. Want notes on one ye already have? That's `/study` (once per Central day).",
       "link": "https://everything-velmora.netlify.app/beasts"
     },
     {
@@ -246,7 +246,7 @@
         "grand duel",
         "trio"
       ],
-      "answer": "`/duel` is first to 2 (best of three) by default — that banks **1 win**. Pick **best of 5, 7, 9, or 51** an' ye play sets of first-to-2 until someone hits 3 / 4 / 5 / 26 — the series winner banks that many wins without startin' over. Sets ye take in a series still fill yer daily duel checklist / house points (up to 3/day) even if ye lose the series. On **Duel Night** those banked wins all count on the night board at double points. Press **Open my cast board** an' yer spell buttons sit under that private board (same idea as broom races). Hex, Ward, Disarm, Bind, Mirror; each beats two an' loses to two. `/trio` wins are house-level: **5** trio wins in a UTC day for that house pay **+5** house points once (anyone on the team can contribute). There's also `/trio scramble`, `/trio housematch`, an' `/grand`. Stuck on \"already in a duel\"? Cast `/duelend` to clear the lock.",
+      "answer": "`/duel` is first to 2 (best of three) by default — that banks **1 win**. Pick **best of 5, 7, 9, or 51** an' ye play sets of first-to-2 until someone hits 3 / 4 / 5 / 26 — the series winner banks that many wins without startin' over. Sets ye take in a series still fill yer daily duel checklist / house points (up to 3/day, Central midnight) even if ye lose the series. On **Duel Night** those banked wins all count on the night board at double points. Press **Open my cast board** an' yer spell buttons sit under that private board (same idea as broom races). Hex, Ward, Disarm, Bind, Mirror; each beats two an' loses to two. `/trio` wins are house-level: **5** trio wins in a Central day for that house pay **+5** house points once (anyone on the team can contribute). There's also `/trio scramble`, `/trio housematch`, an' `/grand`. Stuck on \"already in a duel\"? Cast `/duelend` to clear the lock.",
       "link": "https://everything-velmora.netlify.app/duels"
     },
     {
@@ -328,7 +328,7 @@
         "scramble quidditch",
         "house match"
       ],
-      "answer": "Quidditch runs house matches an' scrambles — five rounds, an' a Snitch that can end it all. Scrambles are record-only. House matches: **5** wins in a UTC day for that house pay **+5** house points once (shared on `/checklist`, not per player). Peek `/help` or the Compendium Quidditch page for the commands.",
+      "answer": "Quidditch runs house matches an' scrambles — five rounds, an' a Snitch that can end it all. Scrambles are record-only. House matches: **5** wins in a Central day for that house pay **+5** house points once (shared on `/checklist`, not per player). Peek `/help` or the Compendium Quidditch page for the commands.",
       "link": "https://everything-velmora.netlify.app/quidditch"
     },
     {
@@ -372,7 +372,7 @@
         "potions class",
         "recipe book potions"
       ],
-      "answer": "`/potions` is yer recipe book — Rep rank, satchel o' brewed draughts, an' every recipe with 🟢/🔴 ingredient dots. Brew with `/brew`, drink with `/drink`. Gather bits in yer `/satchel` (forage an' the market) first. Finish 5 successful `/brew`s in a UTC day for +3 house points once.",
+      "answer": "`/potions` is yer recipe book — Rep rank, satchel o' brewed draughts, an' every recipe with 🟢/🔴 ingredient dots. Brew with `/brew`, drink with `/drink`. Gather bits in yer `/satchel` (forage an' the market) first. Finish 5 successful `/brew`s in a Central day for +3 house points once.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {

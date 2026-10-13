@@ -114,7 +114,7 @@ HELP = {
         "staff": False,
         "note": (
             "Brew from satchel ingredients. Descent buffs last 5 fights (simple) or 10 (harder). "
-            "Felix Felicis is a free weekly 10-step brew. Finish 5 successful brews in a UTC day "
+            "Felix Felicis is a free weekly 10-step brew. Finish 5 successful brews in a Central day "
             "for +3 house points once."
         ),
         "entries": [
@@ -127,7 +127,7 @@ HELP = {
         "title": "Quidditch",
         "staff": False,
         "note": (
-            "Team pickup matches live here. House matches: 5 wins in a UTC day for that "
+            "Team pickup matches live here. House matches: 5 wins in a Central day for that "
             "house pay +5 house points once (shared — not per player). "
             "Solo and challenge broom races (`/broomrace`) also run in the Quidditch channel — see Brooms."
         ),
@@ -168,7 +168,7 @@ HELP = {
             "Upgrade Speed/Altitude toward 10, then race on the Quidditch pitch. "
             "Every stage shows the full set of lines — read them; stats only decide "
             "whether you can hold a clean line. Traps double time lost. "
-            "Solo: 5 learning races/day (UTC); finish all 5 for +3 pts. Challenges: "
+            "Solo: 5 learning races/day (Central); finish all 5 for +3 pts. Challenges: "
             "always open; wins pay 3 pts (3/day), and a perfect +0s finish pays even "
             "on a tie, then free play."
         ),
@@ -204,7 +204,7 @@ HELP = {
         "title": "Beasts",
         "staff": False,
         "note": ("A few times a day a beast wanders into the explore channel and says what it wants. "
-                 "Five befriends in a UTC day pay +3 house points once. "
+                 "Five befriends in a Central day pay +3 house points once. "
                  "First to `/approach` gets 60 seconds alone; then anyone can try. "
                  "71 to find — including Nifflers — some only after dark."),
         "entries": [
@@ -249,7 +249,7 @@ HELP = {
         "staff": False,
         "entries": [
             ("profile", "Your Mirror, wand, patronus, Animagus, broom, points, duel rank, beasts and honours - or anyone's."),
-            ("checklist", "Your daily points board (public) — house trio/Quidditch sets, duels, broom, beasts, potions, F40+ binds, frog, market, and more."),
+            ("checklist", "Your daily points board (public) — everything resets together at midnight Central."),
             ("reportcard", "Public report card — big letter grade from your average checklist % complete."),
             ("gpa", "School-wide GPA ranking from average checklist completion."),
             ("points", "Your points (or anyone's), this season and all time."),
@@ -318,7 +318,7 @@ HELP = {
             ("staffgame duels nightscheduleoff", "Turn off the weekly Duel Night schedule."),
             ("staffgame duels nightscheduleroles", "Set Champions + WIZARDS AND WITCHES for Duel Night warn + start pings."),
             ("staffgame duels nightschedulestatus", "Show the weekly Duel Night schedule."),
-            ("staffgame duels housedaygrant", "Complete every house's trio + Quidditch daily sets for today (+5 each if unpaid); fresh at UTC midnight."),
+            ("staffgame duels housedaygrant", "Complete every house's trio + Quidditch daily sets for today (+5 each if unpaid); fresh at midnight Central."),
         ],
     },
     "staff_world": {

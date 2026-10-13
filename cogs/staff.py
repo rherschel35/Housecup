@@ -756,10 +756,10 @@ class Staff(commands.Cog):
             title="House daily sets granted",
             description=(
                 f"Every house is at **{TRIO_HOUSE_WIN_GOAL}/{TRIO_HOUSE_WIN_GOAL}** trio "
-                f"and **{HOUSE_WIN_GOAL}/{HOUSE_WIN_GOAL}** Quidditch for **today (UTC)**.\n"
+                f"and **{HOUSE_WIN_GOAL}/{HOUSE_WIN_GOAL}** Quidditch for **today (Central)**.\n"
                 f"Awarded **+{trio_awarded}** trio / **+{quid_awarded}** Quidditch "
                 f"(+{TRIO_HOUSE_COMPLETION_POINTS} / +{HOUSE_COMPLETION_POINTS} per unpaid house).\n"
-                "Fresh counters start automatically at the next UTC midnight."
+                "Fresh counters start automatically at the next midnight Central."
             ),
             color=0xC9A227,
         )

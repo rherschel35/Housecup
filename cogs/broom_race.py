@@ -59,7 +59,9 @@ CHALLENGE_POINTS = 3
 
 
 def today_str() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+    """Central (America/Chicago) calendar day for solo / challenge daily caps."""
+    from cogs.world_engine import today as chi_day
+    return chi_day()
 
 # kind -> base time penalty (seconds of "race time")
 # Trap is "double time" vs a normal wrong pick (bold).
