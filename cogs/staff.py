@@ -29,8 +29,41 @@ HEX_CHOICES = [
 _WEEKDAY_NAMES = (
     "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
 )
-_DUEL_NIGHT_LENGTHS = (30, 60)
-_CHALLENGE_TIERS = ("daily", "trial", "rite")
+# Same labels and values as the old dropdowns. Autocomplete, not choices:
+# the choice arrays alone keep /staffgame over Discord's 8000-character cap.
+_ACTION_CHOICES = (
+    app_commands.Choice(name="start", value="start"),
+    app_commands.Choice(name="end", value="end"),
+)
+_LENGTH_CHOICES = (
+    app_commands.Choice(name="30 minutes", value=30),
+    app_commands.Choice(name="1 hour", value=60),
+)
+_WEEKDAY_CHOICES = tuple(
+    app_commands.Choice(name=name, value=index)
+    for index, name in enumerate(_WEEKDAY_NAMES)
+)
+_TIER_CHOICES = (
+    app_commands.Choice(name="Daily (1 point)", value="daily"),
+    app_commands.Choice(name="Trial (3 points)", value="trial"),
+    app_commands.Choice(name="Weekly Rite (5 points)", value="rite"),
+)
+_BINGO_MODE_CHOICES = (
+    app_commands.Choice(name="Traditional — any line", value="traditional"),
+    app_commands.Choice(name="4 Corners", value="corners"),
+    app_commands.Choice(name="Diagonals only", value="diagonals"),
+    app_commands.Choice(name="Random pattern", value="random_pattern"),
+)
+_PRICE_CHOICES = (
+    app_commands.Choice(name="Buy common ingredient", value="buy_common"),
+    app_commands.Choice(name="Buy uncommon ingredient", value="buy_uncommon"),
+    app_commands.Choice(name="Sell payout per batch", value="sell_payout"),
+    app_commands.Choice(name="Daily sell-points cap", value="sell_daily_cap"),
+    app_commands.Choice(name="Hex Scroll", value="scroll"),
+    app_commands.Choice(name="Shop title", value="title"),
+    app_commands.Choice(name="Room of Requirement", value="room"),
+    app_commands.Choice(name="Broom upgrade token", value="broom_token"),
+)
 
 
 def _choice(value, name=None):
@@ -45,6 +78,46 @@ def _weekday_choice(day: int | None):
     if day is None:
         return None
     return _choice(day, _WEEKDAY_NAMES[day])
+
+
+def _match_choices(choices, current: str):
+    """Suggestions for one option. Empty input returns the whole list."""
+    needle = (current or "").strip().casefold()
+    if not needle:
+        return list(choices[:25])
+    return [
+        choice
+        for choice in choices
+        if needle in choice.name.casefold() or needle in str(choice.value).casefold()
+    ][:25]
+
+
+async def _complete_action(interaction: discord.Interaction, current: str):
+    return _match_choices(_ACTION_CHOICES, current)
+
+
+async def _complete_length(interaction: discord.Interaction, current: str):
+    return _match_choices(_LENGTH_CHOICES, current)
+
+
+async def _complete_weekday(interaction: discord.Interaction, current: str):
+    return _match_choices(_WEEKDAY_CHOICES, current)
+
+
+async def _complete_tier(interaction: discord.Interaction, current: str):
+    return _match_choices(_TIER_CHOICES, current)
+
+
+async def _complete_effect(interaction: discord.Interaction, current: str):
+    return _match_choices(HEX_CHOICES, current)
+
+
+async def _complete_bingo_mode(interaction: discord.Interaction, current: str):
+    return _match_choices(_BINGO_MODE_CHOICES, current)
+
+
+async def _complete_price(interaction: discord.Interaction, current: str):
+    return _match_choices(_PRICE_CHOICES, current)
 
 
 class Staff(commands.Cog):
@@ -587,7 +660,7 @@ class Staff(commands.Cog):
     @duels.command(name="night", description="Night.")
     @app_commands.describe(
         action="Action",
-        length="Mins",
+        length="Length",
     )
     async def duels_night(
         self,
@@ -599,29 +672,33 @@ class Staff(commands.Cog):
         if not cog:
             await interaction.response.send_message("Duels isn't loaded.", ephemeral=True)
             return
-        if action not in ("start", "end"):
+        if action not in {c.value for c in _ACTION_CHOICES}:
             await interaction.response.send_message(
                 "Action must be start or end.", ephemeral=True,
             )
             return
         length_choice = None
         if length is not None:
-            if length not in _DUEL_NIGHT_LENGTHS:
+            known_length = next((c for c in _LENGTH_CHOICES if c.value == length), None)
+            if known_length is None:
                 await interaction.response.send_message(
                     "Pick a length: **30 minutes** or **1 hour**.", ephemeral=True,
                 )
                 return
-            length_choice = _choice(length, "30 minutes" if length == 30 else "1 hour")
+            length_choice = known_length
         await cog.duelnight(interaction, _choice(action), length_choice)
+
+    duels_night.autocomplete("action")(_complete_action)
+    duels_night.autocomplete("length")(_complete_length)
 
     @duels.command(
         name="nightschedule",
         description="Nights.",
     )
     @app_commands.describe(
-        day_a="0-6",
+        day_a="Weekday",
         hour_a="Hour",
-        length="Mins",
+        length="Length",
         minute_a="Minute",
         day_b="2nd day",
         hour_b="Hour",
@@ -634,14 +711,14 @@ class Staff(commands.Cog):
     async def duels_nightschedule(
         self,
         interaction: discord.Interaction,
-        day_a: app_commands.Range[int, 0, 6],
+        day_a: int,
         hour_a: app_commands.Range[int, 0, 23],
         length: int,
         minute_a: app_commands.Range[int, 0, 59] = 0,
-        day_b: app_commands.Range[int, 0, 6] = None,
+        day_b: int = None,
         hour_b: app_commands.Range[int, 0, 23] = None,
         minute_b: app_commands.Range[int, 0, 59] = 0,
-        day_c: app_commands.Range[int, 0, 6] = None,
+        day_c: int = None,
         hour_c: app_commands.Range[int, 0, 23] = None,
         minute_c: app_commands.Range[int, 0, 59] = 0,
         channel: discord.TextChannel = None,
@@ -650,7 +727,13 @@ class Staff(commands.Cog):
         if not cog:
             await interaction.response.send_message("Duels isn't loaded.", ephemeral=True)
             return
-        if length not in _DUEL_NIGHT_LENGTHS:
+        if any(day is not None and not 0 <= day <= 6 for day in (day_a, day_b, day_c)):
+            await interaction.response.send_message(
+                "Pick a weekday from the list.", ephemeral=True,
+            )
+            return
+        known_length = next((c for c in _LENGTH_CHOICES if c.value == length), None)
+        if known_length is None:
             await interaction.response.send_message(
                 "Pick a length: **30 minutes** or **1 hour**.", ephemeral=True,
             )
@@ -660,9 +743,14 @@ class Staff(commands.Cog):
             _weekday_choice(day_a), hour_a, minute_a,
             _weekday_choice(day_b), hour_b, minute_b,
             _weekday_choice(day_c), hour_c, minute_c,
-            _choice(length, "30 minutes" if length == 30 else "1 hour"),
+            known_length,
             channel,
         )
+
+    duels_nightschedule.autocomplete("day_a")(_complete_weekday)
+    duels_nightschedule.autocomplete("day_b")(_complete_weekday)
+    duels_nightschedule.autocomplete("day_c")(_complete_weekday)
+    duels_nightschedule.autocomplete("length")(_complete_length)
 
     @duels.command(name="nightscheduleoff", description="Off.")
     async def duels_nightscheduleoff(self, interaction: discord.Interaction):
@@ -770,30 +858,40 @@ class Staff(commands.Cog):
         if not cog:
             await interaction.response.send_message("Quests isn't loaded.", ephemeral=True)
             return
-        if tier not in _CHALLENGE_TIERS:
+        known = next((c for c in _TIER_CHOICES if c.value == tier), None)
+        if known is None:
             await interaction.response.send_message(
                 "Tier must be daily, trial, or rite.", ephemeral=True,
             )
             return
-        await cog.challenge(interaction, _choice(tier))
+        await cog.challenge(interaction, known)
+
+    challenge_post.autocomplete("tier")(_complete_tier)
 
     @challenge.command(name="config", description="Auto.")
     @app_commands.describe(channel="Channel",
-                           hour="Hour", weekday="0-6")
+                           hour="Hour", weekday="Weekday")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def challenge_config(self, interaction: discord.Interaction,
                                channel: discord.TextChannel, hour: int = 18,
-                               weekday: app_commands.Range[int, 0, 6] = None):
+                               weekday: int = None):
         cog = self._cog("Quests")
         if not cog:
             await interaction.response.send_message("Quests isn't loaded.", ephemeral=True)
             return
+        if weekday is not None and not 0 <= weekday <= 6:
+            await interaction.response.send_message(
+                "Pick a weekday from the list.", ephemeral=True,
+            )
+            return
         await cog.challengeconfig(interaction, channel, hour, _weekday_choice(weekday))
+
+    challenge_config.autocomplete("weekday")(_complete_weekday)
 
     # ------------------------------------------------------------------ hex
 
     @hex_g.command(name="cast", description="Cast.")
-    @app_commands.describe(member="Who", effect="Id",
+    @app_commands.describe(member="Who", effect="Curse",
                            duration="Mins")
     async def hex_cast(self, interaction: discord.Interaction, member: discord.Member,
                        effect: str, duration: app_commands.Range[int, 0, 10080]):
@@ -803,6 +901,8 @@ class Staff(commands.Cog):
             return
         known = next((c for c in HEX_CHOICES if c.value == effect), None)
         await cog.hex(interaction, member, known or _choice(effect), duration)
+
+    hex_cast.autocomplete("effect")(_complete_effect)
 
     @hex_g.command(name="lift", description="Lift.")
     @app_commands.describe(member="Who")
@@ -841,6 +941,8 @@ class Staff(commands.Cog):
             await interaction.response.send_message("Bingo isn't loaded.", ephemeral=True)
             return
         await cog.staff_start(interaction, name=name, mode=mode, channel=channel)
+
+    bingo_start.autocomplete("mode")(_complete_bingo_mode)
 
     @bingo.command(name="call", description="Call.")
     @app_commands.describe(square="Square")
@@ -907,7 +1009,7 @@ class Staff(commands.Cog):
 
     @market.command(name="setprice", description="Price.")
     @app_commands.describe(
-        item="Key",
+        item="Item",
         points="Points",
     )
     async def market_setprice(
@@ -921,6 +1023,8 @@ class Staff(commands.Cog):
             await interaction.response.send_message("Marketplace isn't loaded.", ephemeral=True)
             return
         await cog.staff_setprice(interaction, item, int(points))
+
+    market_setprice.autocomplete("item")(_complete_price)
 
     @market.command(name="prices", description="Prices.")
     async def market_prices(self, interaction: discord.Interaction):
