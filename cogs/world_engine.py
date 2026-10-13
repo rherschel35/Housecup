@@ -30,29 +30,17 @@ used.
 """
 
 import datetime as dt
-import json
-import logging
 import math
-import os
 import random
 import re
 import time
 import uuid
-from pathlib import Path
 
 try:
     from zoneinfo import ZoneInfo
     TZ = ZoneInfo("America/Chicago")
 except Exception:  # pragma: no cover
     TZ = dt.timezone.utc
-
-log = logging.getLogger("velmora.world_engine")
-
-# Shared day-clock hold (checklist + explore + other Central-day caps).
-_DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-_STATE_DIR = Path(os.getenv("STATE_DIR", str(_DATA_DIR)))
-_DAY_HOLD_PATH = _STATE_DIR / "day_hold.json"
-_day_hold_cache: dict | None = None
 
 RARITY_WEIGHT = {"common": 10, "uncommon": 5, "rare": 2, "very_rare": 0.6, "legendary": 0.1}
 RARITY_LABEL = {"common": "Common", "uncommon": "Uncommon", "rare": "Rare",
@@ -83,106 +71,18 @@ def now_local(now=None):
     return dt.datetime.fromtimestamp(now if now is not None else time.time(), TZ)
 
 
-def today_raw(now=None) -> str:
-    """America/Chicago calendar date with no grace hold applied."""
+def today(now=None) -> str:
+    """Calendar day in America/Chicago — shared checklist / daily-cap day key."""
     return now_local(now).date().isoformat()
 
 
-def next_midnight_raw(now=None) -> int:
-    """Unix timestamp of the next America/Chicago midnight (no grace hold)."""
+def next_midnight_ts(now=None) -> int:
+    """Unix timestamp of the next America/Chicago midnight (shared checklist reset)."""
     n = now_local(now)
     nxt = (n + dt.timedelta(days=1)).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
     return int(nxt.timestamp())
-
-
-def _read_day_hold() -> dict | None:
-    if not _DAY_HOLD_PATH.exists():
-        return None
-    try:
-        data = json.loads(_DAY_HOLD_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        log.exception("day_hold.json unreadable")
-        return None
-    if not isinstance(data, dict):
-        return None
-    if not data.get("hold_until") or not data.get("hold_day"):
-        return None
-    return data
-
-
-def _write_day_hold(data: dict) -> None:
-    try:
-        _STATE_DIR.mkdir(parents=True, exist_ok=True)
-        tmp = _DAY_HOLD_PATH.with_suffix(".tmp")
-        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-        os.replace(tmp, _DAY_HOLD_PATH)
-    except OSError:
-        log.exception("Could not save day_hold.json")
-
-
-def ensure_day_hold(now: float | None = None) -> dict:
-    """One-time grace: freeze the current Central day until *tomorrow night*.
-
-    First call after deploy skips tonight's midnight and rolls at the midnight
-    after that (~28h when tonight is ~4h away), so players aren't cut short
-    mid-evening. After ``hold_until``, normal midnight Central resumes.
-    """
-    global _day_hold_cache
-    if _day_hold_cache is not None:
-        return _day_hold_cache
-    existing = _read_day_hold()
-    if existing is not None:
-        _day_hold_cache = existing
-        return existing
-    ts = time.time() if now is None else now
-    tonight = next_midnight_raw(ts)
-    data = {
-        "hold_day": today_raw(ts),
-        "hold_until": int(tonight + 24 * 3600),
-        "set_at": float(ts),
-        "note": "Skip first Central midnight so the shared checklist day ends tomorrow night.",
-    }
-    _write_day_hold(data)
-    _day_hold_cache = data
-    log.info(
-        "Day hold set: freeze %s until %s (tomorrow night Central)",
-        data["hold_day"],
-        data["hold_until"],
-    )
-    return data
-
-
-def day_hold_active(now: float | None = None) -> bool:
-    ts = time.time() if now is None else now
-    hold = ensure_day_hold(ts)
-    return ts < float(hold["hold_until"])
-
-
-def today(now=None) -> str:
-    """Central calendar day for shared daily caps (checklist, explore, …).
-
-    While the one-time grace hold is active, every timestamp inside the hold
-    window maps to the frozen ``hold_day`` so counters don't rollover tonight.
-    """
-    ts = time.time() if now is None else now
-    hold = ensure_day_hold(ts)
-    set_at = float(hold.get("set_at") or 0)
-    until = float(hold["hold_until"])
-    if set_at <= ts < until:
-        return str(hold["hold_day"])
-    return today_raw(ts)
-
-
-def next_midnight_ts(now=None) -> int:
-    """Next shared day reset (hold end while grace is active, else Central midnight)."""
-    ts = time.time() if now is None else now
-    hold = ensure_day_hold(ts)
-    until = int(hold["hold_until"])
-    if ts < until:
-        return until
-    return next_midnight_raw(ts)
 
 
 def is_night(now=None) -> bool:

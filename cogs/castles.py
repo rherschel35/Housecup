@@ -170,7 +170,7 @@ def _chicago_now(ts: Optional[float] = None) -> dt.datetime:
 
 
 def chicago_day(ts: Optional[float] = None) -> str:
-    """Central day key — shared with checklist (includes one-time tomorrow-night hold)."""
+    """Central day key — shared with checklist (midnight America/Chicago)."""
     from cogs.world_engine import today as chi_day
     return chi_day(ts)
 

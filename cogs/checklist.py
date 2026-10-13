@@ -593,18 +593,10 @@ class Checklist(commands.Cog):
             ),
             color=0x6C5CE7,
         )
-        from cogs.world_engine import day_hold_active
-        footer = (
-            "Everything on this checklist resets together at midnight Central "
-            "(America/Chicago)."
+        embed.set_footer(
+            text="Everything on this checklist resets together at midnight Central "
+                 "(America/Chicago)."
         )
-        if day_hold_active(now):
-            footer = (
-                "Shared day timer: first reset is tomorrow night Central "
-                "(so tonight’s midnight doesn’t cut anyone short). After that, "
-                "every night at midnight Central."
-            )
-        embed.set_footer(text=footer)
         return embed
 
     def _build_report_card(
