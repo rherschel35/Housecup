@@ -19,7 +19,7 @@ DUELS_POTIONS_CHANNEL_ID = 1555554825616236726
 EVERYTHING_LOUNGE_CHANNEL_ID = 1558611215054282822
 EVERYTHING_LOUNGE_CHANNEL_IDS = frozenset({EVERYTHING_LOUNGE_CHANNEL_ID})
 
-# Multi-game lounges — duels, potions, Descent, Quidditch/broom, chess/checkers.
+# Multi-game lounges — duels, potions, Descent, Quidditch/broom.
 # Not: Wild Threat spawns, exploring, castle PvP, or 3Raid
 # (except channels also listed in EVERYTHING_LOUNGE_CHANNEL_IDS).
 OPEN_LOUNGE_CHANNEL_IDS = frozenset({

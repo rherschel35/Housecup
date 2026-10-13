@@ -436,16 +436,6 @@
       "link": "https://everything-velmora.netlify.app/houses"
     },
     {
-      "id": "chess",
-      "keywords": [
-        "chess",
-        "checkers",
-        "board game"
-      ],
-      "answer": "Wizard's Chess an' Wizard's Checkers share the board-games channel — `/chess challenge` or `/checkers challenge`. Accept, then tap Make move (piece → square). Checkers jumps are mandatory; keep jumpin' with the same piece. Wins count for yer record an' titles only — no house points from chess or checkers.",
-      "link": "https://everything-velmora.netlify.app/commands"
-    },
-    {
       "id": "bean",
       "keywords": [
         "bean",

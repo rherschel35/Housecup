@@ -23,7 +23,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-os.environ.setdefault("ENABLE_BOARD_GAMES", "1")
 os.environ.setdefault("STATE_DIR", tempfile.mkdtemp(prefix="housecup-payload-"))
 os.environ.pop("DISCORD_TOKEN", None)
 

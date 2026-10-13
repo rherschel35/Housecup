@@ -19,7 +19,6 @@ sys.path.insert(0, str(ROOT))
 
 # Importing cogs reads STATE_DIR at import time. Keep that off the repo tree.
 os.environ.setdefault("STATE_DIR", tempfile.mkdtemp(prefix="housecup-import-"))
-os.environ.setdefault("ENABLE_BOARD_GAMES", "1")
 os.environ.pop("DISCORD_TOKEN", None)
 
 

@@ -19,16 +19,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-# Match bot.py defaults: board games on unless explicitly disabled.
 # Keep cog imports off the repo data/ tree.
-os.environ.setdefault("ENABLE_BOARD_GAMES", "1")
 os.environ.setdefault("STATE_DIR", tempfile.mkdtemp(prefix="housecup-slash-"))
 
 DISCORD_CAP = 100
 
 
 def _initial_cogs() -> tuple[str, ...]:
-    # Keep in sync with bot.py INITIAL_COGS / ENABLE_BOARD_GAMES.
+    # Keep in sync with bot.py INITIAL_COGS.
     from bot import INITIAL_COGS
 
     return tuple(INITIAL_COGS)

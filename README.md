@@ -26,8 +26,6 @@ python bot.py
 
 Leave `STATE_DIR` unset for a local trial and the bot writes state under `data/`. Those JSON files are runtime data. Do not commit them.
 
-`ENABLE_BOARD_GAMES` defaults to on, so chess and checkers load. Set it to `0` to leave them out.
-
 ## Environment variables
 
 Names only. Set them in the shell, a local `.env` that stays untracked, or the Railway service variables. Never commit values.
@@ -39,7 +37,6 @@ Names only. Set them in the shell, a local `.env` that stays untracked, or the R
 | `ALLOWED_GUILD_IDS` | Optional comma-separated guild ids. The bot leaves any other server. |
 | `FORCE_COMMAND_SYNC` | Set to `1` to push slash commands even when the tree is unchanged. |
 | `COMMAND_SYNC_TIMEOUT` | Seconds to wait on a Discord sync call. |
-| `ENABLE_BOARD_GAMES` | `0` unloads chess and checkers. Anything else loads them. |
 | `STATE_DIR` | Directory for runtime JSON and downloaded wizard packs. |
 | `ANTHROPIC_API_KEY` | Optional. Wand, broom, patronus, and Animagus text fall back without it. |
 | `WAND_MODEL` | Model name for wand text. |
@@ -115,7 +112,7 @@ Runtime files are written under `STATE_DIR`. The bot creates a file when that fe
 - `house_fire_state.json`, `event_board.json`, `rumor_state.json`
 - `challenges.json`, `countdown.json`, `checklist_state.json`, `triwizard.json`
 - `reaction_roles.json`, `antispam.json`
-- `chess_state.json`, `checkers_state.json`, `broom_races.json`
+- `broom_races.json`
 - `wizard_assets/` - sprite packs unpacked on the volume (not in git)
 
 Place writing, quests, and fonts stay in the git `data/` tree and are read from the image, not from the volume.
