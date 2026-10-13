@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import json
 import logging
-import datetime
 import os
 import random
 import time
@@ -439,10 +438,6 @@ BREW_GOAL = 5
 BREW_COMPLETION_POINTS = 3
 
 
-def _utc_day() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
-
-
 def blank_player() -> dict:
     return {
         "rep_xp": 0,
@@ -450,7 +445,7 @@ def blank_player() -> dict:
         "inventory": {},
         "active": [],
         "felix_free_at": 0,
-        "brew_day": {"date": _utc_day(), "count": 0, "bonus": False},
+        "brew_day": {"date": "", "count": 0, "bonus": False},
     }
 
 
@@ -535,14 +530,40 @@ class Potions(commands.Cog):
         rec.setdefault("discovered", [])
         rec.setdefault("inventory", {})
         rec.setdefault("felix_free_at", 0)
-        day = _utc_day()
-        brew_day = rec.get("brew_day")
-        if not isinstance(brew_day, dict) or brew_day.get("date") != day:
-            rec["brew_day"] = {"date": day, "count": 0, "bonus": False}
-        else:
-            brew_day.setdefault("count", 0)
-            brew_day.setdefault("bonus", False)
+        from cogs.world_engine import (
+            carry_dated_record, central_day_start, claim_bonus_from_ledger,
+        )
+
+        brew_day, needs = carry_dated_record(
+            rec.get("brew_day") if isinstance(rec.get("brew_day"), dict) else None,
+            None,
+            {"count": 0, "bonus": False},
+        )
+        if needs:
+            entries = self._ledger_entries()
+            if entries is not None:
+                if brew_day.get("bonus"):
+                    if int(brew_day.get("count") or 0) < BREW_GOAL:
+                        brew_day["count"] = BREW_GOAL
+                else:
+                    claim_bonus_from_ledger(
+                        brew_day, entries, central_day_start(),
+                        bonus_key="bonus",
+                        reasons=(f"Completed {BREW_GOAL} potion brews today",),
+                        count_key="count", count_floor=BREW_GOAL,
+                        target_id=user_id,
+                    )
+                brew_day.pop("legacy_utc_rekey", None)
+        brew_day.setdefault("count", 0)
+        brew_day.setdefault("bonus", False)
+        rec["brew_day"] = brew_day
         return rec
+
+    def _ledger_entries(self):
+        store = self.bot.get_cog("Store")
+        if store is None:
+            return None
+        return store.state.get("ledger") or []
 
     def brews_today(self, user_id: int) -> int:
         return int(self.record(user_id)["brew_day"].get("count") or 0)

@@ -72,7 +72,191 @@ def now_local(now=None):
 
 
 def today(now=None) -> str:
+    """America/Chicago calendar day, ``YYYY-MM-DD`` (DST via zoneinfo)."""
     return now_local(now).date().isoformat()
+
+
+def utc_today(now=None) -> str:
+    ts = now if now is not None else time.time()
+    return dt.datetime.fromtimestamp(ts, dt.timezone.utc).date().isoformat()
+
+
+def next_central_midnight(now=None) -> int:
+    """Unix time of the next America/Chicago midnight. Handles DST."""
+    now_dt = now_local(now)
+    nxt = (now_dt + dt.timedelta(days=1)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    return int(nxt.timestamp())
+
+
+def central_day_start(now=None) -> float:
+    now_dt = now_local(now)
+    return now_dt.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+
+
+def on_central_day(ts, now=None) -> bool:
+    """True when ``ts`` falls on the same Central calendar day as ``now``."""
+    try:
+        stamp = float(ts)
+    except (TypeError, ValueError):
+        return False
+    return today(stamp) == today(now)
+
+
+def adopt_central_day(stored: str | None, now=None) -> tuple[str, bool]:
+    """Return ``(central_today, keep_saved_record)``.
+
+    Keep a saved ``YYYY-MM-DD`` when it is already today's Central date, or
+    when it is still stamped with today's UTC date during the evening window
+    where UTC has rolled ahead of Central. That second case is a legacy
+    UTC-midnight key: the counters and bonus flags still belong to this
+    Central day, so callers rewrite ``date`` instead of starting a fresh
+    record (which would wipe progress and could pay a completion bonus twice).
+    """
+    chi = today(now)
+    if stored == chi:
+        return chi, True
+    utc = utc_today(now)
+    if stored and stored == utc and utc != chi:
+        return chi, True
+    return chi, False
+
+
+def carry_dated_record(rec, now, fresh: dict) -> tuple[dict, bool]:
+    """Bind a ``{date, ...}`` record to today's Central day.
+
+    Returns ``(record, needs_reconcile)``. ``needs_reconcile`` is true when
+    the saved date was a legacy UTC day (or a previous pass flagged it) and
+    the caller should confirm completion bonuses against the points ledger
+    before trusting a cleared flag. The flag stays on the record until that
+    check runs, so a restart before the ledger is readable does not forget.
+    """
+    stored = rec.get("date") if isinstance(rec, dict) else None
+    if not isinstance(stored, str):
+        stored = None
+    day, keep = adopt_central_day(stored, now)
+    if not isinstance(rec, dict) or not keep:
+        out = dict(fresh)
+        out["date"] = day
+        return out, False
+    if rec.get("date") != day:
+        rec["legacy_utc_rekey"] = True
+    rec["date"] = day
+    return rec, bool(rec.get("legacy_utc_rekey"))
+
+
+def ledger_matches(
+    entries,
+    since: float,
+    *,
+    target_id=None,
+    house=None,
+    reasons=(),
+    prefixes=(),
+) -> list:
+    """Ledger rows at or after ``since``, skipping undone entries.
+
+    Match an exact reason and/or a reason prefix. ``target_id`` and ``house``
+    are optional extra filters (house-level bonuses omit ``target_id``).
+    """
+    reason_set = set(reasons or ())
+    prefix_tuple = tuple(prefixes or ())
+    matched = []
+    for entry in entries or []:
+        if not isinstance(entry, dict) or entry.get("undone"):
+            continue
+        try:
+            at = float(entry.get("at") or 0)
+        except (TypeError, ValueError):
+            continue
+        if at < since:
+            continue
+        reason = str(entry.get("reason") or "")
+        if reason in reason_set or any(reason.startswith(p) for p in prefix_tuple):
+            if target_id is not None and entry.get("target_id") != target_id:
+                continue
+            if house is not None and entry.get("house") != house:
+                continue
+            matched.append(entry)
+    return matched
+
+
+def claim_bonus_from_ledger(
+    rec: dict,
+    entries,
+    since: float,
+    *,
+    bonus_key: str,
+    reasons=(),
+    prefixes=(),
+    count_key: str | None = None,
+    count_floor: int = 0,
+    target_id=None,
+    house=None,
+) -> bool:
+    """If this Central day already paid the completion bonus, keep it claimed.
+
+    Used when a legacy UTC reset may have cleared ``bonus`` before deploy.
+    When the ledger shows the payout, the count is raised to at least
+    ``count_floor`` so the set cannot complete a second time.
+    """
+    if rec.get(bonus_key):
+        return False
+    hits = ledger_matches(
+        entries, since,
+        target_id=target_id, house=house,
+        reasons=reasons, prefixes=prefixes,
+    )
+    if not hits:
+        return False
+    rec[bonus_key] = True
+    if count_key is not None:
+        rec[count_key] = max(int(rec.get(count_key) or 0), int(count_floor))
+    return True
+
+
+def raise_tally_from_ledger(
+    rec: dict,
+    entries,
+    since: float,
+    *,
+    field: str,
+    cap: int,
+    target_id=None,
+    house=None,
+    reasons=(),
+    prefixes=(),
+    mode: str = "count",
+) -> bool:
+    """Raise a daily counter up to ``cap`` from ledger rows since Central midnight.
+
+    ``count`` uses the number of matching rows (one payout each). ``sum`` adds
+    positive deltas (market sell points). Never lowers a counter that is
+    already higher than the ledger.
+    """
+    hits = ledger_matches(
+        entries, since,
+        target_id=target_id, house=house,
+        reasons=reasons, prefixes=prefixes,
+    )
+    if mode == "sum":
+        derived = 0
+        for hit in hits:
+            try:
+                derived += max(0, int(hit.get("delta") or 0))
+            except (TypeError, ValueError):
+                continue
+    else:
+        derived = len(hits)
+    current = int(rec.get(field) or 0)
+    # Never lower a counter already stored for today. Cap only the amount
+    # rebuilt from the ledger.
+    updated = max(current, min(int(cap), derived))
+    if updated == current:
+        return False
+    rec[field] = updated
+    return True
 
 
 def is_night(now=None) -> bool:
