@@ -9,6 +9,9 @@ wizard_assets/{male,female,female_full} (STATE_DIR on Railway, or data/ locally)
 House identity is the card colour (not robes on the figure). Worn gear
 is shown as icons beside the portrait, not drawn on the body.
 
+Discord ids in WIDE_CARD_USER_IDS get a landscape card instead
+(cogs/mirror_wide.py). Everyone else keeps the portrait card.
+
     render(...) -> PNG bytes
 """
 
@@ -42,6 +45,20 @@ def refresh_asset_paths() -> None:
 # Final card size (Discord-friendly)
 CW, CH = 720, 1120  # taller so earned titles fit under the motto
 S = 2  # draw at 2x then scale
+
+# Landscape card. Add a Discord user id here to opt someone in later;
+# everyone else keeps the portrait card exactly as it is.
+WIDE_CARD_USER_IDS = frozenset({
+    555141900802457630,
+})
+
+# Custom hero art for wide-card players, keyed by Discord user id.
+# Filenames live in data/wide_portraits/ and are cover-cropped into the
+# left pane. An allowlisted id with no entry keeps the sprite portrait.
+WIDE_PORTRAIT_DIR = REPO_ROOT / "data" / "wide_portraits"
+WIDE_CARD_PORTRAITS = {
+    555141900802457630: "gon-thornmere.jpg",
+}
 
 # Source sprites are 1400x1200
 SRC_W, SRC_H = 1400, 1200
@@ -731,7 +748,20 @@ def render(*, look: dict, user_id: int, name: str, title: str | None = None,
     gear_icons: optional list of {slot, emoji, name} for the side panel.
     gear: legacy on-body visuals — ignored (kept so older callers don't break).
     spire_backdrop: Spireheart Necklace — Arc Spire faded behind the portrait.
+
+    Ids in WIDE_CARD_USER_IDS get the landscape card. Same arguments,
+    same data; only the layout changes.
     """
+    if int(user_id) in WIDE_CARD_USER_IDS:
+        from cogs.mirror_wide import render_wide
+        return render_wide(
+            look=look, user_id=int(user_id), name=name, title=title, titles=titles,
+            house_key=house_key, house_color=house_color, house_emoji=house_emoji,
+            gear=gear, gear_icons=gear_icons, wand=wand, beast_emoji=beast_emoji,
+            stats=stats, motto=motto, stars=stars, aura=aura, gold_trim=gold_trim,
+            wand_sparks=wand_sparks, spire_backdrop=spire_backdrop,
+        )
+
     look = clean_look(look, user_id)
     hcol = hexint(house_color) if isinstance(house_color, int) else house_color
     hc = rgb(hcol)
