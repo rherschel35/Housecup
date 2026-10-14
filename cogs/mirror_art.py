@@ -50,6 +50,7 @@ S = 2  # draw at 2x then scale
 # everyone else keeps the portrait card exactly as it is.
 WIDE_CARD_USER_IDS = frozenset({
     555141900802457630,
+    929025104644562996,
 })
 
 # Custom hero art for wide-card players, keyed by Discord user id.
@@ -58,6 +59,7 @@ WIDE_CARD_USER_IDS = frozenset({
 WIDE_PORTRAIT_DIR = REPO_ROOT / "data" / "wide_portraits"
 WIDE_CARD_PORTRAITS = {
     555141900802457630: "gon-thornmere.jpg",
+    929025104644562996: "caldrin-929025104644562996.jpg",
 }
 
 # Source sprites are 1400x1200
