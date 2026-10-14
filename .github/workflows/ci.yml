@@ -37,6 +37,11 @@ jobs:
         env:
           DISCORD_TOKEN: ""
 
+      - name: Explore two-person fights resolve on the second cast
+        run: python scripts/test_explore_pack_timer.py
+        env:
+          DISCORD_TOKEN: ""
+
       - name: Duel Night pool payout
         run: python scripts/test_duel_night.py
         env:
