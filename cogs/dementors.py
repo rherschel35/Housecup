@@ -17,17 +17,27 @@ nothing happens; no penalty, just try something else (or ask someone who
 knows). A Dementor is still only driven out by an already-cast Patronus,
 same as always.
 
-Most creatures fall to a single clean hit. A couple don't: they take two
-hits from two DIFFERENT people before they're actually gone, so a lone
-wizard can weaken one but can't finish it alone. Everyone who lands the
-right hit shares in the reward once it's down.
+Most creatures fall to a single clean hit, and that result posts right
+away. A couple don't: they take two hits from two DIFFERENT people before
+they're actually gone, so a lone wizard can weaken one but can't finish it
+alone. Everyone who lands the right hit shares in the reward once it's down.
 
 A Storm Sprite is rarer and skittish - leave it too long and it bolts to
 another configured channel rather than wait to be caught.
 
 When /explore or /forage in a dangerous place stirs one up, that student
-gets 25 seconds alone to /cast at it. After that window, anyone can try.
-Scheduled sightings and staff summons stay open to everyone from the start.
+gets 25 seconds alone to /cast at it. The arrival post counts that window
+down. On a two-person creature, the first clean hit removes that countdown
+and opens the fight — the second hit resolves it immediately (rewards and
+the result post) instead of waiting out the clock. If that second hit never
+comes, the original deadline still closes the fight with no reward, so a
+half-finished creature doesn't stay up forever. A one-person creature is
+unchanged: the winning cast resolves it immediately, and the countdown
+comes off the arrival post. With nobody having landed a hit, the 25 seconds
+still end the finder's exclusive turn and then anyone can try; that
+creature stays until it's beaten (or a Storm Sprite wanders). Scheduled
+sightings and staff summons stay open to everyone from the start and have
+no countdown.
 
 A monster stirred by /explore still pays its usual house points in full,
 every time — the daily explore cap does not reduce that payout. Those
@@ -75,6 +85,7 @@ Discord, so a busy Attack doesn't freeze every other /cast behind one
 slow image upload.
 """
 
+import asyncio
 import datetime as dt
 import json
 import logging
@@ -468,6 +479,55 @@ def _article(word: str) -> str:
     return "an" if word[:1].lower() in "aeiou" else "a"
 
 
+def exclusive_countdown_note(finder_id: int, exclusive_until: float) -> str:
+    """Visible exclusive-window line on an explore/forage arrival post."""
+    return (
+        f"\n\n⏳ <@{finder_id}> stirred it up — they have until "
+        f"<t:{int(exclusive_until)}:R> to `/cast` first. "
+        f"Then anyone can try."
+    )
+
+
+def strip_exclusive_countdown(description: str | None) -> str:
+    """Drop the exclusive-window countdown, leaving the arrival text."""
+    if not description:
+        return ""
+    for marker in ("\n\n⏳ ", "\n⏳ "):
+        idx = description.find(marker)
+        if idx != -1:
+            return description[:idx].rstrip()
+    return description
+
+
+def partial_pack_should_expire(active: dict | None, now: float) -> bool:
+    """A multi-person fight with a hit landed, still short of a kill, whose
+    hidden deadline (the original exclusive window) has passed.
+
+    Zero hits do not expire: the window only ends the finder's turn, and the
+    creature stays until someone beats it. A first hit that lands after the
+    window never sets partial_expires_at, so those stay too.
+    """
+    if not active:
+        return False
+    try:
+        deadline = float(active.get("partial_expires_at") or 0)
+    except (TypeError, ValueError):
+        return False
+    if deadline <= 0 or now < deadline:
+        return False
+    hits = active.get("hits") or []
+    if not hits:
+        return False
+    creature = CREATURES.get(active.get("creature") or "")
+    if not creature:
+        return False
+    try:
+        pack = int(creature.get("pack") or 1)
+    except (TypeError, ValueError):
+        pack = 1
+    return len(hits) < pack
+
+
 class Dementors(commands.Cog):
     # Nested under /staff after load (see staff_groups.nest_pure_staff_groups).
     group = app_commands.Group(
@@ -486,6 +546,7 @@ class Dementors(commands.Cog):
         self.state.setdefault("spawns_today", 0)
         self.state.setdefault("event", None)
         self.state.setdefault("attack_schedule", self._blank_attack_schedule())
+        self._partial_expiry_task: asyncio.Task | None = None
 
     @staticmethod
     def _blank_attack_schedule() -> dict:
@@ -581,13 +642,16 @@ class Dementors(commands.Cog):
         return self._slot_attack_minutes(None)
 
     async def cog_load(self):
-        import asyncio
         self.lock = asyncio.Lock()
         self.tick.start()
         self.event_tick.start()
         self.attack_schedule_tick.start()
+        # A restart mid-fight should still close a half-finished two-person
+        # creature when its original deadline has passed.
+        self._arm_partial_expiry()
 
     async def cog_unload(self):
+        self._cancel_partial_expiry()
         self.tick.cancel()
         self.event_tick.cancel()
         self.attack_schedule_tick.cancel()
@@ -667,9 +731,7 @@ class Dementors(commands.Cog):
         if creature_id == "dementor":
             desc += "\n\nOnly a cast patronus can drive it out — `/cast`, then tap **Patronus**."
         if finder_id and exclusive_until and time.time() < exclusive_until:
-            desc += (f"\n\n⏳ <@{finder_id}> stirred it up — they have until "
-                     f"<t:{int(exclusive_until)}:R> to `/cast` first. "
-                     f"Then anyone can try.")
+            desc += exclusive_countdown_note(finder_id, exclusive_until)
         return discord.Embed(
             title=f"{c['emoji']} A {c['name']} has appeared",
             description=desc,
@@ -678,7 +740,12 @@ class Dementors(commands.Cog):
 
     def _finder_blocks(self, active: dict, user_id: int) -> str | None:
         """Ephemeral refusal while the explorer who stirred it up still has
-        exclusive cast rights; None once the window is open or there was no finder."""
+        exclusive cast rights; None once the window is open or there was no finder.
+
+        A landed hit opens a two-person fight immediately. The original
+        deadline stays on the encounter only as a hidden expiry."""
+        if active.get("hits"):
+            return None
         until = active.get("exclusive_until")
         finder = active.get("finder_id")
         if not until or not finder:
@@ -731,6 +798,7 @@ class Dementors(commands.Cog):
             # Stays set if the creature wanders, so the checklist credit
             # still applies after a Storm Sprite bolts.
             active["pay_explore_points"] = True
+        self._cancel_partial_expiry()
         self.state["active"] = active
         self.state["spawns_today"] = self.state.get("spawns_today", 0) + 1
         self.save()
@@ -797,6 +865,8 @@ class Dementors(commands.Cog):
         # pay_explore_points stays with the creature so the checklist still counts it.
         active.pop("finder_id", None)
         active.pop("exclusive_until", None)
+        active.pop("partial_expires_at", None)
+        self._cancel_partial_expiry()
         self.save()
 
     @tasks.loop(minutes=TICK_MINUTES)
@@ -807,6 +877,16 @@ class Dementors(commands.Cog):
                 return  # an event is running - it owns spawning right now
             active = self.state.get("active")
             if active:
+                # Restart safety: the short task is gone, so the 5-minute tick
+                # still closes a half-finished two-person fight past its deadline.
+                if partial_pack_should_expire(active, time.time()):
+                    creature_id = active["creature"]
+                    channel_id = active["channel_id"]
+                    self._cancel_partial_expiry()
+                    self.state["active"] = None
+                    self.save()
+                    await self._announce_partial_slip(channel_id, creature_id)
+                    return
                 c = CREATURES.get(active["creature"], {})
                 if c.get("wander") and time.time() - active["spawned_at"] >= WANDER_MINUTES * 60:
                     await self._wander(active)
@@ -944,10 +1024,151 @@ class Dementors(commands.Cog):
             world_cog.world.note_explore_kill(student, amount)
             world_cog.save()
 
+    def _note_partial_deadline(self, active: dict, now: float | None = None) -> None:
+        """Keep the original exclusive deadline once a multi-person fight has
+        a hit but isn't finished. Later hits do not move it. A hit that lands
+        after the window does not start this clock — that creature stays."""
+        if active.get("partial_expires_at"):
+            return
+        until = active.get("exclusive_until")
+        if not until:
+            return
+        now = time.time() if now is None else now
+        try:
+            until_f = float(until)
+        except (TypeError, ValueError):
+            return
+        if now >= until_f:
+            return
+        creature = CREATURES.get(active.get("creature") or "")
+        try:
+            pack = int(creature.get("pack") or 1) if creature else 1
+        except (TypeError, ValueError):
+            pack = 1
+        hits = active.get("hits") or []
+        if pack <= 1 or not hits or len(hits) >= pack:
+            return
+        active["partial_expires_at"] = until_f
+
+    def _cancel_partial_expiry(self) -> None:
+        task = getattr(self, "_partial_expiry_task", None)
+        self._partial_expiry_task = None
+        if task is not None and not task.done():
+            task.cancel()
+
+    def _arm_partial_expiry(self) -> None:
+        """Sleep until the hidden deadline, then close a still-unfinished fight."""
+        self._cancel_partial_expiry()
+        active = self.state.get("active") or {}
+        try:
+            deadline = float(active.get("partial_expires_at") or 0)
+        except (TypeError, ValueError):
+            return
+        if deadline <= 0:
+            return
+        hits = active.get("hits") or []
+        creature = CREATURES.get(active.get("creature") or "")
+        try:
+            pack = int(creature.get("pack") or 1) if creature else 1
+        except (TypeError, ValueError):
+            pack = 1
+        if not hits or len(hits) >= pack:
+            return
+        message_id = active.get("message_id")
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        self._partial_expiry_task = loop.create_task(
+            self._partial_expiry_wait(message_id, deadline)
+        )
+
+    async def _partial_expiry_wait(self, message_id, deadline: float) -> None:
+        delay = deadline - time.time()
+        try:
+            if delay > 0:
+                await asyncio.sleep(delay)
+        except asyncio.CancelledError:
+            return
+        wait_ready = getattr(self.bot, "wait_until_ready", None)
+        if wait_ready is not None:
+            try:
+                await wait_ready()
+            except Exception:
+                return
+        if self.lock is None:
+            return
+        async with self.lock:
+            active = self.state.get("active")
+            if not active or active.get("message_id") != message_id:
+                return
+            # Sleep can wake a hair early; the deadline itself still counts.
+            if not partial_pack_should_expire(active, max(time.time(), deadline)):
+                return
+            creature_id = active["creature"]
+            channel_id = active["channel_id"]
+            self.state["active"] = None
+            self.save()
+        await self._announce_partial_slip(channel_id, creature_id)
+
+    async def _announce_partial_slip(self, channel_id: int, creature_id: str) -> None:
+        """No rewards. The original window ran out with the fight unfinished."""
+        c = CREATURES.get(creature_id) or {}
+        name = c.get("name") or "creature"
+        emoji = c.get("emoji") or ""
+        channel = await self._get_channel(channel_id)
+        if channel is None:
+            return
+        text = f"{emoji} The {name} slips away. One spell wasn't enough, and nobody finished it in time."
+        embed = discord.Embed(description=text.strip(), color=0x7A7A7A)
+        try:
+            await channel.send(embed=embed)
+        except discord.HTTPException:
+            log.info("Could not post the slip-away for %s in %s", creature_id, channel_id)
+
+    async def _clear_visible_countdown(self, active: dict) -> None:
+        """Edit the arrival post so the exclusive-window countdown is gone."""
+        channel_id = active.get("channel_id")
+        message_id = active.get("message_id")
+        if not channel_id or not message_id:
+            return
+        channel = self.bot.get_channel(channel_id)
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(channel_id)
+            except discord.HTTPException:
+                return
+        if channel is None or not hasattr(channel, "fetch_message"):
+            return
+        try:
+            msg = await channel.fetch_message(message_id)
+        except discord.HTTPException:
+            return
+        embeds = getattr(msg, "embeds", None)
+        if not embeds:
+            return
+        embed = embeds[0]
+        desc = embed.description or ""
+        stripped = strip_exclusive_countdown(desc)
+        if stripped == desc:
+            return
+        new_embed = embed.copy()
+        new_embed.description = stripped
+        # Keep the creature portrait. Passing [] would strip attachments.
+        edit_kwargs: dict = {"embed": new_embed}
+        existing = getattr(msg, "attachments", None)
+        if existing:
+            edit_kwargs["attachments"] = list(existing)
+        try:
+            await msg.edit(**edit_kwargs)
+        except discord.HTTPException:
+            log.info("Could not clear the threat countdown on message %s", message_id)
+
     async def resolve_cast(self, interaction: discord.Interaction, spell: SpellPick):
         """Resolve a cast once the spell is known (auto-pick or button)."""
         event_reply = None
         explore_pay = False
+        spawn_ref = None
         async with self.lock:
             channel_id = interaction.channel_id
             event = self.state.get("event")
@@ -989,7 +1210,14 @@ class Dementors(commands.Cog):
                 active.setdefault("hits", []).append(interaction.user.id)
 
                 if len(active["hits"]) < creature["pack"]:
+                    # First hit on a two-person explore creature: hide the
+                    # countdown and remember the original deadline. Anyone
+                    # else can finish it now; if they don't, it slips away
+                    # at that deadline instead of sitting forever.
+                    self._note_partial_deadline(active)
                     self.save()
+                    self._arm_partial_expiry()
+                    await self._clear_visible_countdown(active)
                     line = self.rng.choice(creature["progress"]).format(member=interaction.user.mention)
                     await interaction.response.send_message(
                         embed=discord.Embed(description=line, color=creature["color"])
@@ -997,13 +1225,23 @@ class Dementors(commands.Cog):
                     return
 
                 # Defeated - award every contributor and clear the encounter.
+                # One-person creatures land here on their only hit, so they
+                # still resolve immediately instead of waiting out the clock.
                 explore_pay = bool(active.get("pay_explore_points"))
+                spawn_ref = {
+                    "channel_id": active.get("channel_id"),
+                    "message_id": active.get("message_id"),
+                }
+                self._cancel_partial_expiry()
                 self.state["active"] = None
                 self.save()
 
         if event_reply is not None:
             await self._deliver_cast_reply(interaction, event_reply)
             return
+
+        if spawn_ref:
+            await self._clear_visible_countdown(spawn_ref)
 
         contributors = active["hits"]
         credited = []
@@ -1048,8 +1286,14 @@ class Dementors(commands.Cog):
             return
 
         explore_pay = bool(active.get("pay_explore_points"))
+        spawn_ref = {
+            "channel_id": active.get("channel_id"),
+            "message_id": active.get("message_id"),
+        }
+        self._cancel_partial_expiry()
         self.state["active"] = None
         self.save()
+        await self._clear_visible_countdown(spawn_ref)
 
         points = CREATURES["dementor"]["points"]
         awarded, house = await self._award_kill_points(
@@ -1650,6 +1894,7 @@ class Dementors(commands.Cog):
                 active
                 and active.get("channel_id") in PRACTICE_SUMMON_CHANNEL_IDS
             ):
+                self._cancel_partial_expiry()
                 self.state["active"] = None
             pool_pts = _preset_kill_pool(preset)
             mult_line = (
@@ -1947,7 +2192,13 @@ class Dementors(commands.Cog):
             lines.append(f"Active now: {c['name']} in <#{active['channel_id']}>, {age} minute(s) ago{progress}.")
             until = active.get("exclusive_until")
             finder = active.get("finder_id")
-            if finder and until and time.time() < until:
+            partial_at = active.get("partial_expires_at")
+            if hits and partial_at and time.time() < float(partial_at):
+                lines.append(
+                    f"First hit landed — countdown hidden. "
+                    f"Slips away <t:{int(float(partial_at))}:R> if it isn't finished."
+                )
+            elif finder and until and time.time() < until:
                 lines.append(f"Exclusive cast: <@{finder}> until <t:{int(until)}:R>.")
         else:
             lines.append("Nothing active right now.")
@@ -2336,6 +2587,7 @@ class Dementors(commands.Cog):
             now = time.time()
             active = self.state.get("active")
             if active and active.get("channel_id") == channel_id:
+                self._cancel_partial_expiry()
                 self.state["active"] = None
             event = {
                 "name": clean_name,

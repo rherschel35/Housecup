@@ -167,7 +167,9 @@ HELP = {
         "staff": False,
         "note": ("Places remember how you treat them. Not everything you can do is listed here. "
                  "Exploring or foraging in the Dungeons or Forbidden Woods can stir up a wild threat — "
-                 "you get 25 seconds alone to `/cast` before anyone else can try."),
+                 "you get 25 seconds alone to `/cast` before anyone else can try. "
+                 "A creature that needs two people opens to everyone after the first hit, "
+                 "and the second hit ends it right away."),
         "entries": [
             ("places", "Where you can go, and what's happening there."),
             ("explore", "Go somewhere and see what you find."),
