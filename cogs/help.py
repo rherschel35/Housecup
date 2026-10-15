@@ -171,7 +171,7 @@ HELP = {
                  "you get 25 seconds alone before anyone else can try. "
                  "The monster shows green spell buttons under the post, same as a staff summon, a sighting, or an Attack wave. "
                  "The right spell beats it. A wrong one locks you out, and the channel hears about it. "
-                 "A Dementor still needs a patronus you already cast with `/patronus`. "
+                 "A Dementor's right button is Patronus, the same as any other creature's correct spell. "
                  "A creature that needs two people opens to everyone after the first hit, "
                  "and the second hit ends it right away. "
                  "If nobody lands that second hit, it slips away 2 minutes after the first one."),

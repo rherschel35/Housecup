@@ -6,7 +6,8 @@ that works is still CREATURES[id]["weak"]. A wrong press locks that player
 out of that monster and posts a random teasing line in the channel. "Not
 yet" and "already out" stay ephemeral. There is no /cast command. On an
 Attack wave, an auto-pick player treats any button as the right spell.
-Solo fights do not auto-pick. A Dementor still needs an already-cast patronus.
+Solo fights do not auto-pick. The Patronus button banishes a Dementor
+whether or not that player has cast /patronus.
 """
 
 from __future__ import annotations
@@ -413,26 +414,29 @@ async def main() -> None:
     assert "slips away" in (slip.description or "")
     assert len(store.state["ledger"]) == slip_rows
 
-    # Dementor: the wrong spell locks them out. Patronus without a patronus does not.
+    # Dementor: a wrong spell locks them out. The Patronus button itself
+    # banishes it, even for a player who has never cast /patronus.
     assert await threats.try_ambient_spawn(
         111, "dementor", finder_id=finder.id, pay_explore_points=True,
     )
     demon = _active_arrival(threats)
     bad_patron = Interaction(friend, guild, message=demon)
-    # Friend is outside the window once we open it; keep the finder exclusive
-    # and use the finder for the patronus check after a fresh spawn.
     threats.state["active"]["exclusive_until"] = time.time() - 1
     await threats.on_public_spell_click(bad_patron, "hex")
     assert bad_patron.response.sent[-1].get("ephemeral") is not True
     assert "Hex" in bad_patron.response.sent[-1]["content"]
     assert "Dementor" in bad_patron.response.sent[-1]["content"]
     assert threats.state["active"]["locked_out"] == [friend.id]
+    assert _enabled(demon.view)
     bare = Interaction(User(9, "No Patronus"), guild, message=demon)
     await threats.on_public_spell_click(bare, "patronus")
-    assert "patronus" in bare.response.sent[-1]["content"].lower()
-    assert bare.response.sent[-1]["ephemeral"] is True
-    assert 9 not in threats.state["active"]["locked_out"]
-    assert _enabled(demon.view)
+    assert threats.state["active"] is None
+    bare_reply = bare.response.sent[-1]
+    assert bare_reply.get("ephemeral") is not True
+    assert bare_reply["embed"].title == "✨ The Dementor is banished"
+    assert "silver patronus" in (bare_reply["embed"].description or "").lower()
+    assert "/patronus" not in (bare_reply["embed"].description or "")
+    assert _disabled(demon.view)
 
     # Stale buttons after the fight is gone get disabled, and the note is private.
     threats.state["active"] = None
@@ -484,9 +488,9 @@ async def main() -> None:
     assert _disabled(sighting_msg.view)
 
     # Attack waves use the same public green row. A wrong press locks out.
-    # Auto-pick treats any button as the weakness. A Dementor still needs
-    # a patronus that was already cast. The solo monster underneath is a
-    # different fight.
+    # Auto-pick treats any button as the weakness. The Patronus button
+    # banishes a Dementor with no saved patronus. The solo monster
+    # underneath is a different fight.
     threats.state["active"] = None
     threats.state["event"] = None
     threats._roll_creature = lambda: "shadow_wolf"
@@ -560,7 +564,8 @@ async def main() -> None:
     assert fresh["message_id"] != old_wave_msg.id
     assert fresh["locked_out"] == []
 
-    # Dementor wave: Patronus without a patronus is private and not a lockout.
+    # Dementor wave: a wrong spell locks out. The Patronus button banishes
+    # it for a player who has never cast /patronus.
     threats.state["event"] = None
     started_d = time.time()
     threats._roll_creature = lambda: "dementor"
@@ -574,20 +579,19 @@ async def main() -> None:
     await threats._deliver_wave(started_d, threats._prepare_wave(threats.state["event"]))
     demon = threats.state["event"]["channels"]["111"]
     demon_msg = next(m for m in bot.channel.sent if m.id == demon["message_id"])
-    bare = Interaction(User(9, "No Patronus"), guild, message=demon_msg)
-    await threats.on_public_spell_click(bare, "patronus")
-    assert bare.response.sent[-1]["ephemeral"] is True
-    assert "/patronus" in bare.response.sent[-1]["content"]
-    assert 9 not in threats.state["event"]["channels"]["111"]["locked_out"]
-    assert threats.state["event"]["channels"]["111"]["creature"] == "dementor"
     bad = Interaction(friend, guild, message=demon_msg)
     await threats.on_public_spell_click(bad, "hex")
     assert friend.id in threats.state["event"]["channels"]["111"]["locked_out"]
     assert _enabled(demon_msg.view)
-    good = Interaction(finder, guild, message=demon_msg)
-    await threats.on_public_spell_click(good, "patronus")
+    bare = Interaction(User(9, "No Patronus"), guild, message=demon_msg)
+    await threats.on_public_spell_click(bare, "patronus")
     assert "111" not in threats.state["event"]["channels"]
-    assert good.response.sent[-1]["embed"].title == "✨ The Dementor is banished"
+    bare_wave = bare.response.sent[-1]
+    assert bare_wave.get("ephemeral") is not True
+    assert bare_wave["embed"].title == "✨ The Dementor is banished"
+    assert "silver patronus" in (bare_wave["embed"].description or "").lower()
+    assert "/patronus" not in (bare_wave["embed"].description or "")
+    assert str(9) in threats.state["event"]["tally"]
     assert _disabled(demon_msg.view)
 
     # A solo monster and a wave in the same channel do not share a lockout.

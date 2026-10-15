@@ -16,8 +16,10 @@ a few times a day - and a headmaster can always summon one on the spot.
 Every creature has exactly one spell that actually works on it, and the
 post never says which - that's the whole game. The spell that works is
 CREATURES[id]["weak"] (patronus, hex, ward, disarm, bind, or mirror).
-A Dementor is still only driven out by an already-cast Patronus, same
-as always.
+The Patronus button under a Dementor is that spell. Pressing it banishes
+the Dementor the same way the right button beats any other creature.
+/patronus still casts a player's own patronus; the fight does not
+require one.
 
 Every solo Wild Threat puts those spells on the public arrival post as
 green buttons, the way a Quidditch sign-up sits on its message. That is
@@ -298,10 +300,11 @@ BANISHED = [
 
 # ---------------------------------------------------------------- creatures
 #
-# "weak": the spell-button value that actually works. "patronus" is handled
-#   by the original dementor path below (it needs an already-cast patronus,
-#   not just the right pick). Everything else uses the five duel spells
-#   from cogs/duels.py: hex, ward, disarm, bind, mirror.
+# "weak": the spell-button value that actually works. "patronus" uses the
+#   dementor flavour below (banished title, and a saved animal in the line
+#   when the player has one). The button itself is the spell. Everything
+#   else uses the five duel spells from cogs/duels.py: hex, ward, disarm,
+#   bind, mirror.
 # "pack": how many DIFFERENT people need to land that spell before it's
 #   actually gone. 1 means one clean hit does it.
 # "points": awarded to the house of EVERY contributor once it's defeated
@@ -884,15 +887,27 @@ class Dementors(commands.Cog):
                 return art
         return self._attach_art(embed, "dementor", field="defeat_image")
 
+    def _banished_line(self, user) -> str:
+        """Banishment flavour. A saved patronus names the animal; the button works either way."""
+        animal = None
+        patronus_cog = self.bot.get_cog("Patronus") if self.bot else None
+        if patronus_cog is not None:
+            mine = patronus_cog.patronus_of(user.id)
+            if mine and mine.get("animal"):
+                animal = str(mine["animal"]).lower()
+        if animal:
+            patronus = f"{_article(animal)} silver {animal}"
+        else:
+            animal = "patronus"
+            patronus = "a silver patronus"
+        return self.rng.choice(BANISHED).format(
+            patronus=patronus, animal=animal, member=user.mention,
+        )
+
     def embed_arrival(self, creature_id: str, finder_id: int | None = None,
                        exclusive_until: float | None = None) -> discord.Embed:
         c = CREATURES[creature_id]
         desc = self.rng.choice(c["arrivals"])
-        if creature_id == "dementor":
-            desc += (
-                "\n\nOnly a patronus you have already cast can drive it out — "
-                "tap **Patronus**. Cast one first with `/patronus` if you haven't."
-            )
         if finder_id and exclusive_until and time.time() < exclusive_until:
             desc += exclusive_countdown_note(finder_id, exclusive_until)
         return discord.Embed(
@@ -1191,8 +1206,8 @@ class Dementors(commands.Cog):
         of this monster only. "Not yet" and "already out" stay ephemeral.
         On an Attack wave, an auto-pick player (CAST_AUTO_USER_ID, Liquid
         Luck, Surestroke Tower) treats any press as the right spell. Solo
-        fights still require the matching button. A Dementor still needs a
-        patronus that player already cast.
+        fights still require the matching button. The Patronus button is
+        the matching spell for a Dementor.
         """
         hexes = self.bot.get_cog("Hexes") if self.bot else None
         if hexes and await hexes.deny_if_limp_wand(interaction):
@@ -1565,20 +1580,12 @@ class Dementors(commands.Cog):
             await interaction.response.send_message(embed=embed)
 
     async def _cast_dementor(self, interaction, spell, active):
-        """Dementor flow: needs an already-cast patronus, resolves in a single
-        hit, uses its own flavour text. An explore-stirred one also counts
-        toward the Explore points checklist."""
+        """Dementor flow: the Patronus button is the spell. One hit banishes
+        it, with its own flavour text. An explore-stirred one also counts
+        toward the Explore points checklist. A saved patronus names the
+        animal in the line; the fight does not require one."""
         if spell.value != "patronus":
             await interaction.response.send_message("Nothing happens.", ephemeral=True)
-            return
-
-        patronus_cog = self.bot.get_cog("Patronus")
-        mine = patronus_cog.patronus_of(interaction.user.id) if patronus_cog else None
-        if not mine:
-            await interaction.response.send_message(
-                "You have no patronus to send against it yet - cast one with `/patronus` first.",
-                ephemeral=True,
-            )
             return
 
         explore_pay = bool(active.get("pay_explore_points"))
@@ -1601,12 +1608,7 @@ class Dementors(commands.Cog):
             interaction.user, points, "Banished a Dementor", explore=explore_pay,
         )
 
-        animal = mine["animal"].lower()
-        line = self.rng.choice(BANISHED).format(
-            patronus=f"{_article(animal)} silver {animal}",
-            animal=animal,
-            member=interaction.user.mention,
-        )
+        line = self._banished_line(interaction.user)
         embed = discord.Embed(title="✨ The Dementor is banished", description=line, color=0xC4CCD6)
         footer = format_kill_footer([(awarded, house)], points_word=True)
         if footer:
@@ -1637,24 +1639,11 @@ class Dementors(commands.Cog):
         if creature_id == "dementor":
             if spell.value != "patronus":
                 return {"content": "Nothing happens.", "ephemeral": True}
-            patronus_cog = self.bot.get_cog("Patronus")
-            mine = patronus_cog.patronus_of(interaction.user.id) if patronus_cog else None
-            if not mine:
-                return {
-                    "content": (
-                        "You have no patronus to send against it yet - "
-                        "cast one with `/patronus` first."
-                    ),
-                    "ephemeral": True,
-                }
             disable = self._button_target(key, wave)
             del event["channels"][key]
             self._credit_event(event, [interaction.user.id], creature)
             self.save()
-            animal = mine["animal"].lower()
-            line = self.rng.choice(BANISHED).format(
-                patronus=f"{_article(animal)} silver {animal}", animal=animal, member=interaction.user.mention,
-            )
+            line = self._banished_line(interaction.user)
             embed = discord.Embed(title="✨ The Dementor is banished", description=line, color=0xC4CCD6)
             if event.get("practice"):
                 embed.set_footer(text=f"Practice · no points · ⚔️ {event['name']}")

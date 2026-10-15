@@ -308,16 +308,18 @@ async def main() -> None:
     assert store.state["ledger"][wolf_rows]["reason"] == "Defeated a Shadow Wolf"
 
     # Dementor (also one hit) resolves immediately and drops the countdown.
+    # The finder has a saved stag; the button works, and the line names it.
     assert await threats.try_ambient_spawn(111, "dementor", finder_id=finder.id)
-    assert "patronus" in (_active_arrival(threats).embeds[0].description or "").lower()
     assert "⏳" in (_active_arrival(threats).embeds[0].description or "")
+    assert "/patronus" not in (_active_arrival(threats).embeds[0].description or "")
     ban = Interaction(finder, guild)
     await threats.resolve_cast(ban, SpellPick("patronus"))
     assert threats.state["active"] is None
-    assert _embed(ban.response).title == "✨ The Dementor is banished"
+    banished = _embed(ban.response)
+    assert banished.title == "✨ The Dementor is banished"
+    assert "stag" in (banished.description or "").lower()
     demon_posts = [m for m in bot.channel.sent if m.embeds and "Dementor" in (m.embeds[0].title or "")]
     assert demon_posts and "⏳" not in (demon_posts[-1].embeds[0].description or "")
-    assert "patronus" in (demon_posts[-1].embeds[0].description or "").lower()
 
     # A cast with only a few seconds left on the exclusive window still
     # leaves the full 2 minutes. The old clock was spawn + 25s, so this
