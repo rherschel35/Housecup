@@ -343,8 +343,8 @@ class WorldCog(commands.Cog, name="World"):
                                                  finder_id=interaction.user.id,
                                                  pay_explore_points=True)
         if monster:
-            text += ("\n\n⚠️ Something else was already here. "
-                     "You have **25 seconds** to `/cast` before anyone else can try.")
+            text += ("\n\n⚠️ Something else was already here — green spell buttons are on it. "
+                     "You have **25 seconds** before anyone else can try.")
         embed = self.embed(text, f"{interaction.user.display_name} explores {P.name}"
                            + (" by moonlight" if enc["night"] else ""), enc["night"])
         embed.set_footer(text=f"Visits left today: {left}")
