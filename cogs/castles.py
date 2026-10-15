@@ -73,8 +73,10 @@ ARMY_CAP = 5000  # total monsters (home + garrison + march) — only while PvP i
 ARMY_PAGE_SIZE = 12  # units listed per /army page
 SUNDAY_CASTLE_POINTS = 50
 BANNERHALL_PER_CASTLE = 30
-# Daily house-point bonus: bind this many floor-40+ monsters (Chicago day).
-BIND_BONUS_GOAL = 200
+# Daily Descent challenge: floor-40+ monsters bound in one Chicago day.
+# This is the challenge length (monster count), separate from the live
+# PvP recruit cap (DAILY_RECRUIT_CAP).
+BIND_BONUS_GOAL = 75
 BIND_BONUS_POINTS = 10
 BIND_BONUS_MIN_FLOOR = 40
 
@@ -641,22 +643,14 @@ class Castles(commands.Cog):
     def bind40_bonus_claimed(self, user_id: int) -> bool:
         return bool(self._bind40_rec(user_id).get("bind40_bonus"))
 
-    def note_bind40(self, member: discord.Member, *, floor: int, n: int = 1) -> int:
-        """Count floor-40+ Descent wins toward the daily +10 bonus.
+    def _pay_bind40_bonus(self, member: discord.Member, prec: dict) -> int:
+        """Pay the daily bonus once if today's count already meets the goal.
 
-        Call this for every F40+ win, even when ``recruit_allowed`` is 0 —
-        the checklist goal is independent of army size / daily recruit caps.
+        Does not change ``bind40_today``. A lowered goal can therefore finish
+        a day already in progress without resetting the counter or paying twice.
         Returns house points awarded (0 or ``BIND_BONUS_POINTS``).
         """
-        if n <= 0 or int(floor) < BIND_BONUS_MIN_FLOOR:
-            return 0
-        prec = self._bind40_rec(member.id)
-        prec["bind40_today"] = int(prec.get("bind40_today") or 0) + n
-        if (
-            int(prec["bind40_today"]) < BIND_BONUS_GOAL
-            or prec.get("bind40_bonus")
-        ):
-            self.save()
+        if int(prec.get("bind40_today") or 0) < BIND_BONUS_GOAL or prec.get("bind40_bonus"):
             return 0
         store = self.bot.get_cog("Store")
         house = store.member_house(member) if store else None
@@ -676,6 +670,32 @@ class Castles(commands.Cog):
         prec["bind40_bonus"] = True
         self.save()
         return BIND_BONUS_POINTS
+
+    def settle_bind40(self, member: discord.Member) -> int:
+        """Award the daily bonus if this Chicago day already reached the goal.
+
+        Checklist and GPA read this so a run past the new total shows complete
+        without another fight. The stored count is left as-is.
+        """
+        return self._pay_bind40_bonus(member, self._bind40_rec(member.id))
+
+    def note_bind40(self, member: discord.Member, *, floor: int, n: int = 1) -> int:
+        """Count floor-40+ Descent wins toward the daily +10 bonus.
+
+        Call this for every F40+ win, even when ``recruit_allowed`` is 0 —
+        the checklist goal is independent of army size / daily recruit caps.
+        Returns house points awarded (0 or ``BIND_BONUS_POINTS``).
+        """
+        if n <= 0 or int(floor) < BIND_BONUS_MIN_FLOOR:
+            return 0
+        prec = self._bind40_rec(member.id)
+        prec["bind40_today"] = int(prec.get("bind40_today") or 0) + n
+        awarded = self._pay_bind40_bonus(member, prec)
+        if awarded == 0:
+            # Count still has to persist when the goal is not met yet, and
+            # when the bonus was already claimed earlier today.
+            self.save()
+        return awarded
 
     def fifth_muster_bonus(self, user_id: int) -> int:
         """Call after a Descent win. Returns how many extra units to clone (0 or 1)."""

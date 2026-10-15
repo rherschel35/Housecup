@@ -478,6 +478,9 @@ class Checklist(commands.Cog):
                 BIND_BONUS_MIN_FLOOR,
                 BIND_BONUS_POINTS,
             )
+            # Finish a day that already passed a lowered goal. Does not
+            # add binds or clear a counter that is still in progress.
+            castles.settle_bind40(member)
             bound = castles.bind40_today(member.id)
             claimed = castles.bind40_bonus_claimed(member.id)
             detail = (

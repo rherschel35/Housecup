@@ -16,6 +16,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.castles import BIND_BONUS_GOAL, BIND_BONUS_MIN_FLOOR, BIND_BONUS_POINTS
+
 log = logging.getLogger("velmora.help")
 
 # (command path, what it does). A path with a space is a subcommand.
@@ -88,7 +90,8 @@ HELP = {
                  "`/descend auto:True` posts the next monster after each win. "
                  "Idle 3 minutes with no button press counts as a loss. "
                  "Wins bind monsters into your army for castle sieges. "
-                 "Bind 200 floor-40+ monsters in a Central day for +10 house points once."),
+                 f"Bind {BIND_BONUS_GOAL} floor-{BIND_BONUS_MIN_FLOOR}+ monsters in a Central day "
+                 f"for +{BIND_BONUS_POINTS} house points once."),
         "entries": [
             ("descend", "Fight the next monster (or resume). Use auto:True to chain wins without retyping."),
             ("descendend", "Forfeit an open fight (counts as a loss). Idle 3 min with no button also loses. Staff can forfeit others."),
@@ -103,7 +106,8 @@ HELP = {
         "note": ("Army PvP in the castles channel. Bind Descent monsters, hold one of six castles, "
                  "siege on Wed & Sat (Chicago). Reinforce anytime except mid-assault. "
                  "One castle per player — abandon before attacking another. "
-                 "200 floor-40+ binds in a Central day = +10 house points."),
+                 f"{BIND_BONUS_GOAL} floor-{BIND_BONUS_MIN_FLOOR}+ binds in a Central day "
+                 f"= +{BIND_BONUS_POINTS} house points."),
         "entries": [
             ("castles", "Map board: owners, perks, reinforce anytime (not mid-assault), siege, abandon."),
             ("army", "Full paged roster + sacrifice 500 → ATK/DEF (castles + Descent channels). Size (5000) and daily bind caps start when PvP goes live."),
