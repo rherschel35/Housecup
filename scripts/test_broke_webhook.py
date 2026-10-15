@@ -148,9 +148,9 @@ def _command_unchanged() -> None:
     assert params[0].required is True
 
     src = inspect.getsource(cmd.callback)
-    send_at = src.index("response.send_message")
+    receipt_at = src.index("embed=receipt")
     forward_at = src.index("_forward_ticket")
-    assert send_at < forward_at
+    assert receipt_at < forward_at
     assert "await self._forward_ticket" not in src
     assert "await _post_ticket_webhook" not in src
     for snippet in (
@@ -159,7 +159,7 @@ def _command_unchanged() -> None:
         "You just sent one — try again in",
         "Run this in a text channel so staff can jump back to your ticket.",
     ):
-        assert src.index(snippet) < send_at
+        assert src.index(snippet) < receipt_at
     for snippet in (
         "Your ticket is posted here, but the staff inbox couldn't be reached.",
         "Ping Gon if it's urgent.",
@@ -295,6 +295,7 @@ async def _run() -> None:
             grab.messages.clear()
             _use_env(TICKET_WEBHOOK_URL=base + "/ok", TICKET_WEBHOOK_KEY=KEY)
             interaction = _Interaction(channel_obj)
+            cog._last.clear()
             if prepare:
                 prepare(cog, interaction)
             await callback(cog, interaction, what)
