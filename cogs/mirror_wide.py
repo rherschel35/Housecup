@@ -313,15 +313,25 @@ def render_wide(*, look: dict, user_id: int, name: str, title: str | None = None
     # Gold trim and wand sparks still change the foil and the wand line.
     del gear, beast_emoji, stars, aura, spire_backdrop
 
+    house_key, house_color, house_emoji, motto, house_palette = art.apply_wide_card_house(
+        user_id, house_key, house_color, house_emoji, motto)
+
     hcol = art.hexint(house_color) if isinstance(house_color, int) else house_color
     hc = art.rgb(hcol)
-    # Deep forest, tinted by the house so a later opt-in still reads as their house.
-    panel = art.mix((8, 24, 16), hc, 0.24)
+    # Deep forest, tinted a little by the house. That base is what reads as
+    # the default dark green when a house never arrives (or when the house
+    # blue is too dark to win a 24% mix). Configured houses below paint from
+    # the house colour instead. Gon and Caldrin stay on the forest formula.
+    if house_palette:
+        panel = art.mix((10, 18, 36), hc, 0.62)
+        header_fill = art.mix((226, 232, 238), art.light(hc, 0.45), 0.42)
+    else:
+        panel = art.mix((8, 24, 16), hc, 0.24)
+        header_fill = art.mix((246, 236, 208), art.light(hc, 0.55), 0.10)
     cream = art.light(hc, 0.92)
     cream_soft = art.light(hc, 0.70)
     cream_dim = art.light(hc, 0.55)
     ink = art.dark(hc, 0.86)
-    header_fill = art.mix((246, 236, 208), art.light(hc, 0.55), 0.10)
     box_fill = art.mix(panel, (236, 226, 196), 0.12)
     box_empty = art.mix(panel, (4, 8, 6), 0.40)
     box_edge = art.mix((228, 216, 176), hc, 0.30)
@@ -387,10 +397,20 @@ def render_wide(*, look: dict, user_id: int, name: str, title: str | None = None
     crest = art.load_crest(house_key, crest_size)
     crest_pad = (crest_size + 36) if (crest or house_emoji) else 8
     name_text = " ".join((name or "Wizard").split())
-    name_face, name_text = _fit_line(
-        d, name_text.upper(), "Cinzel.ttf", 34, 700,
-        max(40, rw - 28 - crest_pad), minimum=18,
-    )
+    name_display = name_text.upper()
+    name_max = max(40, rw - 28 - crest_pad)
+    # Cinzel-only names take the original fit + draw path so existing cards
+    # (Gon, Caldrin) stay pixel-identical. Decorated names fall back per glyph.
+    if art.glyphs_covered("Cinzel.ttf", name_display, 34, 700):
+        name_face, name_text = _fit_line(
+            d, name_display, "Cinzel.ttf", 34, 700, name_max, minimum=18,
+        )
+        name_runs = None
+    else:
+        name_face = None
+        name_runs = art.fit_mixed_line(
+            d, name_display, name_max, start=34, minimum=18, weight=700,
+        )
 
     title_text = " ".join((title or "").split())
     title_face = art.font("Alegreya-Italic.ttf", 22)
@@ -486,10 +506,11 @@ def render_wide(*, look: dict, user_id: int, name: str, title: str | None = None
         [rx * S, header_y * S, (rx + rw) * S, (header_y + header_h) * S],
         radius=14 * S, fill=art.rgba(header_fill),
         outline=art.rgba(art.mix(ink, header_fill, 0.45)), width=2 * S)
-    d.text(
-        ((rx + 20) * S, (header_y + header_h / 2) * S),
-        name_text, font=name_face, fill=art.rgba(ink), anchor="lm",
-    )
+    name_xy = ((rx + 20) * S, (header_y + header_h / 2) * S)
+    if name_runs is None:
+        d.text(name_xy, name_text, font=name_face, fill=art.rgba(ink), anchor="lm")
+    else:
+        art.draw_mixed_line(d, name_runs, name_xy[0], name_xy[1], art.rgba(ink))
     if crest:
         art.paste_center(card, crest, rx + rw - 22 - crest_size / 2, header_y + header_h / 2)
     elif house_emoji:
