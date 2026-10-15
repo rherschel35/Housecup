@@ -5,17 +5,25 @@ Players describe what's wrong. A ticket receipt is posted in the channel
 where they ran the command, and a copy goes to the staff broke-report
 channel with a jump link. Staff can press **Close ticket** on either
 message; the reporter is notified that it's resolved and fixed.
+
+When TICKET_WEBHOOK_URL is set, the filed ticket is also POSTed as JSON
+to that URL. The POST does not change what the player sees. Failures are
+logged and do not block the ticket.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
+import re
 import time
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
+import aiohttp
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -37,6 +45,10 @@ COLOR = 0xC0392B
 RESOLVED_COLOR = 0x2ECC71
 CLOSE_CUSTOM_ID = "broke:close"
 
+# External copy of a filed ticket. Unset URL means the feature is off.
+WEBHOOK_TIMEOUT_SECONDS = 10
+_HEADER_NAME_RE = re.compile(r"^[!#$%&'*+\-.0-9A-Z^_`a-z|~]+$")
+
 
 def _load_state() -> dict:
     if STATE_PATH.exists():
@@ -49,6 +61,123 @@ def _load_state() -> dict:
         except (OSError, json.JSONDecodeError):
             log.exception("Broke state unreadable — starting fresh.")
     return {"tickets": {}, "by_msg": {}}
+
+
+def _utc_now_iso() -> str:
+    return (
+        datetime.now(timezone.utc)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )
+
+
+def _commit_sha() -> str | None:
+    """Railway sets this on git deploys. Absent when the process has no sha."""
+    sha = os.getenv("RAILWAY_GIT_COMMIT_SHA", "").strip()
+    return sha or None
+
+
+def _redact(text: str, secret: str) -> str:
+    if not secret or not text:
+        return text
+    return text.replace(secret, "[redacted]")
+
+
+def _ticket_webhook_auth_headers(key: str, header_name: str) -> dict[str, str]:
+    """Headers that carry the webhook secret.
+
+    With no header name, the key is sent as ``Authorization: Bearer <key>``.
+    When a header name is set, the raw key is sent under that name instead.
+    An empty key sends no auth header. A header name that is not an HTTP
+    token raises ValueError and does not include the key.
+    """
+    key = (key or "").strip()
+    header_name = (header_name or "").strip()
+    if not key:
+        return {}
+    if not header_name:
+        return {"Authorization": f"Bearer {key}"}
+    if _HEADER_NAME_RE.fullmatch(header_name) is None:
+        raise ValueError("invalid webhook key header name")
+    return {header_name: key}
+
+
+def _build_broke_ticket_payload(
+    *,
+    text: str,
+    reporter_id: int,
+    reporter_name: str,
+    channel_id: int,
+    channel_name: str,
+    guild_id: int | None,
+    ticket_id: str,
+    timestamp: str | None = None,
+    commit_sha: str | None = None,
+) -> dict[str, object]:
+    """JSON body for one filed ticket. No category: this command has none."""
+    payload: dict[str, object] = {
+        "text": text,
+        "reporter_id": str(reporter_id),
+        "reporter_display_name": reporter_name,
+        "channel_id": str(channel_id),
+        "channel_name": channel_name,
+        "guild_id": str(guild_id) if guild_id else None,
+        "timestamp": timestamp or _utc_now_iso(),
+        "ticket_id": ticket_id,
+    }
+    sha = (commit_sha or "").strip()
+    if sha:
+        payload["commit_sha"] = sha
+    return payload
+
+
+def _clip(text: str, limit: int = 300) -> str:
+    text = text.replace("\n", " ").strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "…"
+
+
+async def _post_ticket_webhook(url: str, payload: dict[str, object]) -> None:
+    """POST the ticket. Logs failures. Never raises to the caller."""
+    key = os.getenv("TICKET_WEBHOOK_KEY", "").strip()
+    ticket_id = payload.get("ticket_id") or ""
+    try:
+        header_name = os.getenv("TICKET_WEBHOOK_KEY_HEADER", "").strip()
+        try:
+            auth = _ticket_webhook_auth_headers(key, header_name)
+        except ValueError:
+            log.error(
+                "TICKET_WEBHOOK_KEY_HEADER is not a valid HTTP header name; "
+                "forwarding broke ticket %s without the key.",
+                ticket_id,
+            )
+            auth = {}
+        timeout = aiohttp.ClientTimeout(total=WEBHOOK_TIMEOUT_SECONDS)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(
+                url,
+                json=payload,
+                headers=auth,
+                allow_redirects=False,
+            ) as resp:
+                raw = await resp.text()
+                if resp.status < 200 or resp.status >= 300:
+                    detail = _clip(_redact(raw, key))
+                    log.warning(
+                        "Broke ticket webhook returned HTTP %s for ticket %s%s",
+                        resp.status,
+                        ticket_id,
+                        f" ({detail})" if detail else "",
+                    )
+                    return
+        log.info("Forwarded broke ticket %s", ticket_id)
+    except Exception as exc:
+        log.warning(
+            "Broke ticket webhook failed for ticket %s: %s",
+            ticket_id,
+            _redact(f"{type(exc).__name__}: {exc}", key),
+        )
 
 
 class CloseTicketButton(discord.ui.Button):
@@ -98,6 +227,7 @@ class Broke(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self._last: dict[int, float] = {}
+        self._webhook_tasks: set[asyncio.Task[None]] = set()
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         self.state = _load_state()
         # Persistent Close button (same custom_id on ticket + staff report).
@@ -157,6 +287,35 @@ class Broke(commands.Cog):
         if report_msg_id:
             by_msg[str(report_msg_id)] = ticket_id
         self.save()
+
+    def _forward_ticket(
+        self,
+        interaction: discord.Interaction,
+        what: str,
+        ticket_id: str,
+    ) -> None:
+        """Schedule the webhook. Returns immediately. No-op when the URL is unset."""
+        url = os.getenv("TICKET_WEBHOOK_URL", "").strip()
+        if not url:
+            return
+        channel = interaction.channel
+        reporter = interaction.user
+        payload = _build_broke_ticket_payload(
+            text=what,
+            reporter_id=reporter.id,
+            reporter_name=getattr(reporter, "display_name", "") or str(reporter),
+            channel_id=getattr(channel, "id", 0) or 0,
+            channel_name=getattr(channel, "name", "") or "",
+            guild_id=interaction.guild_id,
+            ticket_id=ticket_id,
+            commit_sha=_commit_sha(),
+        )
+        task = asyncio.create_task(
+            _post_ticket_webhook(url, payload),
+            name=f"broke-webhook-{ticket_id}",
+        )
+        self._webhook_tasks.add(task)
+        task.add_done_callback(self._webhook_tasks.discard)
 
     def _ticket_for_message(self, message_id: int) -> tuple[str, dict] | None:
         tid = self.state.get("by_msg", {}).get(str(message_id))
@@ -428,6 +587,15 @@ class Broke(commands.Cog):
         await interaction.response.send_message(
             embed=receipt, view=BrokeTicketView()
         )
+        # The receipt is already posted. Scheduling must not delay the staff
+        # copy or add a message the player can see.
+        try:
+            self._forward_ticket(interaction, what, ticket_id)
+        except Exception as exc:
+            log.warning(
+                "Could not schedule broke ticket webhook: %s",
+                type(exc).__name__,
+            )
         try:
             ticket_msg = await interaction.original_response()
         except discord.HTTPException:
