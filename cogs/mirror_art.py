@@ -68,6 +68,17 @@ WIDE_CARD_PORTRAITS = {
     479078540986548224: "portrait-479078540986548224.jpg",
 }
 
+# House the landscape card should wear when live lookup doesn't.
+# Keys are the internal house ids in cogs.store.HOUSES (moonveil is the
+# public house AsterWilde; vashara is Oakmont).
+# Sky is always AsterWilde here. Vish is Oakmont only when nothing resolved.
+WIDE_CARD_HOUSES = {
+    479078540986548224: "moonveil",
+    804202856240381963: "vashara",
+}
+# Sky's lookup is the one that comes back empty. Her override always wins.
+WIDE_CARD_HOUSE_FORCED = frozenset({479078540986548224})
+
 # Source sprites are 1400x1200
 SRC_W, SRC_H = 1400, 1200
 
@@ -495,6 +506,12 @@ def hexint(n: int) -> str:
 _font_cache: dict = {}
 
 
+# Cinzel has no U+2E30 RING POINT (the ⸰ in decorated display names). Those
+# glyphs share the font's .notdef box. Noto Sans covers that punctuation.
+FALLBACK_FONT = "NotoSans-Regular.ttf"
+_notdef_sig: dict = {}
+
+
 def font(name: str, size: int, weight: int | None = None):
     key = (name, size, weight)
     if key not in _font_cache:
@@ -510,6 +527,113 @@ def font(name: str, size: int, weight: int | None = None):
             f = ImageFont.load_default(size * S)
         _font_cache[key] = f
     return _font_cache[key]
+
+
+def _face_notdef(face):
+    key = id(face)
+    sig = _notdef_sig.get(key)
+    if sig is None:
+        mask = face.getmask("\uffff")
+        sig = (mask.size, mask.getbbox())
+        _notdef_sig[key] = sig
+    return sig
+
+
+def face_has_glyph(face, ch: str) -> bool:
+    """False when `ch` would draw this face's .notdef (tofu) box."""
+    if not ch or ch.isspace():
+        return True
+    mask = face.getmask(ch)
+    return (mask.size, mask.getbbox()) != _face_notdef(face)
+
+
+def glyphs_covered(font_name: str, text: str, size: int, weight: int | None) -> bool:
+    face = font(font_name, size, weight)
+    return all(face_has_glyph(face, ch) for ch in text)
+
+
+def mixed_runs(text: str, size: int, weight: int | None, primary: str = "Cinzel.ttf"):
+    """Split `text` into (font, substring) runs.
+
+    Cinzel draws what it has. Noto Sans draws the rest. A character neither
+    face contains is omitted so the card never paints a tofu box.
+    """
+    main = font(primary, size, weight)
+    fallback = font(FALLBACK_FONT, size, None)
+    runs: list[tuple] = []
+    buf = ""
+    chosen = None
+    for ch in text:
+        if face_has_glyph(main, ch):
+            face = main
+        elif face_has_glyph(fallback, ch):
+            face = fallback
+        else:
+            continue
+        if face is not chosen:
+            if buf and chosen is not None:
+                runs.append((chosen, buf))
+            chosen = face
+            buf = ch
+        else:
+            buf += ch
+    if buf and chosen is not None:
+        runs.append((chosen, buf))
+    return runs
+
+
+def fit_mixed_line(draw, text: str, max_w: float, start: int = 34,
+                   minimum: int = 18, weight: int | None = 700):
+    """Shrink a mixed-font line to `max_w` picture units. Ellipsis last."""
+    max_px = max_w * S
+
+    def width(runs) -> float:
+        return sum(draw.textlength(part, font=face) for face, part in runs)
+
+    size = start
+    runs = mixed_runs(text, size, weight)
+    while size > minimum and width(runs) > max_px:
+        size -= 1
+        runs = mixed_runs(text, size, weight)
+    if not runs or width(runs) <= max_px:
+        return runs
+    ell = text
+    while ell and width(mixed_runs(ell + "…", size, weight)) > max_px:
+        ell = ell[:-1].rstrip()
+    shown = (ell + "…") if ell else "…"
+    return mixed_runs(shown, size, weight)
+
+
+def draw_mixed_line(draw, runs, x: float, y: float, fill) -> None:
+    """Left-middle anchor, same point `draw.text(..., anchor='lm')` would use."""
+    for face, part in runs:
+        draw.text((x, y), part, font=face, fill=fill, anchor="lm")
+        x += draw.textlength(part, font=face)
+
+
+def apply_wide_card_house(user_id, house_key, house_color, house_emoji, motto):
+    """Fill a wide card's house from WIDE_CARD_HOUSES.
+
+    Returns (house_key, color, emoji, motto, use_house_palette).
+
+    Sky is forced to AsterWilde. member_house() only sees a points-store
+    override or a role whose name contains the house (AsterWilde / Moonveil).
+    Her display name is not consulted, this repo has no override for her id,
+    and a headmasters role does not name the house, so the lookup is None.
+    The wide card then skips the crest and paints its deep-forest panel.
+    Vish gets Oakmont only when her live house did not resolve. Gon and
+    Caldrin are not in this map and are returned unchanged.
+    """
+    forced = WIDE_CARD_HOUSES.get(int(user_id))
+    if not forced:
+        return house_key, house_color, house_emoji, motto, False
+    from cogs.store import HOUSES
+    if forced not in HOUSES:
+        return house_key, house_color, house_emoji, motto, False
+    if int(user_id) not in WIDE_CARD_HOUSE_FORCED and house_key in HOUSES:
+        return house_key, house_color, house_emoji, motto, False
+    meta = HOUSES[forced]
+    return forced, meta["color"], meta["emoji"], meta["motto"], True
 
 
 def emoji_image(ch: str, size: int) -> Image.Image | None:

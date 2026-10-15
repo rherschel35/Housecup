@@ -26,6 +26,8 @@ from cogs.mirror_art import (  # noqa: E402
     WIDE_CARD_PORTRAITS,
     WIDE_CARD_USER_IDS,
     WIDE_PORTRAIT_DIR,
+    glyphs_covered,
+    mixed_runs,
     render,
 )
 from cogs.mirror_wide import (  # noqa: E402
@@ -39,6 +41,9 @@ from cogs.mirror_wide import (  # noqa: E402
 )
 
 GON = 555141900802457630
+CALDRIN = 929025104644562996
+SKY = 479078540986548224
+VISH = 804202856240381963
 
 
 def _sample_scene(user_id: int) -> dict:
@@ -132,6 +137,65 @@ def main() -> int:
     # Allowlisted id with no portrait file still gets the wide layout.
     fallback = _open(render_wide(**_sample_scene(42)))
     assert fallback.size == (WIDE_W, WIDE_H)
+
+    # Decorated display names: Cinzel has no U+2E30, so that glyph must not
+    # stay on Cinzel (it would draw the .notdef box). Noto Sans takes it.
+    decorated = "⸰.° HEADSQUIRREL SKY °.⸰"
+    assert not glyphs_covered("Cinzel.ttf", decorated, 34, 700)
+    assert glyphs_covered("Cinzel.ttf", "HEADMASTER GON VALE", 34, 700)
+    runs = mixed_runs(decorated, 34, 700)
+    flat = "".join(part for _, part in runs)
+    assert flat == decorated, flat
+    assert any("⸰" in part for _, part in runs)
+    cinzel_runs = [part for face, part in runs if "Cinzel" in str(getattr(face, "path", ""))]
+    assert cinzel_runs and all("⸰" not in part for part in cinzel_runs)
+
+    def _panel(png: bytes):
+        im = _open(png).convert("RGBA")
+        return im.getpixel((1500, 430))
+
+    # Unresolved Sky becomes AsterWilde night blue plus the squirrel crest,
+    # not the unsorted forest/purple panel.
+    sky_png = render(**dict(
+        _sample_scene(SKY),
+        name=decorated,
+        house_key=None,
+        house_color=0x6C5CE7,
+        house_emoji=None,
+        motto=None,
+    ))
+    sky_px = _panel(sky_png)
+    assert sky_px[2] > sky_px[1] > sky_px[0], sky_px
+    assert sky_px != (32, 40, 67, 255), sky_px
+    sky_im = _open(sky_png)
+    crest_px = sky_im.getpixel((1760, 80))
+    assert crest_px[3] > 200 and not (crest_px[0] > 220 and crest_px[1] > 220), crest_px
+
+    # Vish with no house gets Oakmont. A resolved house is left alone, so her
+    # Thornmere panel matches Gon's (the forest formula, not the override).
+    vish_png = render(**dict(
+        _sample_scene(VISH), name="Vish",
+        house_key=None, house_color=0x6C5CE7, house_emoji=None, motto=None,
+    ))
+    vish_px = _panel(vish_png)
+    assert vish_px[0] > vish_px[1], vish_px
+    gon_house = _panel(render(**dict(
+        _sample_scene(GON), name="Gon", title=None, titles=[],
+        gear_icons=[], stats=[], motto="Loyalty is earned, Advantage is taken.",
+    )))
+    vish_kept = _panel(render(**dict(
+        _sample_scene(VISH), name="Vish", title=None, titles=[],
+        gear_icons=[], stats=[], motto="Loyalty is earned, Advantage is taken.",
+        house_key="thornmere", house_color=0x3E8E5A,
+    )))
+    assert vish_kept == gon_house, (vish_kept, gon_house)
+
+    # Caldrin (lemur) stays on the forest/gold panel.
+    cal_px = _panel(render(**_sample_scene(CALDRIN) | dict(
+        name="Caldrin", house_key="caldrin", house_color=0xE0B53A,
+        motto="Measured, not meek.",
+    )))
+    assert cal_px[0] > 40 and cal_px[1] > 40 and cal_px[2] < 40, cal_px
 
     # Sparse data should still render.
     sparse = _open(render_wide(
