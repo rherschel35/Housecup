@@ -29,6 +29,8 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
+import discord
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 os.environ.setdefault("STATE_DIR", tempfile.mkdtemp(prefix="housecup-duel-night-"))
@@ -44,8 +46,12 @@ from cogs.duels import (  # noqa: E402
     GRAND_REWARD_POINTS,
     RIVAL_AFTER,
     REWARDED_PER_DAY,
+    Duel,
     Duels,
     duel_night_payout,
+    _ephemeral_board_kwargs,
+    edit_private_board,
+    edit_public_board,
     pair_key,
 )
 from cogs.point_share import kill_share_awards  # noqa: E402
@@ -459,6 +465,136 @@ async def test_expiry_tick(duels: Duels, store: Store, bot: Bot) -> None:
     assert not STORE_PATH.with_suffix(".tmp").exists()
 
 
+def _webhook_expired() -> discord.HTTPException:
+    response = type("Resp", (), {"status": 401, "reason": "Unauthorized"})()
+    return discord.HTTPException(
+        response, {"code": 50027, "message": "Invalid Webhook Token"}
+    )
+
+
+def test_private_board_omits_empty_view() -> None:
+    kwargs = _ephemeral_board_kwargs(object(), None)
+    assert "view" not in kwargs and kwargs["ephemeral"] is True
+    view = object()
+    assert _ephemeral_board_kwargs(object(), view)["view"] is view
+    # The crash is view.is_finished() when view is None. Both open paths omit it.
+    for fn in (Duel.open_cast_board,):
+        src = inspect.getsource(fn)
+        assert "_ephemeral_board_kwargs" in src
+        assert "view=view" not in src
+
+
+async def test_expired_boards_repost() -> None:
+    class Dead:
+        id = 5
+
+        async def edit(self, **kwargs):
+            raise _webhook_expired()
+
+    class Fresh:
+        id = 9
+
+    class Chan:
+        def __init__(self):
+            self.sent = []
+
+        async def send(self, *args, **kwargs):
+            self.sent.append((args, kwargs))
+            return Fresh()
+
+    match = type("Match", (), {})()
+    match.message = Dead()
+    match.channel = Chan()
+    match.private_boards = {7: Dead()}
+    match._cast_nudged = set()
+    await edit_public_board(match, embed=None, view=None)
+    assert match.message.id == 9
+    await edit_private_board(match, 7, Dead(), embed=None, view=None)
+    assert 7 not in match.private_boards
+    nudge = match.channel.sent[-1][0][0]
+    assert "<@7>" in nudge and "Open my cast board" in nudge
+    await edit_private_board(match, 7, Dead(), embed=None, view=None)
+    assert sum("Open my cast board" in (args[0] if args else "") for args, _ in match.channel.sent) == 1
+
+
+async def test_series_survives_the_clock(duels: Duels, store: Store) -> None:
+    """Sets won in a series count, including after Duel Night's clock."""
+    assert duels.state.get("duel_night") is None
+    ok, _msg, _night = duels._begin_duel_night(
+        minutes=30, by=1, channel_id=42, guild_id=1,
+    )
+    assert ok
+    w, l = Member(901, "SeriesW"), Member(902, "SeriesL")
+    store.set_override(w.id, "thornmere")
+    store.set_override(l.id, "vashara")
+    match = Duel(duels, None, w, l, best_of=7)
+    match.state = "active"
+    # Started a minute ago so moving ends_at into the past still leaves
+    # started_at < ends_at. A sub-second test would otherwise invert them.
+    match.started_at = time.time() - 60
+    duels.mark_busy(match, w, l)
+
+    # Fizzle/draw banks finished sets, not the unplayed series bank of 4.
+    drawn = duels.settle(
+        w, l, match_wins=4, winner_sets=2, loser_sets=1,
+        sets_only=True, played_winner_sets=2, played_loser_sets=1,
+        started_at=match.started_at,
+    )
+    assert drawn["night_wins"] == 2 and drawn["loser_night_wins"] == 1
+    assert drawn["awarded"] == 0
+    assert duels.streak_of(w.id) == 0
+    assert duels.record_of(w.id)["w"] == 2
+    assert duels.record_of(l.id)["w"] == 1
+    assert tally_wins(duels, w.id) == 2
+    assert tally_wins(duels, l.id) == 1
+
+    # Forfeit with only the set score (no played_* ) still banks both sides.
+    fw, fl = Member(903, "ForfeitW"), Member(904, "ForfeitL")
+    store.set_override(fw.id, "caldrin")
+    store.set_override(fl.id, "moonveil")
+    forfeited = duels.settle(
+        fw, fl, match_wins=5, winner_sets=3, loser_sets=2, forfeit=True,
+        started_at=match.started_at,
+    )
+    assert forfeited["night_wins"] == 3 and forfeited["loser_night_wins"] == 2
+    assert tally_wins(duels, fw.id) == 3
+    assert tally_wins(duels, fl.id) == 2
+
+    duels.state["duel_night"]["ends_at"] = match.started_at + 30
+    assert duels.pop_expired_duel_night() is None
+    late = duels.settle(
+        w, l, now=time.time(), match_wins=4, winner_sets=4, loser_sets=1,
+        started_at=match.started_at,
+    )
+    assert late["reason"] == "night"
+    assert late["night_wins"] == 4 and late["loser_night_wins"] == 1
+    assert tally_wins(duels, w.id) == 6
+    assert tally_wins(duels, l.id) == 2
+
+    aw, al = Member(905, "AfterW"), Member(906, "AfterL")
+    store.set_override(aw.id, "thornmere")
+    store.set_override(al.id, "vashara")
+    after = duels.settle(aw, al, now=time.time(), started_at=time.time())
+    assert after["reason"] != "night"
+    assert tally_wins(duels, aw.id) == 0
+
+    duels.release_match(match)
+    popped = duels.pop_expired_duel_night()
+    assert popped is not None
+    tally = popped["tally"]
+    assert int(tally[str(w.id)]["wins"]) == 6
+    assert int(tally[str(l.id)]["wins"]) == 2
+    assert int(tally[str(fw.id)]["wins"]) == 3
+    assert int(tally[str(fl.id)]["wins"]) == 2
+
+    # Neither side finished a set: nothing is banked.
+    zilch = duels.settle(
+        w, l, sets_only=True, winner_sets=0, loser_sets=0, match_wins=26,
+    )
+    assert zilch["reason"] == "no-play" and zilch["night_wins"] == 0
+    assert duels.record_of(w.id)["w"] == 2 + 4
+
+
 async def main() -> None:
     test_kill_share_matches_attack()
     test_payout_math()
@@ -468,8 +604,11 @@ async def main() -> None:
     bot.cogs["Store"] = store
     bot.cogs["Duels"] = duels
     test_rules_text(duels)
+    test_private_board_omits_empty_view()
+    await test_expired_boards_repost()
     await test_live_rules(duels, store)
     await test_expiry_tick(duels, store, bot)
+    await test_series_survives_the_clock(duels, store)
     print("Duel Night pool payout: ok")
 
 
