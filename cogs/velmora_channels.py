@@ -17,7 +17,11 @@ DUELS_POTIONS_CHANNEL_ID = 1555554825616236726
 
 # Full multi-game lounge: everything except castle PvP and 3Raid.
 EVERYTHING_LOUNGE_CHANNEL_ID = 1558611215054282822
-EVERYTHING_LOUNGE_CHANNEL_IDS = frozenset({EVERYTHING_LOUNGE_CHANNEL_ID})
+# Extra everything lounge. Same games as the lounge above — not castle PvP or 3Raid.
+ALL_ACCESS_CHANNEL_ID = 1560280552303624252
+ALL_ACCESS_CHANNEL_IDS = frozenset({ALL_ACCESS_CHANNEL_ID})
+
+EVERYTHING_LOUNGE_CHANNEL_IDS = frozenset({EVERYTHING_LOUNGE_CHANNEL_ID, *ALL_ACCESS_CHANNEL_IDS})
 
 # Multi-game lounges — duels, potions, Descent, Quidditch/broom.
 # Not: Wild Threat spawns, exploring, castle PvP, or 3Raid
