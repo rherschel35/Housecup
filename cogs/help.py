@@ -41,7 +41,8 @@ HELP = {
             ("animagus", "Your Animagus form from three words of your own — you don't pick it. Run again anytime for 1 min of animal sounds on your messages."),
             ("broom", "Claim your unique broom (see Brooms section for upgrades, races, and notes)."),
             ("rumor", "Explore secrets, student gossip, odd headmaster whispers, embarrassing ghosts."),
-            ("cast", "Banish an Attack-wave monster. Solo Wild Threats use the green spell buttons on the post."),
+            ("birthday register", "Save your birthday once — month dropdown, then the day. Staff can change it."),
+            ("birthday view", "See the birthday you saved."),
             ("familiar status", "Check in on your familiar — friendship, look, and today's care checklist."),
             ("familiar adopt", "Adopt a salamander, raven, or fox for good (once)."),
             ("familiar name", "Give your familiar a name, or rename it."),
@@ -168,9 +169,9 @@ HELP = {
         "note": ("Places remember how you treat them. Not everything you can do is listed here. "
                  "Exploring or foraging in the Dungeons or Forbidden Woods can stir up a wild threat — "
                  "you get 25 seconds alone before anyone else can try. "
-                 "The monster shows green spell buttons under the post, same as a staff summon or a sighting. "
+                 "The monster shows green spell buttons under the post, same as a staff summon, a sighting, or an Attack wave. "
                  "The right spell beats it. A wrong one locks you out, and the channel hears about it. "
-                 "`/cast` won't fight that one — it tells you to use the buttons. "
+                 "A Dementor's right button is Patronus, the same as any other creature's correct spell. "
                  "A creature that needs two people opens to everyone after the first hit, "
                  "and the second hit ends it right away. "
                  "If nobody lands that second hit, it slips away 2 minutes after the first one."),
@@ -289,7 +290,9 @@ HELP = {
             ("staffgame market sellreset", "Clear someone's daily Marketplace sell-points cap."),
             ("staffgame market setprice", "Set the point price for scrolls, titles, Room, ingredients, etc."),
             ("staffgame market prices", "Show current Marketplace prices (including overrides)."),
-            ("staffgame hex cast", "Curse a student (Headmasters + Presidents) — chat mangles, or Limp Wand (blocks /wand, /patronus, /broom, /cast for 1 hour)."),
+            ("staffgame hex cast", "Curse a student (Headmasters + Presidents) — chat mangles, or Limp Wand (blocks /wand, /patronus, /broom, and wild-threat spell buttons for 1 hour)."),
+            ("birthday staff set", "Change someone's saved birthday (month and day)."),
+            ("birthday staff clear", "Clear someone's saved birthday. A year already gifted is not gifted again."),
             ("staffgame hex lift", "Lift a hex early (Headmasters + Presidents)."),
             ("staffgame hex list", "Show who's currently hexed (Headmasters + Presidents)."),
             ("staffgame bingo start", "Open a Bingo lobby — pick mode (Traditional / 4 Corners / Diagonals / Random pattern); players Join, host Start, then auto-calls every 20s."),

@@ -2,11 +2,11 @@
 Wild Threats. Something slips into one of the social channels on its own,
 a few times a day - and a headmaster can always summon one on the spot.
 
-    /cast
-        - Attack waves: opens spell buttons against whatever's here
-        - a solo Wild Threat (explore, forage, ambient, staff summon)
-          already shows spell buttons and refuses /cast
-        - CAST_AUTO_USER_ID auto-picks the right spell on an Attack wave
+    There is no /cast command. Every fight — a solo Wild Threat and every
+    Attack-wave monster — shows the same public green spell buttons on its
+    post. CAST_AUTO_USER_ID (and Liquid Luck, and Surestroke Tower) still
+    auto-picks: on an Attack wave, any button that player presses counts as
+    the creature's weakness. Solo fights do not auto-pick.
     /staff dementor channels          - set the channels they can appear in
     /staff dementor summon [channel] [creature] - make one appear right now
         (study hall + shared games lounge + swarm practice room are
@@ -16,8 +16,10 @@ a few times a day - and a headmaster can always summon one on the spot.
 Every creature has exactly one spell that actually works on it, and the
 post never says which - that's the whole game. The spell that works is
 CREATURES[id]["weak"] (patronus, hex, ward, disarm, bind, or mirror).
-A Dementor is still only driven out by an already-cast Patronus, same
-as always.
+The Patronus button under a Dementor is that spell. Pressing it banishes
+the Dementor the same way the right button beats any other creature.
+/patronus still casts a player's own patronus; the fight does not
+require one.
 
 Every solo Wild Threat puts those spells on the public arrival post as
 green buttons, the way a Quidditch sign-up sits on its message. That is
@@ -30,10 +32,13 @@ loud: a random teasing line names them, the spell, and the creature.
 Someone else can still try. During the finder's 25 seconds, anyone
 else's click gets a private note and is not a lockout. A player who is
 already locked out gets a private note too, not another public miss.
-The buttons disable when the monster is defeated or slips away. /cast
-does not fight these. It replies in private: use the spell buttons on
-the monster post. Attack waves still use /cast, including its spell
-menu. A wrong /cast there still does nothing and does not lock anyone out.
+The buttons disable when the monster is defeated, slips away, or a new
+Attack wave sweeps the post aside. Attack waves use that same public
+row: shuffled green buttons, a wrong press locks that player out of
+that monster, and the channel hears a teasing miss. A lockout on a solo
+monster does not follow anyone into a wave, or the other way around.
+A wrong press during the finder's 25 seconds is not a lockout — that
+note stays private, same as "already out."
 
 Most creatures fall to a single clean hit, and that result posts right
 away. A couple don't: they take two hits from two DIFFERENT people before
@@ -102,8 +107,8 @@ House practice floods a single house channel the same way, but awards
 nothing at the end — just drills for the real Attack.
 
 Event casts and wave posts release the shared lock before talking to
-Discord, so a busy Attack doesn't freeze every other /cast behind one
-slow image upload.
+Discord, so a busy Attack doesn't freeze every other spell button
+behind one slow image upload.
 """
 
 import asyncio
@@ -295,10 +300,11 @@ BANISHED = [
 
 # ---------------------------------------------------------------- creatures
 #
-# "weak": the /cast spell value that actually works. "patronus" is handled
-#   by the original dementor path below (it needs an already-cast patronus,
-#   not just the right pick). Everything else uses the five duel spells
-#   from cogs/duels.py: hex, ward, disarm, bind, mirror.
+# "weak": the spell-button value that actually works. "patronus" uses the
+#   dementor flavour below (banished title, and a saved animal in the line
+#   when the player has one). The button itself is the spell. Everything
+#   else uses the five duel spells from cogs/duels.py: hex, ward, disarm,
+#   bind, mirror.
 # "pack": how many DIFFERENT people need to land that spell before it's
 #   actually gone. 1 means one clean hit does it.
 # "points": awarded to the house of EVERY contributor once it's defeated
@@ -419,8 +425,6 @@ BUTTONS_PER_ROW = 5
 MAX_SPELL_BUTTONS = 25
 THREAT_SPELL_PREFIX = "threatspell:"
 LOCKED_OUT_MESSAGE = "You're already out for this one."
-USE_SPELL_BUTTONS_MESSAGE = "Use the spell buttons on the monster post."
-
 # Public misses. {member}, {spell}, and {creature} are filled in when one
 # is picked. Generic lines always qualify; spell and creature lines are
 # added when they match, then one is chosen at random.
@@ -491,9 +495,10 @@ WRONG_SPELL_BY_CREATURE = {
     ],
 }
 
-# Headmaster convenience: /cast auto-picks the right weakness on an Attack
-# wave. Solo fights use the public buttons and refuse /cast. Override with
-# CAST_AUTO_USER_ID; unset/0 disables.
+# Headmaster convenience: on an Attack wave, a spell-button press from this
+# user counts as the creature's weakness. Solo fights still require the
+# right button. Also granted by Liquid Luck and Surestroke Tower.
+# Override with CAST_AUTO_USER_ID; unset/0 disables.
 _raw_cast_auto = os.getenv("CAST_AUTO_USER_ID", "555141900802457630")
 CAST_AUTO_USER_ID = (
     int(_raw_cast_auto) if _raw_cast_auto and str(_raw_cast_auto).isdigit() else None
@@ -513,67 +518,6 @@ class SpellPick:
 def _unknown_interaction(exc: BaseException) -> bool:
     """Discord 10062: the click arrived after the interaction token expired."""
     return isinstance(exc, discord.NotFound) and getattr(exc, "code", None) == 10062
-
-
-class CastSpellButton(discord.ui.Button):
-    def __init__(self, spell_value: str):
-        label = SPELL_LABEL.get(spell_value, spell_value.title())
-        super().__init__(label=label, style=discord.ButtonStyle.secondary, custom_id=f"cast:{spell_value}")
-        self.spell_value = spell_value
-
-    async def callback(self, interaction: discord.Interaction):
-        view: CastSpellView = self.view  # type: ignore[assignment]
-        if interaction.user.id != view.owner_id:
-            try:
-                await interaction.response.send_message("Those aren't your spells.", ephemeral=True)
-            except discord.NotFound as exc:
-                if _unknown_interaction(exc):
-                    log.debug("Spell button skipped; interaction expired.")
-                    return
-                raise
-            return
-        view.stop()
-        for item in view.children:
-            item.disabled = True
-        try:
-            await interaction.message.edit(view=view)
-        except discord.DiscordException:
-            pass
-        try:
-            await view.cog.resolve_cast(interaction, SpellPick(self.spell_value))
-        except discord.NotFound as exc:
-            if _unknown_interaction(exc):
-                # Token already dead (view timed out, or Discord gave up). The
-                # cast path raises here only on the reply, so a hit that was
-                # already saved stays saved.
-                log.debug(
-                    "Spell button skipped; interaction expired (spell=%s).",
-                    self.spell_value,
-                )
-                return
-            raise
-
-
-class CastSpellView(discord.ui.View):
-    def __init__(self, cog: "Dementors", owner_id: int):
-        super().__init__(timeout=45)
-        self.cog = cog
-        self.owner_id = owner_id
-        for value in SPELL_ORDER:
-            self.add_item(CastSpellButton(value))
-
-    async def on_timeout(self):
-        for item in self.children:
-            item.disabled = True
-
-    async def on_error(self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item):
-        if _unknown_interaction(error):
-            log.debug(
-                "Spell button skipped; interaction expired (spell=%s).",
-                getattr(item, "spell_value", None),
-            )
-            return
-        await super().on_error(interaction, error, item)
 
 
 def shuffled_spell_order(rng) -> list[str]:
@@ -943,12 +887,27 @@ class Dementors(commands.Cog):
                 return art
         return self._attach_art(embed, "dementor", field="defeat_image")
 
+    def _banished_line(self, user) -> str:
+        """Banishment flavour. A saved patronus names the animal; the button works either way."""
+        animal = None
+        patronus_cog = self.bot.get_cog("Patronus") if self.bot else None
+        if patronus_cog is not None:
+            mine = patronus_cog.patronus_of(user.id)
+            if mine and mine.get("animal"):
+                animal = str(mine["animal"]).lower()
+        if animal:
+            patronus = f"{_article(animal)} silver {animal}"
+        else:
+            animal = "patronus"
+            patronus = "a silver patronus"
+        return self.rng.choice(BANISHED).format(
+            patronus=patronus, animal=animal, member=user.mention,
+        )
+
     def embed_arrival(self, creature_id: str, finder_id: int | None = None,
                        exclusive_until: float | None = None) -> discord.Embed:
         c = CREATURES[creature_id]
         desc = self.rng.choice(c["arrivals"])
-        if creature_id == "dementor":
-            desc += "\n\nOnly a cast patronus can drive it out — `/cast`, then tap **Patronus**."
         if finder_id and exclusive_until and time.time() < exclusive_until:
             desc += exclusive_countdown_note(finder_id, exclusive_until)
         return discord.Embed(
@@ -1002,7 +961,7 @@ class Dementors(commands.Cog):
                                    exclusive_until=exclusive_until)
         file = self._attach_art(embed, creature_id)
         # Every solo fight (explore, forage, ambient, staff summon) gets the
-        # public row. Attack waves post through _deliver_wave and do not.
+        # public row. Attack waves post the same row from _deliver_wave.
         view = ThreatSpellView(shuffled_spell_order(self.rng))
         try:
             send_kwargs: dict = {"embed": embed, "view": view}
@@ -1141,7 +1100,7 @@ class Dementors(commands.Cog):
     async def before_tick(self):
         await self.bot.wait_until_ready()
 
-    # ------------------------------------------------------------ /cast
+    # ------------------------------------------------------------ spell buttons
 
     @staticmethod
     def _as_channel_id(value) -> int | None:
@@ -1149,27 +1108,6 @@ class Dementors(commands.Cog):
             return int(value)
         except (TypeError, ValueError):
             return None
-
-    def _creature_in_channel(self, channel_id: int) -> dict | None:
-        """Active wild threat in this channel (event wave or solo spawn)."""
-        channel_id = self._as_channel_id(channel_id)
-        if channel_id is None:
-            return None
-        event = self.state.get("event")
-        key = str(channel_id)
-        if event and key in event.get("channels", {}):
-            cid = event["channels"][key].get("creature")
-            return CREATURES.get(cid) if cid else None
-        active = self.state.get("active")
-        if active and self._as_channel_id(active.get("channel_id")) == channel_id:
-            return CREATURES.get(active.get("creature"))
-        return None
-
-    def _auto_spell_for(self, channel_id: int) -> SpellPick | None:
-        creature = self._creature_in_channel(channel_id)
-        if not creature:
-            return None
-        return SpellPick(creature["weak"])
 
     def _can_auto_cast(self, user_id: int) -> bool:
         if CAST_AUTO_USER_ID is not None and user_id == CAST_AUTO_USER_ID:
@@ -1188,7 +1126,7 @@ class Dementors(commands.Cog):
             if key not in event.get("channels", {}):
                 return (
                     f"**{event.get('name', 'The attack')}** is still landing in this room — "
-                    "try `/cast` again in a second."
+                    "try the spell buttons again in a second."
                 )
         return "The air here feels perfectly normal. Nothing to banish."
 
@@ -1209,35 +1147,21 @@ class Dementors(commands.Cog):
             return False
         return self._as_channel_id(active.get("channel_id")) == self._as_channel_id(channel_id)
 
-    def _cast_locked_out(self, channel_id, user_id: int) -> bool:
-        """True when this player already hit the wrong public spell here.
+    def _fight_for_message(self, channel_id, message_id):
+        """The fight whose public spell row is this message, if it is still up.
 
-        An Attack wave in this channel is a different fight, so the solo
-        lockout does not follow them into it.
+        A solo monster and an Attack wave can share a channel. Each post
+        fights only itself. Returns ("solo", active) or ("wave", wave).
         """
-        event = self.state.get("event")
-        key = str(self._as_channel_id(channel_id) or channel_id)
-        if event and key in (event.get("channels") or {}):
-            return False
         active = self.state.get("active")
-        if not self._buttons_match(active, channel_id, active.get("message_id") if active else None):
-            return False
-        return user_id in (active.get("locked_out") or [])
-
-    def _cast_blocked_by_buttons(self, channel_id) -> bool:
-        """Explore monsters with public spell buttons are not fought with /cast.
-
-        An Attack wave in this channel is a different fight, so /cast stays
-        available for that wave.
-        """
-        event = self.state.get("event")
+        if self._buttons_match(active, channel_id, message_id):
+            return "solo", active
+        event = self.state.get("event") or {}
         key = str(self._as_channel_id(channel_id) or channel_id)
-        if event and key in (event.get("channels") or {}):
-            return False
-        active = self.state.get("active")
-        if not active or not active.get("spell_buttons"):
-            return False
-        return self._as_channel_id(active.get("channel_id")) == self._as_channel_id(channel_id)
+        wave = (event.get("channels") or {}).get(key)
+        if wave and wave.get("message_id") == message_id:
+            return "wave", wave
+        return None, None
 
     async def _disable_threat_buttons(self, channel_id, message_id) -> None:
         """Grey out the public spell row. The monster is gone from this post."""
@@ -1276,12 +1200,18 @@ class Dementors(commands.Cog):
             return
 
     async def on_public_spell_click(self, interaction: discord.Interaction, spell_value: str) -> None:
-        """Resolve one press of a green spell on the monster post.
+        """Resolve one press of a green spell on a solo monster or an Attack wave.
 
-        A wrong spell is announced in the channel and locks that player out.
-        "Not yet" and "already out" stay ephemeral. A clean hit uses /cast's
-        public result.
+        A wrong spell is announced in the channel and locks that player out
+        of this monster only. "Not yet" and "already out" stay ephemeral.
+        On an Attack wave, an auto-pick player (CAST_AUTO_USER_ID, Liquid
+        Luck, Surestroke Tower) treats any press as the right spell. Solo
+        fights still require the matching button. The Patronus button is
+        the matching spell for a Dementor.
         """
+        hexes = self.bot.get_cog("Hexes") if self.bot else None
+        if hexes and await hexes.deny_if_limp_wand(interaction):
+            return
         if self.lock is None:
             await interaction.response.send_message(
                 "Wild Threats is still starting up — try again in a second.",
@@ -1293,27 +1223,33 @@ class Dementors(commands.Cog):
         stale = False
         private = None
         public_miss = None
-        cast = False
+        chosen = None
         async with self.lock:
-            active = self.state.get("active")
-            if not self._buttons_match(active, interaction.channel_id, message_id):
+            kind, fight = self._fight_for_message(interaction.channel_id, message_id)
+            if kind is None:
                 stale = True
             else:
-                blocked = self._finder_blocks(active, interaction.user.id)
-                if blocked:
-                    private = blocked
-                elif interaction.user.id in (active.get("locked_out") or []):
-                    private = LOCKED_OUT_MESSAGE
-                elif spell_value != CREATURES[active["creature"]]["weak"]:
-                    locked = active.setdefault("locked_out", [])
-                    if interaction.user.id not in locked:
-                        locked.append(interaction.user.id)
-                        self.save()
-                    public_miss = wrong_spell_announcement(
-                        self.rng, interaction.user, spell_value, active["creature"],
-                    )
-                else:
-                    cast = True
+                creature_id = fight["creature"]
+                weak = CREATURES[creature_id]["weak"]
+                if kind == "solo":
+                    private = self._finder_blocks(fight, interaction.user.id)
+                if private is None:
+                    locked = fight.setdefault("locked_out", [])
+                    if interaction.user.id in locked:
+                        private = LOCKED_OUT_MESSAGE
+                    else:
+                        spell = spell_value
+                        if kind == "wave" and self._can_auto_cast(interaction.user.id):
+                            spell = weak
+                        if spell != weak:
+                            if interaction.user.id not in locked:
+                                locked.append(interaction.user.id)
+                                self.save()
+                            public_miss = wrong_spell_announcement(
+                                self.rng, interaction.user, spell_value, creature_id,
+                            )
+                        else:
+                            chosen = spell
         if stale:
             await self._disable_threat_buttons(interaction.channel_id, message_id)
             await interaction.response.send_message(
@@ -1327,46 +1263,8 @@ class Dementors(commands.Cog):
         if public_miss is not None:
             await interaction.response.send_message(public_miss)
             return
-        if cast:
-            await self.resolve_cast(interaction, SpellPick(spell_value))
-
-    @app_commands.command(name="cast", description="Cast a spell at whatever's in this channel.")
-    async def cast(self, interaction: discord.Interaction):
-        """Spell menu for fights that do not already show public spell buttons."""
-        hexes = self.bot.get_cog("Hexes")
-        if hexes and await hexes.deny_if_limp_wand(interaction):
-            return
-
-        channel_id = interaction.channel_id
-        if self._cast_blocked_by_buttons(channel_id):
-            await interaction.response.send_message(USE_SPELL_BUTTONS_MESSAGE, ephemeral=True)
-            return
-        if self._cast_locked_out(channel_id, interaction.user.id):
-            await interaction.response.send_message(LOCKED_OUT_MESSAGE, ephemeral=True)
-            return
-        if self._can_auto_cast(interaction.user.id):
-            spell = self._auto_spell_for(channel_id)
-            if spell is None:
-                await interaction.response.send_message(
-                    self._nothing_here_message(channel_id),
-                    ephemeral=True,
-                )
-                return
-            await self.resolve_cast(interaction, spell)
-            return
-
-        if self._creature_in_channel(channel_id) is None:
-            await interaction.response.send_message(
-                self._nothing_here_message(channel_id),
-                ephemeral=True,
-            )
-            return
-
-        await interaction.response.send_message(
-            "Which spell?",
-            view=CastSpellView(self, interaction.user.id),
-            ephemeral=True,
-        )
+        if chosen:
+            await self.resolve_cast(interaction, SpellPick(chosen))
 
     async def _award_kill_points(
         self, member, amount: int, reason: str, *, explore: bool,
@@ -1556,26 +1454,40 @@ class Dementors(commands.Cog):
             log.info("Could not clear the threat countdown on message %s", message_id)
 
     async def resolve_cast(self, interaction: discord.Interaction, spell: SpellPick):
-        """Resolve a cast once the spell is known (auto-pick or button)."""
+        """Resolve a cast once the spell is known (auto-pick or button).
+
+        A button press fights the post it was on. A solo monster and an
+        Attack wave can share a channel; the message id picks which one.
+        """
         event_reply = None
         explore_pay = False
         spawn_ref = None
+        message = getattr(interaction, "message", None)
+        press_message = getattr(message, "id", None)
         async with self.lock:
             channel_id = interaction.channel_id
             event = self.state.get("event")
             key = str(self._as_channel_id(channel_id) or channel_id)
-            if event and key in event.get("channels", {}):
-                # Build the reply under the lock; Discord I/O happens after release
-                # so a slow image upload can't freeze every other /cast.
-                event_reply = self._cast_event(interaction, spell, event, key)
+            wave = (event.get("channels") or {}).get(key) if event else None
+            active = self.state.get("active")
+            active_cid = self._as_channel_id(active.get("channel_id")) if active else None
+            active_here = bool(active) and active_cid == self._as_channel_id(channel_id)
+            if press_message is not None:
+                on_wave = bool(wave) and wave.get("message_id") == press_message
+                on_solo = active_here and active.get("message_id") == press_message
             else:
-                active = self.state.get("active")
-                active_cid = self._as_channel_id(active.get("channel_id")) if active else None
-                if not active or active_cid != self._as_channel_id(channel_id):
-                    await interaction.response.send_message(
-                        self._nothing_here_message(channel_id), ephemeral=True
-                    )
-                    return
+                on_wave = bool(wave)
+                on_solo = active_here and not on_wave
+            if on_wave:
+                # Build the reply under the lock; Discord I/O happens after release
+                # so a slow image upload can't freeze every other spell button.
+                event_reply = self._cast_event(interaction, spell, event, key)
+            elif not on_solo:
+                await interaction.response.send_message(
+                    self._nothing_here_message(channel_id), ephemeral=True
+                )
+                return
+            else:
                 blocked = self._finder_blocks(active, interaction.user.id)
                 if blocked:
                     await interaction.response.send_message(blocked, ephemeral=True)
@@ -1668,20 +1580,12 @@ class Dementors(commands.Cog):
             await interaction.response.send_message(embed=embed)
 
     async def _cast_dementor(self, interaction, spell, active):
-        """Dementor flow: needs an already-cast patronus, resolves in a single
-        hit, uses its own flavour text. An explore-stirred one also counts
-        toward the Explore points checklist."""
+        """Dementor flow: the Patronus button is the spell. One hit banishes
+        it, with its own flavour text. An explore-stirred one also counts
+        toward the Explore points checklist. A saved patronus names the
+        animal in the line; the fight does not require one."""
         if spell.value != "patronus":
             await interaction.response.send_message("Nothing happens.", ephemeral=True)
-            return
-
-        patronus_cog = self.bot.get_cog("Patronus")
-        mine = patronus_cog.patronus_of(interaction.user.id) if patronus_cog else None
-        if not mine:
-            await interaction.response.send_message(
-                "You have no patronus to send against it yet - cast one with `/patronus` first.",
-                ephemeral=True,
-            )
             return
 
         explore_pay = bool(active.get("pay_explore_points"))
@@ -1704,12 +1608,7 @@ class Dementors(commands.Cog):
             interaction.user, points, "Banished a Dementor", explore=explore_pay,
         )
 
-        animal = mine["animal"].lower()
-        line = self.rng.choice(BANISHED).format(
-            patronus=f"{_article(animal)} silver {animal}",
-            animal=animal,
-            member=interaction.user.mention,
-        )
+        line = self._banished_line(interaction.user)
         embed = discord.Embed(title="✨ The Dementor is banished", description=line, color=0xC4CCD6)
         footer = format_kill_footer([(awarded, house)], points_word=True)
         if footer:
@@ -1720,7 +1619,7 @@ class Dementors(commands.Cog):
         else:
             await interaction.response.send_message(embed=embed)
 
-    # ------------------------------------------------------- event: /cast
+    # ------------------------------------------------------- event: spell buttons
 
     def _credit_event(self, event: dict, uids: list, creature: dict) -> None:
         tally = event.setdefault("tally", {})
@@ -1740,30 +1639,18 @@ class Dementors(commands.Cog):
         if creature_id == "dementor":
             if spell.value != "patronus":
                 return {"content": "Nothing happens.", "ephemeral": True}
-            patronus_cog = self.bot.get_cog("Patronus")
-            mine = patronus_cog.patronus_of(interaction.user.id) if patronus_cog else None
-            if not mine:
-                return {
-                    "content": (
-                        "You have no patronus to send against it yet - "
-                        "cast one with `/patronus` first."
-                    ),
-                    "ephemeral": True,
-                }
+            disable = self._button_target(key, wave)
             del event["channels"][key]
             self._credit_event(event, [interaction.user.id], creature)
             self.save()
-            animal = mine["animal"].lower()
-            line = self.rng.choice(BANISHED).format(
-                patronus=f"{_article(animal)} silver {animal}", animal=animal, member=interaction.user.mention,
-            )
+            line = self._banished_line(interaction.user)
             embed = discord.Embed(title="✨ The Dementor is banished", description=line, color=0xC4CCD6)
             if event.get("practice"):
                 embed.set_footer(text=f"Practice · no points · ⚔️ {event['name']}")
             else:
                 embed.set_footer(text=f"+{creature['points']} rep - ⚔️ {event['name']}")
             file = self._dementor_defeat_art(embed, interaction.user.id)
-            return {"embed": embed, "file": file}
+            return {"embed": embed, "file": file, "disable": disable}
 
         if spell.value != creature["weak"]:
             return {"content": "Nothing happens.", "ephemeral": True}
@@ -1782,6 +1669,7 @@ class Dementors(commands.Cog):
             return {"embed": discord.Embed(description=line, color=creature["color"])}
 
         contributors = wave["hits"]
+        disable = self._button_target(key, wave)
         del event["channels"][key]
         self._credit_event(event, contributors, creature)
         self.save()
@@ -1798,10 +1686,27 @@ class Dementors(commands.Cog):
         else:
             embed.set_footer(text=f"+{creature['points']} rep each - ⚔️ {event['name']}")
         file = self._attach_art(embed, creature_id, field="defeat_image")
-        return {"embed": embed, "file": file}
+        return {"embed": embed, "file": file, "disable": disable}
+
+    def _button_target(self, key, wave: dict) -> tuple | None:
+        """Channel and message of a fight's public spell row, if it has one."""
+        mid = (wave or {}).get("message_id")
+        cid = self._as_channel_id(key)
+        if cid and mid:
+            return cid, mid
+        return None
+
+    async def _disable_event_buttons(self, event: dict | None) -> None:
+        """Grey out every spell row still standing when a wave or event ends."""
+        if not event:
+            return
+        for key, wave in (event.get("channels") or {}).items():
+            target = self._button_target(key, wave)
+            if target:
+                await self._disable_threat_buttons(*target)
 
     async def _deliver_cast_reply(self, interaction: discord.Interaction, reply: dict) -> None:
-        """Send a /cast reply prepared under the lock (no lock held here)."""
+        """Send a spell-button reply prepared under the lock (no lock held here)."""
         kwargs = {}
         if "content" in reply:
             kwargs["content"] = reply["content"]
@@ -1812,6 +1717,9 @@ class Dementors(commands.Cog):
         if reply.get("ephemeral"):
             kwargs["ephemeral"] = True
         await interaction.response.send_message(**kwargs)
+        disable = reply.get("disable")
+        if disable:
+            await self._disable_threat_buttons(*disable)
 
     # ------------------------------------------------------- event: spawns
 
@@ -1842,9 +1750,9 @@ class Dementors(commands.Cog):
     def _prepare_wave(self, event: dict) -> list[dict]:
         """Roll the next wave under the lock.
 
-        Standing creatures stay castable until each room's new post is
-        registered in `_deliver_wave` (avoids `/cast` seeing empty air
-        while Discord is still posting the wave).
+        Each room gets the same shuffled green spell row a solo monster
+        uses. The previous wave stays registered until `_deliver_wave`
+        starts, then those buttons are disabled as the new posts land.
         """
         payloads = []
         practice = bool(event.get("practice"))
@@ -1861,31 +1769,43 @@ class Dementors(commands.Cog):
                 "creature_id": creature_id,
                 "embed": embed,
                 "file": file,
+                "view": ThreatSpellView(shuffled_spell_order(self.rng)),
             })
         return payloads
 
     async def _deliver_wave(self, started_at: float, payloads: list[dict]) -> None:
-        """Post wave messages; register each channel as soon as it lands.
+        """Post wave messages with public spell buttons; register each as it lands.
 
-        Writing state only after every channel finished left a race where a
-        Dementor was visible in Discord but `/cast` (and auto-pick) said
-        nothing was there.
+        The previous wave's buttons are disabled once delivery starts, so a
+        press on a swept-aside monster cannot hit the creature that just
+        replaced it. Each new post is registered before the next room is
+        sent, so the buttons resolve against the monster players can see.
         """
-        # Drop the previous wave once delivery starts, then fill rooms in.
+        old_buttons: list[tuple] = []
         async with self.lock:
             event = self.state.get("event")
             if not event or event.get("started_at") != started_at:
                 return
+            for key, wave in (event.get("channels") or {}).items():
+                target = self._button_target(key, wave)
+                if target:
+                    old_buttons.append(target)
             event["channels"] = {}
             self.save()
+
+        for target in old_buttons:
+            await self._disable_threat_buttons(*target)
 
         for p in payloads:
             channel = await self._get_channel(p["channel_id"])
             if channel is None:
                 continue
+            view = p.get("view") or ThreatSpellView(shuffled_spell_order(self.rng))
+            send_kwargs: dict = {"embed": p["embed"], "view": view}
+            if p.get("file"):
+                send_kwargs["file"] = p["file"]
             try:
-                msg = (await channel.send(embed=p["embed"], file=p["file"]) if p["file"]
-                       else await channel.send(embed=p["embed"]))
+                msg = await channel.send(**send_kwargs)
             except discord.HTTPException:
                 continue
             async with self.lock:
@@ -1897,6 +1817,8 @@ class Dementors(commands.Cog):
                     "message_id": msg.id,
                     "spawned_at": time.time(),
                     "hits": [],
+                    "spell_buttons": True,
+                    "locked_out": [],
                 }
                 self.save()
 
@@ -1912,6 +1834,7 @@ class Dementors(commands.Cog):
         return event
 
     async def _finalize_event(self, event: dict) -> None:
+        await self._disable_event_buttons(event)
         tally = event.get("tally", {})
         store = self.bot.get_cog("Store")
         guild = self.bot.get_guild(event["guild_id"]) if event.get("guild_id") else None
@@ -2325,6 +2248,8 @@ class Dementors(commands.Cog):
                 title=f"⚔️ {clean_name}",
                 description=(
                     self.rng.choice(ATTACK_INTRO)
+                    + "\n\nGreen spell buttons are on each monster. The right spell works. "
+                    "A wrong one locks you out of that monster."
                     + f"\n\n**{preset['label']}** swarm — waves for the next "
                     f"**{minutes}** minutes. {mult_line} "
                     f"House turnout: **+{EVENT_HOUSE_TURNOUT_BONUS}** · "
@@ -3016,8 +2941,9 @@ class Dementors(commands.Cog):
                 title=f"Practice — {clean_name}",
                 description=(
                     "House drill — same waves as Attack on Velmora, but **nothing "
-                    "awards points or rewards**. Learn the creatures, practice `/cast`, "
-                    f"then clear out.\n\nWaves keep coming for the next {minutes} minute(s)."
+                    "awards points or rewards**. Green spell buttons are on each monster. "
+                    "The right spell works. A wrong one locks you out of that monster.\n\n"
+                    f"Waves keep coming for the next {minutes} minute(s)."
                 ),
                 color=EVENT_COLOR,
             )

@@ -260,7 +260,7 @@
         "nightweaver",
         "stone golem"
       ],
-      "answer": "When a wild threat crawls into a channel, `/cast` then tap the right spell button (Patronus for Dementors). If ye stirred it up explorin', ye get 25 seconds alone first.",
+      "answer": "When a wild threat crawls into a channel — explorin', foragin', a sightin', or an Attack wave — tap the green spell buttons on the post. The right one works. A wrong one locks ye out of that monster, an' the channel hears about it. A Dementor's right button is Patronus, same as any other creature. If ye stirred it up explorin', ye get 25 seconds alone first.",
       "link": "https://everything-velmora.netlify.app/duels"
     },
     {
@@ -317,7 +317,7 @@
         "hold a castle",
         "castle perk"
       ],
-      "answer": "Castle PvP lives in the castles channel. Descent wins bind monsters into yer army — `/army` shows the roster (castles + Descent channels) an' lets ye sacrifice 500 regulars for ATK or DEF. `/castles` opens the map: reinforce anytime (not mid-assault), siege on Wed & Sat (Chicago), or abandon. One castle per player. Before PvP goes live, binds are uncapped; once live it's 200/day an' 5,000 total. Bind **200** floor-**40**+ monsters in a Central day for **+10** house points once. Each keep has a perk (duel ties, Descent half-attack, `/cast` auto-pick, an' more) — full list on the Compendium Castles page.",
+      "answer": "Castle PvP lives in the castles channel. Descent wins bind monsters into yer army — `/army` shows the roster (castles + Descent channels) an' lets ye sacrifice 500 regulars for ATK or DEF. `/castles` opens the map: reinforce anytime (not mid-assault), siege on Wed & Sat (Chicago), or abandon. One castle per player. Before PvP goes live, binds are uncapped; once live it's 200/day an' 5,000 total. Bind **200** floor-**40**+ monsters in a Central day for **+10** house points once. Each keep has a perk (duel ties, Descent half-attack, Attack-wave spell buttons that auto-pick, an' more) — full list on the Compendium Castles page.",
       "link": "https://everything-velmora.netlify.app/castles"
     },
     {
@@ -492,6 +492,18 @@
         "duelrecord"
       ],
       "answer": "`/profile` is yer whole sheet — Mirror, wand, points, ranks, beasts. `/standings` is the Cup table; `/leaderboard` the top earners; `/duelrecord` yer duel sheet.",
+      "link": "https://everything-velmora.netlify.app/commands"
+    },
+    {
+      "id": "birthday",
+      "keywords": [
+        "birthday",
+        "birthdays",
+        "birthday register",
+        "birthday view",
+        "my birthday"
+      ],
+      "answer": "`/birthday register` saves yer month an' day once — month is a dropdown, day is a list ye can type to narrow. `/birthday view` shows it. At midnight Central on the day, the announcement channel gets a shout-out an' ye get one gift. Staff can change or clear it. A year that already paid out does not pay again, even after a restart.",
       "link": "https://everything-velmora.netlify.app/commands"
     },
     {

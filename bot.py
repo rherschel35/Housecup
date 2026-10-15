@@ -84,6 +84,7 @@ INITIAL_COGS = (
     "cogs.triwizard",
     "cogs.profile",
     "cogs.help",
+    "cogs.birthdays",
     "cogs.world",
     "cogs.rumors",
     "cogs.dementors",

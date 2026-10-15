@@ -66,7 +66,8 @@ Names only. Set them in the shell, a local `.env` that stays untracked, or the R
 | `FIRE_STOKE_THRESHOLD` | Stoke count for the house fire. |
 | `FIRE_WINNER_PTS` | Points awarded for the house fire. |
 | `FROG_MYTHIC_ODDS` | Denominator for the mythic Chocolate Frog card. |
-| `CAST_AUTO_USER_ID` | Optional user whose `/cast` skips the spell buttons. |
+| `CAST_AUTO_USER_ID` | Optional user whose Attack-wave spell button press counts as the right spell. Solo fights still need the matching button. |
+| `BIRTHDAY_CHANNEL_ID` | Optional channel for birthday shout-outs. Defaults to the event announcement channel. |
 | `DESCENT_ONESHOT_USER_ID` | Optional user who gets the Descent one-shot button. |
 | `ANIMAGUS_FORCE_USER_ID` | Optional Animagus override user. |
 | `ANIMAGUS_FORCE_ANIMAL` | Optional forced Animagus animal. |
