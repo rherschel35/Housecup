@@ -1705,7 +1705,7 @@ class Descent(commands.Cog):
         # Daily F40+ checklist / +10 house-point goal counts every win on
         # floor 40+, even when the army cannot take another recruit (full
         # roster or live 200/day cap). Otherwise deep players freeze mid-day
-        # (e.g. stuck at 174/200) while still clearing F40+ fights.
+        # (e.g. stuck at 74/75) while still clearing F40+ fights.
         if castles:
             bind_pts += castles.note_bind40(
                 member, floor=fight.floor, n=1 + muster_extra
