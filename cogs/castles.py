@@ -115,7 +115,7 @@ CASTLES: dict[str, dict] = {
         "key": "surestroke_tower",
         "name": "Surestroke Tower",
         "title": "Keeper of Surestroke Tower",
-        "perk": "Wild Threat `/cast` auto-picks",
+        "perk": "Attack-wave spell buttons auto-pick the right spell",
         "wall": "ice",
         "wall_label": "Ice",
         "art": "Surestroke_Tower.jpg",

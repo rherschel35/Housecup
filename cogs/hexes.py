@@ -9,7 +9,7 @@ without warning, whatever they type comes out cursed — or their wand goes limp
 Most curses mangle chat: the bot deletes the cursed member's message and
 reposts it through a per-channel webhook wearing their name and avatar.
 Limp Wand is different — it leaves chat alone and blocks /wand, /patronus,
-/broom, and /cast for one hour.
+/broom, and the green wild-threat spell buttons for one hour.
 
 Headmasters and house Presidents may cast, lift, and list. Needs the bot to
 hold Manage Messages (to delete the original) and Manage Webhooks (to
@@ -834,7 +834,7 @@ EFFECTS = {
     },
     "limp_wand": {
         "name": "Limp Wand",
-        "description": "Their wand hangs limp — /wand, /patronus, /patronusreset, and /broom won't answer for an hour.",
+        "description": "Their wand hangs limp — /wand, /patronus, /patronusreset, /broom, and wild-threat spell buttons won't answer for an hour.",
         "func": None,  # not a chat mangle; blocks wand commands instead
         "blocks_wand": True,
         "fixed_minutes": 60,
@@ -978,7 +978,7 @@ class Hexes(commands.Cog):
         )
         msg = (
             "Your wand hangs limp and won't answer. "
-            f"`/wand`, `/patronus`, `/patronusreset`, and `/broom` are out {when}."
+            f"`/wand`, `/patronus`, `/patronusreset`, `/broom`, and wild-threat spell buttons are out {when}."
         )
         if interaction.response.is_done():
             await interaction.followup.send(msg, ephemeral=True)

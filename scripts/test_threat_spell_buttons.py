@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Explore monsters carry public green spell buttons.
+"""Wild Threats carry public green spell buttons, solo and Attack wave.
 
 The row is shuffled whenever it is drawn, five buttons to a row. The spell
-that works is still CREATURES[id]["weak"], the same value other fights use
-with /cast. A wrong press locks that player out and posts a random teasing
-line in the channel. "Not yet" and "already out" stay ephemeral. /cast on
-a solo monster only says to use the buttons. Attack waves still use /cast.
+that works is still CREATURES[id]["weak"]. A wrong press locks that player
+out of that monster and posts a random teasing line in the channel. "Not
+yet" and "already out" stay ephemeral. There is no /cast command. On an
+Attack wave, an auto-pick player treats any button as the right spell.
+Solo fights do not auto-pick. A Dementor still needs an already-cast patronus.
 """
 
 from __future__ import annotations
@@ -29,7 +30,6 @@ from cogs.dementors import (  # noqa: E402
     BUTTONS_PER_ROW,
     CREATURES,
     LOCKED_OUT_MESSAGE,
-    USE_SPELL_BUTTONS_MESSAGE,
     MAX_SPELL_BUTTONS,
     SPELL_LABEL,
     SPELL_ORDER,
@@ -247,7 +247,7 @@ async def main() -> None:
     _check_pools()
     _check_layout()
 
-    # The button and /cast agree on the one spell that works.
+    # The button is the one spell that works.
     assert CREATURES["dementor"]["weak"] == "patronus"
     assert CREATURES["shadow_wolf"]["weak"] == "hex"
     assert CREATURES["wisp_swarm"]["weak"] == "mirror"
@@ -295,10 +295,6 @@ async def main() -> None:
     forage_view = bot.channel.sent[-1].view
     assert isinstance(forage_view, ThreatSpellView)
     assert all(child.style == discord.ButtonStyle.success for child in forage_view.children)
-    forage_told = Interaction(finder, guild)
-    await threats.cast.callback(threats, forage_told)
-    assert forage_told.response.sent[-1]["content"] == USE_SPELL_BUTTONS_MESSAGE
-    assert forage_told.response.sent[-1]["ephemeral"] is True
     threats.state["active"] = None
 
     # Back on the golem. Someone else is early: private note, no lockout.
@@ -313,39 +309,15 @@ async def main() -> None:
     assert threats.state["active"]["hits"] == []
     assert _enabled(_active_arrival(threats).view)
 
-    # /cast is off while the public buttons are up, including auto-pick.
-    told = Interaction(finder, guild)
-    await threats.cast.callback(threats, told)
-    assert told.response.sent[-1]["content"] == USE_SPELL_BUTTONS_MESSAGE
-    assert told.response.sent[-1]["ephemeral"] is True
-    assert "view" not in told.response.sent[-1]
-    assert threats.state["active"]["hits"] == []
-    assert threats.state["active"]["locked_out"] == []
+    # Auto-pick does not skip a solo monster. A wrong button still locks them out.
     threats._can_auto_cast = lambda user_id: True
-    auto = Interaction(finder, guild)
-    await threats.cast.callback(threats, auto)
-    assert auto.response.sent[-1]["content"] == USE_SPELL_BUTTONS_MESSAGE
-    assert auto.response.sent[-1]["ephemeral"] is True
+    auto = Interaction(finder, guild, message=_active_arrival(threats))
+    await threats.on_public_spell_click(auto, "hex")
+    assert auto.response.sent[-1].get("ephemeral") is not True
     assert threats.state["active"]["hits"] == []
+    assert threats.state["active"]["locked_out"] == [finder.id]
+    threats.state["active"]["locked_out"] = []
     threats._can_auto_cast = Dementors._can_auto_cast.__get__(threats, Dementors)
-
-    # An Attack wave in the same channel still uses /cast. The explore
-    # monster underneath is not what that command fights.
-    threats.state["event"] = {
-        "name": "Attack on Velmora",
-        "channels": {
-            "111": {"creature": "shadow_wolf", "hits": [], "message_id": 1, "spawned_at": time.time()},
-        },
-        "tally": {},
-    }
-    wave = Interaction(finder, guild)
-    await threats.cast.callback(threats, wave)
-    assert wave.response.sent[-1]["content"] == "Which spell?"
-    assert wave.response.sent[-1]["ephemeral"] is True
-    assert wave.response.sent[-1]["view"].timeout == 45
-    assert threats.state["active"]["hits"] == []
-    assert threats.state["active"]["spell_buttons"] is True
-    threats.state["event"] = None
 
     # The public button miss names them and locks only them out.
     wrong = Interaction(finder, guild, message=_active_arrival(threats))
@@ -371,11 +343,6 @@ async def main() -> None:
     await threats.on_public_spell_click(again, "ward")
     assert again.response.sent[-1]["content"] == LOCKED_OUT_MESSAGE
     assert again.response.sent[-1]["ephemeral"] is True
-    assert threats.state["active"]["locked_out"] == [finder.id]
-    via_cast = Interaction(finder, guild)
-    await threats.cast.callback(threats, via_cast)
-    assert via_cast.response.sent[-1]["content"] == USE_SPELL_BUTTONS_MESSAGE
-    assert via_cast.response.sent[-1]["ephemeral"] is True
     assert threats.state["active"]["locked_out"] == [finder.id]
     assert threats.state["active"]["hits"] == []
 
@@ -487,10 +454,6 @@ async def main() -> None:
     assert isinstance(summoned_msg.view, ThreatSpellView)
     assert all(child.style == discord.ButtonStyle.success for child in summoned_msg.view.children)
     assert [child.row for child in summoned_msg.view.children] == [0, 0, 0, 0, 0, 1]
-    summon_cast = Interaction(finder, guild)
-    await threats.cast.callback(threats, summon_cast)
-    assert summon_cast.response.sent[-1]["content"] == USE_SPELL_BUTTONS_MESSAGE
-    assert summon_cast.response.sent[-1]["ephemeral"] is True
     summon_miss = Interaction(friend, guild, message=summoned_msg)
     await threats.on_public_spell_click(summon_miss, "ward")
     assert summon_miss.response.sent[-1].get("ephemeral") is not True
@@ -514,14 +477,146 @@ async def main() -> None:
     assert "finder_id" not in threats.state["active"]
     sighting_msg = _active_arrival(threats)
     assert isinstance(sighting_msg.view, ThreatSpellView)
-    sighting_cast = Interaction(finder, guild)
-    await threats.cast.callback(threats, sighting_cast)
-    assert sighting_cast.response.sent[-1]["content"] == USE_SPELL_BUTTONS_MESSAGE
     wisp = Interaction(finder, guild, message=sighting_msg)
     await threats.on_public_spell_click(wisp, "mirror")
     assert threats.state["active"] is None
     assert wisp.response.sent[-1]["embed"].title == "✨ The Wisp Swarm is defeated"
     assert _disabled(sighting_msg.view)
+
+    # Attack waves use the same public green row. A wrong press locks out.
+    # Auto-pick treats any button as the weakness. A Dementor still needs
+    # a patronus that was already cast. The solo monster underneath is a
+    # different fight.
+    threats.state["active"] = None
+    threats.state["event"] = None
+    threats._roll_creature = lambda: "shadow_wolf"
+    started = time.time()
+    threats.state["event"] = {
+        "name": "Attack on Velmora",
+        "started_at": started,
+        "channels": {},
+        "tally": {},
+        "channel_ids": [111],
+        "practice": False,
+    }
+    payloads = threats._prepare_wave(threats.state["event"])
+    assert isinstance(payloads[0]["view"], ThreatSpellView)
+    assert all(child.style == discord.ButtonStyle.success for child in payloads[0]["view"].children)
+    await threats._deliver_wave(started, payloads)
+    wave = threats.state["event"]["channels"]["111"]
+    assert wave["creature"] == "shadow_wolf"
+    assert wave["spell_buttons"] is True
+    assert wave["locked_out"] == []
+    wave_msg = next(m for m in bot.channel.sent if m.id == wave["message_id"])
+    assert isinstance(wave_msg.view, ThreatSpellView)
+    assert _enabled(wave_msg.view)
+
+    miss = Interaction(friend, guild, message=wave_msg)
+    await threats.on_public_spell_click(miss, "ward")
+    assert miss.response.sent[-1].get("ephemeral") is not True
+    assert "Ward" in miss.response.sent[-1]["content"]
+    assert "Shadow Wolf" in miss.response.sent[-1]["content"]
+    assert threats.state["event"]["channels"]["111"]["locked_out"] == [friend.id]
+    assert _enabled(wave_msg.view)
+
+    again = Interaction(friend, guild, message=wave_msg)
+    await threats.on_public_spell_click(again, "hex")
+    assert again.response.sent[-1]["content"] == LOCKED_OUT_MESSAGE
+    assert again.response.sent[-1]["ephemeral"] is True
+
+    threats._can_auto_cast = lambda user_id: user_id == finder.id
+    auto_hit = Interaction(finder, guild, message=wave_msg)
+    await threats.on_public_spell_click(auto_hit, "bind")
+    assert "111" not in threats.state["event"]["channels"]
+    assert auto_hit.response.sent[-1]["embed"].title == "✨ The Shadow Wolf is defeated"
+    assert finder.id not in wave["locked_out"]
+    assert _disabled(wave_msg.view)
+    threats._can_auto_cast = Dementors._can_auto_cast.__get__(threats, Dementors)
+
+    # Next wave disables the previous post's buttons.
+    old_wave_msg = wave_msg
+    started_next = time.time()
+    threats.state["event"]["started_at"] = started_next
+    # The wolf is already gone; put a stand-in post back so delivery has
+    # something to disable, then roll a fresh creature over it.
+    threats.state["event"]["channels"] = {
+        "111": {
+            "creature": "shadow_wolf",
+            "message_id": old_wave_msg.id,
+            "hits": [],
+            "spell_buttons": True,
+            "locked_out": [],
+        },
+    }
+    # The defeat already disabled old_wave_msg. Re-enable a fresh view so
+    # the sweep is what turns it off.
+    old_wave_msg.view = ThreatSpellView(list(SPELL_ORDER))
+    threats._roll_creature = lambda: "wisp_swarm"
+    nxt = threats._prepare_wave(threats.state["event"])
+    await threats._deliver_wave(started_next, nxt)
+    assert _disabled(old_wave_msg.view)
+    fresh = threats.state["event"]["channels"]["111"]
+    assert fresh["creature"] == "wisp_swarm"
+    assert fresh["message_id"] != old_wave_msg.id
+    assert fresh["locked_out"] == []
+
+    # Dementor wave: Patronus without a patronus is private and not a lockout.
+    threats.state["event"] = None
+    started_d = time.time()
+    threats._roll_creature = lambda: "dementor"
+    threats.state["event"] = {
+        "name": "Attack on Velmora",
+        "started_at": started_d,
+        "channels": {},
+        "tally": {},
+        "channel_ids": [111],
+    }
+    await threats._deliver_wave(started_d, threats._prepare_wave(threats.state["event"]))
+    demon = threats.state["event"]["channels"]["111"]
+    demon_msg = next(m for m in bot.channel.sent if m.id == demon["message_id"])
+    bare = Interaction(User(9, "No Patronus"), guild, message=demon_msg)
+    await threats.on_public_spell_click(bare, "patronus")
+    assert bare.response.sent[-1]["ephemeral"] is True
+    assert "/patronus" in bare.response.sent[-1]["content"]
+    assert 9 not in threats.state["event"]["channels"]["111"]["locked_out"]
+    assert threats.state["event"]["channels"]["111"]["creature"] == "dementor"
+    bad = Interaction(friend, guild, message=demon_msg)
+    await threats.on_public_spell_click(bad, "hex")
+    assert friend.id in threats.state["event"]["channels"]["111"]["locked_out"]
+    assert _enabled(demon_msg.view)
+    good = Interaction(finder, guild, message=demon_msg)
+    await threats.on_public_spell_click(good, "patronus")
+    assert "111" not in threats.state["event"]["channels"]
+    assert good.response.sent[-1]["embed"].title == "✨ The Dementor is banished"
+    assert _disabled(demon_msg.view)
+
+    # A solo monster and a wave in the same channel do not share a lockout.
+    threats.state["event"] = None
+    assert await threats.try_ambient_spawn(111, "stone_golem", finder_id=finder.id)
+    solo_msg = _active_arrival(threats)
+    threats.state["active"]["exclusive_until"] = time.time() - 1
+    started_both = time.time()
+    threats._roll_creature = lambda: "wisp_swarm"
+    threats.state["event"] = {
+        "name": "Attack on Velmora",
+        "started_at": started_both,
+        "channels": {},
+        "tally": {},
+        "channel_ids": [111],
+    }
+    await threats._deliver_wave(started_both, threats._prepare_wave(threats.state["event"]))
+    both = threats.state["event"]["channels"]["111"]
+    both_msg = next(m for m in bot.channel.sent if m.id == both["message_id"])
+    solo_bad = Interaction(finder, guild, message=solo_msg)
+    await threats.on_public_spell_click(solo_bad, "hex")
+    assert finder.id in threats.state["active"]["locked_out"]
+    assert finder.id not in threats.state["event"]["channels"]["111"]["locked_out"]
+    wave_hit = Interaction(friend, guild, message=both_msg)
+    await threats.on_public_spell_click(wave_hit, "mirror")
+    assert "111" not in threats.state["event"]["channels"]
+    assert threats.state["active"]["creature"] == "stone_golem"
+    assert _disabled(both_msg.view)
+    assert _enabled(solo_msg.view)
 
     print("OK")
 

@@ -353,8 +353,9 @@ RECIPES = {
         "pass_correct": FELIX_PASS_CORRECT,
         "blurb": (
             "Liquid Luck for 4 hours: win one duel tie per match, best bean "
-            "outcome, one free beast approach, auto-cast the right swarm spell, "
-            "and hex immunity. Brewable free once every 7 days."
+            "outcome, one free beast approach, and hex immunity. On an Attack wave, "
+            "any spell button counts as the right spell. "
+            "Brewable free once every 7 days."
         ),
     },
 }
@@ -414,7 +415,7 @@ def effect_desc(recipe: dict) -> str:
         hours = int(round(int(e.get("duration") or FELIX_DURATION_SECONDS) / 3600))
         return (
             f"Liquid Luck for {hours} hour{'s' if hours != 1 else ''}: win one duel tie per match, "
-            "best beans, one free beast approach, auto-cast the right swarm spell, hex immunity."
+            "best beans, one free beast approach, any Attack-wave spell button counts as the right spell, hex immunity."
         )
     return recipe.get("blurb") or "A temporary edge."
 
