@@ -989,17 +989,43 @@ class Potions(commands.Cog):
 
         expires = time.time() + window
         b = beasts.beasts[key]
+        who = interaction.user.display_name
         embed = discord.Embed(
-            title=f"{b['emoji']} A {b['name']} appears - just for you",
+            title=f"{b['emoji']} A {b['name']} appears - just for {who}",
             description=(f"{b['sighting']}\n\n**It wants:** {beasts.items_line(b['wants'])}\n\n"
-                         f"Only you can see this. Approach before it slips away <t:{int(expires)}:R>."),
+                         f"Only {who} can approach it. The button stays until <t:{int(expires)}:R>."),
             color=discord.Color.from_rgb(46, 139, 68),
         )
         view = PrivateEncounterView(self, beasts, interaction.user.id, key, expires)
+        await self._post_encounter_message(interaction, embed, view)
+
+    async def _post_encounter_message(self, interaction: discord.Interaction, embed: discord.Embed,
+                                      view: "PrivateEncounterView") -> None:
+        """Post the Approach button where it stays until the encounter timer.
+
+        Ephemeral replies are not kept that long. Discord drops them on its own,
+        often after a few minutes or when you leave the channel, which removed
+        the button while the beast was still waiting. A channel message stays.
+        Fetching it back lets the expiry edit use the bot token. The interaction
+        token dies at 15 minutes, and Potion Rep can stretch this window past that.
+        """
         if interaction.response.is_done():
-            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+            sent = await interaction.followup.send(embed=embed, view=view)
         else:
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            await interaction.response.send_message(embed=embed, view=view)
+            try:
+                sent = await interaction.original_response()
+            except discord.HTTPException:
+                log.info("Private encounter posted; could not load it for the expiry edit")
+                return
+        view.message = sent
+        channel = interaction.channel
+        if channel is None or sent is None:
+            return
+        try:
+            view.message = await channel.fetch_message(sent.id)
+        except discord.HTTPException:
+            log.info("Private encounter posted; expiry edit will use the interaction message")
 
     def _pick_private_beast(self, beasts, skew: Optional[str], place: Optional[str]) -> Optional[str]:
         pool = dict(beasts.beasts)
@@ -1211,13 +1237,34 @@ class HunterPlaceButton(discord.ui.Button):
 
 class PrivateEncounterView(discord.ui.View):
     def __init__(self, cog: Potions, beasts_cog, owner_id: int, beast_key: str, expires: float):
-        super().__init__(timeout=max(1, int(expires - time.time())))
+        # Same clock as the encounter. A shorter view timeout disables the
+        # Approach button while the beast is still waiting.
+        super().__init__(timeout=max(1.0, expires - time.time()))
         self.cog = cog
         self.beasts_cog = beasts_cog
         self.owner_id = owner_id
         self.beast_key = beast_key
         self.expires = expires
+        self.message: Optional[discord.Message] = None
         self.add_item(ApproachButton())
+
+    def _gone_embed(self) -> discord.Embed:
+        b = self.beasts_cog.beasts.get(self.beast_key, {})
+        emoji = b.get("emoji", "🐾")
+        name = b.get("name", "beast")
+        return discord.Embed(
+            description=f"{emoji} The {name} slipped away.",
+            color=0x7A7A7A,
+        )
+
+    async def on_timeout(self) -> None:
+        """Encounter timer ended. Keep the message; drop only the button."""
+        if self.message is None:
+            return
+        try:
+            await self.message.edit(content=None, embed=self._gone_embed(), view=None)
+        except discord.HTTPException:
+            log.info("Could not mark a private encounter as expired")
 
 
 class ApproachButton(discord.ui.Button):
@@ -1230,8 +1277,9 @@ class ApproachButton(discord.ui.Button):
             await interaction.response.send_message("This encounter isn't yours.", ephemeral=True)
             return
         if time.time() >= view.expires:
+            view.stop()
             await interaction.response.edit_message(
-                content="It slipped away.", embed=None, view=None)
+                content=None, embed=view._gone_embed(), view=None)
             return
 
         beasts = view.beasts_cog
@@ -1263,6 +1311,7 @@ class ApproachButton(discord.ui.Button):
         else:
             lines.append(f"*You've befriended a {b['name']} before - it's added to your bestiary again.*")
         lines += out["notes"]
+        view.stop()
         await interaction.response.edit_message(
             embed=discord.Embed(description="\n".join(lines), color=0x2E8B44), view=None)
         adorn = view.cog.bot.get_cog("Adornments")
