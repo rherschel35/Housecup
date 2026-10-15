@@ -5,8 +5,7 @@ The row is shuffled whenever it is drawn, five buttons to a row. The spell
 that works is still CREATURES[id]["weak"], the same value other fights use
 with /cast. A wrong press locks that player out and posts a random teasing
 line in the channel. "Not yet" and "already out" stay ephemeral. /cast on
-one of these monsters only says to use the buttons. Everywhere else /cast
-is unchanged, and a wrong /cast still does nothing.
+a solo monster only says to use the buttons. Attack waves still use /cast.
 """
 
 from __future__ import annotations
@@ -270,7 +269,7 @@ async def main() -> None:
     store.state["overrides"][str(friend.id)] = "thornmere"
     guild = Guild([finder, friend])
 
-    # /explore posts the buttons on the public monster message. /forage does not.
+    # /explore posts the buttons on the public monster message.
     assert await threats.try_ambient_spawn(
         111, "stone_golem", finder_id=finder.id, pay_explore_points=True,
     )
@@ -289,9 +288,17 @@ async def main() -> None:
     assert "⏳" in (arrival.embeds[0].description or "")
 
     threats.state["active"] = None
+    # /forage is a fightable threat too, so it gets the same public row.
     assert await threats.try_ambient_spawn(111, "shadow_wolf", finder_id=finder.id)
-    assert "spell_buttons" not in threats.state["active"]
-    assert bot.channel.sent[-1].view is None
+    assert threats.state["active"]["spell_buttons"] is True
+    assert "pay_explore_points" not in threats.state["active"]
+    forage_view = bot.channel.sent[-1].view
+    assert isinstance(forage_view, ThreatSpellView)
+    assert all(child.style == discord.ButtonStyle.success for child in forage_view.children)
+    forage_told = Interaction(finder, guild)
+    await threats.cast.callback(threats, forage_told)
+    assert forage_told.response.sent[-1]["content"] == USE_SPELL_BUTTONS_MESSAGE
+    assert forage_told.response.sent[-1]["ephemeral"] is True
     threats.state["active"] = None
 
     # Back on the golem. Someone else is early: private note, no lockout.
@@ -467,23 +474,54 @@ async def main() -> None:
     assert stale.response.sent[-1]["ephemeral"] is True
     assert _disabled(demon.view)
 
-    # Forage and staff summons have no public buttons, so /cast is unchanged.
-    assert await threats.try_ambient_spawn(111, "shadow_wolf", finder_id=finder.id)
-    assert "spell_buttons" not in threats.state["active"]
-    forage_cast = Interaction(finder, guild)
-    await threats.cast.callback(threats, forage_cast)
-    assert forage_cast.response.sent[-1]["content"] == "Which spell?"
-    assert forage_cast.response.sent[-1]["ephemeral"] is True
-    wrong_cast = Interaction(finder, guild)
-    await threats.resolve_cast(wrong_cast, SpellPick("ward"))
-    assert wrong_cast.response.sent[-1]["content"] == "Nothing happens."
-    assert wrong_cast.response.sent[-1]["ephemeral"] is True
-    assert threats.state["active"]["hits"] == []
-    assert "locked_out" not in threats.state["active"]
-    right_cast = Interaction(finder, guild)
-    await threats.resolve_cast(right_cast, SpellPick("hex"))
+    # Staff summon is spawn() with no finder and no explore checklist mark.
+    threats.state["active"] = None
+    summoned = await threats.spawn(111, "shadow_wolf")
+    assert summoned is not None
+    assert threats.state["active"]["creature"] == "shadow_wolf"
+    assert threats.state["active"]["spell_buttons"] is True
+    assert threats.state["active"]["locked_out"] == []
+    assert "finder_id" not in threats.state["active"]
+    assert "pay_explore_points" not in threats.state["active"]
+    summoned_msg = _active_arrival(threats)
+    assert isinstance(summoned_msg.view, ThreatSpellView)
+    assert all(child.style == discord.ButtonStyle.success for child in summoned_msg.view.children)
+    assert [child.row for child in summoned_msg.view.children] == [0, 0, 0, 0, 0, 1]
+    summon_cast = Interaction(finder, guild)
+    await threats.cast.callback(threats, summon_cast)
+    assert summon_cast.response.sent[-1]["content"] == USE_SPELL_BUTTONS_MESSAGE
+    assert summon_cast.response.sent[-1]["ephemeral"] is True
+    summon_miss = Interaction(friend, guild, message=summoned_msg)
+    await threats.on_public_spell_click(summon_miss, "ward")
+    assert summon_miss.response.sent[-1].get("ephemeral") is not True
+    assert "Ward" in summon_miss.response.sent[-1]["content"]
+    assert "Shadow Wolf" in summon_miss.response.sent[-1]["content"]
+    assert threats.state["active"]["locked_out"] == [friend.id]
+    assert _enabled(summoned_msg.view)
+    summon_hit = Interaction(finder, guild, message=summoned_msg)
+    await threats.on_public_spell_click(summon_hit, "hex")
     assert threats.state["active"] is None
-    assert right_cast.response.sent[-1]["embed"].title == "✨ The Shadow Wolf is defeated"
+    assert summon_hit.response.sent[-1]["embed"].title == "✨ The Shadow Wolf is defeated"
+    assert _disabled(summoned_msg.view)
+
+    # Ambient sightings use the same spawn() and the same buttons.
+    threats.state["channel_ids"] = [111]
+    threats.state["active"] = None
+    sighting = await threats.spawn(creature_id="wisp_swarm")
+    assert sighting is not None
+    assert threats.state["active"]["creature"] == "wisp_swarm"
+    assert threats.state["active"]["spell_buttons"] is True
+    assert "finder_id" not in threats.state["active"]
+    sighting_msg = _active_arrival(threats)
+    assert isinstance(sighting_msg.view, ThreatSpellView)
+    sighting_cast = Interaction(finder, guild)
+    await threats.cast.callback(threats, sighting_cast)
+    assert sighting_cast.response.sent[-1]["content"] == USE_SPELL_BUTTONS_MESSAGE
+    wisp = Interaction(finder, guild, message=sighting_msg)
+    await threats.on_public_spell_click(wisp, "mirror")
+    assert threats.state["active"] is None
+    assert wisp.response.sent[-1]["embed"].title == "✨ The Wisp Swarm is defeated"
+    assert _disabled(sighting_msg.view)
 
     print("OK")
 

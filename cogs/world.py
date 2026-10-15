@@ -409,8 +409,8 @@ class WorldCog(commands.Cog, name="World"):
         monster = await self.maybe_spawn_monster(place, interaction.channel_id,
                                                  finder_id=interaction.user.id)
         if monster:
-            text += ("\n\n⚠️ Something else was already here. "
-                     "You have **25 seconds** to `/cast` before anyone else can try.")
+            text += ("\n\n⚠️ Something else was already here — green spell buttons are on it. "
+                     "You have **25 seconds** before anyone else can try.")
         embed = self.embed(text, f"{interaction.user.display_name} forages in {P.name}")
         embed.set_footer(text=f"Searches left today: {left}")
         await interaction.response.send_message(embed=embed)

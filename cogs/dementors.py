@@ -3,10 +3,10 @@ Wild Threats. Something slips into one of the social channels on its own,
 a few times a day - and a headmaster can always summon one on the spot.
 
     /cast
-        - anyone, opens spell buttons against whatever's here
-        - an explore monster that already shows spell buttons refuses this
-          and says to use the buttons on the post
-        - CAST_AUTO_USER_ID auto-picks the right spell (no buttons)
+        - Attack waves: opens spell buttons against whatever's here
+        - a solo Wild Threat (explore, forage, ambient, staff summon)
+          already shows spell buttons and refuses /cast
+        - CAST_AUTO_USER_ID auto-picks the right spell on an Attack wave
     /staff dementor channels          - set the channels they can appear in
     /staff dementor summon [channel] [creature] - make one appear right now
         (study hall + shared games lounge + swarm practice room are
@@ -19,8 +19,9 @@ CREATURES[id]["weak"] (patronus, hex, ward, disarm, bind, or mirror).
 A Dementor is still only driven out by an already-cast Patronus, same
 as always.
 
-A monster stirred by /explore puts those spells on the public arrival
-post as green buttons, the way a Quidditch sign-up sits on its message.
+Every solo Wild Threat puts those spells on the public arrival post as
+green buttons, the way a Quidditch sign-up sits on its message. That is
+/explore, /forage, an ambient sighting, and /staff dementor summon.
 Everyone in the channel can see and press them. They are shuffled every
 time they are drawn, so the working spell is not always in the same
 spot. Discord allows 5 buttons per row and 25 total; the six spells use
@@ -31,9 +32,8 @@ else's click gets a private note and is not a lockout. A player who is
 already locked out gets a private note too, not another public miss.
 The buttons disable when the monster is defeated or slips away. /cast
 does not fight these. It replies in private: use the spell buttons on
-the monster post. /cast is unchanged for forage, staff summons, ambient
-sightings, and Attack waves, including its own spell menu. A wrong
-/cast there still does nothing and does not lock anyone out.
+the monster post. Attack waves still use /cast, including its spell
+menu. A wrong /cast there still does nothing and does not lock anyone out.
 
 Most creatures fall to a single clean hit, and that result posts right
 away. A couple don't: they take two hits from two DIFFERENT people before
@@ -44,7 +44,7 @@ A Storm Sprite is rarer and skittish - leave it too long and it bolts to
 another configured channel rather than wait to be caught.
 
 When /explore or /forage in a dangerous place stirs one up, that student
-gets 25 seconds alone to /cast at it. The arrival post counts that window
+gets 25 seconds alone to try a spell. The arrival post counts that window
 down. On a two-person creature, the first clean hit removes that countdown
 and opens the fight — the second hit resolves it immediately (rewards and
 the result post) instead of waiting out the clock. If that second hit never
@@ -491,9 +491,9 @@ WRONG_SPELL_BY_CREATURE = {
     ],
 }
 
-# Headmaster convenience: /cast auto-picks the right weakness (no buttons).
-# Everyone else gets ephemeral spell buttons. Override with CAST_AUTO_USER_ID;
-# unset/0 disables.
+# Headmaster convenience: /cast auto-picks the right weakness on an Attack
+# wave. Solo fights use the public buttons and refuse /cast. Override with
+# CAST_AUTO_USER_ID; unset/0 disables.
 _raw_cast_auto = os.getenv("CAST_AUTO_USER_ID", "555141900802457630")
 CAST_AUTO_USER_ID = (
     int(_raw_cast_auto) if _raw_cast_auto and str(_raw_cast_auto).isdigit() else None
@@ -697,7 +697,7 @@ def exclusive_countdown_note(finder_id: int, exclusive_until: float) -> str:
     """Visible exclusive-window line on an explore/forage arrival post."""
     return (
         f"\n\n⏳ <@{finder_id}> stirred it up — they have until "
-        f"<t:{int(exclusive_until)}:R> to `/cast` first. "
+        f"<t:{int(exclusive_until)}:R> to try a spell first. "
         f"Then anyone can try."
     )
 
@@ -981,7 +981,7 @@ class Dementors(commands.Cog):
         is given, and a random creature (weighted) if none is given - except
         a manual, unspecified /staff dementor summon still defaults to a Dementor,
         same as it always has. When finder_id is set (explore/forage stir),
-        that student gets FINDER_EXCLUSIVE_SECONDS alone to /cast.
+        that student gets FINDER_EXCLUSIVE_SECONDS alone to try a spell.
         pay_explore_points is only for a threat stirred by /explore: the
         defeat still pays full house points, and those points also count
         on the Explore points checklist. Returns the channel it landed in,
@@ -1001,16 +1001,13 @@ class Dementors(commands.Cog):
         embed = self.embed_arrival(creature_id, finder_id=finder_id,
                                    exclusive_until=exclusive_until)
         file = self._attach_art(embed, creature_id)
-        # Only /explore. Forage, ambient sightings, staff summons, and
-        # Attack waves keep the /cast menu and do not get this public row.
-        spell_buttons = bool(pay_explore_points)
-        view = ThreatSpellView(shuffled_spell_order(self.rng)) if spell_buttons else None
+        # Every solo fight (explore, forage, ambient, staff summon) gets the
+        # public row. Attack waves post through _deliver_wave and do not.
+        view = ThreatSpellView(shuffled_spell_order(self.rng))
         try:
-            send_kwargs: dict = {"embed": embed}
+            send_kwargs: dict = {"embed": embed, "view": view}
             if file:
                 send_kwargs["file"] = file
-            if view is not None:
-                send_kwargs["view"] = view
             msg = await channel.send(**send_kwargs)
         except discord.HTTPException:
             log.exception("Couldn't post the %s in %s", creature_id, channel_id)
@@ -1018,6 +1015,7 @@ class Dementors(commands.Cog):
         active = {
             "creature": creature_id, "channel_id": channel_id, "message_id": msg.id,
             "spawned_at": now, "hits": [],
+            "spell_buttons": True, "locked_out": [],
         }
         if finder_id:
             active["finder_id"] = finder_id
@@ -1026,9 +1024,6 @@ class Dementors(commands.Cog):
             # Stays set if the creature wanders, so the checklist credit
             # still applies after a Storm Sprite bolts.
             active["pay_explore_points"] = True
-        if spell_buttons:
-            active["spell_buttons"] = True
-            active["locked_out"] = []
         self._cancel_partial_expiry()
         self.state["active"] = active
         self.state["spawns_today"] = self.state.get("spawns_today", 0) + 1

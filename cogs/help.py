@@ -41,7 +41,7 @@ HELP = {
             ("animagus", "Your Animagus form from three words of your own — you don't pick it. Run again anytime for 1 min of animal sounds on your messages."),
             ("broom", "Claim your unique broom (see Brooms section for upgrades, races, and notes)."),
             ("rumor", "Explore secrets, student gossip, odd headmaster whispers, embarrassing ghosts."),
-            ("cast", "Banish a wild threat that has no spell buttons on its post. Explore monsters use those buttons instead."),
+            ("cast", "Banish an Attack-wave monster. Solo Wild Threats use the green spell buttons on the post."),
             ("familiar status", "Check in on your familiar — friendship, look, and today's care checklist."),
             ("familiar adopt", "Adopt a salamander, raven, or fox for good (once)."),
             ("familiar name", "Give your familiar a name, or rename it."),
@@ -168,7 +168,7 @@ HELP = {
         "note": ("Places remember how you treat them. Not everything you can do is listed here. "
                  "Exploring or foraging in the Dungeons or Forbidden Woods can stir up a wild threat — "
                  "you get 25 seconds alone before anyone else can try. "
-                 "An explore monster shows green spell buttons under the post. "
+                 "The monster shows green spell buttons under the post, same as a staff summon or a sighting. "
                  "The right spell beats it. A wrong one locks you out, and the channel hears about it. "
                  "`/cast` won't fight that one — it tells you to use the buttons. "
                  "A creature that needs two people opens to everyone after the first hit, "
@@ -324,7 +324,7 @@ HELP = {
         "staff": True,
         "entries": [
             ("staffworld dementor channels", "Set the channels a wild threat can appear in (optional 5th)."),
-            ("staffworld dementor summon", "Make one appear right now (study hall OK for practice; Attack waves skip it)."),
+            ("staffworld dementor summon", "Make one appear right now, with spell buttons (study hall OK for practice; Attack waves skip it)."),
             ("staffops beastadmin spawn", "Make a beast appear right now."),
             ("staffops beastadmin channel", "Set which channel beasts appear in."),
             ("staffops beastadmin status", "What's out there, and when the next beast comes."),
