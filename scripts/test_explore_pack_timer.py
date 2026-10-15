@@ -6,8 +6,9 @@ window is a live countdown on the arrival post, and it used to keep
 blocking everyone else even after the finder had already landed a hit.
 On a two-person creature the first clean hit now removes that countdown
 and opens the fight. The second hit resolves immediately. If the second
-hit never comes, the original deadline still closes the fight with no
-reward. A one-person creature still resolves on its only hit.
+hit never comes, the creature stays for 2 minutes counted from that first
+cast, then slips away with no reward. A one-person creature still resolves
+on its only hit.
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ import discord  # noqa: E402
 from cogs.dementors import (  # noqa: E402
     CREATURES,
     Dementors,
+    PARTIAL_FINISH_SECONDS,
     SpellPick,
     exclusive_countdown_note,
     partial_pack_should_expire,
@@ -231,16 +233,21 @@ async def main() -> None:
     assert "⏳" in (_active_arrival(threats).embeds[0].description or "")
     assert threats._finder_blocks(threats.state["active"], friend.id)
 
-    # First clean hit: countdown gone, friend may cast, deadline unchanged,
-    # fight still open, no reward yet.
+    # First clean hit: countdown gone, friend may cast, exclusive window
+    # unchanged. The finish clock is a full 2 minutes from this cast, not
+    # the leftover spawn window.
     rows_before = len(store.state["ledger"])
     first = Interaction(finder, guild)
     started = time.perf_counter()
+    hit_at = time.time()
     await threats.resolve_cast(first, SpellPick("bind"))
     assert time.perf_counter() - started < 1
     assert threats.state["active"]["hits"] == [finder.id]
     assert threats.state["active"]["exclusive_until"] == until
-    assert threats.state["active"]["partial_expires_at"] == until
+    finish_at = threats.state["active"]["partial_expires_at"]
+    assert PARTIAL_FINISH_SECONDS == 120
+    assert abs(finish_at - (hit_at + PARTIAL_FINISH_SECONDS)) < 2
+    assert finish_at > until
     assert threats._finder_blocks(threats.state["active"], friend.id) is None
     desc = _active_arrival(threats).embeds[0].description or ""
     assert "⏳" not in desc
@@ -258,7 +265,7 @@ async def main() -> None:
     assert "someone else" in again.response.sent[-1]["content"]
     assert threats.state["active"]["hits"] == [finder.id]
 
-    # Second hit resolves immediately, while the old deadline is still ahead.
+    # Second hit resolves immediately, while the exclusive window is still ahead.
     second = Interaction(friend, guild)
     await threats.resolve_cast(second, SpellPick("bind"))
     assert time.time() < until
@@ -312,18 +319,36 @@ async def main() -> None:
     assert demon_posts and "⏳" not in (demon_posts[-1].embeds[0].description or "")
     assert "patronus" in (demon_posts[-1].embeds[0].description or "").lower()
 
-    # Only one hit, original deadline passes: creature slips away, no reward.
+    # A cast with only a few seconds left on the exclusive window still
+    # leaves the full 2 minutes. The old clock was spawn + 25s, so this
+    # used to slip away immediately.
+    threats.state["active"] = None
+    assert await threats.try_ambient_spawn(111, "stone_golem", finder_id=finder.id)
+    threats.state["active"]["exclusive_until"] = time.time() + 5
+    late_cast_at = time.time()
+    late_cast = Interaction(finder, guild)
+    await threats.resolve_cast(late_cast, SpellPick("bind"))
+    late_deadline = threats.state["active"]["partial_expires_at"]
+    assert abs(late_deadline - (late_cast_at + PARTIAL_FINISH_SECONDS)) < 2
+    assert late_deadline - threats.state["active"]["exclusive_until"] > 60
+    await _drain(threats._partial_expiry_task)
+
+    # Only one hit, finish deadline passes: creature slips away, no reward.
     threats.state["active"] = None
     assert await threats.try_ambient_spawn(
         111, "nightweaver", finder_id=finder.id, pay_explore_points=True,
     )
     # Keep the cast itself inside the window, then pull the hidden deadline
-    # forward. The expiry must follow partial_expires_at, not a fresh 25s.
+    # forward. The expiry must follow partial_expires_at.
     threats.state["active"]["exclusive_until"] = time.time() + 30
     slip_rows = len(store.state["ledger"])
     opened = Interaction(finder, guild)
+    opened_at = time.time()
     await threats.resolve_cast(opened, SpellPick("disarm"))
     assert threats.state["active"]["hits"] == [finder.id]
+    assert abs(
+        threats.state["active"]["partial_expires_at"] - (opened_at + PARTIAL_FINISH_SECONDS)
+    ) < 2
     assert "⏳" not in (_active_arrival(threats).embeds[0].description or "")
     old_timer = threats._partial_expiry_task
     threats.state["active"]["partial_expires_at"] = time.time() + 0.05

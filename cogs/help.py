@@ -169,7 +169,8 @@ HELP = {
                  "Exploring or foraging in the Dungeons or Forbidden Woods can stir up a wild threat — "
                  "you get 25 seconds alone to `/cast` before anyone else can try. "
                  "A creature that needs two people opens to everyone after the first hit, "
-                 "and the second hit ends it right away."),
+                 "and the second hit ends it right away. "
+                 "If nobody lands that second hit, it slips away 2 minutes after the first one."),
         "entries": [
             ("places", "Where you can go, and what's happening there."),
             ("explore", "Go somewhere and see what you find."),

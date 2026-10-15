@@ -30,12 +30,15 @@ gets 25 seconds alone to /cast at it. The arrival post counts that window
 down. On a two-person creature, the first clean hit removes that countdown
 and opens the fight — the second hit resolves it immediately (rewards and
 the result post) instead of waiting out the clock. If that second hit never
-comes, the original deadline still closes the fight with no reward, so a
-half-finished creature doesn't stay up forever. A one-person creature is
-unchanged: the winning cast resolves it immediately, and the countdown
-comes off the arrival post. With nobody having landed a hit, the 25 seconds
-still end the finder's exclusive turn and then anyone can try; that
-creature stays until it's beaten (or a Storm Sprite wanders). Scheduled
+comes, the creature stays for 2 minutes counted from that first cast, then
+slips away with no reward. The finish clock does not start at spawn, so a
+finder who casts near the end of their 25 seconds still leaves everyone the
+full two minutes. A hit that lands only after the exclusive window does not
+start this clock; that creature stays until someone beats it. A one-person
+creature is unchanged: the winning cast resolves it immediately, and the
+countdown comes off the arrival post. With nobody having landed a hit, the
+25 seconds still end the finder's exclusive turn and then anyone can try;
+that creature stays until it's beaten (or a Storm Sprite wanders). Scheduled
 sightings and staff summons stay open to everyone from the start and have
 no countdown.
 
@@ -157,6 +160,9 @@ SPAWN_CHANCE = SPAWNS_PER_DAY / TICKS_PER_DAY   # per tick, while under the dail
 
 WANDER_MINUTES = 10   # how long a creature that can wander waits before it bolts
 FINDER_EXCLUSIVE_SECONDS = 25  # explorer who stirred one up gets first crack
+# Two-person explore threats: after the first clean hit, this is how long
+# the fight stays open. Counted from that cast, not from the spawn.
+PARTIAL_FINISH_SECONDS = 120
 
 REWARD_POINTS = 3   # kept for backward compatibility; see CREATURES["dementor"]["points"]
 DARK = 0x0B0B12
@@ -501,11 +507,13 @@ def strip_exclusive_countdown(description: str | None) -> str:
 
 def partial_pack_should_expire(active: dict | None, now: float) -> bool:
     """A multi-person fight with a hit landed, still short of a kill, whose
-    hidden deadline (the original exclusive window) has passed.
+    finish deadline has passed.
 
-    Zero hits do not expire: the window only ends the finder's turn, and the
-    creature stays until someone beats it. A first hit that lands after the
-    window never sets partial_expires_at, so those stay too.
+    That deadline is PARTIAL_FINISH_SECONDS after the first hit, and only
+    when that hit landed inside the finder's exclusive window. Zero hits do
+    not expire: the window only ends the finder's turn, and the creature
+    stays until someone beats it. A first hit that lands after the window
+    never sets partial_expires_at, so those stay too.
     """
     if not active:
         return False
@@ -647,7 +655,7 @@ class Dementors(commands.Cog):
         self.event_tick.start()
         self.attack_schedule_tick.start()
         # A restart mid-fight should still close a half-finished two-person
-        # creature when its original deadline has passed.
+        # creature when its finish deadline has passed.
         self._arm_partial_expiry()
 
     async def cog_unload(self):
@@ -742,8 +750,8 @@ class Dementors(commands.Cog):
         """Ephemeral refusal while the explorer who stirred it up still has
         exclusive cast rights; None once the window is open or there was no finder.
 
-        A landed hit opens a two-person fight immediately. The original
-        deadline stays on the encounter only as a hidden expiry."""
+        A landed hit opens a two-person fight immediately. The exclusive
+        timestamp stays on the encounter; the finish window is separate."""
         if active.get("hits"):
             return None
         until = active.get("exclusive_until")
@@ -877,7 +885,7 @@ class Dementors(commands.Cog):
                 return  # an event is running - it owns spawning right now
             active = self.state.get("active")
             if active:
-                # Restart safety: the short task is gone, so the 5-minute tick
+                # Restart safety: the sleep task is gone, so the 5-minute tick
                 # still closes a half-finished two-person fight past its deadline.
                 if partial_pack_should_expire(active, time.time()):
                     creature_id = active["creature"]
@@ -1025,9 +1033,11 @@ class Dementors(commands.Cog):
             world_cog.save()
 
     def _note_partial_deadline(self, active: dict, now: float | None = None) -> None:
-        """Keep the original exclusive deadline once a multi-person fight has
-        a hit but isn't finished. Later hits do not move it. A hit that lands
-        after the window does not start this clock — that creature stays."""
+        """Open a finish window once a multi-person fight has a hit but isn't
+        finished. The window is PARTIAL_FINISH_SECONDS from this first hit, so
+        players get the full two minutes even when the exclusive window is
+        almost over. Later hits do not move it. A hit that lands after the
+        exclusive window does not start this clock — that creature stays."""
         if active.get("partial_expires_at"):
             return
         until = active.get("exclusive_until")
@@ -1038,6 +1048,8 @@ class Dementors(commands.Cog):
             until_f = float(until)
         except (TypeError, ValueError):
             return
+        # The exclusive timestamp only decides whether this hit still counts
+        # as inside the finder's turn. It is not the slip-away deadline.
         if now >= until_f:
             return
         creature = CREATURES.get(active.get("creature") or "")
@@ -1048,7 +1060,7 @@ class Dementors(commands.Cog):
         hits = active.get("hits") or []
         if pack <= 1 or not hits or len(hits) >= pack:
             return
-        active["partial_expires_at"] = until_f
+        active["partial_expires_at"] = now + PARTIAL_FINISH_SECONDS
 
     def _cancel_partial_expiry(self) -> None:
         task = getattr(self, "_partial_expiry_task", None)
@@ -1112,7 +1124,7 @@ class Dementors(commands.Cog):
         await self._announce_partial_slip(channel_id, creature_id)
 
     async def _announce_partial_slip(self, channel_id: int, creature_id: str) -> None:
-        """No rewards. The original window ran out with the fight unfinished."""
+        """No rewards. The finish window ran out with the fight unfinished."""
         c = CREATURES.get(creature_id) or {}
         name = c.get("name") or "creature"
         emoji = c.get("emoji") or ""
@@ -1211,9 +1223,9 @@ class Dementors(commands.Cog):
 
                 if len(active["hits"]) < creature["pack"]:
                     # First hit on a two-person explore creature: hide the
-                    # countdown and remember the original deadline. Anyone
-                    # else can finish it now; if they don't, it slips away
-                    # at that deadline instead of sitting forever.
+                    # countdown and open a 2-minute finish window from this
+                    # cast. Anyone else can finish it now; if they don't, it
+                    # slips away when that window ends.
                     self._note_partial_deadline(active)
                     self.save()
                     self._arm_partial_expiry()
