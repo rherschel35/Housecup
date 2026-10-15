@@ -2,10 +2,11 @@
 """Explore monsters carry public green spell buttons.
 
 The row is shuffled whenever it is drawn, five buttons to a row. The spell
-that works is still CREATURES[id]["weak"], the same value /cast uses. A wrong
-press locks that player out and posts a random teasing line in the channel.
-"Not yet" and "already out" stay ephemeral. A wrong /cast still does nothing
-and does not lock anyone out.
+that works is still CREATURES[id]["weak"], the same value other fights use
+with /cast. A wrong press locks that player out and posts a random teasing
+line in the channel. "Not yet" and "already out" stay ephemeral. /cast on
+one of these monsters only says to use the buttons. Everywhere else /cast
+is unchanged, and a wrong /cast still does nothing.
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ from cogs.dementors import (  # noqa: E402
     BUTTONS_PER_ROW,
     CREATURES,
     LOCKED_OUT_MESSAGE,
+    USE_SPELL_BUTTONS_MESSAGE,
     MAX_SPELL_BUTTONS,
     SPELL_LABEL,
     SPELL_ORDER,
@@ -304,12 +306,39 @@ async def main() -> None:
     assert threats.state["active"]["hits"] == []
     assert _enabled(_active_arrival(threats).view)
 
-    # A wrong /cast is still private and does not lock them out.
-    miss = Interaction(finder, guild, message=_active_arrival(threats))
-    await threats.resolve_cast(miss, SpellPick("hex"))
-    assert miss.response.sent[-1]["content"] == "Nothing happens."
-    assert miss.response.sent[-1]["ephemeral"] is True
+    # /cast is off while the public buttons are up, including auto-pick.
+    told = Interaction(finder, guild)
+    await threats.cast.callback(threats, told)
+    assert told.response.sent[-1]["content"] == USE_SPELL_BUTTONS_MESSAGE
+    assert told.response.sent[-1]["ephemeral"] is True
+    assert "view" not in told.response.sent[-1]
+    assert threats.state["active"]["hits"] == []
     assert threats.state["active"]["locked_out"] == []
+    threats._can_auto_cast = lambda user_id: True
+    auto = Interaction(finder, guild)
+    await threats.cast.callback(threats, auto)
+    assert auto.response.sent[-1]["content"] == USE_SPELL_BUTTONS_MESSAGE
+    assert auto.response.sent[-1]["ephemeral"] is True
+    assert threats.state["active"]["hits"] == []
+    threats._can_auto_cast = Dementors._can_auto_cast.__get__(threats, Dementors)
+
+    # An Attack wave in the same channel still uses /cast. The explore
+    # monster underneath is not what that command fights.
+    threats.state["event"] = {
+        "name": "Attack on Velmora",
+        "channels": {
+            "111": {"creature": "shadow_wolf", "hits": [], "message_id": 1, "spawned_at": time.time()},
+        },
+        "tally": {},
+    }
+    wave = Interaction(finder, guild)
+    await threats.cast.callback(threats, wave)
+    assert wave.response.sent[-1]["content"] == "Which spell?"
+    assert wave.response.sent[-1]["ephemeral"] is True
+    assert wave.response.sent[-1]["view"].timeout == 45
+    assert threats.state["active"]["hits"] == []
+    assert threats.state["active"]["spell_buttons"] is True
+    threats.state["event"] = None
 
     # The public button miss names them and locks only them out.
     wrong = Interaction(finder, guild, message=_active_arrival(threats))
@@ -338,8 +367,10 @@ async def main() -> None:
     assert threats.state["active"]["locked_out"] == [finder.id]
     via_cast = Interaction(finder, guild)
     await threats.cast.callback(threats, via_cast)
-    assert via_cast.response.sent[-1]["content"] == LOCKED_OUT_MESSAGE
+    assert via_cast.response.sent[-1]["content"] == USE_SPELL_BUTTONS_MESSAGE
     assert via_cast.response.sent[-1]["ephemeral"] is True
+    assert threats.state["active"]["locked_out"] == [finder.id]
+    assert threats.state["active"]["hits"] == []
 
     # Friend still may not cast during the exclusive window.
     blocked = Interaction(friend, guild, message=_active_arrival(threats))
@@ -435,6 +466,24 @@ async def main() -> None:
     await threats.on_public_spell_click(stale, "patronus")
     assert stale.response.sent[-1]["ephemeral"] is True
     assert _disabled(demon.view)
+
+    # Forage and staff summons have no public buttons, so /cast is unchanged.
+    assert await threats.try_ambient_spawn(111, "shadow_wolf", finder_id=finder.id)
+    assert "spell_buttons" not in threats.state["active"]
+    forage_cast = Interaction(finder, guild)
+    await threats.cast.callback(threats, forage_cast)
+    assert forage_cast.response.sent[-1]["content"] == "Which spell?"
+    assert forage_cast.response.sent[-1]["ephemeral"] is True
+    wrong_cast = Interaction(finder, guild)
+    await threats.resolve_cast(wrong_cast, SpellPick("ward"))
+    assert wrong_cast.response.sent[-1]["content"] == "Nothing happens."
+    assert wrong_cast.response.sent[-1]["ephemeral"] is True
+    assert threats.state["active"]["hits"] == []
+    assert "locked_out" not in threats.state["active"]
+    right_cast = Interaction(finder, guild)
+    await threats.resolve_cast(right_cast, SpellPick("hex"))
+    assert threats.state["active"] is None
+    assert right_cast.response.sent[-1]["embed"].title == "✨ The Shadow Wolf is defeated"
 
     print("OK")
 

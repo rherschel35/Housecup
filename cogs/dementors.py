@@ -4,6 +4,8 @@ a few times a day - and a headmaster can always summon one on the spot.
 
     /cast
         - anyone, opens spell buttons against whatever's here
+        - an explore monster that already shows spell buttons refuses this
+          and says to use the buttons on the post
         - CAST_AUTO_USER_ID auto-picks the right spell (no buttons)
     /staff dementor channels          - set the channels they can appear in
     /staff dementor summon [channel] [creature] - make one appear right now
@@ -28,8 +30,10 @@ Someone else can still try. During the finder's 25 seconds, anyone
 else's click gets a private note and is not a lockout. A player who is
 already locked out gets a private note too, not another public miss.
 The buttons disable when the monster is defeated or slips away. /cast
-still works, including its own spell menu. A wrong /cast still does
-nothing and does not lock anyone out.
+does not fight these. It replies in private: use the spell buttons on
+the monster post. /cast is unchanged for forage, staff summons, ambient
+sightings, and Attack waves, including its own spell menu. A wrong
+/cast there still does nothing and does not lock anyone out.
 
 Most creatures fall to a single clean hit, and that result posts right
 away. A couple don't: they take two hits from two DIFFERENT people before
@@ -415,6 +419,7 @@ BUTTONS_PER_ROW = 5
 MAX_SPELL_BUTTONS = 25
 THREAT_SPELL_PREFIX = "threatspell:"
 LOCKED_OUT_MESSAGE = "You're already out for this one."
+USE_SPELL_BUTTONS_MESSAGE = "Use the spell buttons on the monster post."
 
 # Public misses. {member}, {spell}, and {creature} are filled in when one
 # is picked. Generic lines always qualify; spell and creature lines are
@@ -1224,6 +1229,21 @@ class Dementors(commands.Cog):
             return False
         return user_id in (active.get("locked_out") or [])
 
+    def _cast_blocked_by_buttons(self, channel_id) -> bool:
+        """Explore monsters with public spell buttons are not fought with /cast.
+
+        An Attack wave in this channel is a different fight, so /cast stays
+        available for that wave.
+        """
+        event = self.state.get("event")
+        key = str(self._as_channel_id(channel_id) or channel_id)
+        if event and key in (event.get("channels") or {}):
+            return False
+        active = self.state.get("active")
+        if not active or not active.get("spell_buttons"):
+            return False
+        return self._as_channel_id(active.get("channel_id")) == self._as_channel_id(channel_id)
+
     async def _disable_threat_buttons(self, channel_id, message_id) -> None:
         """Grey out the public spell row. The monster is gone from this post."""
         if not channel_id or not message_id:
@@ -1317,12 +1337,15 @@ class Dementors(commands.Cog):
 
     @app_commands.command(name="cast", description="Cast a spell at whatever's in this channel.")
     async def cast(self, interaction: discord.Interaction):
-        """Spell is chosen via ephemeral buttons. Explore monsters also have public ones."""
+        """Spell menu for fights that do not already show public spell buttons."""
         hexes = self.bot.get_cog("Hexes")
         if hexes and await hexes.deny_if_limp_wand(interaction):
             return
 
         channel_id = interaction.channel_id
+        if self._cast_blocked_by_buttons(channel_id):
+            await interaction.response.send_message(USE_SPELL_BUTTONS_MESSAGE, ephemeral=True)
+            return
         if self._cast_locked_out(channel_id, interaction.user.id):
             await interaction.response.send_message(LOCKED_OUT_MESSAGE, ephemeral=True)
             return

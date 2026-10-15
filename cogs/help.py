@@ -41,7 +41,7 @@ HELP = {
             ("animagus", "Your Animagus form from three words of your own — you don't pick it. Run again anytime for 1 min of animal sounds on your messages."),
             ("broom", "Claim your unique broom (see Brooms section for upgrades, races, and notes)."),
             ("rumor", "Explore secrets, student gossip, odd headmaster whispers, embarrassing ghosts."),
-            ("cast", "Banish a wild threat. Explore monsters have green spell buttons on the post. 25s alone if you stirred it up."),
+            ("cast", "Banish a wild threat that has no spell buttons on its post. Explore monsters use those buttons instead."),
             ("familiar status", "Check in on your familiar — friendship, look, and today's care checklist."),
             ("familiar adopt", "Adopt a salamander, raven, or fox for good (once)."),
             ("familiar name", "Give your familiar a name, or rename it."),
@@ -170,7 +170,7 @@ HELP = {
                  "you get 25 seconds alone before anyone else can try. "
                  "An explore monster shows green spell buttons under the post. "
                  "The right spell beats it. A wrong one locks you out, and the channel hears about it. "
-                 "`/cast` still works. "
+                 "`/cast` won't fight that one — it tells you to use the buttons. "
                  "A creature that needs two people opens to everyone after the first hit, "
                  "and the second hit ends it right away. "
                  "If nobody lands that second hit, it slips away 2 minutes after the first one."),
