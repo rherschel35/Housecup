@@ -63,39 +63,43 @@ CUSTOM_PATRONUSES: dict[str, dict] = {
         "defeat_art": "Siren_Rowie_Defeat.png",
     },
     "206828442065305600": {  # Pod / Vish's Head Boy Pod
-        "animal": "Griffin",
+        "animal": "Trio of cheetahs",
+        "label": "🐆 A Trio of Silver Cheetahs",
         "form": (
-            "A powerful griffin emerges from the light, its wings spreading "
-            "wide as its lion-like paws settle firmly against the ground. There "
-            "is something regal in its presence, but not distant. Its gaze is "
-            "sharp, curious, and almost mischievous, as though it has already "
-            "figured out the room before anyone else has."
+            "Three silver cheetahs move as one, their sleek coats shimmering "
+            "like moonlight beneath a midnight sky. Each carries a distinct "
+            "presence: one watchful and poised, one playful and mischievous, "
+            "and one quietly commanding. Different in nature, yet bound by "
+            "something deeper than instinct. Together, they embody a confidence "
+            "that borders on arrogance, with the unmistakable air of those who "
+            "know they belong exactly where they stand."
         ),
         "reading": (
-            "You carry an unusual combination of confidence and curiosity. You "
-            "want to experience everything, meet people, build connections, and "
-            "leave something behind that matters. You can be loud, ridiculous, "
-            "flirtatious, and completely unserious one moment, then surprisingly "
-            "thoughtful and fiercely determined the next.\n\n"
-            "**Your guard is this:** you don't give up on people easily. You may "
-            "become frustrated, hurt, or disappointed, but the people you truly "
-            "claim as your own tend to stay yours. You have a stubborn instinct "
-            "to protect, encourage, and fight for the things you believe deserve "
-            "a chance.\n\n"
-            "The griffin represents the part of you that refuses to be reduced "
-            "to one thing. **You can be both tenderness and force, humor and "
-            "seriousness, ambition and loyalty.** You adapt without losing "
-            "yourself.\n\n"
-            "And beneath everything is a desire to live a life that actually "
-            "feels *alive*. To make memories. To love loudly. To build something "
-            "you're proud of. To be surrounded by people who matter and to know "
-            "that, when the moment comes, you had the courage to choose your "
-            "own path.\n\n"
-            "**The griffin does not simply guard what it loves. It rises above "
-            "it, sees where it is going, and then refuses to turn back.**"
+            "You are drawn to excitement, connection, and the thrill of being "
+            "wanted. You flirt because you enjoy the game, tease because you "
+            "enjoy the reaction, and charm because you know exactly how much "
+            "trouble a smile can cause.\n\n"
+            "Your guard is this: you refuse to take life too seriously for too "
+            "long. You know when to be serious, but you also know when the "
+            "moment calls for a grin, a raised eyebrow, or getting just a "
+            "little too close.\n\n"
+            "You chase experiences with the instinct of a cheetah: fast, "
+            "fearless, and completely committed once you’ve decided what you "
+            "want. But like these three, you understand that strength isn’t "
+            "always about running alone. There is power in loyalty, comfort in "
+            "companionship, and something extraordinary about finding those who "
+            "can match your stride.\n\n"
+            "Beneath the flirtation and playful arrogance lies a genuine hunger "
+            "for connection. You love attention, affection, chemistry, and the "
+            "electricity of being desired. You aren’t afraid of attraction, and "
+            "you aren’t particularly interested in pretending you are. And when "
+            "you find your people, you protect your bond fiercely. You may run "
+            "wild, but you know exactly who you want running beside you.\n\n"
+            "One may command attention. Two may turn heads. But three silver "
+            "cheetahs, moving as one, are impossible to forget."
         ),
-        "art": "Griffin_Pod.jpg",
-        "defeat_art": "Griffin_Pod_Defeat.jpg",
+        "art": "Cheetahs_Pod.jpg",
+        "defeat_art": "Cheetahs_Pod_Defeat.jpg",
     },
     "534422209968734209": {  # Mara
         "animal": "Margarita",

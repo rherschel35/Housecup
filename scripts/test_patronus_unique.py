@@ -101,7 +101,7 @@ def main() -> None:
 
     assert len(P.ANIMALS) == 190, len(P.ANIMALS)
     assert len(set(P.ANIMALS)) == 190
-    for reserved in ("Siren", "Griffin", "Margarita", "Chimera", "Kraken"):
+    for reserved in ("Siren", "Trio of cheetahs", "Margarita", "Chimera", "Kraken"):
         assert reserved not in P.ANIMALS
 
     class FakeBot:
@@ -135,12 +135,47 @@ def main() -> None:
     # customs still on disk
     for name in (
         "Siren_Rowie.png",
-        "Griffin_Pod.jpg",
+        "Cheetahs_Pod.jpg",
+        "Cheetahs_Pod_Defeat.jpg",
         "Margarita_Mara.png",
         "Chimera_Saro.jpg",
         "Kraken_Lumi.jpg",
     ):
         assert (P.ASSETS_DIR / name).is_file(), name
+
+    pod_id = 206828442065305600
+    pod = cog.patronus_of(pod_id)
+    assert pod and pod["animal"] == "Trio of cheetahs"
+    assert cog.headline_for(pod) == "🐆 A Trio of Silver Cheetahs"
+    # The sealed reading is the supplied copy, including the curly apostrophes.
+    verbatim = (
+        "Three silver cheetahs move as one, their sleek coats shimmering like "
+        "moonlight beneath a midnight sky."
+    )
+    assert verbatim in pod["form"]
+    for sentence in (
+        "You are drawn to excitement, connection, and the thrill of being wanted.",
+        "Your guard is this: you refuse to take life too seriously for too long.",
+        "once you’ve decided what you want.",
+        "strength isn’t always about running alone.",
+        "You aren’t afraid of attraction, and you aren’t particularly interested in pretending you are.",
+        "One may command attention. Two may turn heads. But three silver cheetahs, moving as one, are impossible to forget.",
+    ):
+        assert sentence in pod["reading"], sentence
+
+    class _Member:
+        id = pod_id
+        display_name = "Pod"
+
+    embed = cog.embed_for(_Member(), pod, with_art=True)
+    assert len(embed.description) <= 4096, len(embed.description)
+    for field in embed.fields:
+        assert len(field["value"]) <= 1024
+    assert "🐆 A Trio of Silver Cheetahs" in embed.description
+    assert verbatim in embed.description
+    assert cog.art_path_for(pod_id, field="art").name == "Cheetahs_Pod.jpg"
+    assert cog.art_path_for(pod_id, field="defeat_art").name == "Cheetahs_Pod_Defeat.jpg"
+    assert cog.release(pod_id) is False
 
     print("patronus smoke OK", len(used), "unique claims;", len(P.ANIMALS), "forms")
 
