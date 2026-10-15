@@ -63,6 +63,9 @@ Names only. Set them in the shell, a local `.env` that stays untracked, or the R
 | `ATTACK_PING_ROLE_NAMES` | Comma-separated role names pinged for Attack on Velmora. |
 | `BEAST_CHANNEL_ID` | Channel id for beast sightings. |
 | `BROKE_REPORT_CHANNEL_ID` | Channel id for broke reports. |
+| `TICKET_WEBHOOK_URL` | Optional. When set, `/gonsomethingbroke` also POSTs the filed ticket as JSON. Unset leaves forwarding off. |
+| `TICKET_WEBHOOK_KEY` | Optional secret for that POST. Sent as `Authorization: Bearer <key>` unless `TICKET_WEBHOOK_KEY_HEADER` is set. Never logged. |
+| `TICKET_WEBHOOK_KEY_HEADER` | Optional header name. When set, the raw key is sent in this header instead of the Bearer default. |
 | `FIRE_STOKE_THRESHOLD` | Stoke count for the house fire. |
 | `FIRE_WINNER_PTS` | Points awarded for the house fire. |
 | `FROG_MYTHIC_ODDS` | Denominator for the mythic Chocolate Frog card. |
@@ -80,6 +83,8 @@ Names only. Set them in the shell, a local `.env` that stays untracked, or the R
 Railway builds this repo and deploys on every push to `main`. The service start command is `python bot.py`.
 
 Put `DISCORD_TOKEN` and any other variables above in the Railway service variables, not in git.
+
+`/gonsomethingbroke` forwards the ticket only when `TICKET_WEBHOOK_URL` is set. Railway injects `RAILWAY_GIT_COMMIT_SHA` on each git deploy; the forwarder includes it as `commit_sha` when that variable is present. Do not put the webhook secret in git.
 
 Attach a volume and set `STATE_DIR` to that volume's mount path. The points ledger, game progress, and command-sync fingerprint live there. A redeploy without a volume (or with `STATE_DIR` left at the default `data/` directory inside the container) starts from empty state.
 
