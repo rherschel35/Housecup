@@ -49,10 +49,10 @@ from cogs.duels import (  # noqa: E402
     Duel,
     Duels,
     duel_night_payout,
+    _ephemeral_board_kwargs,
     edit_private_board,
     edit_public_board,
     pair_key,
-    private_board_kwargs,
 )
 from cogs.point_share import kill_share_awards  # noqa: E402
 from cogs.store import STORE_PATH, Store  # noqa: E402
@@ -473,14 +473,14 @@ def _webhook_expired() -> discord.HTTPException:
 
 
 def test_private_board_omits_empty_view() -> None:
-    kwargs = private_board_kwargs(object(), None)
+    kwargs = _ephemeral_board_kwargs(object(), None)
     assert "view" not in kwargs and kwargs["ephemeral"] is True
     view = object()
-    assert private_board_kwargs(object(), view)["view"] is view
+    assert _ephemeral_board_kwargs(object(), view)["view"] is view
     # The crash is view.is_finished() when view is None. Both open paths omit it.
     for fn in (Duel.open_cast_board,):
         src = inspect.getsource(fn)
-        assert "private_board_kwargs" in src
+        assert "_ephemeral_board_kwargs" in src
         assert "view=view" not in src
 
 
