@@ -17,7 +17,7 @@ DUELS_POTIONS_CHANNEL_ID = 1555554825616236726
 
 # Full multi-game lounge: everything except castle PvP and 3Raid.
 EVERYTHING_LOUNGE_CHANNEL_ID = 1558611215054282822
-# All-access room: every game and command works here, including castle PvP and 3Raid.
+# Extra everything lounge. Same games as the lounge above — not castle PvP or 3Raid.
 ALL_ACCESS_CHANNEL_ID = 1560280552303624252
 ALL_ACCESS_CHANNEL_IDS = frozenset({ALL_ACCESS_CHANNEL_ID})
 
@@ -53,7 +53,7 @@ SWARM_PRACTICE_CHANNEL_IDS = frozenset({
 
 # Castle / army PvP — sieges, map board, battle reports.
 CASTLES_CHANNEL_ID = 1556398769275404441
-CASTLES_CHANNEL_IDS = frozenset({CASTLES_CHANNEL_ID, *ALL_ACCESS_CHANNEL_IDS})
+CASTLES_CHANNEL_IDS = frozenset({CASTLES_CHANNEL_ID})
 
 # Wizard Bingo — primary room, plus everything lounges.
 BINGO_CHANNEL_ID = 1558313269800734740

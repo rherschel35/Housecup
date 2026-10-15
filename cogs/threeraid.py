@@ -15,8 +15,6 @@ Power resets every raid. Descent stats never carry in.
 
 from __future__ import annotations
 
-from cogs.velmora_channels import ALL_ACCESS_CHANNEL_ID
-
 import asyncio
 import datetime
 import json
@@ -717,7 +715,7 @@ class ThreeRaid(commands.Cog):
         return self.state["players"][key]
 
     def _in_channel(self, interaction: discord.Interaction) -> bool:
-        return interaction.channel_id in (THREERAID_CHANNEL_ID, ALL_ACCESS_CHANNEL_ID)
+        return interaction.channel_id == THREERAID_CHANNEL_ID
 
     def _busy(self, user_id: int) -> bool:
         if self.lobby and user_id in self.lobby.member_ids():
