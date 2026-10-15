@@ -52,6 +52,8 @@ WIDE_CARD_USER_IDS = frozenset({
     555141900802457630,
     929025104644562996,
     907495756259266610,
+    804202856240381963,
+    479078540986548224,
 })
 
 # Custom hero art for wide-card players, keyed by Discord user id.
@@ -62,6 +64,8 @@ WIDE_CARD_PORTRAITS = {
     555141900802457630: "gon-thornmere.jpg",
     929025104644562996: "caldrin-929025104644562996.jpg",
     907495756259266610: "portrait-907495756259266610.jpg",
+    804202856240381963: "portrait-804202856240381963.jpg",
+    479078540986548224: "portrait-479078540986548224.jpg",
 }
 
 # Source sprites are 1400x1200
