@@ -33,9 +33,11 @@ could simply trade wins and mint points for their house. Same-house wins
 also never grow a win streak or pay a streak-bounty bonus.
 
 House Duel Night tallies every cross-house win (best-of series still bank
-3/4/5/26, and the other duelist's set wins count too). Nothing is paid when
-the duel ends — no double pay, no rival double — and there is no rematch
-limit. Forfeits and instant ends with no finished game do not count.
+3/4/5/26, and the other duelist's set wins count too). A series that started
+before the night ends still counts if the last set lands after. Nothing is
+paid when the duel ends — no double pay, no rival double — and there is no
+rematch limit. Forfeits and instant ends with no finished game do not count.
+Fizzles and draws still bank every set already won.
 When the night ends, the top 7 by wins split a pool, the MVP and anyone
 who took most of their house's wins get a bonus, and the house with the
 most distinct duelists gets a bonus. Same-house duels still never count.
@@ -668,6 +670,134 @@ def signature_unlocks_for(tally: dict) -> list[tuple[str, int, str]]:
     return out
 
 
+def _finished_sets(explicit: int | None, fallback: int) -> int:
+    """Sets to bank. An omitted count falls back to the set score."""
+    if explicit is None:
+        return max(0, int(fallback))
+    return max(0, int(explicit))
+
+
+def _explicit_no_sets(played_winner: int | None, played_loser: int | None) -> bool:
+    """True when the caller says no game finished (both played counts are 0).
+
+    Missing counts are not a zero — those fall back to the set score so a
+    forfeit cannot drop sets already won.
+    """
+    if played_winner is None and played_loser is None:
+        return False
+    return int(played_winner or 0) == 0 and int(played_loser or 0) == 0
+
+
+def _webhook_token_expired(exc: BaseException) -> bool:
+    """Discord 401 / 50027 — the interaction webhook token is older than 15 minutes."""
+    if getattr(exc, "code", None) == 50027:
+        return True
+    text = str(exc)
+    return "50027" in text or "Invalid Webhook Token" in text
+
+
+async def anchor_channel_message(channel, message):
+    """Keep a public board as a normal channel message.
+
+    Interaction responses edit through a webhook token that Discord invalidates
+    after 15 minutes (50027). ``fetch_message`` returns a Message that edits
+    with the bot token, so a long best-of series can keep updating the board.
+    """
+    if message is None or channel is None:
+        return message
+    if not isinstance(message, discord.InteractionMessage):
+        return message
+    fetch = getattr(channel, "fetch_message", None)
+    if fetch is None:
+        return message
+    try:
+        anchored = await fetch(int(message.id))
+    except (discord.DiscordException, TypeError, ValueError):
+        log.exception(
+            "Could not anchor duel message %s as a channel message",
+            getattr(message, "id", None),
+        )
+        return message
+    return anchored or message
+
+
+async def edit_public_board(match, embed, view) -> None:
+    """Edit the public board, or post a fresh channel message if the webhook died."""
+    channel = getattr(match, "channel", None)
+    message = await anchor_channel_message(channel, getattr(match, "message", None))
+    match.message = message
+    if message is None:
+        return
+    try:
+        await message.edit(content=None, embed=embed, view=view)
+    except discord.HTTPException as exc:
+        if _webhook_token_expired(exc) and channel is not None and hasattr(channel, "send"):
+            log.warning("Duel board webhook expired (50027); posting a channel message.")
+            try:
+                sent = await channel.send(embed=embed, view=view)
+            except discord.DiscordException:
+                log.exception("Could not repost duel board after webhook expiry.")
+                return
+            match.message = sent
+            return
+        log.exception("Could not update duel board.")
+    except discord.DiscordException:
+        log.exception("Could not update duel board.")
+
+
+async def nudge_reopen_cast_board(match, uid: int) -> None:
+    channel = getattr(match, "channel", None)
+    if channel is None or not hasattr(channel, "send"):
+        return
+    nudged = getattr(match, "_cast_nudged", None)
+    if not isinstance(nudged, set):
+        nudged = set()
+        match._cast_nudged = nudged
+    if uid in nudged:
+        return
+    nudged.add(uid)
+    try:
+        await channel.send(
+            f"<@{uid}> your cast board expired — press **Open my cast board** to reopen it."
+        )
+    except discord.DiscordException:
+        log.exception("Could not nudge %s to reopen a cast board", uid)
+
+
+async def edit_private_board(match, uid: int, message, *, embed, view) -> None:
+    """Edit a private cast board. On 50027, drop it and nudge a reopen."""
+    if message is None:
+        return
+    try:
+        await message.edit(embed=embed, view=view)
+    except discord.HTTPException as exc:
+        if _webhook_token_expired(exc):
+            boards = getattr(match, "private_boards", None)
+            if isinstance(boards, dict):
+                boards.pop(uid, None)
+            log.info(
+                "Private cast board for %s expired (50027); asking them to reopen.",
+                uid,
+            )
+            await nudge_reopen_cast_board(match, uid)
+            return
+        log.exception("Could not update private cast board for %s", uid)
+    except discord.DiscordException:
+        log.exception("Could not update private cast board for %s", uid)
+
+
+def private_board_kwargs(embed, view) -> dict:
+    """Ephemeral cast-board payload. Omit ``view`` when there is nothing to press.
+
+    discord.py calls ``view.is_finished()`` whenever ``view`` is passed, including
+    ``None``, which raises AttributeError and the cast board never sticks.
+    """
+    kwargs = {"embed": embed, "ephemeral": True}
+    if view is not None:
+        kwargs["view"] = view
+    return kwargs
+
+
 class Duels(commands.Cog):
     trio = app_commands.Group(name="trio", description="3v3 wizard duels.")
 
@@ -1094,7 +1224,11 @@ class Duels(commands.Cog):
         return False
 
     def pop_expired_duel_night(self, now: float = None) -> dict | None:
-        """If Duel Night timed out, clear it and return the finished night for tallying."""
+        """If Duel Night timed out, clear it and return the finished night for tallying.
+
+        A 1v1 series that started before ``ends_at`` keeps the night open until
+        it settles, so sets won after the clock still land on the tally.
+        """
         night = self.state.get("duel_night")
         if not night:
             return None
@@ -1102,9 +1236,57 @@ class Duels(commands.Cog):
         ends = float(night.get("ends_at") or 0)
         if ends <= 0 or now < ends:
             return None
+        if self._series_blocking_night(night):
+            return None
         self.state["duel_night"] = None
         self.save()
         return night
+
+    def _series_blocking_night(self, night: dict) -> bool:
+        ends = float(night.get("ends_at") or 0)
+        if ends <= 0:
+            return False
+        seen: set[int] = set()
+        for match in self.active.values():
+            ident = id(match)
+            if ident in seen:
+                continue
+            seen.add(ident)
+            if not isinstance(match, Duel):
+                continue
+            if getattr(match, "state", None) == "pending":
+                continue
+            started = getattr(match, "started_at", None)
+            if started is None:
+                continue
+            try:
+                started_f = float(started)
+            except (TypeError, ValueError):
+                continue
+            if started_f < ends:
+                return True
+        return False
+
+    def _night_counts_match(self, now: float, started_at: float | None) -> bool:
+        """True when this result belongs on the live Duel Night tally.
+
+        The clock can already be past ``ends_at``. A series that started
+        before then still counts; one that started after does not.
+        """
+        night = self.state.get("duel_night")
+        if not night:
+            return False
+        ends = float(night.get("ends_at") or 0)
+        if ends <= 0:
+            return False
+        if now < ends:
+            return True
+        if started_at is None:
+            return False
+        try:
+            return float(started_at) < ends
+        except (TypeError, ValueError):
+            return False
 
     async def _take_expired_duel_night(self, now: float = None) -> dict | None:
         """Pop an expired night. One caller wins if the 30s tick and the weekly loop overlap."""
@@ -1118,6 +1300,8 @@ class Duels(commands.Cog):
         pts: int = 0,
         *,
         wins: int = 1,
+        started_at: float | None = None,
+        now: float | None = None,
     ) -> None:
         """Add banked duel wins to the live Duel Night scoreboard.
 
@@ -1125,9 +1309,13 @@ class Duels(commands.Cog):
         normal duel; 3/4/5/26 for best-of 5/7/9/51; the other duelist's set
         wins too). Points are not paid here — the pool is split when the
         night ends — so ``pts`` stays 0.
+
+        A series that started before ``ends_at`` still counts if it finishes
+        after the night clock, as long as the night has not been finalized.
         """
         night = self.state.get("duel_night")
-        if not night or not house or not self.duel_night_on():
+        now = now if now is not None else time.time()
+        if not night or not house or not self._night_counts_match(now, started_at):
             return
         win_n = max(0, int(wins))
         if win_n <= 0:
@@ -1177,6 +1365,7 @@ class Duels(commands.Cog):
         series: bool,
         role: str,
         count_night: bool = True,
+        started_at: float | None = None,
     ) -> tuple[int, str | None]:
         """Pay house points for banked set/series wins. Returns (pts, reason).
 
@@ -1199,7 +1388,9 @@ class Duels(commands.Cog):
                 return 0, "same-house"
             if not count_night or banks <= 0:
                 return 0, "no-play"
-            self._credit_duel_night(member.id, house, 0, wins=banks)
+            self._credit_duel_night(
+                member.id, house, 0, wins=banks, started_at=started_at, now=now,
+            )
             return 0, "night"
 
         if banks <= 0:
@@ -1237,7 +1428,8 @@ class Duels(commands.Cog):
     def settle(self, winner, loser, now: float = None, *, match_wins: int = 1,
                winner_sets: int | None = None, loser_sets: int | None = None,
                forfeit: bool = False, played_winner_sets: int | None = None,
-               played_loser_sets: int | None = None) -> dict:
+               played_loser_sets: int | None = None, sets_only: bool = False,
+               started_at: float | None = None) -> dict:
         """Record the result, award points, and work out every reward it
         triggers. Returns what happened so the announcement can say so.
 
@@ -1253,9 +1445,17 @@ class Duels(commands.Cog):
         checklist / house points (same daily cap as a normal duel win).
         During Duel Night those banks are tallied instead of paid.
 
-        ``forfeit`` with ``played_*_sets`` of 0 is an instant end with no
+        ``forfeit`` with both ``played_*_sets`` of 0 is an instant end with no
         finished game: it does not join the night tally. Sets already won
         before a forfeit still count; the unplayed series bank does not.
+        Omitted played counts fall back to the set score so a forfeit cannot
+        drop games that are already on the board.
+
+        ``sets_only`` (fizzle / draw) banks each duelist's finished sets and
+        does not award the series champion bank, streak, or bounty.
+
+        ``started_at`` lets a series that began before Duel Night's ``ends_at``
+        still count if the last set lands after the clock.
         """
         now = now if now is not None else time.time()
         match_wins = max(1, int(match_wins))
@@ -1265,6 +1465,17 @@ class Duels(commands.Cog):
             loser_sets = 0
         winner_sets = max(0, int(winner_sets))
         loser_sets = max(0, int(loser_sets))
+        if sets_only and _finished_sets(played_winner_sets, winner_sets) == 0 \
+                and _finished_sets(played_loser_sets, loser_sets) == 0:
+            self._log_settled(winner, loser, 0, 0, 0, 0)
+            return {
+                "awarded": 0, "reason": "no-play", "house": None, "notes": [],
+                "night": self._night_counts_match(now, started_at),
+                "rival": False, "match_wins": match_wins,
+                "winner_sets": 0, "loser_sets": 0,
+                "loser_awarded": 0, "loser_reason": "no-play", "loser_house": None,
+                "night_wins": 0, "loser_night_wins": 0, "flourish": None,
+            }
         wid, lid = str(winner.id), str(loser.id)
         self._roll_week(now)
 
@@ -1280,7 +1491,7 @@ class Duels(commands.Cog):
         w_house = store.member_house(winner) if store else None
         l_house = store.member_house(loser) if store else None
         same_house = bool(w_house and l_house and w_house == l_house)
-        night = self.duel_night_on(now)
+        night = self._night_counts_match(now, started_at)
 
         # rivalry (one meeting per series / duel, not per set)
         pk = pair_key(winner.id, loser.id)
@@ -1300,11 +1511,21 @@ class Duels(commands.Cog):
 
         # ------------------------------------------------ house points (per banked win, capped)
         # Off-night: pay match_wins / loser_sets exactly as before, including a
-        # forfeit. During the night, only finished games join the tally.
+        # forfeit. During the night, and on a fizzle/draw, every finished set
+        # joins the tally — both duelists, not only the series bank.
         series = match_wins > 1 or winner_sets > 1 or loser_sets > 0
-        if night and forfeit:
-            w_bank = max(0, int(played_winner_sets or 0))
-            l_bank = max(0, int(played_loser_sets or 0))
+        if sets_only:
+            w_bank = _finished_sets(played_winner_sets, winner_sets)
+            l_bank = _finished_sets(played_loser_sets, loser_sets)
+            w_count = w_bank > 0
+            l_count = l_bank > 0
+        elif night and forfeit:
+            if _explicit_no_sets(played_winner_sets, played_loser_sets):
+                w_bank = 0
+                l_bank = 0
+            else:
+                w_bank = _finished_sets(played_winner_sets, winner_sets)
+                l_bank = _finished_sets(played_loser_sets, loser_sets)
             w_count = w_bank > 0
             l_count = l_bank > 0
         else:
@@ -1323,12 +1544,14 @@ class Duels(commands.Cog):
             series=series and match_wins > 1,
             role="win",
             count_night=w_count,
+            started_at=started_at,
         )
         # Best-of: sets the loser took still count toward their daily duel
         # checklist + house points (capped like a normal win). During Duel
-        # Night they count on the night tally instead.
+        # Night they count on the night tally instead. Every finished set
+        # banks — a forfeit must not keep only one side.
         l_pts, l_reason = (0, None)
-        if l_bank > 0 and loser_sets > 0 and (match_wins > 1 or winner_sets > 1):
+        if l_bank > 0:
             l_pts, l_reason = self._pay_banked_wins(
                 store, loser, l_house,
                 banks=l_bank,
@@ -1340,6 +1563,7 @@ class Duels(commands.Cog):
                 series=True,
                 role="sets",
                 count_night=l_count,
+                started_at=started_at,
             )
         outcome = {
             "awarded": w_pts, "reason": w_reason, "house": w_house, "notes": notes,
@@ -1351,15 +1575,23 @@ class Duels(commands.Cog):
         }
 
         # ------------------------------------------------ Triple Tithe castle perk
-        castles = self.bot.get_cog("Castles")
-        tithe = castles.triple_tithe_bonus(winner.id) if castles else 0
+        # Abandoned series (sets_only) bank the sets and stop. No champion
+        # tithe, bounty, streak, or reputation swing for a draw / fizzle.
+        if not sets_only:
+            castles = self.bot.get_cog("Castles")
+            tithe = castles.triple_tithe_bonus(winner.id) if castles else 0
+        else:
+            tithe = 0
         if tithe and store and w_house and not same_house:
             self._award(store, w_house, tithe, winner.id, "Triple Tithe")
             outcome["awarded"] = int(outcome.get("awarded") or 0) + tithe
             notes.append(f"🏰 Triple Tithe: +{tithe} for **{winner.display_name}**.")
 
         # ------------------------------------------------ bounty on the loser
-        bounty = self.state["bounties"].pop(lid, None)
+        if sets_only:
+            bounty = None
+        else:
+            bounty = self.state["bounties"].pop(lid, None)
         if bounty:
             broken = self.state["streaks"].get(lid, 0) or bounty.get("streak", BOUNTY_AT)
             if same_house:
@@ -1386,9 +1618,11 @@ class Duels(commands.Cog):
         # ------------------------------------------------ streaks
         # A loss always ends the loser's streak. Same-house wins do not grow
         # the winner's streak or put a bounty on their head — only cross-house
-        # wins count toward killing-streak bonuses.
-        self.state["streaks"][lid] = 0
-        if not same_house:
+        # wins count toward killing-streak bonuses. A fizzle/draw has no
+        # series champion, so neither streak moves.
+        if not sets_only:
+            self.state["streaks"][lid] = 0
+        if not sets_only and not same_house:
             streak = self.state["streaks"].get(wid, 0) + match_wins
             self.state["streaks"][wid] = streak
             if streak >= BOUNTY_AT and wid not in self.state["bounties"]:
@@ -1404,21 +1638,22 @@ class Duels(commands.Cog):
                 notes.append(f"🔥 **{winner.display_name}** is on a {streak}-win streak.")
 
         # ------------------------------------------------ Circle reputation
-        self.state["rep"][wid] = self.state["rep"].get(wid, 0) + REP_WIN
-        self.state["rep"][lid] = self.state["rep"].get(lid, 0) + REP_LOSS
-        for member, uid in ((winner, wid), (loser, lid)):
-            if self.state["rep"][uid] >= REP_GIFT and not self.state["gifted"].get(uid):
-                self.state["gifted"][uid] = True
-                house = store.member_house(member) if store else None
-                if store and house:
-                    self._award(store, house, GIFT_POINTS, member.id, "A gift from the Dueling Circle")
-                    notes.append(f"🎁 The Dueling Circle has been watching **{member.display_name}**. "
-                                 f"It sends a gift: +{GIFT_POINTS} to their house.")
-                else:
-                    notes.append(f"🎁 The Dueling Circle has been watching **{member.display_name}**, "
-                                 "and it approves.")
+        if not sets_only:
+            self.state["rep"][wid] = self.state["rep"].get(wid, 0) + REP_WIN
+            self.state["rep"][lid] = self.state["rep"].get(lid, 0) + REP_LOSS
+            for member, uid in ((winner, wid), (loser, lid)):
+                if self.state["rep"][uid] >= REP_GIFT and not self.state["gifted"].get(uid):
+                    self.state["gifted"][uid] = True
+                    house = store.member_house(member) if store else None
+                    if store and house:
+                        self._award(store, house, GIFT_POINTS, member.id, "A gift from the Dueling Circle")
+                        notes.append(f"🎁 The Dueling Circle has been watching **{member.display_name}**. "
+                                     f"It sends a gift: +{GIFT_POINTS} to their house.")
+                    else:
+                        notes.append(f"🎁 The Dueling Circle has been watching **{member.display_name}**, "
+                                     "and it approves.")
         outcome["flourish"] = None
-        if self.state["rep"][wid] >= REP_FLOURISH:
+        if not sets_only and self.state["rep"][wid] >= REP_FLOURISH:
             outcome["flourish"] = FLOURISHES[winner.id % len(FLOURISHES)].format(name=winner.display_name)
 
         # ------------------------------------------------ ranks
@@ -1457,11 +1692,35 @@ class Duels(commands.Cog):
 
         # ------------------------------------------------ this week's tally
         week = self.state["week"]["wins"]
-        entry = week.get(wid, [0, now])
-        week[wid] = [entry[0] + match_wins, now]   # [wins, when they reached that count]
+        if sets_only:
+            # Each finished set counts. Nobody banks the unplayed series.
+            if winner_sets:
+                entry = week.get(wid, [0, now])
+                week[wid] = [entry[0] + winner_sets, now]
+            if loser_sets:
+                entry = week.get(lid, [0, now])
+                week[lid] = [entry[0] + loser_sets, now]
+        else:
+            entry = week.get(wid, [0, now])
+            week[wid] = [entry[0] + match_wins, now]   # [wins, when they reached that count]
 
+        self._log_settled(winner, loser, winner_sets, loser_sets, w_bank, l_bank)
         self.save()
         return outcome
+
+    @staticmethod
+    def _log_settled(winner, loser, winner_sets, loser_sets, w_bank, l_bank) -> None:
+        log.info(
+            "Duel settled: %s (%s) vs %s (%s); set score %s–%s; wins banked %s–%s",
+            getattr(winner, "display_name", winner),
+            getattr(winner, "id", "?"),
+            getattr(loser, "display_name", loser),
+            getattr(loser, "id", "?"),
+            winner_sets,
+            loser_sets,
+            w_bank,
+            l_bank,
+        )
 
     def _duelist_label(self, member) -> str:
         wands = self.bot.get_cog("Wands")
@@ -1643,7 +1902,11 @@ class Duels(commands.Cog):
             embed=duel.challenge_embed(),
             view=AcceptView(duel),
         )
-        duel.message = await interaction.original_response()
+        # Fetch as a channel message so later edits use the bot token.
+        # The interaction webhook dies after 15 minutes (50027) and froze
+        # best-of series that ran longer than that.
+        posted = await interaction.original_response()
+        duel.message = await anchor_channel_message(interaction.channel, posted)
         duel.start_accept_timer()
 
     @app_commands.command(
@@ -1797,6 +2060,8 @@ class Duels(commands.Cog):
                 f"including every game won inside a best-of series. "
                 f"A best of 5/7/9/51 still banks **3 / 4 / 5 / 26** for the series "
                 f"winner, and sets the other duelist takes count too. "
+                f"A series that starts before the night ends still counts if the "
+                f"last set lands after. "
                 f"Same-house duels do not count. There is **no rematch limit**. "
                 f"Forfeits and instant ends with no finished game do not count.\n\n"
                 f"**Nothing is paid when the duel ends** — no double points and no "
@@ -2574,7 +2839,8 @@ class Duels(commands.Cog):
             return
         signup = TrioSignup(self, is_house, house_a, house_b)
         await interaction.response.send_message(embed=signup.embed(), view=TrioSignupView(signup))
-        signup.message = await interaction.original_response()
+        posted = await interaction.original_response()
+        signup.message = await anchor_channel_message(interaction.channel, posted)
         signup.timer_task = asyncio.create_task(signup._timeout())
 
     # ---------------------------------------------------------------- grand
@@ -2620,7 +2886,8 @@ class Duels(commands.Cog):
             embed=gd.challenge_embed(),
             view=GrandAcceptView(gd),
         )
-        gd.message = await interaction.original_response()
+        posted = await interaction.original_response()
+        gd.message = await anchor_channel_message(interaction.channel, posted)
         gd.start_accept_timer()
 
 
@@ -2655,6 +2922,11 @@ class Duel:
         # each duelist's ephemeral board, which edits in place each round.
         self.private_boards: dict[int, discord.Message] = {}
         self.opened: set[int] = set()
+        self._cast_nudged: set[int] = set()
+        # Set when the challenge is accepted. Duel Night still counts this
+        # series if that moment is before the night's ends_at.
+        self.started_at: float | None = None
+        self._settled = False
         # Fixed for this duel so board edits don't reshuffle the joke.
         self.rival_line = self.cog.rivalry_board_line(challenger, opponent)
         # Felix Felicis: one won spell-tie per drinker for this whole match.
@@ -2779,38 +3051,32 @@ class Duel:
                 boards = dict(self.private_boards)
                 round_no = self.round
             if self.message is not None:
-                try:
-                    await self.message.edit(content=None, embed=embed, view=view)
-                except discord.DiscordException:
-                    log.exception("Could not update the duel message.")
+                await edit_public_board(self, embed, view)
             for uid, msg in boards.items():
-                try:
-                    priv_footer = footer
-                    if priv_footer is None and state == "active" and uid in picks:
-                        priv_footer = (
-                            f"You cast {SPELLS[picks[uid]]['name']}. "
-                            "Waiting on your opponent…"
-                        )
-                    elif priv_footer is None and state == "active":
-                        priv_footer = (
-                            f"Pick a spell below • Open again if dismissed "
-                            f"• {ROUND_TIMEOUT}s per round"
-                        )
-                    priv_embed = discord.Embed(
-                        title=embed.title,
-                        description=embed.description,
-                        color=embed.color,
+                priv_footer = footer
+                if priv_footer is None and state == "active" and uid in picks:
+                    priv_footer = (
+                        f"You cast {SPELLS[picks[uid]]['name']}. "
+                        "Waiting on your opponent…"
                     )
-                    if priv_footer:
-                        priv_embed.set_footer(text=priv_footer)
-                    elif embed.footer and embed.footer.text:
-                        priv_embed.set_footer(text=embed.footer.text)
-                    priv_view = None
-                    if state == "active" and uid not in picks:
-                        priv_view = PrivateSpellView(self, round_no=round_no)
-                    await msg.edit(embed=priv_embed, view=priv_view)
-                except discord.DiscordException:
-                    log.exception("Could not update private cast board for %s", uid)
+                elif priv_footer is None and state == "active":
+                    priv_footer = (
+                        f"Pick a spell below • Open again if dismissed "
+                        f"• {ROUND_TIMEOUT}s per round"
+                    )
+                priv_embed = discord.Embed(
+                    title=embed.title,
+                    description=embed.description,
+                    color=embed.color,
+                )
+                if priv_footer:
+                    priv_embed.set_footer(text=priv_footer)
+                elif embed.footer and embed.footer.text:
+                    priv_embed.set_footer(text=embed.footer.text)
+                priv_view = None
+                if state == "active" and uid not in picks:
+                    priv_view = PrivateSpellView(self, round_no=round_no)
+                await edit_private_board(self, uid, msg, embed=priv_embed, view=priv_view)
 
     async def _update(self, view=None, footer=None):
         """Convenience: snapshot under the lock, then publish unlocked."""
@@ -2858,28 +3124,77 @@ class Duel:
                 self.history.append(f"*{loser.display_name} froze and never cast.*")
                 finish = (winner, loser)
             else:
-                self.cog.release_match(self)
+                # Stay in active until the sets are banked so an expiring
+                # Duel Night does not finalize underneath this series.
+                self.state = "done"
                 fizzle = self._snapshot(
                     view=None, footer="Neither duelist cast. The duel fizzles out.")
         if finish:
             await self._finish(finish[0], finish[1], forfeit=True)
         elif fizzle:
+            await self._bank_abandoned_sets()
             await self._publish(*fizzle)
+
+    async def _bank_abandoned_sets(self) -> None:
+        """Fizzle or draw: settle every set already won, then free the duelists."""
+        async with self.lock:
+            if self._settled:
+                return
+            self._settled = True
+            self.state = "done"
+            a_sets = int(self.set_score.get(self.a.id, 0) or 0)
+            b_sets = int(self.set_score.get(self.b.id, 0) or 0)
+        if self._timer is asyncio.current_task():
+            self._timer = None
+        elif self._timer:
+            self._timer.cancel()
+            self._timer = None
+        if b_sets > a_sets:
+            winner, loser = self.b, self.a
+            w_sets, l_sets = b_sets, a_sets
+        else:
+            winner, loser = self.a, self.b
+            w_sets, l_sets = a_sets, b_sets
+        outcome: dict = {}
+        try:
+            outcome = self.cog.settle(
+                winner, loser,
+                match_wins=self.match_wins,
+                winner_sets=w_sets,
+                loser_sets=l_sets,
+                forfeit=True,
+                sets_only=True,
+                played_winner_sets=w_sets,
+                played_loser_sets=l_sets,
+                started_at=self.started_at,
+            )
+        finally:
+            self.cog.release_match(self)
+        notes = outcome.get("notes") or []
+        if notes and self.channel is not None:
+            try:
+                await self.channel.send("\n".join(notes))
+            except discord.DiscordException:
+                log.exception("Could not post duel announcements.")
 
     # ------------------------------------------------------------ the rounds
 
     async def _next_round(self):
         arm_round = None
+        abandon = False
         async with self.lock:
             self.round += 1
             self.total_rounds += 1
             self.picks = {}
             if self.total_rounds > self.max_rounds:
-                self.cog.release_match(self)
+                self.state = "done"
+                abandon = True
                 snap = self._snapshot(view=None, footer="Too evenly matched — declared a draw.")
             else:
                 snap = self._snapshot(view=OpenCastBoardView(self))
                 arm_round = self.round
+        if abandon:
+            await self._bank_abandoned_sets()
         await self._publish(*snap)
         if arm_round is not None:
             self._arm(self._round_timeout(arm_round))
@@ -2905,9 +3220,7 @@ class Duel:
             self.opened.add(uid)
             embed = self.private_embed(uid)
             view = self._private_view_for(uid)
-        await interaction.response.send_message(
-            embed=embed, view=view, ephemeral=True
-        )
+        await interaction.response.send_message(**private_board_kwargs(embed, view))
         try:
             self.private_boards[uid] = await interaction.original_response()
         except discord.HTTPException:
@@ -2924,6 +3237,7 @@ class Duel:
         publish = None
         finish = None
         arm_round = None
+        abandon = False
         async with self.lock:
             if self.state != "active":
                 return "This duel is over."
@@ -2982,7 +3296,8 @@ class Duel:
                         self.total_rounds += 1
                         self.picks = {}
                         if self.total_rounds > self.max_rounds:
-                            self.cog.release_match(self)
+                            self.state = "done"
+                            abandon = True
                             publish = self._snapshot(
                                 view=None, footer="Too evenly matched — declared a draw.")
                         else:
@@ -2993,7 +3308,8 @@ class Duel:
                     self.total_rounds += 1
                     self.picks = {}
                     if self.total_rounds > self.max_rounds:
-                        self.cog.release_match(self)
+                        self.state = "done"
+                        abandon = True
                         publish = self._snapshot(
                             view=None, footer="Too evenly matched — declared a draw.")
                     else:
@@ -3004,18 +3320,26 @@ class Duel:
         if finish:
             await self._finish(finish[0], finish[1], forfeit=finish[2])
         elif publish:
+            if abandon:
+                await self._bank_abandoned_sets()
             await self._publish(*publish)
             if arm_round is not None:
                 self._arm(self._round_timeout(arm_round))
         return reply
 
     async def _finish(self, winner, loser, forfeit: bool = False):
-        if self._timer:
+        async with self.lock:
+            if self._settled:
+                return
+            self._settled = True
+            self.state = "done"
+            winner_sets = int(self.set_score.get(winner.id, 0) or 0)
+            loser_sets = int(self.set_score.get(loser.id, 0) or 0)
+        if self._timer is asyncio.current_task():
+            self._timer = None
+        elif self._timer:
             self._timer.cancel()
             self._timer = None
-        self.cog.release_match(self)
-        winner_sets = int(self.set_score.get(winner.id, 0) or 0)
-        loser_sets = int(self.set_score.get(loser.id, 0) or 0)
         # Sets actually finished before this call. A timeout forfeit with none
         # of these is an instant end: it must not join the Duel Night tally.
         played_winner_sets = winner_sets
@@ -3025,15 +3349,21 @@ class Duel:
         if self.series_to_win <= 1:
             winner_sets = max(1, winner_sets)
             loser_sets = 0
-        outcome = self.cog.settle(
-            winner, loser,
-            match_wins=self.match_wins,
-            winner_sets=winner_sets,
-            loser_sets=loser_sets,
-            forfeit=forfeit,
-            played_winner_sets=played_winner_sets,
-            played_loser_sets=played_loser_sets,
-        )
+        # Settle before release so a night that has hit ends_at still sees
+        # this series in active and does not pay out underneath it.
+        try:
+            outcome = self.cog.settle(
+                winner, loser,
+                match_wins=self.match_wins,
+                winner_sets=winner_sets,
+                loser_sets=loser_sets,
+                forfeit=forfeit,
+                played_winner_sets=played_winner_sets,
+                played_loser_sets=played_loser_sets,
+                started_at=self.started_at,
+            )
+        finally:
+            self.cog.release_match(self)
 
         from cogs.store import HOUSES
         if outcome.get("flourish"):
@@ -3136,6 +3466,7 @@ class AcceptView(discord.ui.View):
                 await interaction.response.send_message("Too late for that.", ephemeral=True)
                 return
             d.state = "active"
+            d.started_at = time.time()
         await interaction.response.defer()
         d.round = 0
         await d._next_round()
@@ -3314,11 +3645,15 @@ class TrioSignup:
             if self.timer_task:
                 self.timer_task.cancel()
             match = TrioMatch(self)
-            match.message = interaction.message
             match.round = 1
             await interaction.response.edit_message(
                 embed=match.board_embed(), view=OpenTrioCastBoardView(match)
             )
+            match.message = await anchor_channel_message(
+                interaction.channel, self.message or interaction.message
+            )
+            if match.channel is None:
+                match.channel = interaction.channel
             match._arm(match._round_timeout(1))
         else:
             await interaction.response.edit_message(embed=self.embed(), view=TrioSignupView(self))
@@ -3450,36 +3785,32 @@ class TrioMatch:
                 boards = dict(self.private_boards)
                 round_no = self.round
             if self.message is not None:
-                try:
-                    await self.message.edit(content=None, embed=embed, view=view)
-                except discord.DiscordException:
-                    log.exception("Could not update trio message.")
+                await edit_public_board(self, embed, view)
             for uid, msg in boards.items():
-                try:
-                    priv_footer = footer
-                    pick = picks.get(uid)
-                    if priv_footer is None and state == "active" and pick:
-                        priv_footer = f"You cast {SPELLS[pick]['name']}. Waiting…"
-                    elif priv_footer is None and state == "active":
-                        priv_footer = (
-                            f"Pick a spell below • Open again if dismissed "
-                            f"• {ROUND_TIMEOUT}s per round"
-                        )
-                    priv_embed = discord.Embed(
-                        title=embed.title,
-                        description=embed.description,
-                        color=embed.color,
+                priv_footer = footer
+                pick = picks.get(uid)
+                if priv_footer is None and state == "active" and pick:
+                    priv_footer = f"You cast {SPELLS[pick]['name']}. Waiting…"
+                elif priv_footer is None and state == "active":
+                    priv_footer = (
+                        f"Pick a spell below • Open again if dismissed "
+                        f"• {ROUND_TIMEOUT}s per round"
                     )
-                    if priv_footer:
-                        priv_embed.set_footer(text=priv_footer)
-                    elif embed.footer and embed.footer.text:
-                        priv_embed.set_footer(text=embed.footer.text)
-                    priv_view = None
-                    if state == "active" and uid not in picks:
-                        priv_view = TrioPrivateSpellView(self, round_no=round_no)
-                    await msg.edit(embed=priv_embed, view=priv_view)
-                except discord.DiscordException:
-                    log.exception("Could not update trio private cast board for %s", uid)
+                priv_embed = discord.Embed(
+                    title=embed.title,
+                    description=embed.description,
+                    color=embed.color,
+                )
+                if priv_footer:
+                    priv_embed.set_footer(text=priv_footer)
+                elif embed.footer and embed.footer.text:
+                    priv_embed.set_footer(text=embed.footer.text)
+                priv_view = None
+                if state == "active" and uid not in picks:
+                    priv_view = TrioPrivateSpellView(self, round_no=round_no)
+                await edit_private_board(
+                    self, uid, msg, embed=priv_embed, view=priv_view
+                )
 
     async def _update(self, view=None, footer=None):
         async with self.lock:
@@ -3508,9 +3839,7 @@ class TrioMatch:
                 if uid in self.picks
                 else TrioPrivateSpellView(self, round_no=self.round)
             )
-        await interaction.response.send_message(
-            embed=embed, view=view, ephemeral=True
-        )
+        await interaction.response.send_message(**private_board_kwargs(embed, view))
         try:
             self.private_boards[uid] = await interaction.original_response()
         except discord.HTTPException:
@@ -3848,40 +4177,34 @@ class GrandDuel:
                 sudden = dict(self.sudden_picks)
                 boards = dict(self.private_boards)
             if self.message is not None:
-                try:
-                    await self.message.edit(content=None, embed=embed, view=view)
-                except discord.DiscordException:
-                    log.exception("Could not update Grand Duel message.")
+                await edit_public_board(self, embed, view)
             # Private boards are only used in sudden death (sequence builder
             # is its own ephemeral opened from the lock prompt).
             if state == "sudden" or state == "done":
                 for uid, msg in boards.items():
-                    try:
-                        priv_footer = footer
-                        pick = sudden.get(uid)
-                        if priv_footer is None and state == "sudden" and pick:
-                            priv_footer = (
-                                f"You cast {SPELLS[pick]['name']}. Waiting…"
-                            )
-                        elif priv_footer is None and state == "sudden":
-                            priv_footer = "Sudden death — pick a spell below."
-                        priv_embed = discord.Embed(
-                            title=embed.title,
-                            description=embed.description,
-                            color=embed.color,
+                    priv_footer = footer
+                    pick = sudden.get(uid)
+                    if priv_footer is None and state == "sudden" and pick:
+                        priv_footer = (
+                            f"You cast {SPELLS[pick]['name']}. Waiting…"
                         )
-                        if priv_footer:
-                            priv_embed.set_footer(text=priv_footer)
-                        elif embed.footer and embed.footer.text:
-                            priv_embed.set_footer(text=embed.footer.text)
-                        priv_view = None
-                        if state == "sudden" and uid not in sudden:
-                            priv_view = GrandSuddenPrivateSpellView(self)
-                        await msg.edit(embed=priv_embed, view=priv_view)
-                    except discord.DiscordException:
-                        log.exception(
-                            "Could not update Grand sudden board for %s", uid
-                        )
+                    elif priv_footer is None and state == "sudden":
+                        priv_footer = "Sudden death — pick a spell below."
+                    priv_embed = discord.Embed(
+                        title=embed.title,
+                        description=embed.description,
+                        color=embed.color,
+                    )
+                    if priv_footer:
+                        priv_embed.set_footer(text=priv_footer)
+                    elif embed.footer and embed.footer.text:
+                        priv_embed.set_footer(text=embed.footer.text)
+                    priv_view = None
+                    if state == "sudden" and uid not in sudden:
+                        priv_view = GrandSuddenPrivateSpellView(self)
+                    await edit_private_board(
+                        self, uid, msg, embed=priv_embed, view=priv_view
+                    )
 
     async def _update(self, view=None, footer=None):
         async with self.lock:
@@ -3926,9 +4249,7 @@ class GrandDuel:
             else:
                 embed.set_footer(text="Sudden death — pick a spell below.")
                 view = GrandSuddenPrivateSpellView(self)
-        await interaction.response.send_message(
-            embed=embed, view=view, ephemeral=True
-        )
+        await interaction.response.send_message(**private_board_kwargs(embed, view))
         try:
             self.private_boards[uid] = await interaction.original_response()
         except discord.HTTPException:
