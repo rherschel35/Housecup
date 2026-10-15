@@ -2624,6 +2624,19 @@ class Duels(commands.Cog):
         gd.start_accept_timer()
 
 
+def _ephemeral_board_kwargs(embed: discord.Embed, view: discord.ui.View | None) -> dict:
+    """Kwargs for a private cast board.
+
+    InteractionResponse.send_message defaults ``view`` to MISSING. Passing
+    ``view=None`` is not "no buttons": discord.py still calls
+    ``view.is_finished()`` and raises AttributeError. Omit the kwarg instead.
+    """
+    kwargs: dict = {"embed": embed, "ephemeral": True}
+    if view is not None:
+        kwargs["view"] = view
+    return kwargs
+
+
 class Duel:
     """One duel, held in memory. Duels last a couple of minutes, so they
     aren't saved - a redeploy mid-duel simply ends it."""
@@ -2905,9 +2918,7 @@ class Duel:
             self.opened.add(uid)
             embed = self.private_embed(uid)
             view = self._private_view_for(uid)
-        await interaction.response.send_message(
-            embed=embed, view=view, ephemeral=True
-        )
+        await interaction.response.send_message(**_ephemeral_board_kwargs(embed, view))
         try:
             self.private_boards[uid] = await interaction.original_response()
         except discord.HTTPException:
@@ -3508,9 +3519,7 @@ class TrioMatch:
                 if uid in self.picks
                 else TrioPrivateSpellView(self, round_no=self.round)
             )
-        await interaction.response.send_message(
-            embed=embed, view=view, ephemeral=True
-        )
+        await interaction.response.send_message(**_ephemeral_board_kwargs(embed, view))
         try:
             self.private_boards[uid] = await interaction.original_response()
         except discord.HTTPException:
@@ -3926,9 +3935,7 @@ class GrandDuel:
             else:
                 embed.set_footer(text="Sudden death — pick a spell below.")
                 view = GrandSuddenPrivateSpellView(self)
-        await interaction.response.send_message(
-            embed=embed, view=view, ephemeral=True
-        )
+        await interaction.response.send_message(**_ephemeral_board_kwargs(embed, view))
         try:
             self.private_boards[uid] = await interaction.original_response()
         except discord.HTTPException:
