@@ -32,12 +32,16 @@ members of the SAME house never award points - otherwise two housemates
 could simply trade wins and mint points for their house. Same-house wins
 also never grow a win streak or pay a streak-bounty bonus.
 
-House Duel Night tallies every cross-house win (best-of series still bank
-3/4/5/26, and the other duelist's set wins count too). A series that started
-before the night ends still counts if the last set lands after. Nothing is
-paid when the duel ends — no double pay, no rival double — and there is no
-rematch limit. Forfeits and instant ends with no finished game do not count.
-Fizzles and draws still bank every set already won.
+House Duel Night tallies every cross-house game won, by every player.
+That includes sets taken by the duelist who loses the best-of series, on a
+normal finish, forfeit, fizzle, draw, or timeout, and the same for trio
+rounds and Grand steps. A best-of 5/7/9/51 that is played out still banks
+3/4/5/26 for the winner — the unplayed remainder of that bank is not a
+substitute for the score. A series that started before the night ends still
+counts if the last set lands after. Nothing is paid when the duel ends —
+no double pay, no rival double — and there is no rematch limit. Forfeits
+and instant ends with no finished game do not count. Each settled result
+is written to the duel state store immediately.
 When the night ends, the top 7 by wins split a pool, the MVP and anyone
 who took most of their house's wins get a bonus, and the house with the
 most distinct duelists gets a bonus. Same-house duels still never count.
@@ -856,24 +860,37 @@ class Duels(commands.Cog):
         if getattr(match, "state", None) not in (None, "done"):
             match.state = "done"
         timer = getattr(match, "_timer", None)
-        if timer is not None:
+        if timer is not None and timer is not asyncio.current_task():
             try:
                 timer.cancel()
             except Exception:
                 pass
         seq_task = getattr(match, "_sequence_task", None)
-        if seq_task is not None and not seq_task.done():
+        if (
+            seq_task is not None
+            and not seq_task.done()
+            and seq_task is not asyncio.current_task()
+        ):
             try:
                 seq_task.cancel()
             except Exception:
                 pass
+        ids: set[int] = set()
         for attr in ("a", "b"):
             m = getattr(match, attr, None)
-            if m is None:
-                continue
-            self.busy.discard(m.id)
-            if self.active.get(m.id) is match:
-                self.active.pop(m.id, None)
+            if m is not None:
+                ids.add(m.id)
+        for attr in ("team_a", "team_b"):
+            for m in getattr(match, attr, None) or []:
+                if m is not None:
+                    ids.add(m.id)
+        for uid, live in list(self.active.items()):
+            if live is match:
+                ids.add(uid)
+        for uid in ids:
+            self.busy.discard(uid)
+            if self.active.get(uid) is match:
+                self.active.pop(uid, None)
 
     def clear_user(self, user_id: int) -> str:
         """End whatever has this user marked busy. Returns a short status."""
@@ -917,6 +934,7 @@ class Duels(commands.Cog):
         state.setdefault("champion", None)      # {"user_id", "week"}
         state.setdefault("duel_night", None)    # {"by", "at", "tally": {uid: {wins, pts, house}}}
         state.setdefault("duel_night_schedule", self._blank_night_schedule())
+        state.setdefault("settled_results", [])  # one row per settled duel, written immediately
         if not state.get("rewards_backfilled"):
             self._backfill(state)
         # Quietly mark already-earned signature titles as announced so a redeploy
@@ -1240,8 +1258,8 @@ class Duels(commands.Cog):
             if ident in seen:
                 continue
             seen.add(ident)
-            if not isinstance(match, Duel):
-                continue
+            # 1v1 series, trio, and grand all hold the night once they have
+            # started. Pending challenges have no started_at and do not.
             if getattr(match, "state", None) == "pending":
                 continue
             started = getattr(match, "started_at", None)
@@ -1290,16 +1308,18 @@ class Duels(commands.Cog):
         wins: int = 1,
         started_at: float | None = None,
         now: float | None = None,
+        name: str | None = None,
     ) -> None:
-        """Add banked duel wins to the live Duel Night scoreboard.
+        """Add games won to the live Duel Night scoreboard.
 
-        ``wins`` is how many record/series wins this result is worth (1 for a
-        normal duel; 3/4/5/26 for best-of 5/7/9/51; the other duelist's set
-        wins too). Points are not paid here — the pool is split when the
-        night ends — so ``pts`` stays 0.
+        ``wins`` is how many sets or games this player actually took (1 for a
+        normal duel; each set of a best-of, including sets taken by the
+        series loser; trio rounds; Grand steps). Points are not paid here —
+        the pool is split when the night ends — so ``pts`` stays 0.
 
         A series that started before ``ends_at`` still counts if it finishes
         after the night clock, as long as the night has not been finalized.
+        ``name`` is kept on the tally so the finale can log a display name.
         """
         night = self.state.get("duel_night")
         now = now if now is not None else time.time()
@@ -1315,6 +1335,8 @@ class Duels(commands.Cog):
         if int(pts) > 0:
             entry["pts"] = int(entry.get("pts", 0)) + int(pts)
         entry["house"] = house
+        if name:
+            entry["name"] = str(name)
 
     def note_round_win(self, user_id: int, spell: str) -> None:
         """A round won with this spell. Called as each round resolves."""
@@ -1378,6 +1400,7 @@ class Duels(commands.Cog):
                 return 0, "no-play"
             self._credit_duel_night(
                 member.id, house, 0, wins=banks, started_at=started_at, now=now,
+                name=getattr(member, "display_name", None),
             )
             return 0, "night"
 
@@ -1417,7 +1440,7 @@ class Duels(commands.Cog):
                winner_sets: int | None = None, loser_sets: int | None = None,
                forfeit: bool = False, played_winner_sets: int | None = None,
                played_loser_sets: int | None = None, sets_only: bool = False,
-               started_at: float | None = None) -> dict:
+               started_at: float | None = None, ending: str | None = None) -> dict:
         """Record the result, award points, and work out every reward it
         triggers. Returns what happened so the announcement can say so.
 
@@ -1440,7 +1463,12 @@ class Duels(commands.Cog):
         drop games that are already on the board.
 
         ``sets_only`` (fizzle / draw) banks each duelist's finished sets and
-        does not award the series champion bank, streak, or bounty.
+        does not award a series-champion streak or bounty.
+
+        Every path banks the sets actually won. A 2–1 credits the winner 2
+        and the loser 1. ``match_wins`` (3/4/5/26) is only the value of a
+        series that has been played out to that score — it does not replace
+        a shorter score.
 
         ``started_at`` lets a series that began before Duel Night's ``ends_at``
         still count if the last set lands after the clock.
@@ -1456,6 +1484,16 @@ class Duels(commands.Cog):
         if sets_only and _finished_sets(played_winner_sets, winner_sets) == 0 \
                 and _finished_sets(played_loser_sets, loser_sets) == 0:
             self._log_settled(winner, loser, 0, 0, 0, 0)
+            self._remember_result(
+                timestamp=now, mode="duel", ending=ending or "no-play",
+                players=[
+                    self._player_result(winner, sets=0, wins=0),
+                    self._player_result(loser, sets=0, wins=0),
+                ],
+                set_score="0-0",
+                wins_credited={str(winner.id): 0, str(loser.id): 0},
+            )
+            self.save()
             return {
                 "awarded": 0, "reason": "no-play", "house": None, "notes": [],
                 "night": self._night_counts_match(now, started_at),
@@ -1498,29 +1536,43 @@ class Duels(commands.Cog):
                 )
 
         # ------------------------------------------------ house points (per banked win, capped)
-        # Off-night: pay match_wins / loser_sets exactly as before, including a
-        # forfeit. During the night, and on a fizzle/draw, every finished set
-        # joins the tally — both duelists, not only the series bank.
+        # Every finished set joins the tally and the off-night checklist,
+        # for both duelists. The unplayed series bank (match_wins) is not
+        # used when the set score is shorter than that.
         series = match_wins > 1 or winner_sets > 1 or loser_sets > 0
         if sets_only:
             w_bank = _finished_sets(played_winner_sets, winner_sets)
             l_bank = _finished_sets(played_loser_sets, loser_sets)
             w_count = w_bank > 0
             l_count = l_bank > 0
-        elif night and forfeit:
-            if _explicit_no_sets(played_winner_sets, played_loser_sets):
-                w_bank = 0
-                l_bank = 0
-            else:
+        elif night and forfeit and _explicit_no_sets(played_winner_sets, played_loser_sets):
+            # Instant night forfeit: no finished game, so nothing joins the tally.
+            # Off-night still falls through and pays winner_sets (a normal duel win).
+            w_bank = 0
+            l_bank = 0
+            w_count = False
+            l_count = False
+        else:
+            # Sets on the board, not the unplayed series bank. A 2–1 credits
+            # 2 and 1 even when match_wins is 3/4/5/26. A forfeit that names
+            # the sets already played uses those counts. An off-night instant
+            # forfeit (played 0/0) still pays winner_sets, which _finish sets
+            # to 1 for a normal duel.
+            explicit_played = (
+                forfeit
+                and (played_winner_sets is not None or played_loser_sets is not None)
+                and not (
+                    not night and _explicit_no_sets(played_winner_sets, played_loser_sets)
+                )
+            )
+            if explicit_played:
                 w_bank = _finished_sets(played_winner_sets, winner_sets)
                 l_bank = _finished_sets(played_loser_sets, loser_sets)
+            else:
+                w_bank = winner_sets
+                l_bank = loser_sets
             w_count = w_bank > 0
             l_count = l_bank > 0
-        else:
-            w_bank = match_wins
-            l_bank = loser_sets
-            w_count = True
-            l_count = True
         w_pts, w_reason = self._pay_banked_wins(
             store, winner, w_house,
             banks=w_bank,
@@ -1611,7 +1663,9 @@ class Duels(commands.Cog):
         if not sets_only:
             self.state["streaks"][lid] = 0
         if not sets_only and not same_house:
-            streak = self.state["streaks"].get(wid, 0) + match_wins
+            # Streak tracks sets won, not an unplayed series bank.
+            added = winner_sets
+            streak = self.state["streaks"].get(wid, 0) + added
             self.state["streaks"][wid] = streak
             if streak >= BOUNTY_AT and wid not in self.state["bounties"]:
                 self.state["bounties"][wid] = {"since": now, "streak": streak}
@@ -1619,10 +1673,10 @@ class Duels(commands.Cog):
                              f"**A bounty is on their head** - beat them for +{BOUNTY_POINTS} points.")
             elif wid in self.state["bounties"]:
                 self.state["bounties"][wid]["streak"] = streak
-                if streak % STREAK_EVERY == 0:
+                if added and streak % STREAK_EVERY == 0:
                     notes.append(f"🔥 **{winner.display_name}** is on a {streak}-win streak. "
                                  "The bounty still stands.")
-            elif streak >= STREAK_ANNOUNCE and streak - match_wins < STREAK_ANNOUNCE:
+            elif added and streak >= STREAK_ANNOUNCE and streak - added < STREAK_ANNOUNCE:
                 notes.append(f"🔥 **{winner.display_name}** is on a {streak}-win streak.")
 
         # ------------------------------------------------ Circle reputation
@@ -1679,22 +1733,181 @@ class Duels(commands.Cog):
                 )
 
         # ------------------------------------------------ this week's tally
+        # Every set won counts for both duelists. A played-out series still
+        # adds winner_sets, which is 3/4/5/26 when that is the final score.
         week = self.state["week"]["wins"]
-        if sets_only:
-            # Each finished set counts. Nobody banks the unplayed series.
-            if winner_sets:
-                entry = week.get(wid, [0, now])
-                week[wid] = [entry[0] + winner_sets, now]
-            if loser_sets:
-                entry = week.get(lid, [0, now])
-                week[lid] = [entry[0] + loser_sets, now]
-        else:
+        if winner_sets:
             entry = week.get(wid, [0, now])
-            week[wid] = [entry[0] + match_wins, now]   # [wins, when they reached that count]
+            week[wid] = [entry[0] + winner_sets, now]
+        if loser_sets:
+            entry = week.get(lid, [0, now])
+            week[lid] = [entry[0] + loser_sets, now]
 
+        if ending is None:
+            if sets_only:
+                ending = "sets"
+            elif forfeit:
+                ending = "forfeit"
+            else:
+                ending = "finish"
+        w_night = w_bank if w_reason == "night" else 0
+        l_night = l_bank if l_reason == "night" else 0
+        self._remember_result(
+            timestamp=now,
+            mode="duel",
+            ending=ending,
+            players=[
+                self._player_result(winner, sets=winner_sets, wins=w_bank, night=w_night),
+                self._player_result(loser, sets=loser_sets, wins=l_bank, night=l_night),
+            ],
+            set_score=f"{winner_sets}-{loser_sets}",
+            wins_credited={str(winner.id): w_bank, str(loser.id): l_bank},
+        )
         self._log_settled(winner, loser, winner_sets, loser_sets, w_bank, l_bank)
         self.save()
         return outcome
+
+    @staticmethod
+    def _player_result(member, *, sets: int, wins: int, night: int = 0) -> dict:
+        return {
+            "id": int(getattr(member, "id", 0) or 0),
+            "name": str(getattr(member, "display_name", None) or getattr(member, "id", "")),
+            "sets": int(sets),
+            "wins": int(wins),
+            "night": int(night),
+        }
+
+    def _remember_result(
+        self,
+        *,
+        timestamp: float,
+        mode: str,
+        ending: str,
+        players: list,
+        set_score: str,
+        wins_credited: dict,
+    ) -> None:
+        """Append one settled result and leave it for the caller to save.
+
+        The row is on ``state`` before ``save()``, and ``save()`` writes the
+        file immediately — the tally is not only an in-memory log line.
+        """
+        credited = {str(k): int(v) for k, v in wins_credited.items()}
+        self.state.setdefault("settled_results", []).append({
+            "timestamp": float(timestamp),
+            "mode": mode,
+            "ending": ending,
+            "players": players,
+            "set_score": str(set_score),
+            "wins_credited": credited,
+        })
+
+    def _cross_house_key(self, member, opponents) -> str | None:
+        """House to tally, or None when this game is not cross-house.
+
+        Same-house never counts. A player with a house still counts when the
+        opponent has no house — that matches a normal 1v1 settle.
+        """
+        store = self.bot.get_cog("Store")
+        if not store:
+            return None
+        house = store.member_house(member)
+        if not house:
+            return None
+        housed = []
+        for opp in opponents:
+            opp_house = store.member_house(opp)
+            if opp_house:
+                housed.append(opp_house)
+        if housed and all(h == house for h in housed):
+            return None
+        return house
+
+    def _apply_game_credits(
+        self,
+        specs: list[tuple],
+        *,
+        now: float,
+        started_at: float | None = None,
+    ) -> dict[str, int]:
+        """Add finished games to the lifetime win record, the week, and Duel Night.
+
+        ``specs`` is ``(member, games, opponents)``. Does not pay house points
+        or stamp the daily checklist — 1v1 ``settle`` pays separately, and a
+        Grand/trio match payout stays on its own path. Returns wins credited
+        per player id (string keys).
+        """
+        self._roll_week(now)
+        credited: dict[str, int] = {}
+        week = self.state["week"]["wins"]
+        night_on = self._night_counts_match(now, started_at)
+        for member, games, opponents in specs:
+            games = max(0, int(games))
+            uid = str(member.id)
+            credited[uid] = credited.get(uid, 0) + games
+            if games <= 0:
+                continue
+            self.record_of(member.id)["w"] += games
+            entry = week.get(uid, [0, now])
+            week[uid] = [entry[0] + games, now]
+            house = self._cross_house_key(member, opponents)
+            if night_on and house:
+                self._credit_duel_night(
+                    member.id,
+                    house,
+                    wins=games,
+                    started_at=started_at,
+                    now=now,
+                    name=getattr(member, "display_name", None),
+                )
+        return credited
+
+    def bank_team_games(
+        self,
+        team_a,
+        score_a: int,
+        team_b,
+        score_b: int,
+        *,
+        mode: str,
+        ending: str,
+        now: float | None = None,
+        started_at: float | None = None,
+    ) -> dict[str, int]:
+        """Credit rounds/steps already won and persist the row. No match crown."""
+        now = now if now is not None else time.time()
+        score_a = max(0, int(score_a))
+        score_b = max(0, int(score_b))
+        specs = (
+            [(m, score_a, list(team_b)) for m in team_a]
+            + [(m, score_b, list(team_a)) for m in team_b]
+        )
+        credited = self._apply_game_credits(specs, now=now, started_at=started_at)
+        players = [
+            self._player_result(
+                m, sets=games, wins=int(credited.get(str(m.id), 0)),
+                night=int(credited.get(str(m.id), 0)),
+            )
+            for m, games, _opponents in specs
+        ]
+        self._remember_result(
+            timestamp=now,
+            mode=mode,
+            ending=ending,
+            players=players,
+            set_score=f"{score_a}-{score_b}",
+            wins_credited=credited,
+        )
+        self._log_settled_games(mode, ending, score_a, score_b, credited)
+        self.save()
+        return credited
+
+    @staticmethod
+    def _log_settled_games(mode: str, ending: str, score_a: int, score_b: int, credited: dict) -> None:
+        log.info(
+            "%s %s settled: set score %s–%s; wins credited %s",
+            mode, ending, score_a, score_b, credited,
+        )
 
     @staticmethod
     def _log_settled(winner, loser, winner_sets, loser_sets, w_bank, l_bank) -> None:
@@ -2542,8 +2755,10 @@ class Duels(commands.Cog):
             else:
                 house_note = "no house"
             crown = "👑 " if uid in payout["mvp_uids"] else ""
+            stored = ((night.get("tally") or {}).get(str(uid)) or {}).get("name")
+            name_bit = f" ({stored})" if stored else ""
             lines.append(
-                f"{crown}<@{uid}>: **{wins}** wins, {', '.join(bits)} = **{total}** — {house_note}"
+                f"{crown}<@{uid}>: **{wins}** wins, {', '.join(bits)} = **{total}** — {house_note}{name_bit}"
             )
 
         ranked = sorted(
@@ -2572,6 +2787,72 @@ class Duels(commands.Cog):
                     f"(+{DUEL_NIGHT_HOUSE_BONUS})."
                 )
         return lines, payout
+
+    def _tally_display_name(self, uid: int, night: dict) -> str:
+        """Display name stored on the tally, else a guild member, else the id."""
+        entry = ((night.get("tally") or {}).get(str(uid)) or {})
+        stored = entry.get("name")
+        if stored:
+            return str(stored)
+        get_guild = getattr(self.bot, "get_guild", None)
+        guild = get_guild(night.get("guild_id")) if get_guild else None
+        member = None
+        if guild is not None:
+            getter = getattr(guild, "get_member", None)
+            if getter:
+                member = getter(uid)
+        if member is not None and getattr(member, "display_name", None):
+            return str(member.display_name)
+        return str(uid)
+
+    def _log_duel_night_tally(self, night: dict, payout: dict) -> None:
+        """One log line per duelist: id, name, wins, pool share, bonuses, total."""
+        from_rows = {r["uid"]: r for r in payout.get("rows") or []}
+        house_bonus_uids: set[int] = set()
+        for house in payout.get("active_houses") or set():
+            members = [r for r in payout["rows"] if r.get("house") == house]
+            if not members:
+                continue
+            top = min(members, key=lambda r: (-r["wins"], r["uid"]))
+            house_bonus_uids.add(top["uid"])
+        # Everyone who banked a win, in the same order as the results post.
+        ordered = list(payout.get("rows") or [])
+        seen = {r["uid"] for r in ordered}
+        for uid_str, entry in (night.get("tally") or {}).items():
+            try:
+                uid = int(uid_str)
+            except (TypeError, ValueError):
+                continue
+            if uid in seen:
+                continue
+            ordered.append({
+                "uid": uid,
+                "wins": int(entry.get("wins") or 0),
+                "house": entry.get("house"),
+            })
+        for r in ordered:
+            uid = r["uid"]
+            wins = int(r.get("wins") or 0)
+            pool = int((payout.get("pool") or {}).get(uid, 0))
+            bonuses = 0
+            if uid in (payout.get("mvp_uids") or set()):
+                bonuses += DUEL_NIGHT_MVP_BONUS
+            if uid in (payout.get("share_uids") or set()):
+                bonuses += DUEL_NIGHT_HOUSE_SHARE_BONUS
+            if uid in house_bonus_uids:
+                bonuses += DUEL_NIGHT_HOUSE_BONUS
+            # Player line in the post is pool + MVP + house share. The house
+            # bonus is paid to one duelist on top of that, so the logged total
+            # is everything this id was paid.
+            posted = int((payout.get("player_total") or {}).get(uid, 0))
+            total = posted + (DUEL_NIGHT_HOUSE_BONUS if uid in house_bonus_uids else 0)
+            if uid not in from_rows:
+                total = pool + bonuses
+            name = self._tally_display_name(uid, night)
+            log.info(
+                "Duel Night tally: id=%s display_name=%s wins=%s pool_share=%s bonuses=%s total=%s",
+                uid, name, wins, pool, bonuses, total,
+            )
 
     @staticmethod
     def _night_result_embeds(lines: list[str]) -> list[discord.Embed]:
@@ -2648,6 +2929,7 @@ class Duels(commands.Cog):
     async def _finalize_duel_night(self, night: dict, *, reason: str = "staff") -> list[discord.Embed]:
         """End-of-night scoreboard. Pays the pool and bonuses through store.record."""
         lines, payout = self._duel_night_score_lines(night, reason=reason)
+        self._log_duel_night_tally(night, payout)
         self._record_duel_night_payout(payout)
         embeds = self._night_result_embeds(lines)
 
@@ -2673,8 +2955,24 @@ class Duels(commands.Cog):
         houses.discard(None)
         return next(iter(houses)) if len(houses) == 1 else None
 
-    def settle_trio(self, winners: list, losers: list, now: float = None) -> dict:
-        """Record a trio result. House points: 5 wins/day for the house → +5 once."""
+    def settle_trio(
+        self,
+        winners: list,
+        losers: list,
+        now: float = None,
+        *,
+        winner_games: int = 0,
+        loser_games: int = 0,
+        started_at: float | None = None,
+        ending: str = "finish",
+    ) -> dict:
+        """Record a trio result. House points: 5 wins/day for the house → +5 once.
+
+        ``winner_games`` / ``loser_games`` are rounds that side already won.
+        Each player on that side gets those games on the lifetime win record
+        and, when cross-house, on the Duel Night tally. The trio match crown
+        (trio_w / trio_l) is separate and is not a substitute for those rounds.
+        """
         now = now if now is not None else time.time()
         notes: list[str] = []
         for m in winners:
@@ -2716,6 +3014,30 @@ class Duels(commands.Cog):
             if now_title and now_title != prev:
                 notes.append(f"🔺 **{member.display_name}** is now **{now_title}** ({wins} trio wins).")
 
+        winner_games = max(0, int(winner_games))
+        loser_games = max(0, int(loser_games))
+        credited = self._apply_game_credits(
+            [(m, winner_games, list(losers)) for m in winners]
+            + [(m, loser_games, list(winners)) for m in losers],
+            now=now,
+            started_at=started_at,
+        )
+        players = [
+            self._player_result(m, sets=winner_games, wins=int(credited.get(str(m.id), 0)))
+            for m in winners
+        ] + [
+            self._player_result(m, sets=loser_games, wins=int(credited.get(str(m.id), 0)))
+            for m in losers
+        ]
+        self._remember_result(
+            timestamp=now,
+            mode="trio",
+            ending=ending,
+            players=players,
+            set_score=f"{winner_games}-{loser_games}",
+            wins_credited=credited,
+        )
+        self._log_settled_games("trio", ending, winner_games, loser_games, credited)
         self.save()
         return {
             "awarded": awarded,
@@ -2730,8 +3052,26 @@ class Duels(commands.Cog):
             "capped": [],
         }
 
-    def settle_grand(self, winner, loser, now: float = None) -> dict:
-        """Record a Grand Duel. Never touches 1v1/trio/signature/streak/bounty."""
+    def settle_grand(
+        self,
+        winner,
+        loser,
+        now: float = None,
+        *,
+        winner_games: int = 0,
+        loser_games: int = 0,
+        started_at: float | None = None,
+        ending: str = "finish",
+    ) -> dict:
+        """Record a Grand Duel.
+
+        The match crown (grand_w / grand_l) and the Grand house points stay
+        as they were: one payout, daily cap unchanged, and that payout does
+        not join the night pool. Steps already won (``winner_games`` /
+        ``loser_games``) are still games: both players get them on the
+        lifetime win record and, when the duel is cross-house, on the Duel
+        Night tally. Calling this with no step score credits no games.
+        """
         now = now if now is not None else time.time()
         notes: list[str] = []
         self.record_of(winner.id)["grand_w"] += 1
@@ -2776,6 +3116,28 @@ class Duels(commands.Cog):
         if now_title and now_title != prev:
             notes.append(f"🏛️ **{winner.display_name}** is now **{now_title}** ({wins} Grand wins).")
 
+        winner_games = max(0, int(winner_games))
+        loser_games = max(0, int(loser_games))
+        credited = self._apply_game_credits(
+            [
+                (winner, winner_games, [loser]),
+                (loser, loser_games, [winner]),
+            ],
+            now=now,
+            started_at=started_at,
+        )
+        self._remember_result(
+            timestamp=now,
+            mode="grand",
+            ending=ending,
+            players=[
+                self._player_result(winner, sets=winner_games, wins=int(credited.get(str(winner.id), 0))),
+                self._player_result(loser, sets=loser_games, wins=int(credited.get(str(loser.id), 0))),
+            ],
+            set_score=f"{winner_games}-{loser_games}",
+            wins_credited=credited,
+        )
+        self._log_settled_games("grand", ending, winner_games, loser_games, credited)
         self.save()
         return {
             "awarded": awarded, "reason": reason, "house": w_house,
@@ -3133,10 +3495,10 @@ class Duel:
         if finish:
             await self._finish(finish[0], finish[1], forfeit=True)
         elif fizzle:
-            await self._bank_abandoned_sets()
+            await self._bank_abandoned_sets(ending="fizzle")
             await self._publish(*fizzle)
 
-    async def _bank_abandoned_sets(self) -> None:
+    async def _bank_abandoned_sets(self, ending: str = "fizzle") -> None:
         """Fizzle or draw: settle every set already won, then free the duelists."""
         async with self.lock:
             if self._settled:
@@ -3168,6 +3530,7 @@ class Duel:
                 played_winner_sets=w_sets,
                 played_loser_sets=l_sets,
                 started_at=self.started_at,
+                ending=ending,
             )
         finally:
             self.cog.release_match(self)
@@ -3195,7 +3558,7 @@ class Duel:
                 snap = self._snapshot(view=OpenCastBoardView(self))
                 arm_round = self.round
         if abandon:
-            await self._bank_abandoned_sets()
+            await self._bank_abandoned_sets(ending="draw")
         await self._publish(*snap)
         if arm_round is not None:
             self._arm(self._round_timeout(arm_round))
@@ -3322,7 +3685,7 @@ class Duel:
             await self._finish(finish[0], finish[1], forfeit=finish[2])
         elif publish:
             if abandon:
-                await self._bank_abandoned_sets()
+                await self._bank_abandoned_sets(ending="draw")
             await self._publish(*publish)
             if arm_round is not None:
                 self._arm(self._round_timeout(arm_round))
@@ -3704,12 +4067,16 @@ class TrioMatch:
         self.picks: dict[int, str] = {}
         self.history: list[str] = []
         self.state = "active"
+        self.started_at = time.time()
+        self._games_banked = False
         self.lock = asyncio.Lock()
         self.publish_lock = asyncio.Lock()
         self.message = None
         self._timer = None
         self.board_gen = 0
         self.channel = signup.message.channel if signup.message else None
+        for m in self.team_a + self.team_b:
+            self.cog.active[m.id] = self
         self.private_boards: dict[int, discord.Message] = {}
         self.opened: set[int] = set()
         self.luck_tie_used: dict[int, bool] = {}
@@ -3861,13 +4228,12 @@ class TrioMatch:
                     self.picks[b.id] = None
             if len([m for m in self.all_players() if m.id in self.picks]) < 2:
                 self.state = "done"
-                for m in self.all_players():
-                    self.cog.busy.discard(m.id)
                 fizzle = self._snapshot(view=None, footer="Too few casts — the trio fizzles out.")
             else:
                 resolve = True
                 follow = self._resolve_round_locked()
         if fizzle:
+            await self._bank_partial("fizzle")
             await self._publish(*fizzle)
             return
         if resolve:
@@ -3953,9 +4319,8 @@ class TrioMatch:
             return {"finish": (self.team_b, self.team_a)}
         if self.round >= MAX_ROUNDS:
             self.state = "done"
-            for m in self.all_players():
-                self.cog.busy.discard(m.id)
             return {
+                "abandon": "draw",
                 "publish": self._snapshot(view=None, footer="Too evenly matched — declared a draw."),
             }
         self.round += 1
@@ -3966,22 +4331,52 @@ class TrioMatch:
             "arm": arm,
         }
 
+    async def _bank_partial(self, ending: str) -> None:
+        """Fizzle or draw: credit rounds already won, then free the duelists."""
+        if self._games_banked:
+            return
+        self._games_banked = True
+        if self._timer is asyncio.current_task():
+            self._timer = None
+        self.cog.bank_team_games(
+            self.team_a, self.score_a, self.team_b, self.score_b,
+            mode="trio", ending=ending, started_at=self.started_at,
+        )
+        self.cog.release_match(self)
+
     async def _apply_trio_followup(self, follow: dict):
         if follow.get("finish"):
             await self._finish(follow["finish"][0], follow["finish"][1])
             return
+        if follow.get("abandon"):
+            await self._bank_partial(follow["abandon"])
         if follow.get("publish"):
             await self._publish(*follow["publish"])
         if follow.get("arm") is not None:
             self._arm(self._round_timeout(follow["arm"]))
 
     async def _finish(self, winners, losers):
-        self.state = "done"
-        if self._timer:
+        if self._games_banked:
+            return
+        self._games_banked = True
+        if self._timer is asyncio.current_task():
+            self._timer = None
+        elif self._timer:
             self._timer.cancel()
-        for m in self.all_players():
-            self.cog.busy.discard(m.id)
-        outcome = self.cog.settle_trio(winners, losers)
+            self._timer = None
+        win_ids = {m.id for m in winners}
+        if win_ids == {m.id for m in self.team_a}:
+            winner_games, loser_games = self.score_a, self.score_b
+        else:
+            winner_games, loser_games = self.score_b, self.score_a
+        outcome = self.cog.settle_trio(
+            winners, losers,
+            winner_games=winner_games,
+            loser_games=loser_games,
+            started_at=self.started_at,
+        )
+        self.state = "done"
+        self.cog.release_match(self)
         from cogs.store import HOUSES
         win_ids = {m.id for m in winners}
         win_side = "a" if win_ids == {m.id for m in self.team_a} else "b"
@@ -4093,6 +4488,8 @@ class GrandDuel:
         self.opened: set[int] = set()
         self.rival_line = self.cog.grand_rivalry_board_line(challenger, opponent)
         self.luck_tie_used: dict[int, bool] = {}
+        self.started_at: float | None = None
+        self._games_banked = False
 
     def challenge_embed(self) -> discord.Embed:
         desc = (
@@ -4156,11 +4553,12 @@ class GrandDuel:
         async with self.lock:
             if self.state != "locking":
                 return
-            self.cog.release_match(self)
+            self.state = "done"
             snap = self._snapshot(
                 view=None,
                 footer="Sequences were never locked in time. The Grand Duel dissolves.",
             )
+        await self._bank_partial("timeout")
         await self._publish(*snap)
 
     def _snapshot(self, view=None, footer=None):
@@ -4303,13 +4701,17 @@ class GrandDuel:
             try:
                 async with self.lock:
                     if self.state not in ("done", "sudden"):
-                        self.cog.release_match(self)
+                        self.state = "done"
                         snap = self._snapshot(
                             view=None,
                             footer="The Grand sequence broke — duel dissolved. Call /grand again.",
                         )
+                        bank = True
                     else:
                         snap = None
+                        bank = False
+                if bank:
+                    await self._bank_partial("fizzle")
                 if snap:
                     await self._publish(*snap)
             except Exception:
@@ -4421,12 +4823,13 @@ class GrandDuel:
                 self.history.append(f"*{loser.display_name} froze in sudden death.*")
                 finish = (winner, loser)
             else:
-                self.cog.release_match(self)
+                self.state = "done"
                 dissolve = self._snapshot(
                     view=None, footer="Neither cast. The Grand Duel dissolves.")
         if finish:
             await self._finish(finish[0], finish[1])
         elif dissolve:
+            await self._bank_partial("fizzle")
             await self._publish(*dissolve)
 
     async def sudden_cast(self, member, spell: str) -> str:
@@ -4488,12 +4891,36 @@ class GrandDuel:
                 self._arm(self._sudden_timeout(arm_round))
         return reply
 
+    async def _bank_partial(self, ending: str) -> None:
+        """Dissolve or fizzle: credit steps already scored, then free the duelists."""
+        if self._games_banked:
+            return
+        self._games_banked = True
+        if self._timer is asyncio.current_task():
+            self._timer = None
+        self.cog.bank_team_games(
+            [self.a], int(self.score.get(self.a.id, 0) or 0),
+            [self.b], int(self.score.get(self.b.id, 0) or 0),
+            mode="grand", ending=ending, started_at=self.started_at,
+        )
+        self.cog.release_match(self)
+
     async def _finish(self, winner, loser):
-        if self._timer:
+        if self._games_banked:
+            return
+        self._games_banked = True
+        if self._timer is asyncio.current_task():
+            self._timer = None
+        elif self._timer:
             self._timer.cancel()
             self._timer = None
+        outcome = self.cog.settle_grand(
+            winner, loser,
+            winner_games=int(self.score.get(winner.id, 0) or 0),
+            loser_games=int(self.score.get(loser.id, 0) or 0),
+            started_at=self.started_at,
+        )
         self.cog.release_match(self)
-        outcome = self.cog.settle_grand(winner, loser)
         from cogs.store import HOUSES
         if outcome["awarded"]:
             h = HOUSES[outcome["house"]]
@@ -4535,6 +4962,7 @@ class GrandAcceptView(discord.ui.View):
                 await interaction.response.send_message("Too late for that.", ephemeral=True)
                 return
             d.state = "locking"
+            d.started_at = time.time()
         await interaction.response.defer()
         await d.begin_locking()
 
