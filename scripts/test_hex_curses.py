@@ -2,10 +2,9 @@
 """Staff-only hex voices rephrase like Cowboy and stay off the shop.
 
 Cowboy deletes a hexed member's chat and reposts a full in-character
-rephrase through the relay webhook. Yoda, Rhyme, Dramatic Narrator, Haiku,
-Toddler, Superhero, and Sheep use that same path, the same durations, and
-the same safety checks. They are effect choices on /staffgame hex cast only —
-Hex Scrolls never roll them.
+rephrase through the relay webhook. The staff-only voices use that same path,
+the same durations, and the same safety checks. They are effect choices on
+/staffgame hex cast only — Hex Scrolls never roll them.
 """
 
 from __future__ import annotations
@@ -34,11 +33,17 @@ from cogs.hexes import (  # noqa: E402
     Hexes,
     _RHYME_PAIRS,
     _syllables,
+    fx_corporate,
     fx_country,
+    fx_dog,
+    fx_genz,
     fx_haiku,
+    fx_influencer,
     fx_narrator,
+    fx_overthinker,
     fx_rhyme,
     fx_sheep,
+    fx_snake,
     fx_superhero,
     fx_toddler,
     fx_yoda,
@@ -55,6 +60,12 @@ STAFF_VOICES = (
     "toddler",
     "superhero",
     "sheep",
+    "genz",
+    "dog",
+    "snake",
+    "corporate",
+    "overthinker",
+    "influencer",
 )
 ORIGINAL_EFFECTS = (
     "reversed",
@@ -77,6 +88,12 @@ VOICE_FUNCS = {
     "toddler": fx_toddler,
     "superhero": fx_superhero,
     "sheep": fx_sheep,
+    "genz": fx_genz,
+    "dog": fx_dog,
+    "snake": fx_snake,
+    "corporate": fx_corporate,
+    "overthinker": fx_overthinker,
+    "influencer": fx_influencer,
 }
 SECRETS = ("discord-test-token-value", "sk-test-secret-token-value")
 CLASS_LUNCH = "I am going to class and then lunch"
@@ -118,6 +135,12 @@ def test_staff_voices_are_castable_and_not_sold() -> None:
         "toddler": "Toddler Curse",
         "superhero": "Superhero Curse",
         "sheep": "Sheep Curse",
+        "genz": "Gen Z Curse",
+        "dog": "Dog Curse",
+        "snake": "Snake Curse",
+        "corporate": "Corporate Email Curse",
+        "overthinker": "Overthinker Curse",
+        "influencer": "Influencer Curse",
     }
     for key, name in names.items():
         spell = EFFECTS[key]
@@ -153,6 +176,26 @@ def test_autocomplete_stays_within_discord_limits() -> None:
     _check(any(item.value == "yoda" for item in yoda), [c.name for c in yoda])
     cowboy = asyncio.run(_complete_effect(None, "cowboy"))
     _check(any(item.value == "country" for item in cowboy), [c.name for c in cowboy])
+    # Typing narrows the list. A broad fragment still cannot exceed 25.
+    typed = {
+        "gen": "genz",
+        "dog": "dog",
+        "snake": "snake",
+        "corporate": "corporate",
+        "email": "corporate",
+        "overthink": "overthinker",
+        "influencer": "influencer",
+        "yoda": "yoda",
+    }
+    for needle, value in typed.items():
+        found = asyncio.run(_complete_effect(None, needle))
+        _check(len(found) <= 25, needle)
+        _check(len(found) < len(HEX_CHOICES), f"{needle} did not filter")
+        _check(any(item.value == value for item in found), [c.name for c in found])
+    broad = asyncio.run(_complete_effect(None, "curse"))
+    _check(len(broad) <= 25, len(broad))
+    _check(any(item.value == "genz" for item in broad), [c.name for c in broad])
+    _check(all(item.value != "limp_wand" for item in broad), [c.name for c in broad])
 
     command = Staff.hex_cast
     _check(isinstance(command, app_commands.Command), type(command))
@@ -287,6 +330,23 @@ def test_meaning_stays_clear() -> None:
         random.seed(seed)
         cowboy = fx_country("hello friend").lower()
         _check("howdy" in cowboy or "partner" in cowboy or "pardner" in cowboy, cowboy)
+
+        random.seed(seed)
+        gen = fx_genz(CLASS_LUNCH)
+        _check(any(marker in gen.lower() for marker in ("no cap", "fr fr", "lowkey", "bussin")), gen)
+        dog = fx_dog(CLASS_LUNCH).lower()
+        _check("woof" in dog, dog)
+        _check("squirrel" in dog or "walk" in dog or "treat" in dog, dog)
+        snake = fx_snake(CLASS_LUNCH).lower()
+        _check("ssss" in snake and "class" in snake and "lunch" in snake, snake)
+        corp = fx_corporate(CLASS_LUNCH).lower()
+        _check(any(marker in corp for marker in ("per my last", "circle back", "circling back", "deliverable")), corp)
+        over = fx_overthinker(CLASS_LUNCH)
+        _check("?" in over and ("wait" in over.lower() or "what if" in over.lower()), over)
+        influ = fx_influencer(CLASS_LUNCH)
+        _check("besties" in influ.lower(), influ)
+        _check("like" in influ.lower() and "comment" in influ.lower(), influ)
+        _check(any(mark in influ for mark in ("✨", "💅", "💕", "👑", "🔥")), influ)
 
 
 def test_empty_and_secret_inputs_stay_safe() -> None:
