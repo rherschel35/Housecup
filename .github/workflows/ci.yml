@@ -47,6 +47,11 @@ jobs:
         env:
           DISCORD_TOKEN: ""
 
+      - name: Every set won is credited
+        run: python scripts/test_duel_set_credit.py
+        env:
+          DISCORD_TOKEN: ""
+
       - name: Daily Descent challenge is 75 floor-40+ monsters
         run: python scripts/test_bind40_goal.py
         env:
