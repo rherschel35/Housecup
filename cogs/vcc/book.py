@@ -14,12 +14,14 @@ import hashlib
 import json
 import logging
 import os
+import random
 import secrets
 import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from cogs.vcc.cpu import CPU_ID, TUTOR_NAME, pick_tutor_house, run_cpu
 from cogs.vcc.engine import Game
 
 log = logging.getLogger("velmora.vcc")
@@ -361,6 +363,74 @@ class Book:
         self.save()
         return raws
 
+    def start_practice(
+        self,
+        *,
+        channel_id: int,
+        guild_id: int,
+        player_id: int,
+        player_name: str,
+        player_house: str,
+        now: float | None = None,
+        seed: int | None = None,
+    ) -> str:
+        """Open a practice table. Returns the human's raw token once.
+
+        The tutor has no token and is not stored as a user, so a second
+        practice table can still open for someone else.
+        """
+        now = time.time() if now is None else now
+        house = player_house if player_house else ""
+        tutor_house = pick_tutor_house(house, random.Random(seed if seed is not None else now))
+        game = Game.new(
+            challenger_id=player_id,
+            challenger_name=player_name,
+            challenger_house=house,
+            opponent_id=CPU_ID,
+            opponent_name=TUTOR_NAME,
+            opponent_house=tutor_house,
+            seed=seed,
+            practice=True,
+            cpu_id=CPU_ID,
+        )
+        table = Table(
+            id=uuid.uuid4().hex,
+            channel_id=channel_id,
+            guild_id=guild_id,
+            message_id=None,
+            created=now,
+            deadline=now + self.turn_timeout,
+            tokens={},
+            game=game,
+            mode="practice",
+            wager=0,
+        )
+        raw, token_hash = mint_token()
+        table.tokens[token_hash] = player_id
+        self.by_digest[token_hash] = table.id
+        self.raw_memory[(table.id, player_id)] = raw
+        self.by_user[player_id] = ("game", table.id)
+        self.games[table.id] = table
+        self.save()
+        return raw
+
+    def abandon_practice(self, user_id: int) -> None:
+        """Drop an unstarted practice table when Discord never took the post."""
+        uid = int(user_id)
+        loc = self.by_user.get(uid)
+        if not loc or loc[0] != "game":
+            return
+        table = self.games.get(loc[1])
+        if table is None or table.mode != "practice" or table.game.winner is not None:
+            return
+        for token_hash, pid in list(table.tokens.items()):
+            self.by_digest.pop(token_hash, None)
+            self.raw_memory.pop((table.id, pid), None)
+        self.games.pop(table.id, None)
+        if self.by_user.get(uid) == ("game", table.id):
+            self.by_user.pop(uid, None)
+        self.save()
+
     def remember_raw(self, game_id: str, user_id: int) -> str | None:
         return self.raw_memory.get((game_id, int(user_id)))
 
@@ -403,6 +473,19 @@ class Book:
             return None, None, stone
         return None, None, None
 
+    def _finish_cpu_turn(self, table: Table, now: float) -> bool:
+        """Let the tutor act when the turn is theirs. True if the duel ended."""
+        if table.mode != "practice" or table.game.winner is not None:
+            return False
+        if table.game.current_id != CPU_ID:
+            return False
+        run_cpu(table.game)
+        ended = self._mark_end(table)
+        if table.game.winner is None:
+            self._touch(table, now)
+        self.save()
+        return ended
+
     def _mark_end(self, table: Table) -> bool:
         if table.game.winner is None or table.end_seen:
             return False
@@ -419,6 +502,7 @@ class Book:
             return Action(status=200, view=_tombstone_view(stone), game_id=stone.get("game_id"))
         if table is None or pid is None:
             return Action(status=404, error="This table link doesn't work.")
+        self._finish_cpu_turn(table, now)
         return Action(
             status=200,
             view=table.game.view_for(pid, now=now, deadline=table.deadline),
@@ -442,6 +526,8 @@ class Book:
             )
         just_ended = self._mark_end(table)
         if not just_ended:
+            just_ended = self._finish_cpu_turn(table, now)
+        if not just_ended and table.game.winner is None:
             self._touch(table, now)
         self.save()
         return Action(
@@ -472,7 +558,13 @@ class Book:
         """End stalled turns. Returns ``(table, pushes)`` for tables that just ended."""
         ended: list[tuple[Table, list]] = []
         for table in list(self.games.values()):
-            if table.game.winner is not None or now < table.deadline:
+            if table.game.winner is not None:
+                continue
+            if table.mode == "practice" and table.game.current_id == CPU_ID:
+                if self._finish_cpu_turn(table, now):
+                    ended.append((table, self.live_views(table, now)))
+                continue
+            if now < table.deadline:
                 continue
             table.game.timeout()
             if self._mark_end(table):

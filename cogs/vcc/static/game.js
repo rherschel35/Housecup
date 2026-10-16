@@ -53,10 +53,12 @@
     const opp = state.opponent;
     const yourTurn = !!state.your_turn;
     subtitle.textContent = headline();
+    document.title = state.practice ? "Practice · Velmora Curse & Crown" : "Velmora Curse & Crown";
     const known = new Set((you.hand || []).map((card) => card.id));
     marked = new Set([...marked].filter((id) => known.has(id)));
 
     board.innerHTML = "";
+    if (state.practice) board.append(practiceFlag());
     board.append(players(you, opp));
     board.append(pills());
     board.append(handBlock(you));
@@ -78,17 +80,25 @@
 
   function headline() {
     if (!state) return "";
-    if (state.over) return state.summary || "The duel is over.";
+    if (state.over) return state.summary || (state.practice ? "Practice is over." : "The duel is over.");
     const left = state.seconds_left;
     const clock = left == null ? "" : " · " + formatClock(left);
-    if (state.your_turn) return "Round " + state.round + " · Your turn" + clock;
-    return "Round " + state.round + " · " + (state.active_name || "Opponent") + "'s turn" + clock;
+    const practice = state.practice ? "Practice · " : "";
+    if (state.your_turn) return practice + "Round " + state.round + " · Your turn" + clock;
+    return practice + "Round " + state.round + " · " + (state.active_name || "Opponent") + "'s turn" + clock;
   }
 
   function formatClock(seconds) {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return m + ":" + String(s).padStart(2, "0");
+  }
+
+  function practiceFlag() {
+    const flag = document.createElement("p");
+    flag.className = "practice-flag";
+    flag.textContent = "Practice — easy Tutor. No points, no cards.";
+    return flag;
   }
 
   function players(you, opp) {
@@ -109,7 +119,10 @@
     const meta = document.createElement("div");
     meta.className = "meta";
     const house = [player.house_emoji, player.house].filter(Boolean).join(" ");
-    const extra = mine ? "You" : ((player.hand_count == null ? "" : player.hand_count + " cards"));
+    let extra = mine ? "You" : ((player.hand_count == null ? "" : player.hand_count + " cards"));
+    if (!mine && state.practice) {
+      extra = "Practice" + (player.hand_count == null ? "" : " · " + player.hand_count + " cards");
+    }
     meta.textContent = [house, extra].filter(Boolean).join(" · ");
     const ward = document.createElement("div");
     ward.className = "ward";
@@ -418,12 +431,19 @@
     text.className = "text";
     text.textContent = state.summary || "The duel is over. The result is in Discord.";
     block.append(title, text);
+    if (state.practice) {
+      const note = document.createElement("p");
+      note.className = "text";
+      note.textContent = "Practice. No house points and no cards.";
+      block.append(note);
+    }
     popup.append(block);
     sheet.append(popup);
   }
 
   function renderEnded() {
-    subtitle.textContent = state.summary || "The duel is over.";
+    subtitle.textContent = state.summary || (state.practice ? "Practice is over." : "The duel is over.");
+    document.title = state.practice ? "Practice · Velmora Curse & Crown" : "Velmora Curse & Crown";
     board.innerHTML = "";
     const popup = document.createElement("section");
     popup.className = "panel";
