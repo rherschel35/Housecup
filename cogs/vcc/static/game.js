@@ -10,6 +10,8 @@
   let forfeitAsk = false;
   let socket = null;
   let toastTimer = 0;
+  let followLatest = true;
+  let scrollingSelf = false;
 
   function artUrl(file) {
     if (!/^[a-z0-9-]+\.jpg$/.test(file || "")) return "";
@@ -42,7 +44,11 @@
 
   function render(next) {
     const previous = state && state.log && state.log.length ? state.log[state.log.length - 1] : null;
+    const previousFeed = state && state.feed ? state.feed.length : 0;
+    const previousField = board.querySelector(".battlefield");
+    const savedScroll = previousField ? previousField.scrollTop : 0;
     state = next;
+    if ((state.feed || []).length !== previousFeed) followLatest = true;
     const latest = state && state.log && state.log.length ? state.log[state.log.length - 1] : null;
     if (previous && latest && latest !== previous && !state.notice) showToast(latest);
     if (state.tombstone || (state.over && !state.you?.hand)) {
@@ -60,14 +66,35 @@
     if (state.pending && state.pending.type === "discard") openId = null;
 
     board.innerHTML = "";
-    if (state.practice) board.append(practiceFlag());
-    board.append(players(you, opp));
-    const highlight = lastTurnBlock();
-    if (highlight) board.append(highlight);
-    board.append(pills());
-    board.append(logBlock());
-    board.append(handBlock(you));
-    board.append(actions());
+    const hud = document.createElement("div");
+    hud.className = "hud";
+    if (state.practice) hud.append(practiceFlag());
+    hud.append(players(you, opp));
+    hud.append(pills());
+    const dock = document.createElement("div");
+    dock.className = "dock";
+    dock.append(handBlock(you));
+    dock.append(actions());
+    board.append(hud, battlefield(), dock);
+    const field = board.querySelector(".battlefield");
+    if (field) {
+      field.addEventListener("scroll", () => {
+        if (scrollingSelf) return;
+        const gap = field.scrollHeight - field.scrollTop - field.clientHeight;
+        followLatest = gap < 72;
+      }, { passive: true });
+      const stick = followLatest;
+      const top = savedScroll;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (!field.isConnected) return;
+        if (stick) scrollBattlefield(field);
+        else {
+          scrollingSelf = true;
+          field.scrollTop = top;
+          scrollingSelf = false;
+        }
+      }));
+    }
     if (state.pending && state.pending.type === "stash") {
       openStash(state.pending.cards || []);
     } else if (openId) {
@@ -119,7 +146,12 @@
     who.className = "who";
     const name = document.createElement("h2");
     name.textContent = player.name || "Duelist";
-    who.append(name);
+    const current = Number(player.ward || 0);
+    const max = Number(player.ward_max || 20);
+    const score = document.createElement("div");
+    score.className = "ward-label";
+    score.textContent = current + "/" + max;
+    who.append(name, score);
     const meta = document.createElement("div");
     meta.className = "meta";
     const house = [player.house_emoji, player.house].filter(Boolean).join(" ");
@@ -131,17 +163,15 @@
     const ward = document.createElement("div");
     ward.className = "ward";
     const fill = document.createElement("span");
-    const current = Number(player.ward || 0);
-    const max = Number(player.ward_max || 20);
     fill.style.width = Math.max(0, Math.min(100, (current / max) * 100)) + "%";
     ward.append(fill);
-    const label = document.createElement("div");
-    label.className = "ward-label";
-    label.textContent = "Ward " + current + " / " + max;
-    const statuses = document.createElement("div");
-    statuses.className = "statuses";
-    statuses.textContent = (player.statuses || []).join(" · ");
-    el.append(who, meta, ward, label, statuses);
+    el.append(who, meta, ward);
+    if ((player.statuses || []).length) {
+      const statuses = document.createElement("div");
+      statuses.className = "statuses";
+      statuses.textContent = player.statuses.join(" · ");
+      el.append(statuses);
+    }
     return el;
   }
 
@@ -358,52 +388,80 @@
     return row;
   }
 
-  function lastTurnBlock() {
-    const last = state.last_turn;
-    if (!state.your_turn || !last) return null;
-    const box = document.createElement("section");
-    box.className = "last-turn";
-    const heading = document.createElement("h3");
-    heading.textContent = last.name + "'s last turn";
-    box.append(heading);
-    if (last.skipped) {
-      const line = document.createElement("p");
-      line.textContent = last.name + " skips the turn.";
-      box.append(line);
-      return box;
-    }
-    const plays = (last.plays || []).filter((item) => item.kind === "play");
-    if (!plays.length) {
-      const line = document.createElement("p");
-      line.textContent = last.name + " played no cards.";
-      box.append(line);
-      return box;
-    }
-    const list = document.createElement("ol");
-    list.className = "feed";
-    plays.forEach((item) => list.append(feedRow(item)));
-    box.append(list);
-    return box;
+  function turnGroups(feed) {
+    const groups = [];
+    (feed || []).forEach((item) => {
+      const last = groups[groups.length - 1];
+      const same = last
+        && item.kind !== "skip"
+        && last.kind !== "skip"
+        && last.actor_id === item.actor_id
+        && last.turn === item.turn;
+      if (same) last.items.push(item);
+      else {
+        groups.push({
+          actor_id: item.actor_id,
+          actor: item.actor,
+          turn: item.turn,
+          kind: item.kind,
+          items: [item],
+        });
+      }
+    });
+    return groups;
   }
 
-  function logBlock() {
+  function groupIsLastTurn(group) {
+    const last = state.last_turn;
+    if (!state.your_turn || !last) return false;
+    if (last.skipped) return group.kind === "skip" && group.actor === last.name;
+    return group.kind !== "skip" && group.actor === last.name && group.turn === last.turn;
+  }
+
+  function battlefield() {
     const panel = document.createElement("section");
-    panel.className = "duel-log";
-    const heading = document.createElement("h3");
-    heading.textContent = "Duel log";
-    const list = document.createElement("ol");
-    list.className = "feed";
-    const items = (state.feed || []).slice().reverse();
-    if (!items.length) {
-      const empty = document.createElement("li");
+    panel.className = "battlefield";
+    panel.setAttribute("aria-label", "Battlefield");
+    const groups = turnGroups(state.feed);
+    if (!groups.length) {
+      const empty = document.createElement("p");
       empty.className = "feed-empty";
-      empty.textContent = "No plays yet.";
-      list.append(empty);
-    } else {
-      items.forEach((item) => list.append(feedRow(item)));
+      empty.textContent = "No turns yet. Plays will stack here.";
+      panel.append(empty);
+      return panel;
     }
-    panel.append(heading, list);
+    groups.forEach((group) => {
+      const block = document.createElement("article");
+      const focus = groupIsLastTurn(group);
+      block.className = "turn-group" + (focus ? " focus" : "");
+      const head = document.createElement("h3");
+      const who = group.actor || "Someone";
+      head.textContent = focus ? who + "'s last turn" : who + " · turn " + (group.turn || 0);
+      block.append(head);
+      const list = document.createElement("ol");
+      list.className = "feed";
+      group.items.forEach((item) => list.append(feedRow(item)));
+      block.append(list);
+      panel.append(block);
+    });
     return panel;
+  }
+
+  function scrollBattlefield(field) {
+    const focus = field.querySelector(".turn-group.focus");
+    const target = focus || field.lastElementChild;
+    scrollingSelf = true;
+    if (!target) {
+      field.scrollTop = field.scrollHeight;
+    } else {
+      const max = Math.max(0, field.scrollHeight - field.clientHeight);
+      const fits = target.offsetHeight + 8 <= field.clientHeight;
+      const top = fits
+        ? target.offsetTop - 6
+        : target.offsetTop + target.offsetHeight - field.clientHeight + 8;
+      field.scrollTop = Math.min(max, Math.max(0, top));
+    }
+    scrollingSelf = false;
   }
 
   function closeSheet() {

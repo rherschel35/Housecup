@@ -713,8 +713,11 @@ class Game:
             text = line.rstrip(".")
             if text:
                 extras.append(text)
-        parts = bits + extras
-        return "; ".join(parts) if parts else "no effect"
+        damage = ", ".join(bits)
+        extra = "; ".join(extras)
+        if damage and extra:
+            return f"{damage}; {extra}"
+        return damage or extra or "no effect"
 
     @staticmethod
     def _ward_recap(line: str) -> bool:

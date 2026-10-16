@@ -1236,14 +1236,18 @@ def test_tutor_discards_down_to_six() -> None:
 def test_board_log_and_discard_picker() -> None:
     js = (ROOT / "cogs/vcc/static/game.js").read_text(encoding="utf-8")
     css = (ROOT / "cogs/vcc/static/game.css").read_text(encoding="utf-8")
-    check('createElement("details")' not in js, "the duel log is not a collapsed disclosure")
-    check("duel-log" in js and "last-turn" in js, "the board has a log panel and a last-turn highlight")
-    check(".slice().reverse()" in js, "newest play is rendered first")
+    check('createElement("details")' not in js, "the battlefield is not a collapsed disclosure")
+    check("battlefield" in js and "turn-group" in js, "plays are grouped into turns on the battlefield")
+    check("'s last turn" in js, "the opponent's latest turn is called out")
+    check(".slice().reverse()" not in js and "scrollTop" in js, "older turns sit above the latest, which stays in view")
+    check("className = \"dock\"" in js, "the hand stays docked under the battlefield")
     check("Turn " in js and "end at " in js, "mana shows the turn and the hand pill explains the limit")
     check("Discard " in js and " more" in js and "Discard these" in js, "discard picker counts down, then confirms")
     check("Discarding" in js and 'className = "picker"' in js, "discarding marks the card instead of opening it")
     check("-webkit-line-clamp: unset" in css, "picker text is not clamped")
-    check("minmax(220px, 1fr)" in css and "34vh" in css, "picker and log fit a phone")
+    check("minmax(220px, 1fr)" in css and "46vh" in css, "picker and battlefield fit a phone")
+    check("#3dce7a" in css and "#e15b5b" in css, "your Ward is green and the opponent's is red")
+    check(".ward" in css and "height: 6px" in css, "Ward bars are a thin strip")
 
 
 def main() -> int:
