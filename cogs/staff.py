@@ -22,6 +22,9 @@ from cogs.store import HOUSES
 
 log = logging.getLogger("velmora.staff")
 
+# Autocomplete, not a dropdown. Discord rejects a choice list past 25, and
+# _match_choices already returns at most 25. Typing still finds every curse,
+# including the staff-only voices that are not on Hex Scrolls.
 HEX_CHOICES = [
     app_commands.Choice(name=v["name"], value=k) for k, v in EFFECTS.items()
 ]

@@ -982,8 +982,10 @@ class Marketplace(commands.Cog):
             await interaction.response.send_message("Hexes aren't loaded right now.", ephemeral=True)
             return
 
-        from cogs.hexes import EFFECTS, CAST_FLOURISHES
-        effect_key = self.rng.choice(list(EFFECTS.keys()))
+        from cogs.hexes import CAST_FLOURISHES, scroll_effect_keys
+        # Staff-only voices (Yoda, Haiku, …) stay off the shop. Scrolls keep
+        # the original pool.
+        effect_key = self.rng.choice(scroll_effect_keys())
         # Consume first so a failed apply doesn't soft-lock; re-grant on failure.
         key = str(interaction.user.id)
         self.state["scrolls"][key] = self.scroll_count(interaction.user.id) - 1

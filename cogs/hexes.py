@@ -11,6 +11,10 @@ reposts it through a per-channel webhook wearing their name and avatar.
 Limp Wand is different — it leaves chat alone and blocks /wand, /patronus,
 /broom, and the green wild-threat spell buttons for one hour.
 
+Yoda, Rhyme, Dramatic Narrator, Haiku, Toddler, Superhero, and Sheep are
+staff-cast only (`/staffgame hex cast`). Like Cowboy, each one rephrases the
+line in character and keeps the meaning. Hex Scrolls never roll them.
+
 Headmasters and house Presidents may cast, lift, and list. Needs the bot to
 hold Manage Messages (to delete the original) and Manage Webhooks (to
 create/reuse the relay webhook) in this server.
@@ -803,6 +807,792 @@ def fx_pirates_tongue(text: str) -> str:
     return out
 
 
+# ---------------------------------------------------------------------------
+# Staff-only voices. Same shape as Cowboy: a local rephrase (meaning kept,
+# voice changed), then the shared delete-and-webhook relay. Not scroll-legal.
+# ---------------------------------------------------------------------------
+
+def _normalize_apostrophes(text: str) -> str:
+    return text.replace("’", "'").replace("‘", "'").replace("`", "'")
+
+
+def _tidy_speech(text: str) -> str:
+    """Collapse spaces the way Cowboy does, without gluing separate lines."""
+    lines = []
+    for line in text.splitlines():
+        line = re.sub(r"[ \t]{2,}", " ", line)
+        line = re.sub(r" +([,.!?;:])", r"\1", line)
+        lines.append(line.strip())
+    return "\n".join(lines).strip()
+
+
+def _cap_first(text: str) -> str:
+    text = text.strip()
+    for i, ch in enumerate(text):
+        if ch.isalpha():
+            return text[:i] + ch.upper() + text[i + 1:]
+    return text
+
+
+def _word_key(token: str) -> str:
+    match = re.search(r"[A-Za-z']+", token)
+    return match.group(0).lower() if match else ""
+
+
+def _lower_token(token: str) -> str:
+    match = re.match(r"^([^A-Za-z]*)([A-Za-z']+)(.*)$", token)
+    if not match:
+        return token
+    lead, core, trail = match.groups()
+    core = "I" if core.lower() == "i" else core.lower()
+    return lead + core + trail
+
+
+def _voice_bookend(text: str, openers: tuple, closers: tuple, opener_re: str,
+                   closer_re: str, opener_p: float = 0.8, closer_p: float = 0.9) -> str:
+    """Cowboy's porch bookends: usually a voice-y start and end, never a blank."""
+    out = text
+    if random.random() < opener_p and not re.match(opener_re, out, flags=re.IGNORECASE):
+        out = random.choice(openers) + out
+    if random.random() < closer_p and not re.search(closer_re, out, flags=re.IGNORECASE):
+        out = out.rstrip(".!?") + random.choice(closers)
+    return out
+
+
+def _has_letters(text: str) -> bool:
+    return bool(re.search(r"[A-Za-z]", text or ""))
+
+
+# --- Yoda ------------------------------------------------------------------
+_YODA_PREP = [
+    (r"\bi'm\b", "I am"),
+    (r"\bim\b", "I am"),
+    (r"\bi've\b", "I have"),
+    (r"\bi'll\b", "I will"),
+    (r"\bi'd\b", "I would"),
+    (r"\byou're\b", "you are"),
+    (r"\bwe're\b", "we are"),
+    (r"\bthey're\b", "they are"),
+    (r"\bhe's\b", "he is"),
+    (r"\bshe's\b", "she is"),
+    (r"\bit's\b", "it is"),
+    (r"\bwhat's\b", "what is"),
+    (r"\bthat's\b", "that is"),
+    (r"\bdon't\b", "do not"),
+    (r"\bdoesn't\b", "does not"),
+    (r"\bdidn't\b", "did not"),
+    (r"\bcan't\b", "cannot"),
+    (r"\bwon't\b", "will not"),
+    (r"\bisn't\b", "is not"),
+    (r"\baren't\b", "are not"),
+    (r"\bwasn't\b", "was not"),
+    (r"\bweren't\b", "were not"),
+    (r"\blet's\b", "let us"),
+]
+_YODA_WHOLE = (
+    (re.compile(r"^(thank you|thanks)[.!?]*$", re.I), "Thank you, I do"),
+    (re.compile(r"^(hello|hi|hey)[.!?]*$", re.I), "Hello, it is"),
+    (re.compile(r"^(yes|yeah|yep|yup)[.!?]*$", re.I), "Yes, hmm"),
+    (re.compile(r"^(no|nope|nah)[.!?]*$", re.I), "No, I think not"),
+    (re.compile(r"^let us go[.!?]*$", re.I), "Go, we must"),
+    (re.compile(r"^good morning[.!?]*$", re.I), "A good morning, it is"),
+    (re.compile(r"^good night[.!?]*$", re.I), "A good night, it is"),
+)
+_YODA_AUX = frozenset({
+    "am", "is", "are", "was", "were", "be", "been",
+    "do", "does", "did", "have", "has", "had",
+    "will", "would", "shall", "should", "can", "could", "may", "might", "must",
+    "cannot",
+})
+_YODA_PRONOUNS = frozenset({"i", "you", "we", "they", "he", "she", "it"})
+_YODA_OPENERS = ("Hmm. ", "Yes. ", "Hear this. ", "Mmm. ")
+_YODA_CLOSERS = (", hmm.", ", yes.", " — yes.")
+_YODA_EMPTY = (
+    "Hmm. Say more, you must.",
+    "Cloudy, the meaning is.",
+    "Heard, you were not.",
+)
+
+
+def _yoda_tail(subject_words: list[str], aux_word: str) -> str:
+    subject = " ".join(_lower_token(word) for word in subject_words)
+    return f"{subject} {_lower_token(aux_word)}".strip()
+
+
+def _yoda_sentence(sentence: str) -> str:
+    """Invert each clause. 'But' stays put so both facts survive."""
+    raw = sentence.strip()
+    if not raw:
+        return raw
+    pieces = re.split(r"(\bbut\b)", raw, flags=re.IGNORECASE)
+    if len(pieces) == 1:
+        return _yoda_clause(raw)
+    built = []
+    for piece in pieces:
+        if re.fullmatch(r"but", piece, flags=re.IGNORECASE):
+            built.append("but")
+            continue
+        if not piece.strip():
+            continue
+        clause = _yoda_clause(piece.strip())
+        if built:
+            clause = clause[:1].lower() + clause[1:]
+        built.append(clause)
+    return " ".join(built)
+
+
+def _yoda_clause(sentence: str) -> str:
+    raw = sentence.strip()
+    if not raw:
+        return raw
+    for pattern, replacement in _YODA_WHOLE:
+        if pattern.match(raw):
+            if raw.endswith("?"):
+                return replacement.rstrip(".") + "?"
+            if raw.endswith("!"):
+                return replacement.rstrip(".") + "!"
+            return replacement
+
+    end = raw[-1] if raw[-1] in ".!?" else ""
+    body = raw[:-1].strip() if end else raw
+    words = body.split()
+    if len(words) < 2:
+        return raw
+
+    if _word_key(words[0]) in _YODA_AUX:
+        aux = words[0].lower()
+        if len(words) >= 3 and _word_key(words[1]) in _YODA_PRONOUNS:
+            rest = " ".join(words[2:]).strip()
+            if rest:
+                return f"{_cap_first(rest)}, {aux} {_lower_token(words[1])}{end}"
+        rest = " ".join(words[1:]).strip()
+        if rest:
+            return f"{_cap_first(rest)}, {aux}{end}"
+
+    aux_i = None
+    for i in range(1, len(words) - 1):
+        if _word_key(words[i]) in _YODA_AUX:
+            aux_i = i
+            break
+    if aux_i is not None:
+        tail = _yoda_tail(words[:aux_i], words[aux_i])
+        rest = " ".join(words[aux_i + 1:]).strip()
+        low = rest.lower()
+        if low == "not":
+            return f"Not, {tail}{end}"
+        if low.startswith("not "):
+            kept = rest[4:].strip()
+            if kept:
+                return f"{_cap_first(kept)}, {tail} not{end}"
+        if rest:
+            return f"{_cap_first(rest)}, {tail}{end}"
+
+    if _word_key(words[0]) == "thank" and len(words) > 2 and _word_key(words[1]) == "you":
+        return f"{_cap_first(' '.join(words[2:]))}, thank you{end}"
+    if _word_key(words[0]) == "please" and len(words) > 1:
+        return f"{_cap_first(' '.join(words[1:]))}, please{end}"
+    if _word_key(words[0]) in _YODA_PRONOUNS and len(words) >= 3:
+        return f"{_cap_first(' '.join(words[2:]))}, {_yoda_tail([words[0]], words[1])}{end}"
+    return _cap_first(" ".join(words)) + end
+
+
+def fx_yoda(text: str) -> str:
+    """Rephrase in Yoda's inverted speech. The facts stay; the order flips."""
+    if not _has_letters(text):
+        return random.choice(_YODA_EMPTY)
+    prepared = _apply_phrases(_normalize_apostrophes(text), _YODA_PREP)
+    lines_out = []
+    for line in prepared.splitlines():
+        if not line.strip():
+            lines_out.append("")
+            continue
+        parts = re.split(r"(?<=[.!?])\s+", line.strip())
+        lines_out.append(" ".join(_yoda_sentence(part) for part in parts if part.strip()))
+    out = _tidy_speech("\n".join(lines_out))
+    if not _has_letters(out):
+        return random.choice(_YODA_EMPTY)
+    return _voice_bookend(
+        out,
+        openers=_YODA_OPENERS,
+        closers=_YODA_CLOSERS,
+        opener_re=r"^(hmm|yes|hear this|mmm)\b",
+        closer_re=r"(hmm\.|yes\.|— yes\.)\s*$",
+    )
+
+
+# --- Rhyme -----------------------------------------------------------------
+_RHYME_PHRASES = [
+    (r"\bi am going to\b", "I am headed to"),
+    (r"\bi'm going to\b", "I am headed to"),
+    (r"\bim going to\b", "I am headed to"),
+    (r"\bgoing to\b", "headed to"),
+    (r"\bwant to\b", "wish to"),
+    (r"\bhave to\b", "must"),
+    (r"\bi don't know\b", "I do not know"),
+    (r"\bi dont know\b", "I do not know"),
+]
+# Each frame repeats the message and ends on a real rhyme, so the point
+# survives the couplet.
+_RHYME_FRAMES = (
+    ("{msg}, I say —", "{echo}, and that is so today."),
+    ("{msg} — it's true,", "{echo}, I promise you."),
+    ("{msg}, you know,", "{echo} — and that is so."),
+    ("{msg}, all right?", "{echo}, I mean tonight."),
+    ("{msg} — you'll see,", "{echo}, the same with me."),
+    ("{msg}, my dear,", "{echo}, the point is here."),
+)
+_RHYME_PAIRS = (
+    ("say", "today"),
+    ("true", "you"),
+    ("know", "so"),
+    ("right", "tonight"),
+    ("see", "me"),
+    ("dear", "here"),
+)
+
+
+def _clip_sentence(text: str, limit: int = 700) -> str:
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0]
+    return (cut or text[:limit]).rstrip(".,;:—- ")
+
+
+def fx_rhyme(text: str) -> str:
+    """Rephrase as a rhyming couplet that still states the same thing twice."""
+    if not _has_letters(text):
+        msg = "Nothing was said"
+    else:
+        msg = _apply_phrases(_normalize_apostrophes(text), _RHYME_PHRASES)
+        msg = _cap_first(_clip_sentence(msg.strip().rstrip(".!?")))
+        if not _has_letters(msg):
+            msg = "Nothing was said"
+    line1, line2 = random.choice(_RHYME_FRAMES)
+    return f"{line1.format(msg=msg)}\n{line2.format(echo=msg)}"
+
+
+# --- Dramatic narrator -----------------------------------------------------
+_NARRATOR_PHRASES = [
+    (r"\bi am going to\b", "they were going to"),
+    (r"\bi'm going to\b", "they were going to"),
+    (r"\bim going to\b", "they were going to"),
+    (r"\bwe are going to\b", "they were going to"),
+    (r"\bwe're going to\b", "they were going to"),
+    (r"\bi am\b", "they were"),
+    (r"\bi'm\b", "they were"),
+    (r"\bim\b", "they were"),
+    (r"\bi don't\b", "they do not"),
+    (r"\bi dont\b", "they do not"),
+    (r"\bi do not\b", "they do not"),
+    (r"\bi can't\b", "they cannot"),
+    (r"\bi cant\b", "they cannot"),
+    (r"\bi cannot\b", "they cannot"),
+    (r"\bi won't\b", "they will not"),
+    (r"\bi wont\b", "they will not"),
+    (r"\bi will not\b", "they will not"),
+    (r"\bi'll\b", "they will"),
+    (r"\bi will\b", "they will"),
+    (r"\bi've\b", "they have"),
+    (r"\bi have\b", "they have"),
+    (r"\bi'd\b", "they would"),
+    (r"\bi would\b", "they would"),
+    (r"\bi think\b", "they think"),
+    (r"\bi believe\b", "they believe"),
+    (r"\bi love\b", "they love"),
+    (r"\bi like\b", "they like"),
+    (r"\bi need\b", "they need"),
+    (r"\bi want\b", "they want"),
+    (r"\bi know\b", "they know"),
+    (r"\bwe are\b", "they are"),
+    (r"\bwe're\b", "they are"),
+    (r"\bwe were\b", "they were"),
+    (r"\bour\b", "their"),
+    (r"\bours\b", "theirs"),
+    (r"\bmyself\b", "themself"),
+    (r"\bmy\b", "their"),
+    (r"\bmine\b", "theirs"),
+    (r"\bme\b", "them"),
+    (r"\bwe\b", "they"),
+    (r"\bus\b", "them"),
+    (r"\bi\b", "they"),
+]
+_NARRATOR_OPENERS = (
+    "In a voice thick with destiny, they announced that",
+    "The hall held its breath as they declared that",
+    "Eyes alight, they proclaimed that",
+    "As if the realm were listening, they said that",
+    "With terrible gravity, they intoned that",
+    "A hush fell, and they swore that",
+)
+_NARRATOR_QUOTE_OPENERS = (
+    "In a voice thick with destiny, they declared",
+    "The hall held its breath as they proclaimed",
+    "Eyes alight, they cried out",
+    "With terrible gravity, they called",
+    "A hush fell as they announced",
+)
+_NARRATOR_EMPTY = (
+    "In a voice thick with destiny, they announced that they had nothing to say.",
+    "The hall held its breath as they declared that they had nothing to say.",
+    "With terrible gravity, they intoned that they had nothing to say.",
+)
+
+
+def fx_narrator(text: str) -> str:
+    """Rephrase as dramatic third-person narration of what they said."""
+    if not _has_letters(text):
+        return random.choice(_NARRATOR_EMPTY)
+    body = _tidy_speech(_apply_phrases(_normalize_apostrophes(text), _NARRATOR_PHRASES))
+    body = " ".join(body.split())
+    if not _has_letters(body):
+        return random.choice(_NARRATOR_EMPTY)
+    if re.match(r"they\b", body, flags=re.IGNORECASE):
+        body = body[0].lower() + body[1:]
+        body = body.rstrip(".!")
+        return f"{random.choice(_NARRATOR_OPENERS)} {body}."
+    quoted = body.rstrip()
+    if quoted[-1] not in ".!?":
+        quoted += "."
+    return f'{random.choice(_NARRATOR_QUOTE_OPENERS)}: "{_cap_first(quoted)}"'
+
+
+# --- Haiku -----------------------------------------------------------------
+_SYLLABLE_1 = frozenset({
+    "a", "an", "the", "to", "and", "then", "class", "lunch", "am", "i", "me",
+    "my", "you", "we", "he", "she", "it", "is", "are", "was", "were", "go",
+    "see", "now", "here", "still", "yes", "oh", "ah", "so", "for", "of", "in",
+    "on", "at", "be", "do", "hi", "hey", "no", "not", "but", "or", "if", "up",
+    "out", "all", "can", "will", "just", "like", "love", "help", "want", "need",
+    "have", "has", "had", "get", "got", "this", "that", "with", "from", "your",
+    "our", "them", "they", "their", "when", "what", "where", "who", "why", "how",
+    "please", "thanks", "good", "bad", "big", "home", "food", "time", "day",
+    "night", "school", "work", "friend", "friends", "come", "came", "back",
+    "down", "next", "soon", "late", "wait", "stop", "look", "know", "think",
+    "say", "said", "tell", "told", "ask", "eat", "ate", "sleep", "walk", "run",
+    "ran", "make", "made", "take", "took", "give", "gave", "find", "found",
+    "call", "called", "play", "played", "game", "book", "test", "done", "left",
+    "right", "first", "last", "more", "most", "much", "some", "any", "one",
+    "two", "three", "four", "five", "six", "ten", "house", "room", "door",
+    "car", "bus", "cat", "dog", "mom", "dad", "dont", "air", "words", "was",
+    "meet", "should",
+})
+_SYLLABLE_2 = frozenset({
+    "going", "hello", "today", "again", "later", "morning", "evening",
+    "someone", "something", "nothing", "really", "very", "little", "people",
+    "about", "around", "because", "always", "never", "maybe", "hungry",
+    "tired", "sorry", "happy", "angry", "ready", "over", "under", "into",
+    "without", "homework", "classroom", "teacher", "student", "tonight",
+    "better", "doing", "coming", "leaving", "eating", "sleeping", "playing",
+    "working", "trying", "having", "getting", "making", "looking", "walking",
+    "running", "talking", "asking", "helping", "headed", "quiet", "further",
+    "unsaid", "only", "open", "after", "before", "softly", "lightly",
+})
+_SYLLABLE_3 = frozenset({
+    "tomorrow", "yesterday", "anything", "everything", "another", "beautiful",
+    "remember", "important", "together", "however", "everyone", "library",
+})
+_HAIKU_STOP = frozenset({
+    "a", "an", "the", "and", "or", "but", "just", "really", "very", "so",
+})
+# A one-word line of these is a dangling function word, not a fact.
+_HAIKU_WEAK = frozenset({
+    "a", "an", "the", "to", "and", "or", "but", "is", "am", "are", "of",
+    "i", "me", "my", "we", "do", "be", "it", "so", "if", "at", "in", "on",
+})
+_HAIKU_WEAK_START = frozenset({"and", "or", "but", "then", "to"})
+# Exact syllable fillers. They mark the line as reported speech, not new facts.
+_HAIKU_PAD = {
+    1: ("now", "here", "still"),
+    2: ("again", "softly", "lightly"),
+    3: ("so they said", "as they said", "so it goes"),
+    4: ("or so they said",),
+    5: ("this is what was said",),
+    6: ("this is what they said now",),
+    7: ("this is what they said again",),
+}
+_HAIKU_EMPTY_LINES = (
+    "Quiet words unsaid",
+    "Nothing further was told here",
+    "Only open air",
+)
+
+
+def _syllables(word: str) -> int:
+    raw = re.sub(r"[^a-z]", "", word.lower())
+    if not raw:
+        return 1
+    if raw in _SYLLABLE_1:
+        return 1
+    if raw in _SYLLABLE_2:
+        return 2
+    if raw in _SYLLABLE_3:
+        return 3
+    groups = re.findall(r"[aeiouy]+", raw)
+    count = len(groups)
+    if count == 0:
+        return 1
+    if raw.endswith("e") and not raw.endswith(("le", "ye", "ee")) and count > 1:
+        count -= 1
+    return max(1, count)
+
+
+def _haiku_tokens(text: str) -> list[str]:
+    return [raw for raw in text.replace("\n", " ").split() if re.search(r"[A-Za-z0-9]", raw)]
+
+
+def _syllable_total(words: list[str]) -> int:
+    return sum(_syllables(word) for word in words)
+
+
+def _fit_haiku_words(words: list[str]) -> list[str]:
+    """Keep the message inside 17 syllables, dropping filler before facts."""
+    if _syllable_total(words) <= 17:
+        return words
+    kept = [word for word in words if _word_key(word) not in _HAIKU_STOP]
+    if kept and _syllable_total(kept) <= 17:
+        return kept
+    if not kept:
+        kept = list(words)
+    prefix: list[str] = []
+    count = 0
+    for word in kept:
+        syl = _syllables(word)
+        if count + syl > 12:
+            break
+        prefix.append(word)
+        count += syl
+    suffix: list[str] = []
+    tail_count = 0
+    for word in reversed(kept[len(prefix):]):
+        syl = _syllables(word)
+        if tail_count + syl > 5:
+            break
+        suffix.append(word)
+        tail_count += syl
+    suffix.reverse()
+    fitted = prefix + suffix
+    return fitted or kept[:1]
+
+
+def _haiku_line(words: list[str], target: int, index: int = 0) -> str:
+    """One haiku line: the words, then one short aside to hit the count."""
+    have = _syllable_total(words)
+    deficit = target - have
+    if deficit <= 0 or deficit not in _HAIKU_PAD:
+        text = " ".join(words)
+    else:
+        options = _HAIKU_PAD[deficit]
+        pad = options[index % len(options)]
+        if words:
+            head = re.sub(r"[,.;:?!]+$", "", " ".join(words).rstrip())
+            text = f"{head}, {pad}" if head else pad
+        else:
+            text = pad
+    return _cap_first(text)
+
+
+def _line_lonely(words: list[str]) -> bool:
+    return len(words) == 1 and _word_key(words[0]) in _HAIKU_WEAK
+
+
+def _weak_start(words: list[str]) -> bool:
+    return bool(words) and _word_key(words[0]) in _HAIKU_WEAK_START
+
+
+def _greedy_haiku(words: list[str]) -> list[str]:
+    targets = (5, 7, 5)
+    lines: list[list[str]] = [[], [], []]
+    idx = 0
+    for line_i, target in enumerate(targets):
+        have = 0
+        while idx < len(words):
+            syl = _syllables(words[idx])
+            if have + syl > target and have > 0:
+                break
+            if syl > target and have == 0:
+                lines[line_i].append(words[idx])
+                idx += 1
+                have = target
+                break
+            lines[line_i].append(words[idx])
+            have += syl
+            idx += 1
+            if have >= target:
+                break
+    return [_haiku_line(line, target, index) for index, (line, target) in enumerate(zip(lines, targets))]
+
+
+def _pack_haiku(words: list[str]) -> list[str]:
+    counts = [_syllables(word) for word in words]
+    prefix = [0]
+    for count in counts:
+        prefix.append(prefix[-1] + count)
+
+    def span(start: int, end: int) -> int:
+        return prefix[end] - prefix[start]
+
+    best = None
+    n = len(words)
+    for end_one in range(n + 1):
+        for end_two in range(end_one, n + 1):
+            first, second, third = span(0, end_one), span(end_one, end_two), span(end_two, n)
+            if first > 5 or second > 7 or third > 5:
+                continue
+            chunks = (words[:end_one], words[end_one:end_two], words[end_two:])
+            empties = sum(not chunk for chunk in chunks)
+            lonely = sum(_line_lonely(chunk) for chunk in chunks)
+            weak = sum(_weak_start(chunk) for chunk in chunks)
+            pads = (5 - first, 7 - second, 5 - third)
+            score = (empties, lonely, weak, max(pads), sum(pad * pad for pad in pads))
+            if best is None or score < best[0]:
+                best = (score, chunks)
+    if best is None:
+        return _greedy_haiku(words)
+    chunks = best[1]
+    return [
+        _haiku_line(chunk, target, index)
+        for index, (chunk, target) in enumerate(zip(chunks, (5, 7, 5)))
+    ]
+
+
+def fx_haiku(text: str) -> str:
+    """Rephrase into one 5-7-5 haiku. Filler yields; the facts stay."""
+    if not _has_letters(text):
+        return "\n".join(_HAIKU_EMPTY_LINES)
+    words = _fit_haiku_words(_haiku_tokens(text))
+    if not words:
+        return "\n".join(_HAIKU_EMPTY_LINES)
+    return "\n".join(_pack_haiku(words))
+
+
+# --- Toddler ---------------------------------------------------------------
+_TODDLER_PHRASES = [
+    (r"\bi don't know\b", "me no know"),
+    (r"\bi dont know\b", "me no know"),
+    (r"\bi am going to\b", "me gonna"),
+    (r"\bi'm going to\b", "me gonna"),
+    (r"\bim going to\b", "me gonna"),
+    (r"\bgoing to\b", "gonna"),
+    (r"\bwant to\b", "wanna"),
+    (r"\bhave to\b", "gotta"),
+    (r"\bhas to\b", "gotta"),
+    (r"\bthank you\b", "fank you"),
+    (r"\bthanks\b", "fanks"),
+    (r"\bgood morning\b", "mornin"),
+    (r"\bgood night\b", "night night"),
+    (r"\bsee you later\b", "see you later"),
+    (r"\bi am sorry\b", "me sowwy"),
+    (r"\bi'm sorry\b", "me sowwy"),
+    (r"\bi love you\b", "me wuv you"),
+    (r"\bi like you\b", "me wike you"),
+    (r"\blet's go\b", "we go"),
+    (r"\blets go\b", "we go"),
+    (r"\bi think\b", "me fink"),
+    (r"\bright now\b", "wight now"),
+    (r"\bi am\b", "me"),
+    (r"\bi'm\b", "me"),
+    (r"\bim\b", "me"),
+    # After the longer "I …" phrases, so "I" does not get shouted via case-matching.
+    (r"\bi\b", "me"),
+]
+_TODDLER_MAP = {
+    "me": "me", "my": "my", "the": "da", "this": "dis", "that": "dat",
+    "they": "dey", "them": "dem", "there": "dere", "please": "pwease",
+    "little": "wittle", "love": "wuv", "hello": "hewwo", "hi": "hi",
+    "friend": "fwiend", "friends": "fwiends", "water": "wawa", "really": "weawwy",
+    "very": "vewy", "sorry": "sowwy", "right": "wight", "from": "fwom",
+    "you": "you", "your": "your", "going": "goin", "want": "want",
+}
+_TODDLER_PROTECT = frozenset({
+    "class", "lunch", "homework", "library", "school", "tomorrow", "today",
+    "your", "more", "gonna", "wanna", "gotta", "then", "with", "know", "where",
+    "meet", "help", "and",
+})
+_TODDLER_DONE = frozenset(_TODDLER_MAP.values()) | _TODDLER_PROTECT
+_TODDLER_VOICELESS_TH = (
+    "think", "thing", "thank", "three", "throw", "through", "thief", "thin",
+    "thick", "thumb", "thought", "throat", "thrill", "thread", "threat",
+    "threw", "thrown", "throne", "thirst", "thunder",
+)
+_TODDLER_OPENERS = ("Um, ", "Waaah, ", "Ooo, ", "Uh, ")
+_TODDLER_CLOSERS = (" ...pwease?", " ...okay?", " ...yeah?")
+_TODDLER_EMPTY = (
+    "Waaah! Me no talk.",
+    "Um, me got no words.",
+    "Ooo, me quiet.",
+)
+
+
+def _toddler_one(word: str) -> str:
+    if len(word) < 4 or word.isupper() or any(ch.isdigit() for ch in word):
+        return word
+    if word.lower() in _TODDLER_DONE:
+        return word
+    new = word.lower()
+    if new.startswith("th"):
+        voiceless = new.startswith(_TODDLER_VOICELESS_TH)
+        new = ("f" if voiceless else "d") + new[2:]
+    new = new.replace("r", "w")
+    if word[0].isupper():
+        new = new[0].upper() + new[1:]
+    return new
+
+
+def fx_toddler(text: str) -> str:
+    """Rephrase as toddler talk. Content words stay readable."""
+    if not _has_letters(text):
+        return random.choice(_TODDLER_EMPTY)
+    out = _apply_phrases(_normalize_apostrophes(text), _TODDLER_PHRASES)
+    out = _word_swap(out, _TODDLER_MAP)
+    out = WORD.sub(lambda match: _toddler_one(match.group(0)), out)
+    out = _tidy_speech(out)
+    if not _has_letters(out):
+        return random.choice(_TODDLER_EMPTY)
+    return _voice_bookend(
+        out,
+        openers=_TODDLER_OPENERS,
+        closers=_TODDLER_CLOSERS,
+        opener_re=r"^(um|waaah|ooo|uh)\b",
+        closer_re=r"(pwease\?|okay\?|yeah\?)\s*$",
+    )
+
+
+# --- Superhero -------------------------------------------------------------
+_SUPERHERO_PHRASES = [
+    (r"\bi don't know\b", "I do not know"),
+    (r"\bi dont know\b", "I do not know"),
+    (r"\bi am going to\b", "I am bound for"),
+    (r"\bi'm going to\b", "I am bound for"),
+    (r"\bim going to\b", "I am bound for"),
+    (r"\bgoing to\b", "bound for"),
+    (r"\bthank you\b", "you have my gratitude"),
+    (r"\bthanks\b", "you have my gratitude"),
+    (r"\blet's go\b", "we charge onward"),
+    (r"\blets go\b", "we charge onward"),
+    (r"\bi love you\b", "my heart stands with you"),
+    (r"\bi am sorry\b", "I ask your pardon"),
+    (r"\bi'm sorry\b", "I ask your pardon"),
+    (r"\bright now\b", "this very moment"),
+]
+_SUPERHERO_MAP = {
+    "hello": "greetings", "hi": "greetings", "hey": "greetings",
+    "friend": "ally", "friends": "allies", "help": "aid",
+    "bad": "villainous", "good": "noble", "fight": "battle", "stop": "halt",
+    "people": "citizens", "everyone": "every citizen", "enemy": "foe",
+    "problem": "crisis", "scared": "afraid", "home": "headquarters",
+}
+_SUPERHERO_OPENERS = (
+    "HEAR ME, CITIZENS!",
+    "NEVER FEAR!",
+    "BY ALL THAT IS HEROIC —",
+    "LET ALL BEAR WITNESS!",
+    "STAND FAST!",
+)
+_SUPERHERO_CLOSERS = (
+    " SO IT IS PROCLAIMED!",
+    " LET ALL BEAR WITNESS!",
+    " THIS I SWEAR!",
+    " FOR ALL TO HEAR!",
+)
+
+
+def fx_superhero(text: str) -> str:
+    """Rephrase as a bold proclamation. The deed they named stays in the line."""
+    if not _has_letters(text):
+        return "**HEAR ME, CITIZENS!** A hero stands ready! THIS I SWEAR!"
+    out = _apply_phrases(_normalize_apostrophes(text), _SUPERHERO_PHRASES)
+    out = _tidy_speech(_word_swap(out, _SUPERHERO_MAP))
+    out = " ".join(out.split())
+    if not _has_letters(out):
+        out = "A hero stands ready"
+    out = _cap_first(out).rstrip(".!?")
+    opener = random.choice(_SUPERHERO_OPENERS)
+    closer = random.choice(_SUPERHERO_CLOSERS)
+    return f"**{opener}** {out}!{closer}"
+
+
+# --- Sheep -----------------------------------------------------------------
+_SHEEP_PHRASES = [
+    (r"\bi don't know\b", "baaa, I do not know"),
+    (r"\bi dont know\b", "baaa, I do not know"),
+    (r"\bi am going to\b", "I'm trotting off to"),
+    (r"\bi'm going to\b", "I'm trotting off to"),
+    (r"\bim going to\b", "I'm trotting off to"),
+    (r"\bgoing to\b", "trotting to"),
+    (r"\bthank you\b", "baaa, thank ewe"),
+    (r"\bthanks\b", "baaa, thank ewe"),
+    (r"\bhello\b", "baaa, hello"),
+    (r"\bhi\b", "baaa, hi"),
+    (r"\bhey\b", "baaa, hey"),
+    (r"\bgood morning\b", "baaa, good morning"),
+    (r"\bgood night\b", "baaa, good night"),
+    (r"\blet's go\b", "let the flock go"),
+    (r"\blets go\b", "let the flock go"),
+    (r"\bi love you\b", "I love ewe"),
+    (r"\bi like you\b", "I like ewe"),
+    (r"\bsee you\b", "see ewe"),
+    (r"\bhelp me\b", "baaa, help me"),
+    (r"\bi think\b", "baaa, I think"),
+    (r"\byes\b", "baaa yes"),
+    (r"\bno\b", "baaa no"),
+]
+_SHEEP_MAP = {
+    "you": "ewe", "people": "flock", "everyone": "the whole flock",
+    "friend": "flockmate", "friends": "flockmates", "eat": "graze on",
+    "eating": "grazing on", "sleep": "rest in the pasture", "home": "the pen",
+    "house": "the pen", "go": "trot", "going": "trotting", "come": "trot over",
+    "walk": "trot", "run": "bolt", "we": "the flock", "us": "the flock",
+    "together": "as a flock",
+}
+_SHEEP_OPENERS = ("Baaa... ", "Baaa, ", "Baa-baaa, ")
+_SHEEP_CLOSERS = (" ...baaa!", " ...baaa.", " , baaa.")
+_SHEEP_EMPTY = (
+    "Baaa... baaa.",
+    "Baaa. The flock is quiet, baaa.",
+    "Baaa... nothing to bleat, baaa.",
+)
+
+
+def _weave_baaa(text: str) -> str:
+    words = text.split()
+    if not words:
+        return "baaa"
+    out = []
+    since = 0
+    for word in words:
+        out.append(word)
+        if "baaa" in word.lower():
+            since = 0
+            continue
+        since += 1
+        if since >= 5:
+            out.append("baaa")
+            since = 0
+    return " ".join(out)
+
+
+def fx_sheep(text: str) -> str:
+    """Rephrase in sheep-speak. Baaa is woven around the words, not instead of them."""
+    if not _has_letters(text):
+        return random.choice(_SHEEP_EMPTY)
+    out = _apply_phrases(_normalize_apostrophes(text), _SHEEP_PHRASES)
+    out = _tidy_speech(_word_swap(out, _SHEEP_MAP))
+    out = "\n".join(_weave_baaa(line) if line.strip() else line for line in out.splitlines())
+    if not _has_letters(out):
+        return random.choice(_SHEEP_EMPTY)
+    out = _voice_bookend(
+        out,
+        openers=_SHEEP_OPENERS,
+        closers=_SHEEP_CLOSERS,
+        opener_re=r"^baa",
+        closer_re=r"baaa[.!]?\s*$",
+    )
+    if "baaa" not in out.lower():
+        out = f"Baaa, {out}"
+    return out
+
+
 EFFECTS = {
     "reversed": {"name": "Backwards Curse", "description": "Every word comes out back-to-front.",
                 "func": fx_reversed},
@@ -839,7 +1629,55 @@ EFFECTS = {
         "blocks_wand": True,
         "fixed_minutes": 60,
     },
+    # Staff-cast only. scroll_effect_keys() leaves these out of Hex Scrolls.
+    "yoda": {
+        "name": "Yoda Curse",
+        "description": "Rephrases every line in Yoda's inverted speech, meaning intact.",
+        "func": fx_yoda,
+        "staff_only": True,
+    },
+    "rhyme": {
+        "name": "Rhyme Curse",
+        "description": "Rephrases every line into a rhyming couplet, meaning intact.",
+        "func": fx_rhyme,
+        "staff_only": True,
+    },
+    "narrator": {
+        "name": "Dramatic Narrator Curse",
+        "description": "Rephrases every line as dramatic third-person narration, meaning intact.",
+        "func": fx_narrator,
+        "staff_only": True,
+    },
+    "haiku": {
+        "name": "Haiku Curse",
+        "description": "Rephrases every line into a 5-7-5 haiku, meaning intact.",
+        "func": fx_haiku,
+        "staff_only": True,
+    },
+    "toddler": {
+        "name": "Toddler Curse",
+        "description": "Rephrases every line as toddler baby talk, meaning intact.",
+        "func": fx_toddler,
+        "staff_only": True,
+    },
+    "superhero": {
+        "name": "Superhero Curse",
+        "description": "Rephrases every line as a bold superhero proclamation, meaning intact.",
+        "func": fx_superhero,
+        "staff_only": True,
+    },
+    "sheep": {
+        "name": "Sheep Curse",
+        "description": "Rephrases every line in sheep-speak with baaa woven in, meaning intact.",
+        "func": fx_sheep,
+        "staff_only": True,
+    },
 }
+
+
+def scroll_effect_keys() -> list[str]:
+    """Curses a bought Hex Scroll may roll. Staff-only voices are excluded."""
+    return [key for key, spell in EFFECTS.items() if not spell.get("staff_only")]
 
 # Player wand-kit slash commands blocked by Limp Wand (staff resets stay usable).
 WAND_KIT_COMMANDS = frozenset({"wand", "patronus", "patronusreset", "broom"})
