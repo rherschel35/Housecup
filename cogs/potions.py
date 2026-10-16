@@ -13,6 +13,9 @@ broad luck across duels, beans, beasts, swarms, and hexes.
 
 Brewing is usually a 3-round minigame (Felix uses 10). Each round the
 cauldron does something and you pick Stir / Add Heat / Let it Simmer.
+`/practice potion` is the same cauldron with the sequence always Stir,
+Heat, Simmer and the correct button shown in green. It spends nothing
+and awards nothing.
 Simple Descent buffs last 5 fights; harder ones last 10. One-shots stay
 one-shot. Felix Felicis lasts 4 hours and may be attempted once every
 7 days for free (no ingredients).
@@ -76,6 +79,9 @@ FELIX_PASS_CORRECT = 9     # need this many correct of 10 to bottle it
 # ------------------------------------------------------------ the cauldron
 
 ACTIONS = {"stir": "🥄 Stir", "heat": "🔥 Add Heat", "simmer": "💧 Let it Simmer"}
+# /practice potion always uses this order. The correct button is green.
+PRACTICE_SEQUENCE = ("stir", "heat", "simmer")
+PRACTICE_COLOR = 0x7FA66A
 # Shown one-per-round during /brew. Picked at random (no repeats in a single brew)
 # so the cauldron never feels like the same three lines on a loop.
 ROUND_FLAVOR = [
@@ -201,6 +207,13 @@ def pick_brew_prompts(n: int = 3) -> list[str]:
     if n >= len(ROUND_FLAVOR):
         return list(ROUND_FLAVOR)
     return random.sample(ROUND_FLAVOR, n)
+
+
+def brew_action_feedback(was_correct: bool) -> str:
+    """What the cauldron says after one Stir / Heat / Simmer choice."""
+    if was_correct:
+        return "✅ The color settles - good call."
+    return "⚠️ It spits and darkens - that wasn't it."
 
 # ---------------------------------------------------------------- recipes
 #
@@ -460,9 +473,10 @@ class BrewView(discord.ui.View):
         round_index: int,
         prompts: list[str],
         feedback_rounds: set[int] | None = None,
+        practice: bool = False,
     ):
         recipe = RECIPES.get(recipe_id) or {}
-        rounds = max(3, len(recipe.get("sequence") or []))
+        rounds = len(PRACTICE_SEQUENCE) if practice else max(3, len(recipe.get("sequence") or []))
         super().__init__(timeout=120 if rounds <= 3 else 300)
         self.cog = cog
         self.owner_id = owner_id
@@ -471,20 +485,44 @@ class BrewView(discord.ui.View):
         self.round_index = round_index
         self.prompts = prompts
         self.feedback_rounds = feedback_rounds
+        self.practice = practice
+        highlight = None
+        if practice and 0 <= round_index < len(PRACTICE_SEQUENCE):
+            highlight = PRACTICE_SEQUENCE[round_index]
         for action, label in ACTIONS.items():
-            self.add_item(BrewButton(action, label))
+            style = discord.ButtonStyle.secondary
+            if highlight is not None and action == highlight:
+                style = discord.ButtonStyle.success
+            self.add_item(BrewButton(action, label, style=style))
 
 
 class BrewButton(discord.ui.Button):
-    def __init__(self, action: str, label: str):
-        super().__init__(label=label, style=discord.ButtonStyle.secondary)
+    def __init__(self, action: str, label: str, *, style: discord.ButtonStyle = discord.ButtonStyle.secondary):
+        super().__init__(label=label, style=style)
         self.action = action
 
     async def callback(self, interaction: discord.Interaction):
         view: BrewView = self.view
         if interaction.user.id != view.owner_id:
-            await interaction.response.send_message("That's not your cauldron - use `/brew` to start your own.",
-                                                     ephemeral=True)
+            if view.practice:
+                await interaction.response.send_message(
+                    "That's not your practice cauldron — use `/practice potion` to start your own.",
+                    ephemeral=True,
+                )
+            else:
+                await interaction.response.send_message(
+                    "That's not your cauldron - use `/brew` to start your own.",
+                    ephemeral=True,
+                )
+            return
+        if view.practice:
+            await view.cog.practice_brew_round(
+                interaction,
+                view.correct_so_far,
+                view.round_index,
+                self.action,
+                view.prompts,
+            )
             return
         await view.cog.brew_round(
             interaction,
@@ -790,8 +828,7 @@ class Potions(commands.Cog):
 
         show_feedback = feedback_rounds is None or round_index in feedback_rounds
         if show_feedback:
-            feedback = ("✅ The color settles - good call." if was_correct
-                        else "⚠️ It spits and darkens - that wasn't it.")
+            feedback = brew_action_feedback(was_correct)
         else:
             feedback = "🌫️ The brew shifts. You can't tell if that helped."
 
@@ -870,6 +907,110 @@ class Potions(commands.Cog):
             lines.append(f"You've cracked the recipe - the correct sequence for **{recipe['name']}** is yours for good.")
         embed = discord.Embed(title=f"{recipe['emoji']} Brew complete", description="\n".join(lines),
                               color=TIER_COLOR[recipe["tier"]])
+        await interaction.response.edit_message(embed=embed, view=None)
+
+    # ------------------------------------------------------- practice brew
+
+    def _practice_brew_embed(
+        self,
+        round_index: int,
+        prompts: list[str],
+        feedback: str | None = None,
+    ) -> discord.Embed:
+        rounds = len(PRACTICE_SEQUENCE)
+        parts: list[str] = []
+        if feedback:
+            parts.append(feedback)
+            parts.append("")
+        parts.append(prompts[round_index])
+        parts.append("")
+        parts.append("**Practice.** No ingredients, and this brew awards no house points.")
+        parts.append("")
+        parts.append("What do you do?")
+        embed = discord.Embed(
+            title="Practice · Brewing",
+            description="\n".join(parts),
+            color=PRACTICE_COLOR,
+        )
+        embed.set_footer(text=f"Practice · Round {round_index + 1} of {rounds} · no house points")
+        return embed
+
+    async def start_practice_brew(self, interaction: discord.Interaction):
+        """Open a practice cauldron in this channel. No ingredients, no points."""
+        if interaction.guild is None:
+            await interaction.response.send_message(
+                "Practice brewing happens in a server channel.",
+                ephemeral=True,
+            )
+            return
+        prompts = pick_brew_prompts(len(PRACTICE_SEQUENCE))
+        await interaction.response.send_message(
+            embed=self._practice_brew_embed(0, prompts),
+            view=BrewView(
+                self, interaction.user.id, "", 0, 0, prompts, practice=True,
+            ),
+        )
+
+    async def practice_brew_round(
+        self,
+        interaction: discord.Interaction,
+        correct_so_far: int,
+        round_index: int,
+        action: str,
+        prompts: list[str],
+    ):
+        """One practice step. Never reads or writes potion state, inventory, or points."""
+        was_correct = PRACTICE_SEQUENCE[round_index] == action
+        correct_so_far += 1 if was_correct else 0
+        feedback = brew_action_feedback(was_correct)
+        rounds = len(PRACTICE_SEQUENCE)
+        if round_index + 1 < rounds:
+            await interaction.response.edit_message(
+                embed=self._practice_brew_embed(round_index + 1, prompts, feedback),
+                view=BrewView(
+                    self,
+                    interaction.user.id,
+                    "",
+                    correct_so_far,
+                    round_index + 1,
+                    prompts,
+                    practice=True,
+                ),
+            )
+            return
+        await self._finish_practice_brew(interaction, correct_so_far, feedback)
+
+    async def _finish_practice_brew(
+        self,
+        interaction: discord.Interaction,
+        correct: int,
+        last_feedback: str,
+    ):
+        rounds = len(PRACTICE_SEQUENCE)
+        need = max(2, rounds - 1)
+        if correct < need:
+            embed = discord.Embed(
+                title="Practice · The cauldron curdles",
+                description=(
+                    f"{last_feedback}\n\n"
+                    f"The practice brew is ruined ({correct}/{rounds} right; need {need}). "
+                    "No potion was bottled, no ingredients were used, and no house points were awarded."
+                ),
+                color=0xC0392B,
+            )
+        else:
+            perfect = correct >= rounds
+            headline = "Perfect practice brew!" if perfect else "Passable practice brew."
+            embed = discord.Embed(
+                title="Practice · Brew complete",
+                description=(
+                    f"{last_feedback}\n\n"
+                    f"**{headline}** You followed the cauldron ({correct}/{rounds}). "
+                    "Nothing was bottled, no ingredients were used, and no house points were awarded."
+                ),
+                color=PRACTICE_COLOR,
+            )
+        embed.set_footer(text="Practice · Stir → Heat → Simmer · no house points")
         await interaction.response.edit_message(embed=embed, view=None)
 
     # -------------------------------------------------------------- drink
