@@ -424,6 +424,11 @@ CREATURE_CHOICES = [app_commands.Choice(name=c["name"], value=key) for key, c in
 BUTTONS_PER_ROW = 5
 MAX_SPELL_BUTTONS = 25
 THREAT_SPELL_PREFIX = "threatspell:"
+# Practice summons must not share ids with the persistent real-fight view.
+# That view is registered in cog_load and its callback is the live resolver
+# (house points, Explore checklist, Attack tally). A shared id lets a
+# practice click fall through to it.
+PRACTICE_SPELL_PREFIX = "threatspell:practice:"
 LOCKED_OUT_MESSAGE = "You're already out for this one."
 # Public misses. {member}, {spell}, and {creature} are filled in when one
 # is picked. Generic lines always qualify; spell and creature lines are
@@ -557,14 +562,48 @@ def spell_button_slots(order: list[str]) -> list[tuple[str, int]]:
     return slots
 
 
+def spell_from_custom_id(custom_id: str) -> str | None:
+    """Spell value on a threat button, practice prefix checked first.
+
+    ``threatspell:practice:fire`` also starts with ``threatspell:``.
+    Reading the shorter prefix first would treat the spell as
+    ``practice:fire`` and hand the click to the real fight.
+    """
+    if custom_id.startswith(PRACTICE_SPELL_PREFIX):
+        spell = custom_id[len(PRACTICE_SPELL_PREFIX):]
+        return spell or None
+    if custom_id.startswith(THREAT_SPELL_PREFIX):
+        spell = custom_id[len(THREAT_SPELL_PREFIX):]
+        return spell or None
+    return None
+
+
+def _message_is_practice_spells(msg) -> bool:
+    """True when this post's spell row is a practice summon, not a live fight."""
+    view = getattr(msg, "view", None)
+    if getattr(view, "practice", False):
+        return True
+    for row in getattr(msg, "components", None) or []:
+        for child in getattr(row, "children", None) or []:
+            custom_id = getattr(child, "custom_id", None) or ""
+            if custom_id.startswith(PRACTICE_SPELL_PREFIX):
+                return True
+    if view is not None:
+        for child in getattr(view, "children", []):
+            custom_id = getattr(child, "custom_id", None) or ""
+            if custom_id.startswith(PRACTICE_SPELL_PREFIX) or getattr(child, "practice", False):
+                return True
+    return False
+
+
 def _spell_order_from_message(msg) -> list[str]:
     """Spell order already drawn on a message, so a disable keeps that layout."""
     order: list[str] = []
     for row in getattr(msg, "components", None) or []:
         for child in getattr(row, "children", None) or []:
-            custom_id = getattr(child, "custom_id", None) or ""
-            if custom_id.startswith(THREAT_SPELL_PREFIX):
-                order.append(custom_id[len(THREAT_SPELL_PREFIX):])
+            spell = spell_from_custom_id(getattr(child, "custom_id", None) or "")
+            if spell:
+                order.append(spell)
     if order:
         return order
     view = getattr(msg, "view", None)
@@ -581,12 +620,10 @@ def _spell_styles_from_message(msg) -> dict:
     styles: dict = {}
     for row in getattr(msg, "components", None) or []:
         for child in getattr(row, "children", None) or []:
-            custom_id = getattr(child, "custom_id", None) or ""
-            if custom_id.startswith(THREAT_SPELL_PREFIX):
-                spell = custom_id[len(THREAT_SPELL_PREFIX):]
-                style = getattr(child, "style", None)
-                if style is not None:
-                    styles[spell] = style
+            spell = spell_from_custom_id(getattr(child, "custom_id", None) or "")
+            style = getattr(child, "style", None)
+            if spell and style is not None:
+                styles[spell] = style
     if styles:
         return styles
     view = getattr(msg, "view", None)
@@ -616,10 +653,11 @@ class ThreatSpellButton(discord.ui.Button):
         practice: bool = False,
     ):
         label = SPELL_LABEL.get(spell_value, spell_value.title())
+        prefix = PRACTICE_SPELL_PREFIX if practice else THREAT_SPELL_PREFIX
         super().__init__(
             label=label,
             style=style or discord.ButtonStyle.success,
-            custom_id=f"{THREAT_SPELL_PREFIX}{spell_value}",
+            custom_id=f"{prefix}{spell_value}",
             row=row,
             disabled=disabled,
         )
@@ -1470,7 +1508,12 @@ class Dementors(commands.Cog):
             return
         order = _spell_order_from_message(msg) or list(SPELL_ORDER)
         styles = _spell_styles_from_message(msg)
-        view = ThreatSpellView(order, disabled=True, styles=styles or None)
+        practice = _message_is_practice_spells(msg) or (
+            message_id in getattr(self, "practice_fights", {})
+        )
+        view = ThreatSpellView(
+            order, disabled=True, styles=styles or None, practice=practice,
+        )
         edit = getattr(msg, "edit", None)
         if edit is None:
             return
@@ -1493,6 +1536,21 @@ class Dementors(commands.Cog):
         """
         hexes = self.bot.get_cog("Hexes") if self.bot else None
         if hexes and await hexes.deny_if_limp_wand(interaction):
+            return
+        # The persistent real-fight view matches `threatspell:{spell}` on
+        # every message. A practice post used to use those same ids, so a
+        # click with no in-memory practice view landed here and could clear
+        # a live monster, pay points, and fill the Explore daily line.
+        message = getattr(interaction, "message", None)
+        message_id = getattr(message, "id", None)
+        data = getattr(interaction, "data", None) or {}
+        custom_id = data.get("custom_id") if isinstance(data, dict) else ""
+        if (
+            (message_id is not None and message_id in self.practice_fights)
+            or str(custom_id or "").startswith(PRACTICE_SPELL_PREFIX)
+            or (message is not None and _message_is_practice_spells(message))
+        ):
+            await self.on_practice_spell_click(interaction, spell_value)
             return
         if self.lock is None:
             await interaction.response.send_message(

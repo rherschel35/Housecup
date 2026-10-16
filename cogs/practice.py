@@ -7,7 +7,10 @@ Discord shows the two drills as a subcommand dropdown.
     /practice monster  - a creature from the wild-threat pool, no points
 
 Anyone can start either one in any server channel. Neither one writes the
-points ledger, a brew tally, a spawn counter, or an event board.
+points ledger, a brew tally, a spawn counter, an event board, a daily
+challenge, or a quest. `extras={"practice": True}` marks both subcommands
+so the usage listener (and anything else that records a finished slash
+command) can skip them.
 """
 
 from __future__ import annotations
@@ -17,10 +20,29 @@ from discord import app_commands
 from discord.ext import commands
 
 
+# Qualified names the usage hook must not record. Kept next to the commands
+# so a rename cannot silently start counting again.
+PRACTICE_COMMANDS = frozenset({"practice potion", "practice monster"})
+
+
+def tracks_progress(command) -> bool:
+    """False for the two practice drills.
+
+    `/practice potion` and `/practice monster` are not daily challenges,
+    quests, or any other progress. Callers that record a finished slash
+    command should skip them.
+    """
+    extras = getattr(command, "extras", None) or {}
+    if extras.get("practice"):
+        return False
+    name = (getattr(command, "qualified_name", None) or "").strip()
+    return name not in PRACTICE_COMMANDS
+
+
 class Practice(commands.Cog):
     group = app_commands.Group(
         name="practice",
-        description="Practice a potion or a monster. No house points.",
+        description="Practice a potion or a monster. No points or other progress.",
     )
 
     def __init__(self, bot: commands.Bot):
@@ -28,7 +50,8 @@ class Practice(commands.Cog):
 
     @group.command(
         name="potion",
-        description="Practice a potion brew. No ingredients and no points.",
+        description="Practice a potion brew. No points, challenges, or quests.",
+        extras={"practice": True},
     )
     async def potion(self, interaction: discord.Interaction):
         potions = self.bot.get_cog("Potions")
@@ -42,7 +65,8 @@ class Practice(commands.Cog):
 
     @group.command(
         name="monster",
-        description="Summon a practice monster here. No house points.",
+        description="Summon a practice monster. No points, challenges, or quests.",
+        extras={"practice": True},
     )
     async def monster(self, interaction: discord.Interaction):
         threats = self.bot.get_cog("Dementors")

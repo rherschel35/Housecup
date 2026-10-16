@@ -66,3 +66,13 @@ jobs:
         run: python scripts/test_vcc_rules.py
         env:
           DISCORD_TOKEN: ""
+
+      - name: Practice drills award nothing
+        run: python scripts/test_practice_modes.py
+        env:
+          DISCORD_TOKEN: ""
+
+      - name: Practice drills skip challenges and quests
+        run: python scripts/test_practice_progress.py
+        env:
+          DISCORD_TOKEN: ""

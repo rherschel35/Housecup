@@ -1,8 +1,9 @@
 """
 Slash-command usage tracking.
 
-Counts every successful app command via on_app_command_completion.
-Staff reads the tally with /staff usage top|unused|reset.
+Counts every successful app command via on_app_command_completion,
+except `/practice potion` and `/practice monster`. Those drills are not
+progress. Staff reads the tally with /staff usage top|unused|reset.
 """
 
 from __future__ import annotations
@@ -16,6 +17,8 @@ from pathlib import Path
 import discord
 from discord import app_commands
 from discord.ext import commands
+
+from cogs.practice import tracks_progress
 
 log = logging.getLogger("velmora.usage")
 
@@ -88,6 +91,11 @@ class Usage(commands.Cog):
     async def on_app_command_completion(
         self, interaction: discord.Interaction, command: app_commands.Command
     ):
+        # This listener is what records every successful slash command.
+        # Practice drills are not progress: not a daily challenge, not a
+        # quest, and not a usage tally.
+        if not tracks_progress(command):
+            return
         try:
             self.record(command.qualified_name)
         except Exception:

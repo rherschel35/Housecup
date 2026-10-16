@@ -127,7 +127,7 @@ HELP = {
         ),
         "entries": [
             ("brew", "Spend ingredients and try to brew a potion (🟢 = you have them; Felix free once / 7 days)."),
-            ("practice potion", "Practice the cauldron in any channel. Stir, then Heat, then Simmer — the right button is green. No ingredients and no house points."),
+            ("practice potion", "Practice the cauldron in any channel. Stir, then Heat, then Simmer — the right button is green. No ingredients, no house points, and it does not count toward daily challenges, quests, or other progress."),
             ("drink", "Drink a brewed potion from your satchel to activate it."),
             ("potions", "Potion Rep, recipes with effect text, and 🟢/🔴 ingredients you have."),
         ],
@@ -187,7 +187,7 @@ HELP = {
             ("places", "Where you can go, and what's happening there."),
             ("explore", "Go somewhere and see what you find."),
             ("forage", "Search for ingredients and strange things (Pitch Resin for broom upgrades is forage-only)."),
-            ("practice monster", "Summon a practice monster in this channel. The spell that beats it is blue. No house points, and it is not a real spawn."),
+            ("practice monster", "Summon a practice monster in this channel. The spell that beats it is blue. No house points, it is not a real spawn, and it does not count toward daily challenges, quests, or other progress."),
             ("satchel", "What you're carrying. Only you can see it."),
             ("secrets", "Explore secrets you've already found (private). Keeper's Talisman also shows how many are still hidden."),
             ("use", "Try something from your satchel where you are."),
