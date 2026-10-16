@@ -57,13 +57,17 @@
     const known = new Set((you.hand || []).map((card) => card.id));
     marked = new Set([...marked].filter((id) => known.has(id)));
 
+    if (state.pending && state.pending.type === "discard") openId = null;
+
     board.innerHTML = "";
     if (state.practice) board.append(practiceFlag());
     board.append(players(you, opp));
+    const highlight = lastTurnBlock();
+    if (highlight) board.append(highlight);
     board.append(pills());
+    board.append(logBlock());
     board.append(handBlock(you));
     board.append(actions());
-    board.append(logBlock());
     if (state.pending && state.pending.type === "stash") {
       openStash(state.pending.cards || []);
     } else if (openId) {
@@ -147,7 +151,9 @@
     const you = state.you || {};
     const mana = document.createElement("div");
     mana.className = "pill" + (state.your_turn ? "" : " wait");
-    mana.textContent = "Mana " + (you.mana ?? 0) + " / " + (you.mana_max ?? 0);
+    const turn = you.turn || 0;
+    const manaText = "Mana " + (you.mana ?? 0) + " / " + (you.mana_max ?? 0);
+    mana.textContent = turn > 0 ? "Turn " + turn + " · " + manaText : manaText;
     const played = document.createElement("div");
     played.className = "pill";
     const who = state.your_turn ? "Cards played" : ((state.active_name || "They") + " played");
@@ -156,8 +162,12 @@
     spec.className = "pill" + (state.specialist === "ready" ? " gold" : "");
     spec.textContent = specialistLabel();
     const hand = document.createElement("div");
-    hand.className = "pill";
-    hand.textContent = "Hand " + (you.hand_count ?? 0) + " / 6";
+    const limit = you.hand_limit || 6;
+    const count = you.hand_count ?? 0;
+    hand.className = "pill" + (count > limit ? " warn" : "");
+    hand.textContent = count > limit
+      ? "Hand " + count + " · end at " + limit
+      : "Hand " + count + " / " + limit;
     row.append(mana, played, spec, hand);
     return row;
   }
@@ -173,15 +183,26 @@
     wrap.className = "hand-wrap";
     const title = document.createElement("h3");
     const discarding = state.pending && state.pending.type === "discard";
-    title.textContent = discarding
-      ? "Choose " + state.pending.need + " to discard"
-      : "Your hand (only you can see this)";
+    const limit = you.hand_limit || 6;
+    const count = you.hand_count ?? (you.hand || []).length;
+    if (discarding) {
+      title.textContent = "Discard " + state.pending.need + " — tap a card to mark it";
+    } else if (count > limit) {
+      title.textContent = "Your hand (" + count + "). The limit of " + limit + " applies when you end the turn.";
+    } else {
+      title.textContent = "Your hand (only you can see this)";
+    }
     const row = document.createElement("div");
-    row.className = "hand";
-    (you.hand || []).forEach((card) => row.append(cardEl(card)));
+    if (discarding) {
+      row.className = "picker";
+      (you.hand || []).forEach((card) => row.append(pickerCard(card)));
+    } else {
+      row.className = "hand";
+      (you.hand || []).forEach((card) => row.append(cardEl(card)));
+    }
     const note = document.createElement("p");
     note.className = "rules-note";
-    note.textContent = "Ward 20. Draw 2 a turn. Mana 3, then +1 up to 8. Two attack or defense cards a turn, and one specialist every 3rd turn of yours. End holding at most 6.";
+    note.textContent = "Ward heals stop at 20. Draw 2 a turn. You can hold more than 6 during your turn; end at 6. Mana 3, then +1 up to 8. Two attack or defense cards a turn, and one specialist every 3rd turn of yours.";
     wrap.append(title, row, note);
     return wrap;
   }
@@ -217,13 +238,50 @@
       if (state.pending && state.pending.type === "discard") {
         if (marked.has(card.id)) marked.delete(card.id);
         else marked.add(card.id);
-        openId = card.id;
         render(state);
         return;
       }
       openId = card.id;
       forfeitAsk = false;
       openCard(card);
+    });
+    return button;
+  }
+
+  function pickerCard(card) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "card picker-card school-" + (card.school || "star");
+    if (marked.has(card.id)) button.classList.add("marked");
+    const art = document.createElement("div");
+    art.className = "art";
+    const url = artUrl(card.art);
+    if (url) art.style.backgroundImage = "url('" + url + "')";
+    const cost = document.createElement("div");
+    cost.className = "cost" + (card.pay !== card.cost ? " surcharge" : "");
+    cost.textContent = String(card.pay != null ? card.pay : card.cost);
+    const body = document.createElement("div");
+    body.className = "body";
+    const name = document.createElement("strong");
+    name.textContent = card.name;
+    const tag = document.createElement("div");
+    tag.className = "tagline";
+    tag.textContent = card.school_name + " · " + card.tag;
+    const rules = document.createElement("p");
+    rules.className = "rules";
+    rules.textContent = card.text;
+    body.append(name, tag, rules);
+    button.append(art, cost, body);
+    if (marked.has(card.id)) {
+      const badge = document.createElement("div");
+      badge.className = "discard-badge";
+      badge.textContent = "Discarding";
+      button.append(badge);
+    }
+    button.addEventListener("click", () => {
+      if (marked.has(card.id)) marked.delete(card.id);
+      else marked.add(card.id);
+      render(state);
     });
     return button;
   }
@@ -236,11 +294,19 @@
     end.type = "button";
     end.className = "primary";
     if (discardMode) {
-      end.textContent = "Discard " + marked.size + " / " + state.pending.need;
-      end.disabled = marked.size !== state.pending.need || !state.your_turn;
+      const left = state.pending.need - marked.size;
+      if (left > 0) {
+        end.textContent = "Discard " + left + " more";
+        end.disabled = true;
+      } else {
+        end.textContent = "Discard these";
+        end.disabled = marked.size !== state.pending.need || !state.your_turn;
+      }
       end.addEventListener("click", () => send("discard", { cards: [...marked] }));
     } else {
-      end.textContent = "End turn";
+      const you = state.you || {};
+      const extra = Math.max(0, (you.hand_count || 0) - (you.hand_limit || 6));
+      end.textContent = extra > 0 && state.your_turn ? "End turn · discard " + extra : "End turn";
       end.disabled = !state.your_turn || state.over || (state.pending && state.pending.type === "stash");
       end.addEventListener("click", () => send("end"));
     }
@@ -258,19 +324,86 @@
     return row;
   }
 
-  function logBlock() {
-    const details = document.createElement("details");
-    details.className = "log";
-    const summary = document.createElement("summary");
-    summary.textContent = "Duel log";
+  function asYou(text) {
+    const mine = (state.you && state.you.name) || "";
+    if (!text || !mine) return text || "";
+    return String(text).split(mine).join("you");
+  }
+
+  function feedRow(item) {
+    const row = document.createElement("li");
+    row.className = "feed-row" + (item.kind && item.kind !== "play" ? " note" : "");
+    const thumb = document.createElement("div");
+    thumb.className = "thumb";
+    if (item.art) {
+      const url = artUrl(item.art);
+      if (url) thumb.style.backgroundImage = "url('" + url + "')";
+    }
+    const copy = document.createElement("div");
+    copy.className = "feed-copy";
+    const title = document.createElement("strong");
+    const result = document.createElement("span");
+    const who = asYou(item.actor || "Someone");
+    if (item.kind === "skip") {
+      title.textContent = who + " skips the turn";
+    } else if (item.kind === "pass") {
+      title.textContent = who + " ended the turn";
+      result.textContent = "no card played";
+    } else {
+      title.textContent = who + " played " + (item.card || "a card");
+      result.textContent = asYou(item.result || "");
+    }
+    copy.append(title, result);
+    row.append(thumb, copy);
+    return row;
+  }
+
+  function lastTurnBlock() {
+    const last = state.last_turn;
+    if (!state.your_turn || !last) return null;
+    const box = document.createElement("section");
+    box.className = "last-turn";
+    const heading = document.createElement("h3");
+    heading.textContent = last.name + "'s last turn";
+    box.append(heading);
+    if (last.skipped) {
+      const line = document.createElement("p");
+      line.textContent = last.name + " skips the turn.";
+      box.append(line);
+      return box;
+    }
+    const plays = (last.plays || []).filter((item) => item.kind === "play");
+    if (!plays.length) {
+      const line = document.createElement("p");
+      line.textContent = last.name + " played no cards.";
+      box.append(line);
+      return box;
+    }
     const list = document.createElement("ol");
-    (state.log || []).forEach((line) => {
-      const item = document.createElement("li");
-      item.textContent = line;
-      list.append(item);
-    });
-    details.append(summary, list);
-    return details;
+    list.className = "feed";
+    plays.forEach((item) => list.append(feedRow(item)));
+    box.append(list);
+    return box;
+  }
+
+  function logBlock() {
+    const panel = document.createElement("section");
+    panel.className = "duel-log";
+    const heading = document.createElement("h3");
+    heading.textContent = "Duel log";
+    const list = document.createElement("ol");
+    list.className = "feed";
+    const items = (state.feed || []).slice().reverse();
+    if (!items.length) {
+      const empty = document.createElement("li");
+      empty.className = "feed-empty";
+      empty.textContent = "No plays yet.";
+      list.append(empty);
+    } else {
+      items.forEach((item) => list.append(feedRow(item)));
+    }
+    panel.append(heading, list);
+    return panel;
   }
 
   function closeSheet() {
