@@ -89,6 +89,106 @@ def finish(game: Game) -> None:
         check(move.ok, f"discard: {move.error}")
 
 
+def test_vcc_channels() -> None:
+    """/vcc runs only in the listed channels, and in threads under them."""
+    import discord
+
+    from cogs.vcc.channels import VCC_CHANNEL_IDS, vcc_channel_allowed, vcc_channel_refusal
+    from cogs.vcc_game import Vcc
+
+    expected = (
+        1560675344485318676,
+        1555035151208153209,
+        1555701358814826677,
+        1558611215054282822,
+        1560280552303624252,
+    )
+    check(VCC_CHANNEL_IDS == expected, f"channel list drifted: {VCC_CHANNEL_IDS}")
+    check(len(set(VCC_CHANNEL_IDS)) == len(VCC_CHANNEL_IDS), "channel list has a duplicate")
+
+    class Room:
+        def __init__(self, cid, parent_id=None, kind=discord.ChannelType.text):
+            self.id = cid
+            self.parent_id = parent_id
+            self.type = kind
+
+    for cid in VCC_CHANNEL_IDS:
+        check(vcc_channel_allowed(Room(cid)), f"channel {cid} should be allowed")
+    check(not vcc_channel_allowed(Room(1)), "some other channel is refused")
+    check(not vcc_channel_allowed(None), "a missing channel is refused")
+    check(
+        not vcc_channel_allowed(Room(9, parent_id=VCC_CHANNEL_IDS[0], kind=discord.ChannelType.private)),
+        "a DM is refused",
+    )
+    # A text channel's parent is its category. That must not open the command.
+    check(
+        not vcc_channel_allowed(Room(9, parent_id=VCC_CHANNEL_IDS[0], kind=discord.ChannelType.text)),
+        "a sibling under the same category is refused",
+    )
+    for kind in (
+        discord.ChannelType.public_thread,
+        discord.ChannelType.private_thread,
+        discord.ChannelType.news_thread,
+    ):
+        check(
+            vcc_channel_allowed(Room(404, parent_id=VCC_CHANNEL_IDS[2], kind=kind)),
+            f"{kind} under an allowed channel should run",
+        )
+        check(
+            not vcc_channel_allowed(Room(404, parent_id=123, kind=kind)),
+            f"{kind} under another channel is refused",
+        )
+
+    text = vcc_channel_refusal()
+    for cid in VCC_CHANNEL_IDS:
+        check(f"<#{cid}>" in text, f"refusal missing mention for {cid}")
+    check("1560675344485318676" not in text.replace("<#1560675344485318676>", ""), "bare id leaked")
+
+    names = sorted(command.name for command in Vcc.vcc.walk_commands())
+    check(
+        names == ["album", "challenge", "night", "practice", "record"],
+        f"/vcc commands {names}",
+    )
+    for command in Vcc.vcc.walk_commands():
+        check(command.parent is Vcc.vcc, f"{command.name} is not behind the channel check")
+
+    class Reply:
+        def __init__(self):
+            self.done = False
+            self.sent = None
+
+        def is_done(self):
+            return self.done
+
+        async def send_message(self, content, *, ephemeral=False):
+            self.done = True
+            self.sent = (content, ephemeral)
+
+    class Interaction:
+        def __init__(self, channel):
+            self.channel = channel
+            self.response = Reply()
+
+    async def drive():
+        allowed = Interaction(Room(VCC_CHANNEL_IDS[0]))
+        check(await Vcc.vcc.interaction_check(allowed) is True, "allowed channel passes the group check")
+        check(allowed.response.sent is None, "allowed channel got a refusal")
+
+        thread = Interaction(Room(8, parent_id=VCC_CHANNEL_IDS[1], kind=discord.ChannelType.public_thread))
+        check(await Vcc.vcc.interaction_check(thread) is True, "thread under an allowed channel passes")
+
+        blocked = Interaction(Room(8))
+        check(await Vcc.vcc.interaction_check(blocked) is False, "other channel fails the group check")
+        check(blocked.response.sent == (text, True), f"refusal was {blocked.response.sent}")
+
+        again = Interaction(Room(8))
+        again.response.done = True
+        check(await Vcc.vcc.interaction_check(again) is False, "already answered still fails")
+        check(again.response.sent is None, "did not send a second reply")
+
+    asyncio.run(drive())
+
+
 def test_catalog() -> None:
     check(len(SPELL_IDS) == 30, f"expected 30 spells, got {len(SPELL_IDS)}")
     check(len(CARDS) == 35, f"expected 35 cards, got {len(CARDS)}")
@@ -1003,6 +1103,7 @@ async def test_http() -> None:
 
 
 def main() -> int:
+    test_vcc_channels()
     test_catalog()
     test_opening_and_decks()
     test_mana_curve()

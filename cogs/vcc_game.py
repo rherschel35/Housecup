@@ -27,6 +27,7 @@ from discord.ext import commands
 from cogs.store import HOUSES, house_display
 from cogs.vcc.book import Book, public_base_url
 from cogs.vcc.cards import CARDS
+from cogs.vcc.channels import vcc_channel_allowed, vcc_channel_refusal
 from cogs.vcc.scoring import (
     NIGHT_LENGTHS,
     WAGERS,
@@ -207,13 +208,37 @@ def _link_embed(url: str | None, *, fresh: bool) -> discord.Embed:
     )
 
 
+class VccCommands(app_commands.Group):
+    """Every /vcc subcommand. The channel check runs before the command body."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            name="vcc",
+            description="Velmora Curse & Crown, a private spellcard duel.",
+        )
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if vcc_channel_allowed(interaction.channel):
+            return True
+        if not interaction.response.is_done():
+            await interaction.response.send_message(vcc_channel_refusal(), ephemeral=True)
+        return False
+
+    async def on_error(
+        self,
+        interaction: discord.Interaction,
+        error: app_commands.AppCommandError,
+    ) -> None:
+        # A refused channel already got its ephemeral reply. Don't log that.
+        if isinstance(error, app_commands.CheckFailure):
+            return
+        log.exception("Curse & Crown command failed: %s", error)
+
+
 class Vcc(commands.Cog):
     """1v1 Curse & Crown. The cards are played on the web, not in chat."""
 
-    vcc = app_commands.Group(
-        name="vcc",
-        description="Velmora Curse & Crown, a private spellcard duel.",
-    )
+    vcc = VccCommands()
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
