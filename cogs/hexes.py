@@ -11,9 +11,10 @@ reposts it through a per-channel webhook wearing their name and avatar.
 Limp Wand is different — it leaves chat alone and blocks /wand, /patronus,
 /broom, and the green wild-threat spell buttons for one hour.
 
-Yoda, Rhyme, Dramatic Narrator, Haiku, Toddler, Superhero, and Sheep are
-staff-cast only (`/staffgame hex cast`). Like Cowboy, each one rephrases the
-line in character and keeps the meaning. Hex Scrolls never roll them.
+Yoda, Rhyme, Dramatic Narrator, Haiku, Toddler, Superhero, Sheep, Gen Z,
+Dog, Snake, Corporate Email, Overthinker, and Influencer are staff-cast only
+(`/staffgame hex cast`). Like Cowboy, each one rephrases the line in character
+and keeps the meaning. Hex Scrolls never roll them.
 
 Headmasters and house Presidents may cast, lift, and list. Needs the bot to
 hold Manage Messages (to delete the original) and Manage Webhooks (to
@@ -1593,6 +1594,358 @@ def fx_sheep(text: str) -> str:
     return out
 
 
+# --- Gen Z -----------------------------------------------------------------
+_GENZ_PHRASES = [
+    (r"\bi don't know\b", "no cap I don't know"),
+    (r"\bi dont know\b", "no cap I don't know"),
+    (r"\bi am going to\b", "lowkey I'm gonna"),
+    (r"\bi'm going to\b", "lowkey I'm gonna"),
+    (r"\bim going to\b", "lowkey I'm gonna"),
+    (r"\bgoing to\b", "gonna"),
+    (r"\bthank you\b", "tysm"),
+    (r"\bthanks\b", "tysm"),
+    (r"\bhello\b", "yo"),
+    (r"\bhi\b", "yo"),
+    (r"\bhey\b", "yo"),
+    (r"\bi think\b", "lowkey I think"),
+    (r"\bi love\b", "I'm obsessed with"),
+    (r"\bplease\b", "pls"),
+    (r"\blet's go\b", "bet let's go"),
+    (r"\blets go\b", "bet let's go"),
+]
+_GENZ_MAP = {
+    "friend": "bestie", "friends": "besties", "really": "fr", "very": "lowkey",
+    "great": "bussin", "awesome": "bussin", "amazing": "bussin", "good": "bussin",
+    "yes": "no cap", "yeah": "fr", "hello": "yo", "hi": "yo",
+    "please": "pls",
+}
+_GENZ_OPENERS = ("No cap, ", "Fr fr, ", "Lowkey, ", "Bestie, ")
+_GENZ_CLOSERS = (" fr fr.", ", no cap.", ", bussin.", " — lowkey.")
+_GENZ_EMPTY = (
+    "No cap, nothing to say, fr fr.",
+    "Lowkey silence, bussin.",
+    "Fr fr, they said nothing, no cap.",
+)
+_GENZ_MARKERS = ("no cap", "fr fr", "lowkey", "bussin")
+
+
+def fx_genz(text: str) -> str:
+    """Rephrase in Gen Z slang. The facts stay; the voice is no cap / fr fr."""
+    if not _has_letters(text):
+        return random.choice(_GENZ_EMPTY)
+    out = _apply_phrases(_normalize_apostrophes(text), _GENZ_PHRASES)
+    out = _tidy_speech(_word_swap(out, _GENZ_MAP))
+    if not _has_letters(out):
+        return random.choice(_GENZ_EMPTY)
+    out = _voice_bookend(
+        out,
+        openers=_GENZ_OPENERS,
+        closers=_GENZ_CLOSERS,
+        opener_re=r"^(no cap|fr fr|lowkey|bestie)\b",
+        closer_re=r"(fr fr\.|no cap\.|bussin\.|lowkey\.)\s*$",
+    )
+    if not any(marker in out.lower() for marker in _GENZ_MARKERS):
+        out = f"{out.rstrip('.!?')}, fr fr, no cap."
+    return out
+
+
+# --- Dog -------------------------------------------------------------------
+_DOG_PHRASES = [
+    (r"\bi don't know\b", "woof, I don't know"),
+    (r"\bi dont know\b", "woof, I don't know"),
+    (r"\bi am going to\b", "I'm bounding off to"),
+    (r"\bi'm going to\b", "I'm bounding off to"),
+    (r"\bim going to\b", "I'm bounding off to"),
+    (r"\bgoing to\b", "bounding to"),
+    (r"\bhello\b", "woof, hello"),
+    (r"\bhi\b", "woof, hi"),
+    (r"\bhey\b", "woof, hey"),
+    (r"\bi think\b", "I think, tail wagging"),
+    (r"\bthank you\b", "woof, thank you, treat please"),
+    (r"\bthanks\b", "woof, thank you, treat please"),
+    (r"\blet's go\b", "walkies, let's go"),
+    (r"\blets go\b", "walkies, let's go"),
+    (r"\bhelp me\b", "woof, help me"),
+    (r"\byes\b", "woof yes"),
+    (r"\bfood\b", "treats"),
+]
+_DOG_MAP = {
+    "friend": "buddy", "friends": "buddies", "eat": "have a treat",
+    "food": "treats", "walk": "walkies", "walking": "going walkies",
+}
+_DOG_OPENERS = ("Woof! ", "Squirrel! Wait, woof — ", "Ooh, walkies! ")
+_DOG_CLOSERS = (". Squirrel!", ". Walk? Treat? Woof!", ". Woof, treat?")
+_DOG_EMPTY = (
+    "Woof! Squirrel! Walk? Treat?",
+    "Woof woof! Nothing to say — squirrel!",
+    "Walkies? Treat? Woof!",
+)
+
+
+def _weave_woof(text: str) -> str:
+    words = text.split()
+    if not words:
+        return "woof"
+    out = []
+    since = 0
+    for word in words:
+        out.append(word)
+        if "woof" in word.lower():
+            since = 0
+            continue
+        since += 1
+        if since >= 6:
+            out.append("woof")
+            since = 0
+    return " ".join(out)
+
+
+def fx_dog(text: str) -> str:
+    """Rephrase as an excited, easily distracted dog. The errand stays in the bark."""
+    if not _has_letters(text):
+        return random.choice(_DOG_EMPTY)
+    out = _apply_phrases(_normalize_apostrophes(text), _DOG_PHRASES)
+    out = _tidy_speech(_word_swap(out, _DOG_MAP))
+    out = "\n".join(_weave_woof(line) if line.strip() else line for line in out.splitlines())
+    if not _has_letters(out):
+        return random.choice(_DOG_EMPTY)
+    out = _voice_bookend(
+        out,
+        openers=_DOG_OPENERS,
+        closers=_DOG_CLOSERS,
+        opener_re=r"^(woof|squirrel|ooh)\b",
+        closer_re=r"(squirrel!|woof!|treat\?)\s*$",
+    )
+    low = out.lower()
+    if "woof" not in low:
+        out = f"Woof! {out}"
+        low = out.lower()
+    if "squirrel" not in low and "walk" not in low and "treat" not in low:
+        out = f"{out.rstrip('.!')} Squirrel! Walk? Treat?"
+    return out
+
+
+# --- Snake -----------------------------------------------------------------
+_SNAKE_PHRASES = [
+    (r"\bi don't know\b", "I do not know, yesss"),
+    (r"\bi dont know\b", "I do not know, yesss"),
+    (r"\bi am going to\b", "I am sslithering to"),
+    (r"\bi'm going to\b", "I am sslithering to"),
+    (r"\bim going to\b", "I am sslithering to"),
+    (r"\bgoing to\b", "sslithering to"),
+    (r"\byes\b", "yesss"),
+    (r"\byeah\b", "yesss"),
+    (r"\bhello\b", "hiss, hello"),
+    (r"\bhi\b", "hiss, hello"),
+    (r"\bhey\b", "hiss, hello"),
+]
+_SNAKE_OPENERS = ("Sssss. ", "Hissss — ", "Yesss, ")
+_SNAKE_CLOSERS = (" ...sssss.", " yessss.", " — hissss.")
+_SNAKE_EMPTY = (
+    "Sssss...",
+    "Hissss. Nothing was said, yesss.",
+    "Sssss. Silence, yessss.",
+)
+
+
+def _stretch_esses(word: str) -> str:
+    def repl(match: re.Match) -> str:
+        run = match.group(0)
+        if len(run) >= 4:
+            return run
+        extra = "S" * 3 if run[-1].isupper() else "s" * 3
+        return run + extra
+    return re.sub(r"[sS]+", repl, word)
+
+
+def fx_snake(text: str) -> str:
+    """Rephrase with a hiss: stretched s sounds, the words still readable."""
+    if not _has_letters(text):
+        return random.choice(_SNAKE_EMPTY)
+    out = _apply_phrases(_normalize_apostrophes(text), _SNAKE_PHRASES)
+    out = WORD.sub(lambda match: _stretch_esses(match.group(0)), out)
+    out = _tidy_speech(out)
+    if not _has_letters(out):
+        return random.choice(_SNAKE_EMPTY)
+    out = _voice_bookend(
+        out,
+        openers=_SNAKE_OPENERS,
+        closers=_SNAKE_CLOSERS,
+        opener_re=r"^(ssss|hiss|yess)",
+        closer_re=r"(ssss+\.|yesss+\.|hisss+\.)\s*$",
+    )
+    if "ssss" not in out.lower():
+        out = f"Sssss. {out}"
+    return out
+
+
+# --- Corporate email -------------------------------------------------------
+_CORP_PHRASES = [
+    (r"\bi don't know\b", "I do not yet have visibility; I don't know"),
+    (r"\bi dont know\b", "I do not yet have visibility; I don't know"),
+    (r"\bi am going to\b", "I will circle back and proceed to"),
+    (r"\bi'm going to\b", "I will circle back and proceed to"),
+    (r"\bim going to\b", "I will circle back and proceed to"),
+    (r"\bgoing to\b", "proceeding to"),
+    (r"\bthank you\b", "thanks in advance"),
+    (r"\bthanks\b", "thanks in advance"),
+    (r"\bhello\b", "Hello, team"),
+    (r"\bhi\b", "Hello, team"),
+    (r"\bhey\b", "Hello, team"),
+    (r"\bi think\b", "per my last message, I think"),
+    (r"\bplease help me\b", "kindly action this deliverable for me"),
+    (r"\bhelp me\b", "action this deliverable for me"),
+    (r"\bplease\b", "kindly"),
+    (r"\blet's go\b", "let's align and move the deliverable"),
+    (r"\blets go\b", "let's align and move the deliverable"),
+]
+_CORP_MAP = {
+    "problem": "blocker", "problems": "blockers", "meeting": "sync",
+    "boss": "stakeholder",
+}
+_CORP_OPENERS = (
+    "Per my last message, ",
+    "Circling back, ",
+    "Hi team — ",
+)
+_CORP_CLOSERS = (
+    ". Please advise on the deliverables.",
+    ". Thanks in advance.",
+    ". Happy to circle back.",
+)
+_CORP_EMPTY = (
+    "Per my last message, there is no update. Please advise on the deliverables.",
+    "Circling back — nothing was sent. Thanks in advance.",
+    "Hi team — no content to action. Happy to circle back.",
+)
+_CORP_MARKERS = ("per my last", "circle back", "circling back", "deliverable")
+
+
+def fx_corporate(text: str) -> str:
+    """Rephrase as a corporate email. The request stays; the jargon wraps it."""
+    if not _has_letters(text):
+        return random.choice(_CORP_EMPTY)
+    out = _apply_phrases(_normalize_apostrophes(text), _CORP_PHRASES)
+    out = _tidy_speech(_word_swap(out, _CORP_MAP))
+    out = " ".join(out.split())
+    if not _has_letters(out):
+        return random.choice(_CORP_EMPTY)
+    out = _voice_bookend(
+        out,
+        openers=_CORP_OPENERS,
+        closers=_CORP_CLOSERS,
+        opener_re=r"^(per my last|circling back|hi team|hello, team)\b",
+        closer_re=r"(deliverables\.|in advance\.|circle back\.)\s*$",
+    )
+    if not any(marker in out.lower() for marker in _CORP_MARKERS):
+        out = f"Per my last message, {out.rstrip('.!?')}. Please advise on the deliverables."
+    return out
+
+
+# --- Overthinker -----------------------------------------------------------
+_OVERTHINK_STOP = frozenset({
+    "i", "i'm", "im", "am", "a", "an", "the", "to", "and", "then", "is", "my",
+    "we", "should", "with", "me", "do", "not", "don't", "dont", "of", "for",
+    "it", "that", "this", "be", "was", "are", "on", "in", "at",
+})
+_OVERTHINK_EXTRAS = (
+    " What if I already messed it up?",
+    " Am I overthinking this?",
+    " Sorry, ignore that — unless I shouldn't?",
+    " Wait, should I have said less?",
+)
+_OVERTHINK_EMPTY = (
+    "Wait — did I mean to say nothing? Was that wrong? Sorry. What if silence was the wrong choice?",
+    "Sorry. Was saying nothing a mistake? What if they noticed? Am I overthinking this?",
+)
+
+
+def _overthink_words(text: str) -> list[str]:
+    found = []
+    seen = set()
+    for word in re.findall(r"[A-Za-z']+", text):
+        key = word.lower()
+        if key in _OVERTHINK_STOP or key in seen:
+            continue
+        seen.add(key)
+        found.append(word)
+        if len(found) == 3:
+            break
+    return found
+
+
+def fx_overthinker(text: str) -> str:
+    """Rephrase as an anxious spiral. The original point is said, then second-guessed."""
+    if not _has_letters(text):
+        return random.choice(_OVERTHINK_EMPTY)
+    core = " ".join(_normalize_apostrophes(text).split()).strip()
+    if not core:
+        return random.choice(_OVERTHINK_EMPTY)
+    if core[-1] not in ".!?":
+        core += "."
+    words = _overthink_words(core)
+    bits = ["Wait, is that right?"]
+    if words:
+        bits.append(f"What if {words[0].lower()} is the wrong word?")
+    if len(words) > 1:
+        bits.append(f"Or did I mean {words[1].lower()} differently?")
+    if len(words) > 2:
+        bits.append(f"And {words[2].lower()} — was that too much?")
+    bits.append("Sorry. Should I say it again?")
+    return core + " " + " ".join(bits) + random.choice(_OVERTHINK_EXTRAS)
+
+
+# --- Influencer ------------------------------------------------------------
+_INFLUENCER_PHRASES = [
+    (r"\bi am going to\b", "your girl is going to"),
+    (r"\bi'm going to\b", "your girl is going to"),
+    (r"\bim going to\b", "your girl is going to"),
+    (r"\bgoing to\b", "headed to"),
+    (r"\bthank you\b", "thank you, besties"),
+    (r"\bthanks\b", "thank you, besties"),
+    (r"\bi love\b", "I am obsessed with"),
+    (r"\bplease\b", "please, besties"),
+    (r"\bi think\b", "okay so I think"),
+]
+_INFLUENCER_MAP = {
+    "friend": "bestie", "friends": "besties", "great": "iconic",
+    "awesome": "iconic", "amazing": "iconic",
+}
+_INFLUENCER_EMOJIS = ("✨", "💅", "💕", "👑", "🔥")
+_INFLUENCER_OPENERS = ("Hey besties! ", "Besties, hi! ", "Hey besties, okay so ")
+_INFLUENCER_CLOSERS = (
+    " Like and comment!",
+    " Drop a like and comment, besties!",
+    " Like, comment, and share!",
+)
+_INFLUENCER_EMPTY = (
+    "Hey besties! Nothing to share, but like and comment anyway ✨",
+    "Hey besties! Back with no tea, like and comment 💅",
+)
+
+
+def fx_influencer(text: str) -> str:
+    """Rephrase as an influencer post: hey besties, emojis, like and comment."""
+    if not _has_letters(text):
+        return random.choice(_INFLUENCER_EMPTY)
+    out = _apply_phrases(_normalize_apostrophes(text), _INFLUENCER_PHRASES)
+    out = _tidy_speech(_word_swap(out, _INFLUENCER_MAP))
+    out = " ".join(out.split()).strip().rstrip(".!?")
+    if not _has_letters(out):
+        return random.choice(_INFLUENCER_EMPTY)
+    if not re.match(r"^(hey )?besties\b", out, flags=re.IGNORECASE):
+        out = random.choice(_INFLUENCER_OPENERS) + out
+    emoji = random.choice(_INFLUENCER_EMOJIS)
+    closer = random.choice(_INFLUENCER_CLOSERS)
+    if "like" not in out.lower() or "comment" not in out.lower():
+        out = f"{out}!{closer}"
+    elif not out.endswith("!"):
+        out = f"{out}!"
+    if not any(mark in out for mark in _INFLUENCER_EMOJIS):
+        out = f"{out} {emoji}"
+    return out
+
+
 EFFECTS = {
     "reversed": {"name": "Backwards Curse", "description": "Every word comes out back-to-front.",
                 "func": fx_reversed},
@@ -1670,6 +2023,42 @@ EFFECTS = {
         "name": "Sheep Curse",
         "description": "Rephrases every line in sheep-speak with baaa woven in, meaning intact.",
         "func": fx_sheep,
+        "staff_only": True,
+    },
+    "genz": {
+        "name": "Gen Z Curse",
+        "description": "Rephrases every line in Gen Z slang — no cap, fr fr, lowkey, bussin — meaning intact.",
+        "func": fx_genz,
+        "staff_only": True,
+    },
+    "dog": {
+        "name": "Dog Curse",
+        "description": "Rephrases every line as an excited, easily distracted dog, meaning intact.",
+        "func": fx_dog,
+        "staff_only": True,
+    },
+    "snake": {
+        "name": "Snake Curse",
+        "description": "Rephrases every line as hissing speech with stretched s sounds, meaning intact.",
+        "func": fx_snake,
+        "staff_only": True,
+    },
+    "corporate": {
+        "name": "Corporate Email Curse",
+        "description": "Rephrases every line as office jargon — circle back, deliverables — meaning intact.",
+        "func": fx_corporate,
+        "staff_only": True,
+    },
+    "overthinker": {
+        "name": "Overthinker Curse",
+        "description": "Rephrases every line as anxious second-guessing and spiraling questions, meaning intact.",
+        "func": fx_overthinker,
+        "staff_only": True,
+    },
+    "influencer": {
+        "name": "Influencer Curse",
+        "description": "Rephrases every line as a hey-besties post with emojis, likes, and comments, meaning intact.",
+        "func": fx_influencer,
         "staff_only": True,
     },
 }
