@@ -27,7 +27,8 @@ HELP = {
         "staff": False,
         "entries": [
             ("duel", "Challenge someone. Best of 3 = 1 win; best of 5/7/9/51 = series of first-to-2 sets banking 3/4/5/26 wins (sets you take still fill your daily duel checklist/points even if you lose the series). During Duel Night, cross-house wins tally for an end-of-night pool instead of paying on the spot."),
-            ("vcc challenge", "Challenge someone to Velmora Curse & Crown. They accept in Discord; each of you gets a private link to the table. The winner's house earns 3 points, up to 3 wins a day."),
+            ("vcc challenge", "Challenge someone to Velmora Curse & Crown. They accept in Discord; each of you gets a private link to the table. On a wager night, pick Free, 5 pts, or 10 pts — the winner's house takes that stake from the loser's, and a house can't stake more than it has. Any other time the winner draws a Chocolate Frog or a spell card, and no house points move."),
+            ("vcc album", "Your Curse & Crown spell cards (or anyone's). Chocolate Frogs stay in /frog album."),
             ("trio scramble", "Open a casual 3v3 trio duel — any houses, join either side. House points: 5 wins/day for the house → +5 once."),
             ("trio housematch", "Open a house-vs-house 3v3 trio duel (house role gated). Same house daily set: 5 wins → +5."),
             ("grand", "Challenge someone to a Grand Duel (both need 50+ 1v1 wins)."),
@@ -305,6 +306,7 @@ HELP = {
             ("staffgame bingo end", "End the open Wizard Bingo round."),
             ("staffgame bingo winners", "List BINGO winners for the open round."),
             ("staffgame frog prize", "Award any Chocolate Frog card as a prize/reward (incl. mythic Lumen Aegis)."),
+            ("vcc night", "Staff: start or end a Curse & Crown wager night. Optional length is 30 minutes or 1 hour; leave it empty to run until you end it. During the night, /vcc challenge offers Free, 5, or 10 house points."),
             ("staffgame duels night", "Start or end House Duel Night — pick 30 minutes or 1 hour. Cross-house wins tally until the end (no on-the-spot pay, no rematch limit); top 7 split the pool, plus MVP, house-share, and most-duelists bonuses."),
             ("staffgame duels nightschedule", "Schedule 1–3 weekly Duel Nights (30 min or 1 hr) — each with its own Chicago day + time."),
             ("staffgame duels nightscheduleoff", "Turn off the weekly Duel Night schedule."),

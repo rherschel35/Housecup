@@ -118,7 +118,7 @@ Runtime files are written under `STATE_DIR`. The bot creates a file when that fe
 - `world_state.json` - satchels, place reputation, academy flags
 - `dementors.json` - wild threats and Attack schedule
 - `duels.json` - duel records and Duel Night
-- `vcc_state.json` - Curse & Crown challenges, live tables (token hashes only), and the daily points cap
+- `vcc_state.json` - Curse & Crown challenges, live tables (token hashes only), wager night, and spell albums
 - `descent_state.json` - Descent progress
 - `descent_restore_claims.json` - pending Descent restore claims
 - `descent_state.corrupt.*.json` - backups kept when a Descent save could not be read

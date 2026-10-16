@@ -1,8 +1,12 @@
-"""Velmora Curse & Crown — Discord challenge, private table links, house points.
+"""Velmora Curse & Crown — Discord challenge, private table links, rewards.
 
 The duel itself is played on the web table. This cog deals the challenge,
 hands each player a link that only they can use, and writes the result
-back to the channel through the House Cup ledger.
+back to the channel.
+
+During a wager night the winner's house takes the stake from the loser's.
+Any other time the winner draws a Chocolate Frog or a spell card, and the
+Cup does not move.
 
 Links and table tokens are never logged.
 """
@@ -12,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import random
 import time
 from pathlib import Path
 
@@ -21,7 +26,16 @@ from discord.ext import commands
 
 from cogs.store import HOUSES, house_display
 from cogs.vcc.book import Book, public_base_url
-from cogs.vcc.scoring import REWARDED_PER_DAY, WIN_POINTS, points_for_win
+from cogs.vcc.cards import CARDS
+from cogs.vcc.scoring import (
+    NIGHT_LENGTHS,
+    WAGERS,
+    collectible_kind,
+    dropdown_amounts,
+    pick_from,
+    points_to_move,
+    stake_decision,
+)
 from cogs.vcc.web import Hub, create_app, start_site
 
 log = logging.getLogger("velmora.vcc")
@@ -52,6 +66,96 @@ def _accept_timeout() -> float:
 def _house_name(key: str) -> str:
     meta = HOUSES.get(key)
     return meta["name"] if meta else key
+
+
+_STAKE_LABEL = {0: "Free", 5: "5 pts", 10: "10 pts"}
+
+
+def _stake_label(amount: int) -> str:
+    return _STAKE_LABEL.get(int(amount), str(amount))
+
+
+def _pair_balances(store, house_a: str, house_b: str) -> tuple[int, int] | None:
+    """Season totals for both houses, or None when there is no Cup to stake."""
+    if store is None or not store.season_active():
+        return None
+    totals = dict(store.house_totals("season"))
+    return int(totals.get(house_a, 0)), int(totals.get(house_b, 0))
+
+
+def _stake_sentence(mode: str, wager: int, house_a: str, house_b: str, balances) -> str:
+    if mode != "wager":
+        return (
+            "No wager night is running. The winner draws a Chocolate Frog "
+            "or a spell card. No house points move."
+        )
+    if int(wager) <= 0:
+        return "Wager: **Free**. No house points move."
+    covered = ""
+    if balances is not None:
+        covered = (
+            f" {house_display(house_a)} has **{balances[0]}** this season, "
+            f"{house_display(house_b)} has **{balances[1]}**."
+        )
+    return (
+        f"Wager: **{int(wager)}** house points.{covered} "
+        f"The winner's house takes {int(wager)} from the loser's house. "
+        "Each house keeps the rest of what it earned."
+    )
+
+
+def _refusal(decision: str, wager: int, house_a: str, house_b: str, balances) -> str:
+    if decision == "no-night":
+        return (
+            "Wager nights are closed. Pick **Free** — the winner draws "
+            "a Chocolate Frog or a spell card, and no house points move."
+        )
+    if decision == "no-balance":
+        return "No House Cup season is running, so there's nothing to stake. Pick **Free**."
+    if decision == "short" and balances is not None:
+        allowed = dropdown_amounts(night=True, balances=balances, balances_known=True)
+        choices = ", ".join(_stake_label(amount) for amount in allowed)
+        return (
+            f"A **{int(wager)}**-point wager needs both houses to have at least "
+            f"{int(wager)} this season. {house_display(house_a)} has **{balances[0]}**, "
+            f"{house_display(house_b)} has **{balances[1]}**. Open stakes: {choices}."
+        )
+    return "Pick a stake from the list: Free, 5 pts, or 10 pts."
+
+
+async def _complete_wager(
+    interaction: discord.Interaction, current: str
+) -> list[app_commands.Choice[int]]:
+    """Free outside a wager night. During a night, only stakes both houses can cover."""
+    cog = interaction.client.get_cog("Vcc")
+    night = bool(cog and cog.book.wager_night_on())
+    balances = None
+    known = False
+    if night and cog is not None:
+        store = interaction.client.get_cog("Store")
+        opponent = getattr(getattr(interaction, "namespace", None), "opponent", None)
+        me = interaction.user
+        if store is not None and not store.season_active():
+            known = True
+        elif (
+            store is not None
+            and isinstance(me, discord.Member)
+            and isinstance(opponent, discord.Member)
+        ):
+            mine = store.member_house(me)
+            theirs = store.member_house(opponent)
+            if mine and theirs:
+                balances = _pair_balances(store, mine, theirs)
+                known = True
+    amounts = dropdown_amounts(night=night, balances=balances, balances_known=known)
+    needle = (current or "").strip().casefold()
+    choices = []
+    for amount in amounts:
+        label = _stake_label(amount)
+        if needle and needle not in label.casefold() and needle not in str(amount):
+            continue
+        choices.append(app_commands.Choice(name=label, value=amount))
+    return choices
 
 
 def _link(raw: str | None) -> str | None:
@@ -126,8 +230,17 @@ class Vcc(commands.Cog):
     # --------------------------------------------------------------- discord
 
     @vcc.command(name="challenge", description="Challenge someone to Velmora Curse & Crown.")
-    @app_commands.describe(opponent="Who you're challenging")
-    async def challenge(self, interaction: discord.Interaction, opponent: discord.Member):
+    @app_commands.describe(
+        opponent="Who you're challenging",
+        wager="Stake during a wager night: Free, 5 pts, or 10 pts.",
+    )
+    @app_commands.autocomplete(wager=_complete_wager)
+    async def challenge(
+        self,
+        interaction: discord.Interaction,
+        opponent: discord.Member,
+        wager: int = 0,
+    ):
         me = interaction.user
         if not isinstance(me, discord.Member) or interaction.guild is None or interaction.channel is None:
             await interaction.response.send_message(
@@ -157,6 +270,27 @@ class Vcc(commands.Cog):
                 ephemeral=True,
             )
             return
+        try:
+            stake = int(wager)
+        except (TypeError, ValueError):
+            stake = -1
+        if stake not in WAGERS:
+            await interaction.response.send_message(
+                _refusal("invalid", stake, my_house, their_house, None),
+                ephemeral=True,
+            )
+            return
+
+        night = self.book.wager_night_on()
+        balances = _pair_balances(store, my_house, their_house)
+        decision = stake_decision(night=night, wager=stake, balances=balances)
+        if decision != "ok":
+            await interaction.response.send_message(
+                _refusal(decision, stake, my_house, their_house, balances),
+                ephemeral=True,
+            )
+            return
+        mode = "wager" if night else "card"
 
         async with self.lock:
             if self.book.in_match(me.id) or self.book.in_match(opponent.id):
@@ -173,6 +307,8 @@ class Vcc(commands.Cog):
                 opponent_id=opponent.id,
                 opponent_name=opponent.display_name,
                 opponent_house=their_house,
+                wager=stake,
+                mode=mode,
             )
 
         embed = discord.Embed(
@@ -181,14 +317,12 @@ class Vcc(commands.Cog):
                 f"**{me.display_name}** of {_house_name(my_house)} challenges "
                 f"**{opponent.display_name}** of {_house_name(their_house)}.\n\n"
                 "Knock their Ward from 20 to nothing. Accept, and each of you "
-                "gets a private link — only you can see your hand."
+                "gets a private link — only you can see your hand.\n\n"
+                + _stake_sentence(mode, stake, my_house, their_house, balances)
             ),
             color=GOLD,
         )
-        embed.set_footer(
-            text=f"Winner's house earns {WIN_POINTS} points, up to {REWARDED_PER_DAY} wins a day. "
-            "Same house pays nothing."
-        )
+        embed.set_footer(text="The stake is settled when the duel ends.")
         try:
             await interaction.response.send_message(
                 content=opponent.mention,
@@ -215,23 +349,70 @@ class Vcc(commands.Cog):
         async with self.lock:
             challenge = self.book.challenges.get(challenge_id)
             if challenge is None:
-                await interaction.response.send_message(
-                    "That challenge has already been answered.", ephemeral=True
-                )
-                return
-            if interaction.user.id != challenge.opponent_id:
-                await interaction.response.send_message(
-                    "This challenge isn't yours to answer.", ephemeral=True
-                )
-                return
-            raws = self.book.start_game(challenge)
+                outcome = "missing"
+                raws = None
+                refusal = None
+            elif interaction.user.id != challenge.opponent_id:
+                outcome = "stranger"
+                raws = None
+                refusal = None
+            elif challenge.mode == "wager" and challenge.wager > 0:
+                store = self.bot.get_cog("Store")
+                balances = _pair_balances(store, challenge.challenger_house, challenge.opponent_house)
+                decision = stake_decision(night=True, wager=challenge.wager, balances=balances)
+                if decision != "ok":
+                    self.book.drop_challenge(challenge_id)
+                    outcome = "uncovered"
+                    raws = None
+                    refusal = _refusal(
+                        decision,
+                        challenge.wager,
+                        challenge.challenger_house,
+                        challenge.opponent_house,
+                        balances,
+                    )
+                else:
+                    outcome = "start"
+                    raws = self.book.start_game(challenge)
+                    refusal = None
+            else:
+                outcome = "start"
+                raws = self.book.start_game(challenge)
+                refusal = None
+        if outcome == "missing":
+            await interaction.response.send_message(
+                "That challenge has already been answered.", ephemeral=True
+            )
+            return
+        if outcome == "stranger":
+            await interaction.response.send_message(
+                "This challenge isn't yours to answer.", ephemeral=True
+            )
+            return
+        if outcome == "uncovered":
+            await interaction.response.edit_message(
+                content=None,
+                embed=discord.Embed(
+                    description="The stake isn't covered anymore, so the challenge closes. " + (refusal or ""),
+                    color=0x7A7A7A,
+                ),
+                view=None,
+            )
+            return
 
         started = discord.Embed(
             title="Velmora Curse & Crown",
             description=(
                 f"**{challenge.challenger_name}** and **{challenge.opponent_name}** "
                 "are at the table. Each of you has a private link — press **My table** "
-                "if it didn't reach you. Only you can see your hand."
+                "if it didn't reach you. Only you can see your hand.\n\n"
+                + _stake_sentence(
+                    challenge.mode,
+                    challenge.wager,
+                    challenge.challenger_house,
+                    challenge.opponent_house,
+                    None,
+                )
             ),
             color=GOLD,
         )
@@ -313,17 +494,16 @@ class Vcc(commands.Cog):
                 table.points = points
                 table.point_note = note
                 table.points_applied = True
-                if note == "awarded":
-                    stamps = self.book.rewarded.setdefault(str(table.game.winner), [])
-                    stamps.append(time.time())
                 self.book.save()
             digests = list(table.tokens.keys())
             self.book.expire_tokens(table)
             embed = self._result_embed(table)
+            prize = dict(table.prize or {})
             channel_id = table.channel_id
             message_id = table.message_id
+        extra, attachment = self._frog_attachment(prize)
         try:
-            await self._post_result(channel_id, message_id, embed)
+            await self._post_result(channel_id, message_id, embed, extra=extra, file=attachment)
         except Exception:
             log.exception("Could not post a Curse & Crown result in channel %s", channel_id)
             async with self.lock:
@@ -343,29 +523,126 @@ class Vcc(commands.Cog):
         game = table.game
         winner = game.players[game.winner]
         loser = game.other(game.winner)
-        from cogs.world_engine import on_central_day
-
-        already = self.book.rewarded_today(winner.id, lambda stamp: on_central_day(stamp))
-        points, note = points_for_win(
-            same_house=winner.house == loser.house,
-            rewarded_today=already,
-        )
-        if points <= 0:
-            return 0, note
+        if table.mode != "wager":
+            table.prize = self._give_collectible(winner.id)
+            return 0, "card"
+        if int(table.wager) <= 0:
+            return 0, "free"
         store = self.bot.get_cog("Store")
-        if store is None or not store.season_active():
+        balances = _pair_balances(store, loser.house, loser.house)
+        if balances is None:
             return 0, "no-season"
+        moved, note = points_to_move(table.wager, balances[0])
+        if moved <= 0:
+            return 0, note
         actor = self.bot.user.id if self.bot.user else 0
-        entry = store.record(
+        won = store.record(
             house=winner.house,
-            delta=points,
+            delta=moved,
             actor_id=actor,
             target_id=winner.id,
-            reason=f"Curse & Crown win over {loser.name}",
+            reason=f"Curse & Crown wager won from {loser.name}",
         )
-        if entry is None:
+        if won is None:
             return 0, "no-season"
-        return points, "awarded"
+        store.record(
+            house=loser.house,
+            delta=-moved,
+            actor_id=actor,
+            target_id=loser.id,
+            reason=f"Curse & Crown wager lost to {winner.name}",
+        )
+        return moved, note
+
+    def _give_collectible(self, user_id: int) -> dict:
+        """A Chocolate Frog from the existing album, or one of the 35 spell cards."""
+        frogs = self.bot.get_cog("Frogs")
+        if frogs is not None and collectible_kind(random.randrange(2)) == "frog":
+            try:
+                from cogs.frogs import CARDS as FROG_CARDS
+
+                card_id = frogs.roll()
+                count, is_new = frogs.add_card(user_id, card_id)
+                meta = FROG_CARDS[card_id]
+                return {
+                    "kind": "frog",
+                    "card_id": card_id,
+                    "name": meta["name"],
+                    "emoji": meta.get("emoji") or "",
+                    "text": meta.get("blurb") or "",
+                    "count": count,
+                    "new": is_new,
+                }
+            except Exception:
+                log.exception("Chocolate Frog prize failed; dealing a spell card instead.")
+        card_id = pick_from(tuple(CARDS), random.randrange(len(CARDS)))
+        card = CARDS[card_id]
+        count, is_new = self.book.add_spell(user_id, card_id)
+        return {
+            "kind": "spell",
+            "card_id": card_id,
+            "name": card.name,
+            "text": card.text,
+            "school": card.school_name,
+            "tag": card.tag,
+            "count": count,
+            "new": is_new,
+        }
+
+    def _reward_lines(self, table) -> tuple[str, str]:
+        game = table.game
+        winner = game.players[game.winner]
+        loser = game.other(game.winner)
+        note = table.point_note
+        if note == "card":
+            prize = table.prize or {}
+            fresh = "New." if prize.get("new") else f"Now ×{prize.get('count', 1)}."
+            if prize.get("kind") == "frog":
+                return (
+                    "Prize",
+                    f"{winner.name} draws a Chocolate Frog — {prize.get('emoji', '')} "
+                    f"**{prize.get('name', 'a frog')}**.\n{prize.get('text', '')}\n"
+                    f"{fresh} It's in their album (`/frog album`). No house points.",
+                )
+            return (
+                "Prize",
+                f"{winner.name} draws **{prize.get('name', 'a spell')}** "
+                f"({prize.get('school', 'Spell')} · {prize.get('tag', 'Spell')}).\n"
+                f"{prize.get('text', '')}\n"
+                f"{fresh} It's in their spell album (`/vcc album`). No house points.",
+            )
+        if note == "free":
+            return "Wager", f"Wager: **Free**. No house points move."
+        if note == "no-season":
+            return "Wager", "No House Cup season is running, so the stake can't be paid."
+        if note == "uncovered":
+            return (
+                "Wager",
+                f"The wager was **{table.wager}**, and {house_display(loser.house)} "
+                "has nothing left to cover it. No points move.",
+            )
+        same = winner.house == loser.house
+        if note == "partial":
+            lead = (
+                f"The wager was **{table.wager}**. {house_display(loser.house)} could cover "
+                f"**{table.points}**, so those move"
+            )
+        elif note == "paid":
+            lead = f"**{table.points}** house points move"
+        else:
+            return "Wager", "No house points move."
+        if same:
+            return (
+                "Wager",
+                f"{lead} from {loser.name} to {winner.name}. "
+                f"{house_display(winner.house)} keeps the same Cup total. "
+                "They keep everything earned beyond this stake.",
+            )
+        return (
+            "Wager",
+            f"{lead} from {house_display(loser.house)} to {house_display(winner.house)}. "
+            "Each house keeps the rest of what it earned.",
+        )
 
     def _result_embed(self, table) -> discord.Embed:
         game = table.game
@@ -383,33 +660,47 @@ class Vcc(commands.Cog):
             value=f"{winner.name} {winner.ward} · {loser.name} {loser.ward}",
             inline=False,
         )
-        if table.point_note == "awarded" and table.points:
-            embed.add_field(
-                name="House Cup",
-                value=f"+{table.points} to {house_display(winner.house)}",
-                inline=False,
-            )
-        elif table.point_note == "same-house":
-            embed.add_field(name="House Cup", value="Same house — the Cup doesn't move.", inline=False)
-        elif table.point_note == "daily-cap":
-            embed.add_field(
-                name="House Cup",
-                value=f"Daily Curse & Crown points already claimed ({REWARDED_PER_DAY} wins).",
-                inline=False,
-            )
-        elif table.point_note == "no-season":
-            embed.add_field(
-                name="House Cup",
-                value="No House Cup season is running, so the Cup doesn't move.",
-                inline=False,
-            )
+        label, text = self._reward_lines(table)
+        embed.add_field(name=label, value=text[:1024], inline=False)
         return embed
 
-    async def _post_result(self, channel_id: int, message_id: int | None, embed: discord.Embed) -> None:
+    def _frog_attachment(self, prize: dict) -> tuple[discord.Embed | None, discord.File | None]:
+        if prize.get("kind") != "frog" or not prize.get("card_id"):
+            return None, None
+        frogs = self.bot.get_cog("Frogs")
+        if frogs is None:
+            return None, None
+        try:
+            from cogs.frogs import _card_file
+
+            flag = "**NEW!**" if prize.get("new") else f"Duplicate ×{prize.get('count', 1)}"
+            embed = frogs.embed_card(
+                prize["card_id"],
+                title_prefix="🍫 Prize frog",
+                flag=flag,
+                footer="In their album · /frog album",
+            )
+            return embed, _card_file(prize["card_id"])
+        except Exception:
+            log.exception("Could not render a prize frog.")
+            return None, None
+
+    async def _post_result(
+        self,
+        channel_id: int,
+        message_id: int | None,
+        embed: discord.Embed,
+        *,
+        extra: discord.Embed | None = None,
+        file: discord.File | None = None,
+    ) -> None:
         channel = self.bot.get_channel(channel_id)
         if channel is None:
             channel = await self.bot.fetch_channel(channel_id)
-        await channel.send(embed=embed)
+        kwargs = {"embeds": [embed] if extra is None else [embed, extra]}
+        if file is not None:
+            kwargs["file"] = file
+        await channel.send(**kwargs)
         if message_id and hasattr(channel, "fetch_message"):
             try:
                 message = await channel.fetch_message(message_id)
@@ -450,10 +741,13 @@ class Vcc(commands.Cog):
     async def _tick(self) -> None:
         now = time.time()
         async with self.lock:
+            ended_night = self.book.pop_expired_wager_night(now)
             expired = self.book.expire_challenges(now)
             timed = self.book.timeout_games(now)
             self.book.sweep_tombstones(now)
             retry = [table.id for table in self.book.unannounced() if not table.settling]
+        if ended_night:
+            await self._announce_wager_night_over(ended_night)
         for challenge in expired:
             await self._close_challenge(challenge, "The challenge expired unanswered.")
         ended_now = set()
@@ -465,6 +759,158 @@ class Vcc(commands.Cog):
         for game_id in retry:
             if game_id not in ended_now:
                 await self.settle(game_id)
+
+    # ------------------------------------------------------------- album / night
+
+    @vcc.command(name="album", description="Your Curse & Crown spell cards.")
+    @app_commands.describe(member="Whose spell album to view")
+    async def album(self, interaction: discord.Interaction, member: discord.Member | None = None):
+        target = member or interaction.user
+        async with self.lock:
+            shelf = self.book.spells_of(target.id)
+        unique = len(shelf)
+        copies = sum(shelf.values())
+        if not shelf:
+            await interaction.response.send_message(
+                f"{target.display_name} has no spell cards yet. "
+                "Wins outside a wager night add one.",
+                ephemeral=True,
+            )
+            return
+        grouped: dict[str, list[str]] = {}
+        for card_id, count in shelf.items():
+            card = CARDS.get(card_id)
+            if card is None:
+                continue
+            mark = f" ×{count}" if count > 1 else ""
+            grouped.setdefault(card.school_name, []).append(f"{card.name}{mark}")
+        order = (
+            "Fire", "Frost", "Nature", "Shadow", "Star",
+            "Asterwilde", "Oakmont", "Caldrin", "Veyren", "Thornmere",
+        )
+        lines = [f"**{unique}/35** unique · **{copies}** cards"]
+        for school in order:
+            names = grouped.get(school)
+            if names:
+                lines.append(f"**{school}** — " + ", ".join(sorted(names)))
+        embed = discord.Embed(
+            title=f"{target.display_name}'s spell album",
+            description="\n".join(lines)[:4096],
+            color=GOLD,
+        )
+        embed.set_footer(text="Won outside wager nights. Chocolate Frogs stay in /frog album.")
+        await interaction.response.send_message(embed=embed)
+
+    @vcc.command(name="night", description="Start or end a Curse & Crown wager night.")
+    @app_commands.describe(
+        action="Start or end the night",
+        length="How long it runs",
+    )
+    @app_commands.choices(
+        action=[
+            app_commands.Choice(name="start", value="start"),
+            app_commands.Choice(name="end", value="end"),
+        ],
+        length=[
+            app_commands.Choice(name="30 minutes", value=30),
+            app_commands.Choice(name="1 hour", value=60),
+        ],
+    )
+    async def night(
+        self,
+        interaction: discord.Interaction,
+        action: str,
+        length: int | None = None,
+    ):
+        store = self.bot.get_cog("Store")
+        if not (store and store.is_staff(interaction.user)):
+            await interaction.response.send_message("That's for staff.", ephemeral=True)
+            return
+        if action not in {"start", "end"}:
+            await interaction.response.send_message("Pick start or end.", ephemeral=True)
+            return
+        if action == "end":
+            async with self.lock:
+                finished = self.book.end_wager_night()
+            if not finished:
+                await interaction.response.send_message(
+                    "There's no wager night running.", ephemeral=True
+                )
+                return
+            await interaction.response.send_message(embed=_night_over_embed())
+            return
+        if interaction.guild is None or interaction.channel is None:
+            await interaction.response.send_message(
+                "Start a wager night in a server channel.", ephemeral=True
+            )
+            return
+        if length is not None and int(length) not in NIGHT_LENGTHS:
+            await interaction.response.send_message(
+                "Pick **30 minutes**, **1 hour**, or leave the length empty.",
+                ephemeral=True,
+            )
+            return
+        async with self.lock:
+            ok, code, _night = self.book.begin_wager_night(
+                by=interaction.user.id,
+                channel_id=interaction.channel.id,
+                guild_id=interaction.guild.id,
+                minutes=None if length is None else int(length),
+            )
+        if not ok:
+            text = (
+                "A wager night is already running. End it first."
+                if code == "already"
+                else "Pick **30 minutes**, **1 hour**, or leave the length empty."
+            )
+            await interaction.response.send_message(text, ephemeral=True)
+            return
+        await interaction.response.send_message(embed=_night_open_embed(length))
+
+    async def _announce_wager_night_over(self, night: dict) -> None:
+        channel_id = night.get("channel_id")
+        if not channel_id:
+            return
+        try:
+            channel = self.bot.get_channel(int(channel_id))
+            if channel is None:
+                channel = await self.bot.fetch_channel(int(channel_id))
+            await channel.send(embed=_night_over_embed())
+        except discord.HTTPException as exc:
+            log.info("Could not post wager-night end in %s (HTTP %s).", channel_id, getattr(exc, "status", exc))
+
+
+def _night_open_embed(minutes: int | None) -> discord.Embed:
+    if minutes == 30:
+        clock = "It runs for **30 minutes**."
+    elif minutes == 60:
+        clock = "It runs for **1 hour**."
+    else:
+        clock = "It runs until staff end it with `/vcc night`."
+    return discord.Embed(
+        title="Curse & Crown — wager night",
+        description=(
+            "Wager night is open. A challenger picks **Free**, **5 pts**, or **10 pts** "
+            "from the stake list. The opponent sees that stake before they accept.\n\n"
+            "The winner's house takes the stake from the loser's house. "
+            "A house can't stake more than it has this season, and both houses "
+            "keep the rest of what they earned. A free table moves no points.\n\n"
+            f"{clock} Outside this night, wins draw a Chocolate Frog or a spell card instead."
+        ),
+        color=GOLD,
+    )
+
+
+def _night_over_embed() -> discord.Embed:
+    return discord.Embed(
+        title="Curse & Crown — wager night over",
+        description=(
+            "The night is closed. New challenges are free tables, "
+            "and the winner draws a Chocolate Frog or a spell card. "
+            "No house points move."
+        ),
+        color=GOLD,
+    )
 
 
 class TableView(discord.ui.View):

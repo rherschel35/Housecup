@@ -51,6 +51,8 @@ class Challenge:
     opponent_house: str
     created: float
     deadline: float
+    wager: int = 0
+    mode: str = "card"  # "wager" during a wager night, otherwise "card"
 
     def to_dict(self) -> dict:
         return {
@@ -66,6 +68,8 @@ class Challenge:
             "opponent_house": self.opponent_house,
             "created": self.created,
             "deadline": self.deadline,
+            "wager": int(self.wager),
+            "mode": self.mode,
         }
 
     @classmethod
@@ -83,6 +87,8 @@ class Challenge:
             opponent_house=data["opponent_house"],
             created=float(data["created"]),
             deadline=float(data["deadline"]),
+            wager=int(data.get("wager") or 0),
+            mode=data.get("mode") or "card",
         )
 
 
@@ -102,6 +108,9 @@ class Table:
     points: int = 0
     point_note: str = ""
     settling: bool = False
+    wager: int = 0
+    mode: str = "card"
+    prize: dict | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -118,6 +127,9 @@ class Table:
             "announced": self.announced,
             "points": self.points,
             "point_note": self.point_note,
+            "wager": int(self.wager),
+            "mode": self.mode,
+            "prize": self.prize,
         }
 
     @classmethod
@@ -136,6 +148,9 @@ class Table:
             announced=bool(data.get("announced")),
             points=int(data.get("points") or 0),
             point_note=data.get("point_note") or "",
+            wager=int(data.get("wager") or 0),
+            mode=data.get("mode") or "card",
+            prize=data.get("prize") if isinstance(data.get("prize"), dict) else None,
         )
 
 
@@ -161,7 +176,8 @@ class Book:
         self.by_digest: dict[str, str] = {}
         self.raw_memory: dict[tuple[str, int], str] = {}
         self.tombstones: dict[str, dict] = {}
-        self.rewarded: dict[str, list[float]] = {}
+        self.spellbook: dict[str, dict[str, int]] = {}
+        self.wager_night: dict | None = None
         self.load()
 
     # ---------------------------------------------------------------- disk
@@ -195,8 +211,9 @@ class Book:
             for token_hash, pid in table.tokens.items():
                 self.by_digest[token_hash] = table.id
         self.tombstones = dict(data.get("tombstones") or {})
-        rewarded = data.get("rewarded") or {}
-        self.rewarded = {str(k): [float(t) for t in v] for k, v in rewarded.items()}
+        self.spellbook = _clean_spellbook(data.get("spellbook") or {})
+        night = data.get("wager_night")
+        self.wager_night = dict(night) if isinstance(night, dict) else None
 
     def save(self) -> None:
         payload = {
@@ -204,7 +221,8 @@ class Book:
             "challenges": {cid: c.to_dict() for cid, c in self.challenges.items()},
             "games": {gid: g.to_dict() for gid, g in self.games.items()},
             "tombstones": self.tombstones,
-            "rewarded": getattr(self, "rewarded", {}),
+            "spellbook": self.spellbook,
+            "wager_night": self.wager_night,
         }
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -214,11 +232,6 @@ class Book:
             os.replace(tmp, self.path)
         except OSError:
             log.exception("Could not write VCC state to %s", self.path)
-
-    def __init_rewarded(self) -> dict:
-        if not hasattr(self, "rewarded"):
-            self.rewarded = {}
-        return self.rewarded
 
     # ---------------------------------------------------------------- busy
 
@@ -261,6 +274,8 @@ class Book:
         opponent_id: int,
         opponent_name: str,
         opponent_house: str,
+        wager: int = 0,
+        mode: str = "card",
         now: float | None = None,
     ) -> Challenge:
         now = time.time() if now is None else now
@@ -277,6 +292,8 @@ class Book:
             opponent_house=opponent_house,
             created=now,
             deadline=now + self.accept_timeout,
+            wager=int(wager),
+            mode=mode if mode in ("card", "wager") else "card",
         )
         self.challenges[challenge.id] = challenge
         self.by_user[challenger_id] = ("challenge", challenge.id)
@@ -329,6 +346,8 @@ class Book:
             deadline=now + self.turn_timeout,
             tokens={},
             game=game,
+            wager=int(challenge.wager),
+            mode=challenge.mode if challenge.mode in ("card", "wager") else "card",
         )
         raws: dict[int, str] = {}
         for pid in game.order:
@@ -516,21 +535,78 @@ class Book:
             self.tombstones.pop(key, None)
         self.save()
 
-    def rewarded_today(self, user_id: int, on_day) -> int:
-        """``on_day`` is a predicate ``timestamp -> bool`` for the current Central day."""
-        stamps = self.__init_rewarded().get(str(user_id), [])
-        return sum(1 for stamp in stamps if on_day(stamp))
-
-    def note_reward(self, user_id: int, now: float) -> None:
-        stamps = self.__init_rewarded().setdefault(str(user_id), [])
-        stamps.append(now)
-        # Keep a few days so the file doesn't grow with every duel.
-        cutoff = now - 3 * 24 * 3600
-        self.rewarded[str(user_id)] = [stamp for stamp in stamps if stamp >= cutoff]
-        self.save()
-
     def unannounced(self) -> list[Table]:
         return [table for table in self.games.values() if table.end_seen and not table.announced]
+
+    # --------------------------------------------------------------- rewards
+
+    def spells_of(self, user_id: int) -> dict[str, int]:
+        return dict(self.spellbook.get(str(user_id)) or {})
+
+    def add_spell(self, user_id: int, card_id: str) -> tuple[int, bool]:
+        """Add one spell card. The caller saves. Returns ``(count, is_new)``."""
+        shelf = self.spellbook.setdefault(str(user_id), {})
+        before = int(shelf.get(card_id, 0))
+        shelf[card_id] = before + 1
+        return shelf[card_id], before == 0
+
+    def wager_night_on(self, now: float | None = None) -> bool:
+        night = self.wager_night
+        if not night:
+            return False
+        now = time.time() if now is None else now
+        ends = night.get("ends_at")
+        if ends is None:
+            return True
+        return now < float(ends)
+
+    def begin_wager_night(
+        self,
+        *,
+        by: int,
+        channel_id: int,
+        guild_id: int,
+        minutes: int | None,
+        now: float | None = None,
+    ) -> tuple[bool, str, dict | None]:
+        """Open a wager night. ``minutes`` is 30, 60, or None until staff end it."""
+        from cogs.vcc.scoring import NIGHT_LENGTHS
+
+        now = time.time() if now is None else now
+        self.pop_expired_wager_night(now)
+        if self.wager_night_on(now):
+            return False, "already", None
+        if minutes is not None and int(minutes) not in NIGHT_LENGTHS:
+            return False, "length", None
+        night = {
+            "by": int(by),
+            "at": now,
+            "ends_at": None if minutes is None else now + int(minutes) * 60,
+            "minutes": None if minutes is None else int(minutes),
+            "channel_id": int(channel_id),
+            "guild_id": int(guild_id),
+        }
+        self.wager_night = night
+        self.save()
+        return True, "started", night
+
+    def end_wager_night(self) -> dict | None:
+        night = self.wager_night
+        if not night:
+            return None
+        self.wager_night = None
+        self.save()
+        return night
+
+    def pop_expired_wager_night(self, now: float | None = None) -> dict | None:
+        """Clear a night whose clock has run out. Open-ended nights stay."""
+        now = time.time() if now is None else now
+        night = self.wager_night
+        if not night or self.wager_night_on(now):
+            return None
+        self.wager_night = None
+        self.save()
+        return night
 
 
 def _tombstone_view(stone: dict) -> dict:
@@ -557,6 +633,30 @@ def _tombstone_view(stone: dict) -> dict:
         "log": [],
         "pending": None,
     }
+
+
+def _clean_spellbook(raw: dict) -> dict[str, dict[str, int]]:
+    from cogs.vcc.cards import CARDS
+
+    cleaned: dict[str, dict[str, int]] = {}
+    if not isinstance(raw, dict):
+        return cleaned
+    for user_id, shelf in raw.items():
+        if not isinstance(shelf, dict):
+            continue
+        kept = {}
+        for card_id, count in shelf.items():
+            if card_id not in CARDS:
+                continue
+            try:
+                owned = int(count)
+            except (TypeError, ValueError):
+                continue
+            if owned > 0:
+                kept[str(card_id)] = owned
+        if kept:
+            cleaned[str(user_id)] = kept
+    return cleaned
 
 
 def public_base_url() -> str:

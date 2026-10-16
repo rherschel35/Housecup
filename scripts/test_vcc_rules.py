@@ -22,7 +22,13 @@ os.environ.pop("DISCORD_TOKEN", None)
 from cogs.vcc.book import Book  # noqa: E402
 from cogs.vcc.cards import CARDS, HOUSE_CARD, SPECIALISTS, SPELL_IDS  # noqa: E402
 from cogs.vcc.engine import HAND_LIMIT, Game  # noqa: E402
-from cogs.vcc.scoring import points_for_win  # noqa: E402
+from cogs.vcc.scoring import (  # noqa: E402
+    collectible_kind,
+    dropdown_amounts,
+    pick_from,
+    points_to_move,
+    stake_decision,
+)
 from cogs.vcc.web import Hub, create_app  # noqa: E402
 
 
@@ -511,12 +517,85 @@ def test_privacy_end_and_roundtrip() -> None:
     drawn_other = other._draw(other.player(1), 1)
     check(drawn == drawn_other, "rng and deck survive a save")
 
-    same, note = points_for_win(same_house=True, rewarded_today=0)
-    check(same == 0 and note == "same-house", "same house pays nothing")
-    capped, note = points_for_win(same_house=False, rewarded_today=3)
-    check(capped == 0 and note == "daily-cap", "daily cap")
-    paid, note = points_for_win(same_house=False, rewarded_today=2)
-    check(paid == 3 and note == "awarded", "a win pays 3")
+    check(dropdown_amounts(night=False, balances=(100, 100), balances_known=True) == (0,), "outside a night the stake list is Free")
+    check(dropdown_amounts(night=True, balances=None, balances_known=False) == (0, 5, 10), "night menu before houses are known")
+    check(dropdown_amounts(night=True, balances=None, balances_known=True) == (0,), "no Cup balance means Free only")
+    check(dropdown_amounts(night=True, balances=(6, 20), balances_known=True) == (0, 5), "10 is hidden when a house has 6")
+    check(dropdown_amounts(night=True, balances=(10, 10), balances_known=True) == (0, 5, 10), "both houses can cover 10")
+    check(dropdown_amounts(night=True, balances=(0, 40), balances_known=True) == (0,), "a house at 0 can only play Free")
+    check(stake_decision(night=False, wager=0, balances=(0, 0)) == "ok", "free play outside a night")
+    check(stake_decision(night=False, wager=5, balances=(100, 100)) == "no-night", "stakes wait for a wager night")
+    check(stake_decision(night=True, wager=5, balances=None) == "no-balance", "no balance, no stake")
+    check(stake_decision(night=True, wager=10, balances=(9, 40)) == "short", "neither house can overstake")
+    check(stake_decision(night=True, wager=10, balances=(10, 12)) == "ok", "both houses cover 10")
+    check(stake_decision(night=True, wager=7, balances=(20, 20)) == "invalid", "only Free, 5, and 10")
+    moved, note = points_to_move(0, 50)
+    check(moved == 0 and note == "free", "free games move no points")
+    moved, note = points_to_move(10, 10)
+    check(moved == 10 and note == "paid", "a covered stake moves in full")
+    moved, note = points_to_move(10, 4)
+    check(moved == 4 and note == "partial", "a house keeps everything beyond what it can cover")
+    moved, note = points_to_move(5, 0)
+    check(moved == 0 and note == "uncovered", "an empty house pays nothing")
+    moved, note = points_to_move(5, -2)
+    check(moved == 0 and note == "uncovered", "a negative house pays nothing")
+    check(collectible_kind(0) == "spell" and collectible_kind(1) == "frog", "prizes alternate frog and spell")
+    check(pick_from(tuple(CARDS), 0) in CARDS, "a prize can be any of the 35 cards")
+    check(len(tuple(CARDS)) == 35, "spell album draws from all 35 cards")
+    house_card = pick_from(tuple(CARDS), list(CARDS).index("squirrels-stash"))
+    check(house_card == "squirrels-stash", "house cards are in the spell album")
+
+
+def test_wager_night_and_spell_album() -> None:
+    path = Path(tempfile.mkdtemp(prefix="vcc-wager-")) / "vcc_state.json"
+    book = Book(path, turn_timeout=240, accept_timeout=60)
+    check(not book.wager_night_on(1_000), "no wager night yet")
+    ok, code, night = book.begin_wager_night(by=7, channel_id=9, guild_id=3, minutes=30, now=1_000)
+    check(ok and code == "started" and night and night["ends_at"] == 1_000 + 30 * 60, "30 minute night")
+    check(book.wager_night_on(1_000 + 29 * 60), "night still open just before the clock")
+    check(not book.wager_night_on(1_000 + 30 * 60), "night closes when the clock hits")
+    expired = book.pop_expired_wager_night(1_000 + 30 * 60)
+    check(expired and expired["channel_id"] == 9, "expired night is handed back once")
+    check(book.pop_expired_wager_night(1_000 + 30 * 60) is None, "a closed night is not announced twice")
+
+    ok, _, _ = book.begin_wager_night(by=7, channel_id=9, guild_id=3, minutes=None, now=2_000)
+    check(ok and book.wager_night_on(9_999_999), "an open-ended night stays up")
+    again, code, _ = book.begin_wager_night(by=7, channel_id=9, guild_id=3, minutes=60, now=2_001)
+    check(not again and code == "already", "a second night waits until the first ends")
+    bad, code, _ = book.begin_wager_night(by=7, channel_id=9, guild_id=3, minutes=15, now=2_002)
+    check(not bad and code == "already", "length isn't checked while a night is running")
+    ended = book.end_wager_night()
+    check(ended and not book.wager_night_on(2_003), "staff can end the night")
+    bad, code, _ = book.begin_wager_night(by=7, channel_id=9, guild_id=3, minutes=15, now=2_004)
+    check(not bad and code == "length", "length is 30 minutes, 1 hour, or until staff end it")
+
+    challenge = book.open_challenge(
+        channel_id=4,
+        guild_id=3,
+        challenger_id=1,
+        challenger_name="Gon",
+        challenger_house="caldrin",
+        opponent_id=2,
+        opponent_name="Sky",
+        opponent_house="moonveil",
+        wager=10,
+        mode="wager",
+        now=3_000,
+    )
+    check(challenge.wager == 10 and challenge.mode == "wager", "the challenge shows the stake")
+    book.start_game(challenge, seed=3, now=3_001)
+    table = book.games[challenge.id]
+    check(table.wager == 10 and table.mode == "wager", "the table keeps the agreed stake")
+    count, is_new = book.add_spell(1, "ember-lance")
+    check(count == 1 and is_new, "first spell card is new")
+    count, is_new = book.add_spell(1, "ember-lance")
+    check(count == 2 and not is_new, "a second copy is a duplicate")
+    book.add_spell(1, "not-a-card")
+    book.save()
+    reloaded = Book(path, turn_timeout=240, accept_timeout=60)
+    check(reloaded.spells_of(1) == {"ember-lance": 2}, "unknown cards are dropped on load")
+    check(reloaded.games[challenge.id].wager == 10, "the stake survives a restart")
+    check(reloaded.games[challenge.id].mode == "wager", "wager mode survives a restart")
 
 
 def test_illegal_does_not_mutate() -> None:
@@ -612,6 +691,7 @@ def main() -> int:
     test_shadow_and_lantern()
     test_star_and_house()
     test_privacy_end_and_roundtrip()
+    test_wager_night_and_spell_album()
     test_illegal_does_not_mutate()
     asyncio.run(test_http())
     if FAILURES:
