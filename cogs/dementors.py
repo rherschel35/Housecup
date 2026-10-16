@@ -96,7 +96,7 @@ kills and rep are both tied at the top, each of those wizards gets +2.
 One big scoreboard reveal at the end in every channel that fought.
 
 Staff can schedule **1–3** Attacks a week, each with its own Chicago day,
-time, and **5- or 10-minute** length. Five minutes before each, the bot
+time, and **5- or 10-minute** length. Twenty minutes before each, the bot
 warns in the shared event announce channel with Champions / WIZARDS AND
 WITCHES role pings; it pings again there when the swarm starts. Monster
 waves still flood the threat channels. When the swarm ends, the full
@@ -207,7 +207,7 @@ EVENT_PRESETS = {
     10: {"reward_top": 10, "kill_pool": 300, "label": "10-minute"},
 }
 EVENT_COLOR = 0x8A2F2F
-EVENT_WARN_MINUTES = 5
+EVENT_WARN_MINUTES = 20
 ATTACK_SCHEDULE_MAX_DAYS = 3
 # Role names pinged on warn + start (case-insensitive). Override with env:
 # ATTACK_PING_ROLE_NAMES=Champions,WIZARDS AND WITCHES
@@ -576,19 +576,55 @@ def _spell_order_from_message(msg) -> list[str]:
     return order
 
 
-class ThreatSpellButton(discord.ui.Button):
-    """Green spell on the public monster post. Anyone in the channel can press it."""
+def _spell_styles_from_message(msg) -> dict:
+    """Button colors already drawn, so disabling a practice row keeps the blue spell."""
+    styles: dict = {}
+    for row in getattr(msg, "components", None) or []:
+        for child in getattr(row, "children", None) or []:
+            custom_id = getattr(child, "custom_id", None) or ""
+            if custom_id.startswith(THREAT_SPELL_PREFIX):
+                spell = custom_id[len(THREAT_SPELL_PREFIX):]
+                style = getattr(child, "style", None)
+                if style is not None:
+                    styles[spell] = style
+    if styles:
+        return styles
+    view = getattr(msg, "view", None)
+    if view is not None:
+        for child in getattr(view, "children", []):
+            spell = getattr(child, "spell_value", None)
+            style = getattr(child, "style", None)
+            if spell and style is not None:
+                styles[spell] = style
+    return styles
 
-    def __init__(self, spell_value: str, *, row: int, disabled: bool = False):
+
+class ThreatSpellButton(discord.ui.Button):
+    """Spell on a public monster post. Anyone in the channel can press it.
+
+    Real fights use green (success) for every spell. A practice summon
+    paints the spell that beats the creature blue (primary) and the rest green.
+    """
+
+    def __init__(
+        self,
+        spell_value: str,
+        *,
+        row: int,
+        disabled: bool = False,
+        style: discord.ButtonStyle | None = None,
+        practice: bool = False,
+    ):
         label = SPELL_LABEL.get(spell_value, spell_value.title())
         super().__init__(
             label=label,
-            style=discord.ButtonStyle.success,
+            style=style or discord.ButtonStyle.success,
             custom_id=f"{THREAT_SPELL_PREFIX}{spell_value}",
             row=row,
             disabled=disabled,
         )
         self.spell_value = spell_value
+        self.practice = practice
 
     async def callback(self, interaction: discord.Interaction):
         cog = interaction.client.get_cog("Dementors")
@@ -604,7 +640,12 @@ class ThreatSpellButton(discord.ui.Button):
                 raise
             return
         try:
-            await cog.on_public_spell_click(interaction, self.spell_value)
+            if self.practice:
+                await cog.on_practice_spell_click(
+                    interaction, self.spell_value, view=self.view,
+                )
+            else:
+                await cog.on_public_spell_click(interaction, self.spell_value)
         except discord.NotFound as exc:
             if _unknown_interaction(exc):
                 log.debug(
@@ -616,12 +657,26 @@ class ThreatSpellButton(discord.ui.Button):
 
 
 class ThreatSpellView(discord.ui.View):
-    """Public spell row under an explore monster. No timeout: the fight outlives 3 minutes."""
+    """Public spell row under a monster. No timeout: the fight outlives 3 minutes."""
 
-    def __init__(self, order: list[str], *, disabled: bool = False):
+    def __init__(
+        self,
+        order: list[str],
+        *,
+        disabled: bool = False,
+        styles: dict | None = None,
+        practice: bool = False,
+    ):
         super().__init__(timeout=None)
+        self.practice = practice
+        self.fight = None
         for spell, row in spell_button_slots(order):
-            self.add_item(ThreatSpellButton(spell, row=row, disabled=disabled))
+            style = None
+            if styles and spell in styles:
+                style = styles[spell]
+            self.add_item(ThreatSpellButton(
+                spell, row=row, disabled=disabled, style=style, practice=practice,
+            ))
 
     async def on_error(self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item):
         if _unknown_interaction(error):
@@ -707,6 +762,10 @@ class Dementors(commands.Cog):
         self.state.setdefault("event", None)
         self.state.setdefault("attack_schedule", self._blank_attack_schedule())
         self._partial_expiry_task: asyncio.Task | None = None
+        # In-memory only. Practice fights never enter state["active"], the
+        # daily spawn counter, or an Attack tally.
+        self.practice_fights: dict[int, dict] = {}
+        self.practice_lock = None
 
     @staticmethod
     def _blank_attack_schedule() -> dict:
@@ -1018,6 +1077,228 @@ class Dementors(commands.Cog):
         weights = [SPAWN_WEIGHTS[k] for k in keys]
         return self.rng.choices(keys, weights=weights, k=1)[0]
 
+    # --------------------------------------------------------- practice summon
+
+    def _ensure_practice_lock(self) -> asyncio.Lock:
+        lock = getattr(self, "practice_lock", None)
+        if lock is None:
+            lock = asyncio.Lock()
+            self.practice_lock = lock
+        return lock
+
+    def prepare_practice_encounter(self, creature_id: str | None = None):
+        """Build a practice monster post. Does not touch spawn state."""
+        if creature_id is None:
+            creature_id = self._roll_creature()
+        creature = CREATURES[creature_id]
+        order = shuffled_spell_order(self.rng)
+        embed = self.embed_arrival(creature_id)
+        embed.title = f"Practice · {embed.title}"
+        embed.description = (
+            (embed.description or "")
+            + "\n\n**Practice.** No house points. This fight does not count toward "
+            "events, tallies, streaks, daily caps, or leaderboards, and it is not a real spawn."
+        )
+        embed.set_footer(text="Practice · no house points")
+        styles = {
+            spell: (
+                discord.ButtonStyle.primary if spell == creature["weak"]
+                else discord.ButtonStyle.success
+            )
+            for spell in order
+        }
+        view = ThreatSpellView(order, styles=styles, practice=True)
+        file = self._attach_art(embed, creature_id)
+        fight = {
+            "creature": creature_id,
+            "hits": [],
+            "locked_out": [],
+            "spell_buttons": True,
+            "practice": True,
+            "done": False,
+            "channel_id": None,
+            "message_id": None,
+        }
+        view.fight = fight
+        return embed, view, file, fight
+
+    def _register_practice_fight(self, message_id, channel_id, fight: dict, view=None) -> dict:
+        fight["message_id"] = message_id
+        fight["channel_id"] = channel_id
+        if view is not None:
+            view.fight = fight
+        if message_id is not None:
+            self.practice_fights[message_id] = fight
+        return fight
+
+    async def post_practice_monster(self, channel, creature_id: str | None = None):
+        """Post a practice monster into a channel. Leaves real spawns alone."""
+        embed, view, file, fight = self.prepare_practice_encounter(creature_id)
+        kwargs: dict = {"embed": embed, "view": view}
+        if file:
+            kwargs["file"] = file
+        msg = await channel.send(**kwargs)
+        self._register_practice_fight(msg.id, getattr(channel, "id", None), fight, view)
+        return msg
+
+    async def start_practice_summon(self, interaction: discord.Interaction) -> None:
+        """Anyone, any server channel. The reply itself is the practice fight."""
+        if getattr(interaction, "guild", None) is None or getattr(interaction, "channel", None) is None:
+            await interaction.response.send_message(
+                "Summon a practice monster in a server channel.",
+                ephemeral=True,
+            )
+            return
+        embed, view, file, fight = self.prepare_practice_encounter()
+        kwargs: dict = {"embed": embed, "view": view}
+        if file:
+            kwargs["file"] = file
+        await interaction.response.send_message(**kwargs)
+        try:
+            message = await interaction.original_response()
+        except Exception:
+            log.debug("Practice summon posted before its message id was available")
+            message = None
+        message_id = getattr(message, "id", None)
+        if message_id is not None:
+            self._register_practice_fight(message_id, interaction.channel_id, fight, view)
+
+    def _practice_fight_for(self, interaction: discord.Interaction, message_id, view=None):
+        if message_id is not None and message_id in self.practice_fights:
+            return self.practice_fights[message_id]
+        if view is None:
+            message = getattr(interaction, "message", None)
+            view = getattr(message, "view", None) if message is not None else None
+        fight = getattr(view, "fight", None) if view is not None else None
+        if not isinstance(fight, dict):
+            return None
+        if fight.get("done"):
+            return fight
+        if message_id is not None:
+            self._register_practice_fight(message_id, interaction.channel_id, fight, view)
+        return fight
+
+    def _practice_victory_reply(self, interaction, fight: dict, creature_id: str, creature: dict) -> dict:
+        contributors = fight.get("hits") or []
+        if creature_id == "dementor":
+            line = self._banished_line(interaction.user)
+            embed = discord.Embed(
+                title="Practice · The Dementor is banished",
+                description=line,
+                color=0xC4CCD6,
+            )
+            file = self._dementor_defeat_art(embed, interaction.user.id)
+        else:
+            if int(creature.get("pack") or 1) > 1:
+                others = ", ".join(f"<@{uid}>" for uid in contributors[:-1]) or "someone else"
+                line = self.rng.choice(creature["victory"]).format(
+                    member=interaction.user.mention, other=others,
+                )
+            else:
+                line = self.rng.choice(creature["victory"]).format(member=interaction.user.mention)
+            embed = discord.Embed(
+                title=f"Practice · The {creature['name']} is defeated",
+                description=line,
+                color=creature["color"],
+            )
+            file = self._attach_art(embed, creature_id, field="defeat_image")
+        embed.set_footer(text="Practice · no house points")
+        reply: dict = {"embed": embed}
+        if file:
+            reply["file"] = file
+        return reply
+
+    async def on_practice_spell_click(
+        self,
+        interaction: discord.Interaction,
+        spell_value: str,
+        view=None,
+    ) -> None:
+        """Resolve one press on a practice monster. Never pays points or touches a real spawn."""
+        hexes = self.bot.get_cog("Hexes") if self.bot else None
+        if hexes and await hexes.deny_if_limp_wand(interaction):
+            return
+        message = getattr(interaction, "message", None)
+        message_id = getattr(message, "id", None)
+        fight = self._practice_fight_for(interaction, message_id, view)
+        if fight is None or fight.get("done"):
+            await self._disable_threat_buttons(interaction.channel_id, message_id)
+            await interaction.response.send_message(
+                "This practice fight is over.", ephemeral=True,
+            )
+            return
+
+        creature_id = fight["creature"]
+        creature = CREATURES[creature_id]
+        weak = creature["weak"]
+        reply = None
+        disable = False
+        async with self._ensure_practice_lock():
+            if fight.get("done"):
+                reply = {"content": "This practice fight is over.", "ephemeral": True}
+                disable = True
+            else:
+                locked = fight.setdefault("locked_out", [])
+                hits = fight.setdefault("hits", [])
+                if interaction.user.id in locked:
+                    reply = {"content": LOCKED_OUT_MESSAGE, "ephemeral": True}
+                elif spell_value != weak:
+                    if interaction.user.id not in locked:
+                        locked.append(interaction.user.id)
+                    reply = {
+                        "content": "**Practice.** " + wrong_spell_announcement(
+                            self.rng, interaction.user, spell_value, creature_id,
+                        ),
+                    }
+                elif interaction.user.id in hits:
+                    reply = {
+                        "content": "You've already struck this one - it'll take someone else to finish it.",
+                        "ephemeral": True,
+                    }
+                else:
+                    hits.append(interaction.user.id)
+                    try:
+                        pack = int(creature.get("pack") or 1)
+                    except (TypeError, ValueError):
+                        pack = 1
+                    if len(hits) < pack:
+                        line = self.rng.choice(creature["progress"]).format(
+                            member=interaction.user.mention,
+                        )
+                        embed = discord.Embed(
+                            title="Practice",
+                            description=line,
+                            color=creature["color"],
+                        )
+                        embed.set_footer(text="Practice · no house points")
+                        reply = {"embed": embed}
+                    else:
+                        fight["done"] = True
+                        mid = fight.get("message_id")
+                        if mid is not None:
+                            self.practice_fights.pop(mid, None)
+                        disable = True
+                        reply = self._practice_victory_reply(
+                            interaction, fight, creature_id, creature,
+                        )
+        if disable:
+            await self._disable_threat_buttons(
+                fight.get("channel_id") or interaction.channel_id,
+                fight.get("message_id") or message_id,
+            )
+        if reply is None:
+            return
+        kwargs: dict = {}
+        if reply.get("content") is not None:
+            kwargs["content"] = reply["content"]
+        if reply.get("embed") is not None:
+            kwargs["embed"] = reply["embed"]
+        if reply.get("file") is not None:
+            kwargs["file"] = reply["file"]
+        if reply.get("ephemeral"):
+            kwargs["ephemeral"] = True
+        await interaction.response.send_message(**kwargs)
+
     async def _wander(self, active: dict) -> None:
         """Relocate a wandering creature to a different configured channel."""
         c = CREATURES[active["creature"]]
@@ -1188,7 +1469,8 @@ class Dementors(commands.Cog):
         except AttributeError:
             return
         order = _spell_order_from_message(msg) or list(SPELL_ORDER)
-        view = ThreatSpellView(order, disabled=True)
+        styles = _spell_styles_from_message(msg)
+        view = ThreatSpellView(order, disabled=True, styles=styles or None)
         edit = getattr(msg, "edit", None)
         if edit is None:
             return
@@ -2344,11 +2626,11 @@ class Dementors(commands.Cog):
         preset = EVENT_PRESETS[minutes]
         pool_pts = _preset_kill_pool(preset)
 
-        # Five-minute warning.
+        # Advance warning (EVENT_WARN_MINUTES before start).
         if warn_at <= now < target and sched.get("last_warn_key") != key:
             guild = self.bot.guilds[0] if self.bot.guilds else None
             embed = discord.Embed(
-                title="⚔️ Attack on Velmora — 5 minutes",
+                title=f"⚔️ Attack on Velmora — {EVENT_WARN_MINUTES} minutes",
                 description=(
                     f"A **{preset['label']}** swarm hits <t:{int(target.timestamp())}:t> "
                     f"(<t:{int(target.timestamp())}:R>). "
@@ -2719,7 +3001,7 @@ class Dementors(commands.Cog):
         )
         await interaction.response.send_message(
             f"Attack schedule on (America/Chicago): {slot_lines}. "
-            f"**{len(slots)}**/week · 5-minute warn before each."
+            f"**{len(slots)}**/week · {EVENT_WARN_MINUTES}-minute warn before each."
             f"{next_note}{role_note}",
             ephemeral=True,
         )
@@ -2768,7 +3050,7 @@ class Dementors(commands.Cog):
         await interaction.response.send_message(
             "Attack pings will mention "
             + ", ".join(r.mention for r in (champions, wizards_and_witches))
-            + " on the 5-minute warning and again when the swarm starts.",
+            + f" on the {EVENT_WARN_MINUTES}-minute warning and again when the swarm starts.",
             ephemeral=True,
         )
 

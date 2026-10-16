@@ -36,12 +36,14 @@ sys.path.insert(0, str(ROOT))
 os.environ.setdefault("STATE_DIR", tempfile.mkdtemp(prefix="housecup-duel-night-"))
 os.environ.setdefault("DISCORD_TOKEN", "")
 
+from cogs.dementors import EVENT_WARN_MINUTES  # noqa: E402
 from cogs.dementors import kill_share_awards as attack_kill_share  # noqa: E402
 from cogs.duels import (  # noqa: E402
     DUEL_NIGHT_HOUSE_BONUS,
     DUEL_NIGHT_HOUSE_SHARE_BONUS,
     DUEL_NIGHT_MVP_BONUS,
     DUEL_NIGHT_POOL_MAX,
+    DUEL_NIGHT_WARN_MINUTES,
     DUELS_PATH,
     GRAND_REWARD_POINTS,
     RIVAL_AFTER,
@@ -229,6 +231,14 @@ def test_rules_text(duels: Duels) -> None:
     assert "_take_expired_duel_night" in src
     assert "Nothing is paid until it ends" in src
     assert "Rematch as much as you want" in src
+    assert DUEL_NIGHT_WARN_MINUTES == 20
+    assert EVENT_WARN_MINUTES == 20
+    assert "DUEL_NIGHT_WARN_MINUTES" in src
+    assert "— 5 minutes" not in src
+    from cogs.dementors import Dementors
+    attack_src = inspect.getsource(Dementors.attack_schedule_tick.coro)
+    assert "EVENT_WARN_MINUTES" in attack_src
+    assert "— 5 minutes" not in attack_src
     # Expiry runs before the schedule-enabled return.
     assert src.index("_take_expired_duel_night") < src.index('if not sched.get("enabled")')
 

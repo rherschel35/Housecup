@@ -469,7 +469,7 @@ DUEL_NIGHT_HOUSE_SHARE_PCT = 85   # >= this percent of your house's night wins
 DUEL_NIGHT_HOUSE_SHARE_BONUS = 10
 DUEL_NIGHT_HOUSE_BONUS = 10  # house(s) with the most distinct duelists
 DUEL_NIGHT_COLOR = 0xB8434F
-DUEL_NIGHT_WARN_MINUTES = 5
+DUEL_NIGHT_WARN_MINUTES = 20
 DUEL_NIGHT_SCHEDULE_MAX = 3
 # Same role names as Attack warn/start unless overridden.
 _DEFAULT_NIGHT_PING_NAMES = ("Champions", "WIZARDS AND WITCHES")
@@ -2475,7 +2475,7 @@ class Duels(commands.Cog):
 
         if warn_at <= now < target and sched.get("last_warn_key") != key:
             embed = discord.Embed(
-                title="⚔️ House Duel Night — 5 minutes",
+                title=f"⚔️ House Duel Night — {DUEL_NIGHT_WARN_MINUTES} minutes",
                 description=(
                     f"Duel Night opens <t:{int(target.timestamp())}:t> "
                     f"(<t:{int(target.timestamp())}:R>) for **{label}**. "
@@ -2602,7 +2602,8 @@ class Duels(commands.Cog):
         )
         await interaction.response.send_message(
             f"Duel Night schedule on (America/Chicago): {slot_lines}. "
-            f"**{len(slots)}**/week · **{DUEL_NIGHT_PRESETS[minutes]}** each · 5-minute warn."
+            f"**{len(slots)}**/week · **{DUEL_NIGHT_PRESETS[minutes]}** each · "
+            f"{DUEL_NIGHT_WARN_MINUTES}-minute warn."
             f"{where}{next_note}{role_note}",
             ephemeral=True,
         )
@@ -2642,7 +2643,7 @@ class Duels(commands.Cog):
         await interaction.response.send_message(
             "Duel Night pings will mention "
             + ", ".join(r.mention for r in (champions, wizards_and_witches))
-            + " on the 5-minute warning and again when the night starts.",
+            + f" on the {DUEL_NIGHT_WARN_MINUTES}-minute warning and again when the night starts.",
             ephemeral=True,
         )
 

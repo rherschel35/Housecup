@@ -97,6 +97,7 @@ INITIAL_COGS = (
     "cogs.threeraid",
     "cogs.quidditch",
     "cogs.potions",
+    "cogs.practice",
     "cogs.antispam",  # before hexes so spam is deleted, not mangled
     "cogs.hexes",
     # animagus echo relay runs after hexes so chat hexes keep priority
