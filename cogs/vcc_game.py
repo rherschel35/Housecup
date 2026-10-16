@@ -75,6 +75,12 @@ def _stake_label(amount: int) -> str:
     return _STAKE_LABEL.get(int(amount), str(amount))
 
 
+def _tally(wins: int, losses: int) -> str:
+    win_word = "win" if wins == 1 else "wins"
+    loss_word = "loss" if losses == 1 else "losses"
+    return f"{wins} {win_word}, {losses} {loss_word}"
+
+
 def _pair_balances(store, house_a: str, house_b: str) -> tuple[int, int] | None:
     """Season totals for both houses, or None when there is no Cup to stake."""
     if store is None or not store.season_active():
@@ -571,11 +577,7 @@ class Vcc(commands.Cog):
                 return
             table.settling = True
             if not table.points_applied:
-                points, note = self._award(table)
-                table.points = points
-                table.point_note = note
-                table.points_applied = True
-                self.book.save()
+                self._apply_outcome(table)
             digests = list(table.tokens.keys())
             self.book.expire_tokens(table)
             embed = self._result_embed(table)
@@ -599,6 +601,19 @@ class Vcc(commands.Cog):
                 current.settling = False
                 self.book.save()
         await self.hub.close(digests)
+
+    def _apply_outcome(self, table) -> None:
+        """House points, the prize card, and the win/loss record. Once per duel."""
+        if table.points_applied:
+            return
+        points, note = self._award(table)
+        table.points = points
+        table.point_note = note
+        game = table.game
+        if note != "practice" and game.winner is not None and not game.practice:
+            self.book.add_result(game.winner, game.other_id(game.winner))
+        table.points_applied = True
+        self.book.save()
 
     def _award(self, table) -> tuple[int, str]:
         game = table.game
@@ -754,7 +769,22 @@ class Vcc(commands.Cog):
         )
         label, text = self._reward_lines(table)
         embed.add_field(name=label, value=text[:1024], inline=False)
+        record = self._record_line(table)
+        if record:
+            embed.add_field(name="Record", value=record[:1024], inline=False)
         return embed
+
+    def _record_line(self, table) -> str | None:
+        """Win/loss totals after this duel. Practice is not a record."""
+        game = table.game
+        if table.mode == "practice" or game.practice or game.winner is None:
+            return None
+        winner = game.players[game.winner]
+        loser = game.other(game.winner)
+        return (
+            f"{winner.name} — {_tally(*self.book.record_of(winner.id))}\n"
+            f"{loser.name} — {_tally(*self.book.record_of(loser.id))}"
+        )
 
     def _frog_attachment(self, prize: dict) -> tuple[discord.Embed | None, discord.File | None]:
         if prize.get("kind") != "frog" or not prize.get("card_id"):
@@ -853,6 +883,20 @@ class Vcc(commands.Cog):
                 await self.settle(game_id)
 
     # ------------------------------------------------------------- album / night
+
+    @vcc.command(name="record", description="Curse & Crown wins and losses.")
+    @app_commands.describe(member="Whose record to view")
+    async def record(self, interaction: discord.Interaction, member: discord.Member | None = None):
+        target = member or interaction.user
+        async with self.lock:
+            wins, losses = self.book.record_of(target.id)
+        embed = discord.Embed(
+            title=f"{target.display_name}'s Curse & Crown record",
+            description=_tally(wins, losses),
+            color=GOLD,
+        )
+        embed.set_footer(text="Finished duels only. Practice is not counted.")
+        await interaction.response.send_message(embed=embed)
 
     @vcc.command(name="album", description="Your Curse & Crown spell cards.")
     @app_commands.describe(member="Whose spell album to view")

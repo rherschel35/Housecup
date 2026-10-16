@@ -130,20 +130,86 @@ def test_opening_and_decks() -> None:
     check(game.current_id == 2, "turn should pass")
 
 
+def _pass(game: Game) -> None:
+    """End the turn without playing. Trim the hand so no discard prompt opens."""
+    pid = game.current_id
+    player = game.player(pid)
+    while len(player.hand) > HAND_LIMIT:
+        player.discard.append(player.hand.pop())
+    move = game.end_turn(pid)
+    check(move.ok and game.pending is None, f"pass turn: {move.error} {game.pending}")
+
+
 def test_mana_curve() -> None:
-    game = sandbox(seed=3)
-    seen: dict[int, int] = {}
-    for _ in range(40):
-        if game.current_id == 1:
-            seen[game.current.turns_played] = game.current.mana
-            if game.current.turns_played >= 8:
+    """Turns 1-7 refill to 3, 4, 5, 6, 7, 8, 8 after the pool is spent."""
+    expected = {1: 3, 2: 4, 3: 5, 4: 6, 5: 7, 6: 8, 7: 8}
+    for seed in (3, 11):
+        game = sandbox(seed=seed)
+        seen: dict[int, dict[int, tuple[int, int, int, int]]] = {1: {}, 2: {}}
+        for _ in range(40):
+            if game.winner is not None:
                 break
-        finish(game)
-    check(seen.get(1) == 3, f"turn 1 mana {seen.get(1)}")
-    check(seen.get(2) == 4, f"turn 2 mana {seen.get(2)}")
-    check(seen.get(3) == 5, f"turn 3 mana {seen.get(3)}")
-    check(seen.get(6) == 8, f"turn 6 mana {seen.get(6)}")
-    check(seen.get(7) == 8 and seen.get(8) == 8, f"mana cap {seen}")
+            pid = game.current_id
+            turn = game.current.turns_played
+            if 1 <= turn <= 7 and turn not in seen[pid]:
+                view = game.view_for(pid)
+                seen[pid][turn] = (
+                    game.current.mana,
+                    game.current.mana_granted,
+                    view["you"]["mana"],
+                    view["you"]["mana_max"],
+                )
+                game.current.mana = 0
+            _pass(game)
+            if all(len(seen[pid]) == 7 for pid in (1, 2)):
+                break
+        for pid in (1, 2):
+            for turn, want in expected.items():
+                got = seen[pid].get(turn)
+                check(
+                    got == (want, want, want, want),
+                    f"seed {seed} player {pid} turn {turn} mana {got}, want {want}",
+                )
+
+
+def test_practice_mana_curve() -> None:
+    """The page the player sees follows the same curve in a practice game."""
+    path = Path(tempfile.mkdtemp(prefix="vcc-mana-")) / "vcc_state.json"
+    book = Book(path, turn_timeout=240, accept_timeout=60)
+    raw = book.start_practice(
+        channel_id=1,
+        guild_id=1,
+        player_id=42,
+        player_name="Herschel",
+        player_house="caldrin",
+        now=10,
+        seed=4,
+    )
+    expected = [3, 4, 5, 6, 7, 8, 8]
+    for index, want in enumerate(expected, start=1):
+        table, _pid, _stone = book._locate(raw)
+        for player in table.game.players.values():
+            player.ward = 80
+        action = book.view_action(raw, now=100 + index)
+        you = (action.view or {}).get("you") or {}
+        check(action.status == 200 and action.view and action.view.get("your_turn"), f"practice turn {index} is yours")
+        check(
+            you.get("mana") == want and you.get("mana_max") == want,
+            f"practice turn {index} shows {you.get('mana')}/{you.get('mana_max')}, want {want}",
+        )
+        table, pid, _stone = book._locate(raw)
+        player = table.game.player(pid)
+        check(player.turns_played == index, f"practice turn counter {player.turns_played}")
+        player.mana = 0
+        while len(player.hand) > HAND_LIMIT:
+            player.discard.append(player.hand.pop())
+        ended = book.end_turn(raw, now=100 + index)
+        check(ended.status == 200, f"practice end turn {index}")
+        if ended.view and ended.view.get("pending") and ended.view["pending"].get("type") == "discard":
+            need = ended.view["pending"]["need"]
+            ids = [card["id"] for card in ended.view["you"]["hand"]]
+            tossed = book.discard(raw, ids[-need:], now=100 + index)
+            check(tossed.status == 200, f"practice discard on turn {index}")
 
 
 def test_wildgrowth_raises_cap() -> None:
@@ -806,6 +872,55 @@ def test_practice_awards_nothing() -> None:
     check(book.wager_night_on(70), "practice does not close a wager night")
     check(label == "Practice" and "No house points" in text, "the Discord result says practice and no points")
     check("wager night" in text and "records" in text, "the result says it is not counted")
+    cog = Vcc(ledger)
+    cog.book = book
+    cog._apply_outcome(table)
+    check(book.record_of(5) == (0, 0), "practice does not write a win/loss record")
+    check(cog._record_line(table) is None, "the practice result has no record line")
+
+
+def test_real_game_records() -> None:
+    """A finished duel records one win and one loss. Practice and a retry do not."""
+    from cogs.vcc_game import Vcc
+
+    path = Path(tempfile.mkdtemp(prefix="vcc-record-")) / "vcc_state.json"
+    book = Book(path, turn_timeout=240, accept_timeout=60)
+    challenge = book.open_challenge(
+        channel_id=4,
+        guild_id=4,
+        challenger_id=11,
+        challenger_name="Gon",
+        challenger_house="caldrin",
+        opponent_id=22,
+        opponent_name="Sky",
+        opponent_house="thornmere",
+        wager=0,
+        mode="wager",
+        now=5,
+    )
+    book.start_game(challenge, now=6, seed=1)
+    table = book.games[challenge.id]
+    table.game.winner = 11
+    table.game.reason = "forfeit"
+    cog = Vcc(type("Bot", (), {"get_cog": lambda _self, _name: None, "user": None})())
+    cog.book = book
+    cog._apply_outcome(table)
+    check(book.record_of(11) == (1, 0), f"winner record {book.record_of(11)}")
+    check(book.record_of(22) == (0, 1), f"loser record {book.record_of(22)}")
+    line = cog._record_line(table)
+    check(line is not None and "Gon — 1 win, 0 losses" in line, f"result record {line}")
+    check("Sky — 0 wins, 1 loss" in line, f"loser on the result {line}")
+    embed = cog._result_embed(table)
+    names = [field.name for field in embed.fields]
+    check("Record" in names, f"result embed fields {names}")
+    cog._apply_outcome(table)
+    check(book.record_of(11) == (1, 0), "settling twice does not add another win")
+    check("records" in path.read_text(encoding="utf-8"), "the record is on disk")
+    reloaded = Book(path, turn_timeout=240, accept_timeout=60)
+    check(reloaded.record_of(11) == (1, 0) and reloaded.record_of(22) == (0, 1), "record survives a restart")
+    check(reloaded.record_of(99) == (0, 0), "an unknown player has an empty record")
+    book.add_result(0, 22)
+    check(book.record_of(22) == (0, 1), "the tutor id is not a loss")
 
 
 def test_illegal_does_not_mutate() -> None:
@@ -891,6 +1006,7 @@ def main() -> int:
     test_catalog()
     test_opening_and_decks()
     test_mana_curve()
+    test_practice_mana_curve()
     test_wildgrowth_raises_cap()
     test_spell_limit_and_sleight()
     test_specialist_gate()
@@ -904,6 +1020,7 @@ def main() -> int:
     test_wager_night_and_spell_album()
     test_cpu_only_legal_moves()
     test_practice_awards_nothing()
+    test_real_game_records()
     test_illegal_does_not_mutate()
     asyncio.run(test_http())
     if FAILURES:

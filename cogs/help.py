@@ -30,6 +30,7 @@ HELP = {
             ("vcc challenge", "Challenge someone to Velmora Curse & Crown. They accept in Discord; each of you gets a private link to the table. On a wager night, pick Free, 5 pts, or 10 pts — the winner's house takes that stake from the loser's, and a house can't stake more than it has. Any other time the winner draws a Chocolate Frog or a spell card, and no house points move."),
             ("vcc practice", "Practice against an easy Tutor on a private table. No house points, no Chocolate Frog, no spell card, and it does not count toward wager night, events, daily caps, or records."),
             ("vcc album", "Your Curse & Crown spell cards (or anyone's). Chocolate Frogs stay in /frog album."),
+            ("vcc record", "Your Curse & Crown wins and losses, or someone else's. Practice duels are not counted."),
             ("trio scramble", "Open a casual 3v3 trio duel — any houses, join either side. House points: 5 wins/day for the house → +5 once."),
             ("trio housematch", "Open a house-vs-house 3v3 trio duel (house role gated). Same house daily set: 5 wins → +5."),
             ("grand", "Challenge someone to a Grand Duel (both need 50+ 1v1 wins)."),

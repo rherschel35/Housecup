@@ -563,10 +563,15 @@ class Game:
                 self._heal(player, amount)
                 self._log(f"{player.name} mends {amount} Ward. Ward {player.ward}.")
             cap = MANA_CAP + player.mana_cap_bonus
+            # Refill to this player's own turn max: 3, 4, 5, 6, 7, then 8.
+            # Unspent mana is replaced. It is not topped up to the cap early.
             player.mana = min(MANA_START - 1 + player.turns_played, cap)
             player.mana_granted = player.mana
             drawn = self._draw(player, DRAW_PER_TURN)
-            self._log(f"{player.name}'s turn. Drew {len(drawn)}. Mana {player.mana}.")
+            self._log(
+                f"{player.name}'s turn {player.turns_played}. "
+                f"Drew {len(drawn)}. Mana {player.mana}."
+            )
             return
 
     def _pass_turn(self) -> None:
