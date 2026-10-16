@@ -42,6 +42,11 @@ jobs:
         env:
           DISCORD_TOKEN: ""
 
+      - name: Found secrets are listed and a repeat phrase reacts
+        run: python scripts/test_secrets_found.py
+        env:
+          DISCORD_TOKEN: ""
+
       - name: Duel Night pool payout
         run: python scripts/test_duel_night.py
         env:

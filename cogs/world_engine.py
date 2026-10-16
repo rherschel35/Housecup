@@ -276,6 +276,15 @@ def cap(s: str) -> str:
     return s[:1].upper() + s[1:] if s else s
 
 
+def secret_label(secret_id: str) -> str:
+    """A display name for a secret the student has already found.
+
+    Built from the id. Phrases are never used, so a list of these cannot
+    teach anyone a trigger they have not already used.
+    """
+    return (secret_id or "").replace("_", " ").strip().title()
+
+
 def normalize(text: str) -> str:
     t = (text or "").lower().replace("’", "'").replace("'", "")
     t = re.sub(r"[^a-z0-9 ]+", " ", t)
@@ -715,13 +724,64 @@ class Place:
 
     # ------------------------------------------------------------ secrets
 
-    def match_secret(self, message, ctx: Ctx, world_state: dict, event: dict | None):
+    def found_secret_names(self, student: dict) -> list[str]:
+        """Names of this place's secrets the student has already found.
+
+        Only ids that appear on their flags are included. Unfound secrets
+        contribute nothing — not a name, not a phrase.
+        """
+        secrets = self.c.get("secrets") or []
+        known = {sec["id"]: secret_label(sec["id"]) for sec in secrets if sec.get("id")}
+        seen: set[str] = set()
+        prefix = f"{self.key}:"
+        for flag in student.get("flags") or []:
+            base = str(flag).split("@", 1)[0]
+            if not base.startswith(prefix):
+                continue
+            sid = base[len(prefix):]
+            if sid in known:
+                seen.add(sid)
+        return sorted((known[sid] for sid in seen), key=str.lower)
+
+    def _secret_is_used(self, sec, student, server_found, ev_id) -> bool:
+        """True when this secret will not pay out again for this student.
+
+        Same four checks match_secret used to skip. Repeatable secrets
+        (once "none", such as the frog) are never "used".
+        """
+        once = sec.get("once", "user")
+        sid = f"{self.key}:{sec['id']}"
+        flag = f"{sid}@{ev_id}"
+        flags = student.get("flags", [])
+        found = server_found or []
+        if once == "user":
+            return sid in flags
+        if once == "server":
+            return sid in found
+        if once == "event":
+            return flag in flags
+        if once == "server_event":
+            return flag in found
+        return False
+
+    def classify_secret(self, message, ctx: Ctx, world_state: dict, event: dict | None):
+        """How this message should be treated in the place the student is in.
+
+        Returns ("claim", secret) when a secret can still be awarded,
+        ("used", None) when every matching secret is already found and at
+        least one of those had its conditions met, or (None, None) for a
+        wrong guess or a secret whose conditions are not met.
+
+        A still-claimable secret in the same message wins over an
+        already-found one, matching the old first-match order.
+        """
         text = normalize(message)
         if not text:
-            return None
+            return None, None
         s = ctx.student
         ev_id = event["id"] if event else None
         found = world_state.get("server_found", [])
+        used = False
         for sec in self.c.get("secrets", []):
             if not any(normalize(p) in text for p in sec["phrases"]):
                 continue
@@ -729,19 +789,28 @@ class Place:
                 continue
             if not meets(sec, ctx):
                 continue
-            once = sec.get("once", "user")
-            sid = f"{self.key}:{sec['id']}"
-            flag = f"{sid}@{ev_id}"
-            if once == "user" and sid in s.get("flags", []):
+            if self._secret_is_used(sec, s, found, ev_id):
+                used = True
                 continue
-            if once == "server" and sid in found:
-                continue
-            if once == "event" and flag in s.get("flags", []):
-                continue
-            if once == "server_event" and flag in found:
-                continue
+            return "claim", sec
+        if used:
+            return "used", None
+        return None, None
+
+    def match_secret(self, message, ctx: Ctx, world_state: dict, event: dict | None):
+        kind, sec = self.classify_secret(message, ctx, world_state, event)
+        if kind == "claim":
             return sec
         return None
+
+    def already_found_secret(self, message, ctx: Ctx, world_state: dict, event: dict | None) -> bool:
+        """The phrase belongs to a secret this student has already used.
+
+        False for wrong guesses and for secrets whose conditions are not met,
+        even if the student found that secret earlier.
+        """
+        kind, _sec = self.classify_secret(message, ctx, world_state, event)
+        return kind == "used"
 
     def claim_secret(self, sec, ctx: Ctx, world_state: dict, event: dict | None) -> dict:
         s = ctx.student
