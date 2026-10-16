@@ -436,7 +436,7 @@ def test_phoenix_inferno_supernova() -> None:
     grip(game, 2, [], ward=2)
     game.play(1, "phoenix-spark")
     check(game.winner == 1 and game.reason == "ward", "phoenix finishes")
-    check(game.player(1).ward == 23, "phoenix heals 3 on the kill")
+    check(game.player(1).ward == 20, "phoenix heal stops at 20 on the kill")
 
     game = sandbox()
     grip(game, 1, ["phoenix-spark"])
@@ -642,7 +642,7 @@ def test_star_and_house() -> None:
     game = sandbox()
     grip(game, 1, ["glacier-ward"])
     game.play(1, "glacier-ward")
-    check(game.player(1).ward == 25, "glacier ward stacks past 20")
+    check(game.player(1).ward == 20, "glacier ward stops at 20")
 
     game = sandbox()
     grip(game, 1, ["snow-shroud"])
@@ -668,10 +668,14 @@ def test_privacy_end_and_roundtrip() -> None:
         player.discard = [cid for cid in player.discard if cid != secret]
     game.player(2).hand = [secret]
     game.events = []
+    game.feed = []
     view = game.view_for(1)
     blob = json.dumps(view["opponent"])
     check("hand" not in view["opponent"], "opponent hand key leaked")
     check(secret not in blob, "secret card leaked into the opponent panel")
+    check(secret not in json.dumps(view.get("feed")), "secret card leaked into the play feed")
+    check(secret not in json.dumps(view.get("log")), "secret card leaked into the log")
+    check(secret not in json.dumps(view.get("last_turn")), "secret card leaked into the last-turn highlight")
     check(isinstance(view["you"]["deck"], int), "deck count only")
     check(any(card["id"] for card in view["you"]["hand"]), "your hand is visible to you")
 
@@ -1064,6 +1068,7 @@ async def test_http() -> None:
             player.deck = [cid for cid in player.deck if cid != secret]
             player.discard = [cid for cid in player.discard if cid != secret]
         game.events = []
+        game.feed = []
         game.player(2).hand = [secret]
 
         state = await client.get(f"/api/{raw_gon}/state")
@@ -1102,6 +1107,149 @@ async def test_http() -> None:
         await client.close()
 
 
+def test_healing_stops_at_twenty() -> None:
+    game = sandbox()
+    grip(game, 1, ["glacier-ward"], ward=18)
+    game.play(1, "glacier-ward")
+    check(game.player(1).ward == 20, "glacier from 18 lands on 20")
+    check(any("gains 2 Ward" in line for line in game.events), "partial glacier logs the Ward that landed")
+
+    game = sandbox()
+    grip(game, 1, ["glacier-ward"], ward=23)
+    game.play(1, "glacier-ward")
+    check(game.player(1).ward == 23, "ward already above 20 is not pulled down")
+
+    game = sandbox()
+    grip(game, 1, ["bloom"], ward=19)
+    game.play(1, "bloom")
+    check(game.player(1).ward == 20, "bloom from 19 stops at 20")
+
+    game = sandbox()
+    grip(game, 1, ["moonwell"], ward=17)
+    game.play(1, "moonwell")
+    check(game.player(1).ward == 20, "moonwell from 17 stops at 20")
+    grip(game, 1, ["moonwell"], ward=20, mana=20)
+    game.play(1, "moonwell")
+    check(game.player(1).ward == 20, "moonwell at 20 stays 20")
+    check(any("already full" in line for line in game.events), "a full Ward says so")
+
+    game = sandbox()
+    grip(game, 1, ["phoenix-spark"], ward=18)
+    grip(game, 2, [], ward=2)
+    game.play(1, "phoenix-spark")
+    check(game.winner == 1 and game.player(1).ward == 20, "phoenix from 18 heals to 20, not past it")
+
+    game = sandbox()
+    grip(game, 1, ["sapling-shield"], ward=20)
+    game.play(1, "sapling-shield")
+    finish(game)
+    finish(game)
+    check(game.current_id == 1 and game.player(1).ward == 20, "sapling does not heal a full Ward")
+
+    game = sandbox()
+    grip(game, 1, ["sapling-shield"], ward=19)
+    game.play(1, "sapling-shield")
+    finish(game)
+    game.player(1).ward = 19
+    finish(game)
+    check(game.current_id == 1 and game.player(1).ward == 20, "sapling from 19 heals to 20")
+
+
+def test_hand_limit_turn_and_feed() -> None:
+    game = sandbox(seed=3)
+    for _ in range(11):
+        _pass(game)
+        _pass(game)
+    check(game.current_id == 1 and game.player(1).turns_played == 12, "eleven exchanges reach turn 12")
+    check(game.player(1).mana == 8 and game.player(1).mana_granted == 8, "turn 12 refills to 8")
+    check(len(game.player(1).hand) == 8, f"turn 12 opens holding 8, got {len(game.player(1).hand)}")
+    view = game.view_for(1)
+    check(view["you"]["turn"] == 12 and view["you"]["hand_limit"] == HAND_LIMIT, "turn and hand limit are on the view")
+    check(view["you"]["mana"] == 8 and view["you"]["mana_max"] == 8, "the mana pill data is 8/8")
+    check(view["last_turn"] and view["last_turn"]["name"] == "Sky", "your turn highlights the opponent")
+    check(game.end_turn(1).ok and game.pending and game.pending["need"] == 2, "eight cards ask for two discards")
+    check(game.current_id == 1, "the turn does not pass early")
+    check(not game.discard(1, [game.player(1).hand[-1]]).ok, "one card is not enough")
+    check(game.discard(1, game.player(1).hand[-2:]).ok, "discarding two passes the turn")
+    check(len(game.player(1).hand) == HAND_LIMIT and game.current_id == 2, "hand is 6 once the turn passes")
+
+    game = sandbox()
+    secret = "eclipse"
+    grip(game, 1, ["supernova"], ward=20)
+    grip(game, 2, [secret], ward=20)
+    game.play(1, "supernova")
+    play = game.feed[-1]
+    check(play["card_id"] == "supernova" and play["art"] == "supernova.jpg", f"feed art {play.get('art')}")
+    check("8 dmg to Sky" in play["result"] and "3 dmg to Gon" in play["result"], f"feed result {play['result']}")
+    check(secret not in json.dumps(game.feed), "an unplayed card never enters the feed")
+    finish(game)
+    sky = game.view_for(2)
+    last = sky["last_turn"]
+    played = [item.get("card_id") for item in (last or {}).get("plays") or [] if item.get("kind") == "play"]
+    check(last and last["name"] == "Gon" and played == ["supernova"], f"Sky's highlight {played}")
+    check(secret not in json.dumps(sky["feed"]) and secret not in json.dumps(sky["last_turn"]), "highlight hides Sky's hand")
+    check(secret not in json.dumps(sky["opponent"]), "Gon's public side has no secret")
+    grip(game, 2, ["frostveil"], mana=5)
+    game.play(2, "frostveil")
+    finish(game)
+    gon = game.view_for(1)
+    theirs = [item.get("card_id") for item in gon["last_turn"]["plays"] if item.get("kind") == "play"]
+    check(gon["your_turn"] and theirs == ["frostveil"], f"Gon sees Sky's last card, got {theirs}")
+    check("supernova" not in theirs, "the highlight is only the opponent's last turn")
+    order = [item.get("card_id") for item in game.feed if item.get("kind") == "play"]
+    check(order.index("supernova") < order.index("frostveil"), "the feed stays oldest first")
+    restored = Game.from_dict(game.to_dict())
+    check(restored.feed == game.feed, "the play feed survives a save")
+
+    game = sandbox()
+    grip(game, 1, ["permafrost"])
+    game.play(1, "permafrost")
+    finish(game)
+    skipped = game.view_for(1)["last_turn"]
+    check(game.current_id == 1 and skipped and skipped["skipped"] and skipped["name"] == "Sky", "a skipped turn is the highlight")
+
+
+def test_tutor_discards_down_to_six() -> None:
+    game = Game.new(
+        challenger_id=5,
+        challenger_name="Gon",
+        challenger_house="caldrin",
+        opponent_id=CPU_ID,
+        opponent_name=TUTOR_NAME,
+        opponent_house="thornmere",
+        seed=2,
+        practice=True,
+        cpu_id=CPU_ID,
+    )
+    game.current_index = game.order.index(CPU_ID)
+    tutor = game.player(CPU_ID)
+    tutor.hand = [cid for cid in SPELL_IDS if card_of(cid).cost > 0][:8]
+    tutor.mana = 0
+    tutor.turns_played = 1
+    check(len(tutor.hand) == 8, "the tutor was given 8 cards")
+    steps = run_cpu(game)
+    check(steps and all(step.move.ok and step.was_legal for step in steps), "tutor discard stayed legal")
+    check(len(tutor.hand) <= HAND_LIMIT, f"tutor still holds {len(tutor.hand)}")
+    check(game.winner is not None or game.current_id != CPU_ID, "tutor finished the stuffed turn")
+
+
+def test_board_log_and_discard_picker() -> None:
+    js = (ROOT / "cogs/vcc/static/game.js").read_text(encoding="utf-8")
+    css = (ROOT / "cogs/vcc/static/game.css").read_text(encoding="utf-8")
+    check('createElement("details")' not in js, "the battlefield is not a collapsed disclosure")
+    check("battlefield" in js and "turn-group" in js, "plays are grouped into turns on the battlefield")
+    check("'s last turn" in js, "the opponent's latest turn is called out")
+    check(".slice().reverse()" not in js and "scrollTop" in js, "older turns sit above the latest, which stays in view")
+    check("className = \"dock\"" in js, "the hand stays docked under the battlefield")
+    check("Turn " in js and "end at " in js, "mana shows the turn and the hand pill explains the limit")
+    check("Discard " in js and " more" in js and "Discard these" in js, "discard picker counts down, then confirms")
+    check("Discarding" in js and 'className = "picker"' in js, "discarding marks the card instead of opening it")
+    check("-webkit-line-clamp: unset" in css, "picker text is not clamped")
+    check("minmax(220px, 1fr)" in css and "46vh" in css, "picker and battlefield fit a phone")
+    check("#3dce7a" in css and "#e15b5b" in css, "your Ward is green and the opponent's is red")
+    check(".ward" in css and "height: 6px" in css, "Ward bars are a thin strip")
+
+
 def main() -> int:
     test_vcc_channels()
     test_catalog()
@@ -1117,6 +1265,10 @@ def main() -> int:
     test_control_cards()
     test_shadow_and_lantern()
     test_star_and_house()
+    test_healing_stops_at_twenty()
+    test_hand_limit_turn_and_feed()
+    test_tutor_discards_down_to_six()
+    test_board_log_and_discard_picker()
     test_privacy_end_and_roundtrip()
     test_wager_night_and_spell_album()
     test_cpu_only_legal_moves()

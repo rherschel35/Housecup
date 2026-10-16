@@ -10,6 +10,8 @@
   let forfeitAsk = false;
   let socket = null;
   let toastTimer = 0;
+  let followLatest = true;
+  let scrollingSelf = false;
 
   function artUrl(file) {
     if (!/^[a-z0-9-]+\.jpg$/.test(file || "")) return "";
@@ -42,7 +44,11 @@
 
   function render(next) {
     const previous = state && state.log && state.log.length ? state.log[state.log.length - 1] : null;
+    const previousFeed = state && state.feed ? state.feed.length : 0;
+    const previousField = board.querySelector(".battlefield");
+    const savedScroll = previousField ? previousField.scrollTop : 0;
     state = next;
+    if ((state.feed || []).length !== previousFeed) followLatest = true;
     const latest = state && state.log && state.log.length ? state.log[state.log.length - 1] : null;
     if (previous && latest && latest !== previous && !state.notice) showToast(latest);
     if (state.tombstone || (state.over && !state.you?.hand)) {
@@ -57,13 +63,38 @@
     const known = new Set((you.hand || []).map((card) => card.id));
     marked = new Set([...marked].filter((id) => known.has(id)));
 
+    if (state.pending && state.pending.type === "discard") openId = null;
+
     board.innerHTML = "";
-    if (state.practice) board.append(practiceFlag());
-    board.append(players(you, opp));
-    board.append(pills());
-    board.append(handBlock(you));
-    board.append(actions());
-    board.append(logBlock());
+    const hud = document.createElement("div");
+    hud.className = "hud";
+    if (state.practice) hud.append(practiceFlag());
+    hud.append(players(you, opp));
+    hud.append(pills());
+    const dock = document.createElement("div");
+    dock.className = "dock";
+    dock.append(handBlock(you));
+    dock.append(actions());
+    board.append(hud, battlefield(), dock);
+    const field = board.querySelector(".battlefield");
+    if (field) {
+      field.addEventListener("scroll", () => {
+        if (scrollingSelf) return;
+        const gap = field.scrollHeight - field.scrollTop - field.clientHeight;
+        followLatest = gap < 72;
+      }, { passive: true });
+      const stick = followLatest;
+      const top = savedScroll;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (!field.isConnected) return;
+        if (stick) scrollBattlefield(field);
+        else {
+          scrollingSelf = true;
+          field.scrollTop = top;
+          scrollingSelf = false;
+        }
+      }));
+    }
     if (state.pending && state.pending.type === "stash") {
       openStash(state.pending.cards || []);
     } else if (openId) {
@@ -115,7 +146,12 @@
     who.className = "who";
     const name = document.createElement("h2");
     name.textContent = player.name || "Duelist";
-    who.append(name);
+    const current = Number(player.ward || 0);
+    const max = Number(player.ward_max || 20);
+    const score = document.createElement("div");
+    score.className = "ward-label";
+    score.textContent = current + "/" + max;
+    who.append(name, score);
     const meta = document.createElement("div");
     meta.className = "meta";
     const house = [player.house_emoji, player.house].filter(Boolean).join(" ");
@@ -127,17 +163,15 @@
     const ward = document.createElement("div");
     ward.className = "ward";
     const fill = document.createElement("span");
-    const current = Number(player.ward || 0);
-    const max = Number(player.ward_max || 20);
     fill.style.width = Math.max(0, Math.min(100, (current / max) * 100)) + "%";
     ward.append(fill);
-    const label = document.createElement("div");
-    label.className = "ward-label";
-    label.textContent = "Ward " + current + " / " + max;
-    const statuses = document.createElement("div");
-    statuses.className = "statuses";
-    statuses.textContent = (player.statuses || []).join(" · ");
-    el.append(who, meta, ward, label, statuses);
+    el.append(who, meta, ward);
+    if ((player.statuses || []).length) {
+      const statuses = document.createElement("div");
+      statuses.className = "statuses";
+      statuses.textContent = player.statuses.join(" · ");
+      el.append(statuses);
+    }
     return el;
   }
 
@@ -147,7 +181,9 @@
     const you = state.you || {};
     const mana = document.createElement("div");
     mana.className = "pill" + (state.your_turn ? "" : " wait");
-    mana.textContent = "Mana " + (you.mana ?? 0) + " / " + (you.mana_max ?? 0);
+    const turn = you.turn || 0;
+    const manaText = "Mana " + (you.mana ?? 0) + " / " + (you.mana_max ?? 0);
+    mana.textContent = turn > 0 ? "Turn " + turn + " · " + manaText : manaText;
     const played = document.createElement("div");
     played.className = "pill";
     const who = state.your_turn ? "Cards played" : ((state.active_name || "They") + " played");
@@ -156,8 +192,12 @@
     spec.className = "pill" + (state.specialist === "ready" ? " gold" : "");
     spec.textContent = specialistLabel();
     const hand = document.createElement("div");
-    hand.className = "pill";
-    hand.textContent = "Hand " + (you.hand_count ?? 0) + " / 6";
+    const limit = you.hand_limit || 6;
+    const count = you.hand_count ?? 0;
+    hand.className = "pill" + (count > limit ? " warn" : "");
+    hand.textContent = count > limit
+      ? "Hand " + count + " · end at " + limit
+      : "Hand " + count + " / " + limit;
     row.append(mana, played, spec, hand);
     return row;
   }
@@ -173,15 +213,26 @@
     wrap.className = "hand-wrap";
     const title = document.createElement("h3");
     const discarding = state.pending && state.pending.type === "discard";
-    title.textContent = discarding
-      ? "Choose " + state.pending.need + " to discard"
-      : "Your hand (only you can see this)";
+    const limit = you.hand_limit || 6;
+    const count = you.hand_count ?? (you.hand || []).length;
+    if (discarding) {
+      title.textContent = "Discard " + state.pending.need + " — tap a card to mark it";
+    } else if (count > limit) {
+      title.textContent = "Your hand (" + count + "). The limit of " + limit + " applies when you end the turn.";
+    } else {
+      title.textContent = "Your hand (only you can see this)";
+    }
     const row = document.createElement("div");
-    row.className = "hand";
-    (you.hand || []).forEach((card) => row.append(cardEl(card)));
+    if (discarding) {
+      row.className = "picker";
+      (you.hand || []).forEach((card) => row.append(pickerCard(card)));
+    } else {
+      row.className = "hand";
+      (you.hand || []).forEach((card) => row.append(cardEl(card)));
+    }
     const note = document.createElement("p");
     note.className = "rules-note";
-    note.textContent = "Ward 20. Draw 2 a turn. Mana 3, then +1 up to 8. Two attack or defense cards a turn, and one specialist every 3rd turn of yours. End holding at most 6.";
+    note.textContent = "Ward heals stop at 20. Draw 2 a turn. You can hold more than 6 during your turn; end at 6. Mana 3, then +1 up to 8. Two attack or defense cards a turn, and one specialist every 3rd turn of yours.";
     wrap.append(title, row, note);
     return wrap;
   }
@@ -217,13 +268,50 @@
       if (state.pending && state.pending.type === "discard") {
         if (marked.has(card.id)) marked.delete(card.id);
         else marked.add(card.id);
-        openId = card.id;
         render(state);
         return;
       }
       openId = card.id;
       forfeitAsk = false;
       openCard(card);
+    });
+    return button;
+  }
+
+  function pickerCard(card) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "card picker-card school-" + (card.school || "star");
+    if (marked.has(card.id)) button.classList.add("marked");
+    const art = document.createElement("div");
+    art.className = "art";
+    const url = artUrl(card.art);
+    if (url) art.style.backgroundImage = "url('" + url + "')";
+    const cost = document.createElement("div");
+    cost.className = "cost" + (card.pay !== card.cost ? " surcharge" : "");
+    cost.textContent = String(card.pay != null ? card.pay : card.cost);
+    const body = document.createElement("div");
+    body.className = "body";
+    const name = document.createElement("strong");
+    name.textContent = card.name;
+    const tag = document.createElement("div");
+    tag.className = "tagline";
+    tag.textContent = card.school_name + " · " + card.tag;
+    const rules = document.createElement("p");
+    rules.className = "rules";
+    rules.textContent = card.text;
+    body.append(name, tag, rules);
+    button.append(art, cost, body);
+    if (marked.has(card.id)) {
+      const badge = document.createElement("div");
+      badge.className = "discard-badge";
+      badge.textContent = "Discarding";
+      button.append(badge);
+    }
+    button.addEventListener("click", () => {
+      if (marked.has(card.id)) marked.delete(card.id);
+      else marked.add(card.id);
+      render(state);
     });
     return button;
   }
@@ -236,11 +324,19 @@
     end.type = "button";
     end.className = "primary";
     if (discardMode) {
-      end.textContent = "Discard " + marked.size + " / " + state.pending.need;
-      end.disabled = marked.size !== state.pending.need || !state.your_turn;
+      const left = state.pending.need - marked.size;
+      if (left > 0) {
+        end.textContent = "Discard " + left + " more";
+        end.disabled = true;
+      } else {
+        end.textContent = "Discard these";
+        end.disabled = marked.size !== state.pending.need || !state.your_turn;
+      }
       end.addEventListener("click", () => send("discard", { cards: [...marked] }));
     } else {
-      end.textContent = "End turn";
+      const you = state.you || {};
+      const extra = Math.max(0, (you.hand_count || 0) - (you.hand_limit || 6));
+      end.textContent = extra > 0 && state.your_turn ? "End turn · discard " + extra : "End turn";
       end.disabled = !state.your_turn || state.over || (state.pending && state.pending.type === "stash");
       end.addEventListener("click", () => send("end"));
     }
@@ -258,19 +354,114 @@
     return row;
   }
 
-  function logBlock() {
-    const details = document.createElement("details");
-    details.className = "log";
-    const summary = document.createElement("summary");
-    summary.textContent = "Duel log";
-    const list = document.createElement("ol");
-    (state.log || []).forEach((line) => {
-      const item = document.createElement("li");
-      item.textContent = line;
-      list.append(item);
+  function asYou(text) {
+    const mine = (state.you && state.you.name) || "";
+    if (!text || !mine) return text || "";
+    return String(text).split(mine).join("you");
+  }
+
+  function feedRow(item) {
+    const row = document.createElement("li");
+    row.className = "feed-row" + (item.kind && item.kind !== "play" ? " note" : "");
+    const thumb = document.createElement("div");
+    thumb.className = "thumb";
+    if (item.art) {
+      const url = artUrl(item.art);
+      if (url) thumb.style.backgroundImage = "url('" + url + "')";
+    }
+    const copy = document.createElement("div");
+    copy.className = "feed-copy";
+    const title = document.createElement("strong");
+    const result = document.createElement("span");
+    const who = asYou(item.actor || "Someone");
+    if (item.kind === "skip") {
+      title.textContent = who + " skips the turn";
+    } else if (item.kind === "pass") {
+      title.textContent = who + " ended the turn";
+      result.textContent = "no card played";
+    } else {
+      title.textContent = who + " played " + (item.card || "a card");
+      result.textContent = asYou(item.result || "");
+    }
+    copy.append(title, result);
+    row.append(thumb, copy);
+    return row;
+  }
+
+  function turnGroups(feed) {
+    const groups = [];
+    (feed || []).forEach((item) => {
+      const last = groups[groups.length - 1];
+      const same = last
+        && item.kind !== "skip"
+        && last.kind !== "skip"
+        && last.actor_id === item.actor_id
+        && last.turn === item.turn;
+      if (same) last.items.push(item);
+      else {
+        groups.push({
+          actor_id: item.actor_id,
+          actor: item.actor,
+          turn: item.turn,
+          kind: item.kind,
+          items: [item],
+        });
+      }
     });
-    details.append(summary, list);
-    return details;
+    return groups;
+  }
+
+  function groupIsLastTurn(group) {
+    const last = state.last_turn;
+    if (!state.your_turn || !last) return false;
+    if (last.skipped) return group.kind === "skip" && group.actor === last.name;
+    return group.kind !== "skip" && group.actor === last.name && group.turn === last.turn;
+  }
+
+  function battlefield() {
+    const panel = document.createElement("section");
+    panel.className = "battlefield";
+    panel.setAttribute("aria-label", "Battlefield");
+    const groups = turnGroups(state.feed);
+    if (!groups.length) {
+      const empty = document.createElement("p");
+      empty.className = "feed-empty";
+      empty.textContent = "No turns yet. Plays will stack here.";
+      panel.append(empty);
+      return panel;
+    }
+    groups.forEach((group) => {
+      const block = document.createElement("article");
+      const focus = groupIsLastTurn(group);
+      block.className = "turn-group" + (focus ? " focus" : "");
+      const head = document.createElement("h3");
+      const who = group.actor || "Someone";
+      head.textContent = focus ? who + "'s last turn" : who + " · turn " + (group.turn || 0);
+      block.append(head);
+      const list = document.createElement("ol");
+      list.className = "feed";
+      group.items.forEach((item) => list.append(feedRow(item)));
+      block.append(list);
+      panel.append(block);
+    });
+    return panel;
+  }
+
+  function scrollBattlefield(field) {
+    const focus = field.querySelector(".turn-group.focus");
+    const target = focus || field.lastElementChild;
+    scrollingSelf = true;
+    if (!target) {
+      field.scrollTop = field.scrollHeight;
+    } else {
+      const max = Math.max(0, field.scrollHeight - field.clientHeight);
+      const fits = target.offsetHeight + 8 <= field.clientHeight;
+      const top = fits
+        ? target.offsetTop - 6
+        : target.offsetTop + target.offsetHeight - field.clientHeight + 8;
+      field.scrollTop = Math.min(max, Math.max(0, top));
+    }
+    scrollingSelf = false;
   }
 
   function closeSheet() {

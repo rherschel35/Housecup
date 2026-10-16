@@ -13,7 +13,10 @@ Spec (Oct 16 2026):
   Wildgrowth raises that cap by 1 for the rest of the game.
 - Up to 2 attack/defense cards per turn. Lemur's Sleight raises that by 1.
 - On your 3rd, 6th, 9th... turn you may also play 1 specialist.
-- End the turn holding at most 6 cards. You choose what to discard.
+- End the turn holding at most 6 cards. Draws may put you over 6 during
+  the turn; the turn does not pass until you discard down to 6.
+- Healing cannot raise Ward above 20, including Glacier Ward. Ward that
+  is already above 20 is left where it is.
 - A skipped turn (Permafrost) does not draw, refresh mana, or count toward
   the specialist schedule.
 """
@@ -145,6 +148,7 @@ class Game:
         self.reason: str | None = None  # ward | forfeit | timeout
         self.pending: dict | None = None
         self.events: list[str] = []
+        self.feed: list[dict] = []
         self.last_shadow: dict | None = None
         self.rng = random.Random()
         self.practice: bool = False
@@ -205,6 +209,7 @@ class Game:
             "reason": self.reason,
             "pending": self.pending,
             "events": list(self.events),
+            "feed": list(self.feed),
             "last_shadow": self.last_shadow,
             "practice": self.practice,
             "cpu_id": self.cpu_id,
@@ -228,6 +233,7 @@ class Game:
         game.reason = data.get("reason")
         game.pending = data.get("pending")
         game.events = list(data.get("events") or [])
+        game.feed = list(data.get("feed") or [])
         game.last_shadow = data.get("last_shadow")
         game.practice = bool(data.get("practice"))
         game.cpu_id = int(data["cpu_id"]) if data.get("cpu_id") is not None else None
@@ -313,9 +319,12 @@ class Game:
             player.cancel_one_cost = False
             cancelled = True
 
+        wards_before = {who.id: who.ward for who in self.players.values()}
+        log_at = len(self.events)
         if cancelled:
             player.discard.append(card_id)
             self._log(f"{player.name}'s {spec.name} fizzles.")
+            self._remember_play(player, spec, log_at, wards_before)
             self._note_death()
             return _ok()
 
@@ -325,6 +334,7 @@ class Game:
             player.fire_cards_played += 1
 
         self._resolve(player, spec)
+        self._remember_play(player, spec, log_at, wards_before)
         # Stash pulls its draws aside. Anything else lands in the discard.
         if self.pending and self.pending.get("type") == "stash" and card_id in self.pending.get("hold", ()):
             pass
@@ -465,6 +475,8 @@ class Game:
             "opponent": self._public_player(opp, reveal_hand=False),
             "pending": pending,
             "log": self.events[-18:],
+            "feed": list(self.feed[-40:]),
+            "last_turn": self._last_turn(pid),
         }
 
     def _public_player(self, player: Player, *, reveal_hand: bool) -> dict:
@@ -481,6 +493,8 @@ class Game:
             "mana_max": player.mana_granted,
             "block": player.block,
             "hand_count": len(player.hand),
+            "hand_limit": HAND_LIMIT,
+            "turn": player.turns_played,
             "deck": len(player.deck),
             "statuses": _statuses(player),
         }
@@ -543,6 +557,7 @@ class Game:
                 player.skip_next = False
                 player.extra_turn = False
                 self._log(f"{player.name} is frozen solid and skips the turn.")
+                self._remember_note(player, "skip", "skips the turn")
                 self.current_index = 1 - self.current_index
                 continue
             self.round += 1
@@ -560,8 +575,11 @@ class Game:
             if player.heal_at_turn_start:
                 amount = player.heal_at_turn_start
                 player.heal_at_turn_start = 0
-                self._heal(player, amount)
-                self._log(f"{player.name} mends {amount} Ward. Ward {player.ward}.")
+                gained = self._heal(player, amount)
+                if gained:
+                    self._log(f"{player.name} mends {gained} Ward. Ward {player.ward}.")
+                else:
+                    self._log(f"{player.name}'s Ward is already full.")
             cap = MANA_CAP + player.mana_cap_bonus
             # Refill to this player's own turn max: 3, 4, 5, 6, 7, then 8.
             # Unspent mana is replaced. It is not topped up to the cap early.
@@ -578,6 +596,11 @@ class Game:
         if self.winner is not None:
             return
         player = self.current
+        extra = len(player.hand) - HAND_LIMIT
+        if extra > 0:
+            self.pending = {"type": "discard", "need": extra}
+            return
+        self._remember_empty_pass(player)
         opponent = self.other(player.id)
         opponent.thorns_live = False
         player.no_fire = False
@@ -627,8 +650,117 @@ class Game:
         if len(self.events) > 80:
             del self.events[:40]
 
-    def _heal(self, player: Player, amount: int) -> None:
-        player.ward += amount
+    def _heal(self, player: Player, amount: int) -> int:
+        """Raise Ward toward 20. Ward already above 20 is left alone."""
+        if amount <= 0 or player.ward >= WARD_START:
+            return 0
+        gained = min(amount, WARD_START - player.ward)
+        player.ward += gained
+        return gained
+
+    def _remember_play(self, player: Player, spec: Card, log_at: int, before: dict) -> None:
+        self.feed.append({
+            "kind": "play",
+            "actor_id": player.id,
+            "actor": player.name,
+            "card_id": spec.id,
+            "card": spec.name,
+            "art": spec.art,
+            "turn": player.turns_played,
+            "round": self.round,
+            "result": self._play_result(player, self.events[log_at:], before),
+        })
+        self._trim_feed()
+
+    def _remember_note(self, player: Player, kind: str, result: str) -> None:
+        self.feed.append({
+            "kind": kind,
+            "actor_id": player.id,
+            "actor": player.name,
+            "turn": player.turns_played,
+            "round": self.round,
+            "result": result,
+        })
+        self._trim_feed()
+
+    def _remember_empty_pass(self, player: Player) -> None:
+        played = any(
+            item.get("kind") == "play"
+            and item.get("actor_id") == player.id
+            and item.get("turn") == player.turns_played
+            for item in self.feed
+        )
+        if played:
+            return
+        self._remember_note(player, "pass", "ended the turn with no card")
+
+    def _trim_feed(self) -> None:
+        if len(self.feed) > 80:
+            del self.feed[:40]
+
+    def _play_result(self, actor: Player, lines: list[str], before: dict) -> str:
+        bits: list[str] = []
+        for who in (self.other(actor.id), actor):
+            delta = who.ward - before.get(who.id, who.ward)
+            if delta < 0:
+                bits.append(f"{-delta} dmg to {who.name}")
+            elif delta > 0:
+                bits.append(f"{who.name} gains {delta} Ward")
+        extras: list[str] = []
+        for line in lines:
+            if bits and self._ward_recap(line):
+                continue
+            text = line.rstrip(".")
+            if text:
+                extras.append(text)
+        damage = ", ".join(bits)
+        extra = "; ".join(extras)
+        if damage and extra:
+            return f"{damage}; {extra}"
+        return damage or extra or "no effect"
+
+    @staticmethod
+    def _ward_recap(line: str) -> bool:
+        if "already full" in line:
+            return False
+        if " hits " in line and ("damage" in line or "blocked" in line or "no Ward lost" in line):
+            return True
+        if "from the blast" in line:
+            return True
+        if " Ward." in line and ("gains " in line or "heals " in line or "mends " in line):
+            return True
+        return False
+
+    def _last_turn(self, pid: int) -> dict | None:
+        if self.winner is not None or pid != self.current_id:
+            return None
+        opp = self.other(pid)
+        skipped = bool(
+            self.feed
+            and self.feed[-1].get("kind") == "skip"
+            and self.feed[-1].get("actor_id") == opp.id
+        )
+        if skipped:
+            return {
+                "name": opp.name,
+                "turn": opp.turns_played,
+                "plays": [],
+                "skipped": True,
+            }
+        if opp.turns_played <= 0:
+            return None
+        plays = [
+            item for item in self.feed
+            if item.get("actor_id") == opp.id
+            and item.get("kind") in ("play", "pass")
+            and item.get("turn") == opp.turns_played
+        ]
+        return {
+            "name": opp.name,
+            "turn": opp.turns_played,
+            "plays": plays,
+            "skipped": False,
+        }
 
     def _suffer(self, player: Player, amount: int) -> None:
         player.ward = max(0, player.ward - amount)
@@ -739,8 +871,11 @@ class Game:
         elif cid == "phoenix-spark":
             self._strike(player, opponent, self._fire_packets(player, [2]), name=spec.name)
             if opponent.ward <= 0:
-                self._heal(player, 3)
-                self._log(f"The phoenix sparks. {player.name} heals 3. Ward {player.ward}.")
+                gained = self._heal(player, 3)
+                if gained:
+                    self._log(f"The phoenix sparks. {player.name} heals {gained}. Ward {player.ward}.")
+                else:
+                    self._log(f"The phoenix sparks, but {player.name}'s Ward is already full.")
         elif cid == "inferno":
             self._strike(player, opponent, self._fire_packets(player, [6]), name=spec.name)
             for who in (player, opponent):
@@ -763,14 +898,20 @@ class Game:
             got = card(drawn[0]).name if drawn else "nothing"
             self._log(f"{player.name} gains 3 Block ({player.block}) and draws {got}.")
         elif cid == "glacier-ward":
-            self._heal(player, 5)
-            self._log(f"{player.name} gains 5 Ward. Ward {player.ward}.")
+            gained = self._heal(player, 5)
+            if gained:
+                self._log(f"{player.name} gains {gained} Ward. Ward {player.ward}.")
+            else:
+                self._log(f"{player.name}'s Ward is already full.")
         elif cid == "permafrost":
             opponent.skip_next = True
             self._log(f"{opponent.name} will skip their next turn.")
         elif cid == "bloom":
-            self._heal(player, 2)
-            self._log(f"{player.name} heals 2. Ward {player.ward}.")
+            gained = self._heal(player, 2)
+            if gained:
+                self._log(f"{player.name} heals {gained}. Ward {player.ward}.")
+            else:
+                self._log(f"{player.name}'s Ward is already full.")
         elif cid == "thornlash":
             self._strike(player, opponent, [2], ignore_block=True, name=spec.name)
         elif cid == "sapling-shield":
@@ -781,8 +922,11 @@ class Game:
             opponent.arm_no_fire = True
             self._log(f"{opponent.name} can't play Fire on their next turn.")
         elif cid == "moonwell":
-            self._heal(player, 4)
-            self._log(f"{player.name} heals 4. Ward {player.ward}.")
+            gained = self._heal(player, 4)
+            if gained:
+                self._log(f"{player.name} heals {gained}. Ward {player.ward}.")
+            else:
+                self._log(f"{player.name}'s Ward is already full.")
         elif cid == "wildgrowth":
             player.mana_cap_bonus += 1
             player.mana += 1
