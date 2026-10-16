@@ -165,6 +165,19 @@ def _link(raw: str | None) -> str | None:
     return f"{base}/play/{raw}"
 
 
+def _practice_link_embed(url: str | None) -> discord.Embed:
+    embed = _link_embed(url, fresh=False)
+    embed.title = "Practice table — Velmora Curse & Crown"
+    if url:
+        embed.description = (
+            "Practice. Only you can see this hand. The Tutor plays an easy game. "
+            "No house points and no cards.\n"
+            f"{url}"
+        )
+        embed.set_footer(text="Practice. This link is yours, and it closes when the duel ends.")
+    return embed
+
+
 def _link_embed(url: str | None, *, fresh: bool) -> discord.Embed:
     if url:
         note = "Only you can see this hand."
@@ -345,6 +358,74 @@ class Vcc(commands.Cog):
                 current.message_id = message.id
                 self.book.save()
 
+    @vcc.command(
+        name="practice",
+        description="Practice against an easy Tutor. No points, cards, or records.",
+    )
+    async def practice(self, interaction: discord.Interaction):
+        me = interaction.user
+        if interaction.channel is None:
+            await interaction.response.send_message(
+                "Open a practice table from a channel.", ephemeral=True
+            )
+            return
+        store = self.bot.get_cog("Store")
+        house = ""
+        if store is not None and isinstance(me, discord.Member):
+            house = store.member_house(me) or ""
+        async with self.lock:
+            if self.book.in_match(me.id):
+                await interaction.response.send_message(
+                    "You're already at a Curse & Crown table.", ephemeral=True
+                )
+                return
+            raw = self.book.start_practice(
+                channel_id=interaction.channel.id,
+                guild_id=interaction.guild.id if interaction.guild else 0,
+                player_id=me.id,
+                player_name=me.display_name,
+                player_house=house,
+            )
+        public = discord.Embed(
+            title="Practice — Velmora Curse & Crown",
+            description=(
+                f"**{me.display_name}** is practicing against the **Tutor**.\n\n"
+                "Practice. The Tutor plays an easy game. "
+                "No house points, no Chocolate Frog, and no spell card. "
+                "This table does not count toward a wager night, events, "
+                "daily caps, or records.\n\n"
+                "The table link is private."
+            ),
+            color=GOLD,
+        )
+        private = _practice_link_embed(_link(raw))
+        try:
+            if interaction.guild is None:
+                await interaction.response.send_message(embed=private)
+            else:
+                await interaction.response.send_message(embed=public, view=TableView())
+        except discord.HTTPException:
+            async with self.lock:
+                self.book.abandon_practice(me.id)
+            log.info("Could not post a Curse & Crown practice table.")
+            return
+        if interaction.guild is not None:
+            try:
+                await interaction.followup.send(embed=private, ephemeral=True)
+            except discord.HTTPException:
+                log.info("Could not send a private practice link in channel %s.", interaction.channel.id)
+            await self._dm(me.id, private)
+            try:
+                message = await interaction.original_response()
+            except discord.HTTPException:
+                log.info("Could not read the Curse & Crown practice message back.")
+                return
+            async with self.lock:
+                table = self.book.active_game_for(me.id)
+                if table and table.mode == "practice":
+                    table.message_id = message.id
+                    self.book.save()
+
     async def accept(self, interaction: discord.Interaction, challenge_id: str) -> None:
         async with self.lock:
             challenge = self.book.challenges.get(challenge_id)
@@ -523,6 +604,9 @@ class Vcc(commands.Cog):
         game = table.game
         winner = game.players[game.winner]
         loser = game.other(game.winner)
+        if table.mode == "practice" or game.practice:
+            table.prize = None
+            return 0, "practice"
         if table.mode != "wager":
             table.prize = self._give_collectible(winner.id)
             return 0, "card"
@@ -594,6 +678,13 @@ class Vcc(commands.Cog):
         winner = game.players[game.winner]
         loser = game.other(game.winner)
         note = table.point_note
+        if note == "practice" or table.mode == "practice":
+            return (
+                "Practice",
+                "Practice against the Tutor. No house points, no Chocolate Frog, "
+                "and no spell card. It does not count toward a wager night, events, "
+                "daily caps, or records.",
+            )
         if note == "card":
             prize = table.prize or {}
             fresh = "New." if prize.get("new") else f"Now ×{prize.get('count', 1)}."
@@ -650,10 +741,11 @@ class Vcc(commands.Cog):
         loser = game.other(game.winner)
         summary = game.view_for(winner.id).get("summary") or f"{winner.name} wins."
         meta = HOUSES.get(winner.house)
+        practice = table.mode == "practice" or game.practice
         embed = discord.Embed(
-            title="Velmora Curse & Crown",
+            title="Practice — Velmora Curse & Crown" if practice else "Velmora Curse & Crown",
             description=summary,
-            color=meta["color"] if meta else GOLD,
+            color=GOLD if practice else (meta["color"] if meta else GOLD),
         )
         embed.add_field(
             name="Ward",

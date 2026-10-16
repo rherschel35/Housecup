@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import random
 import sys
 import tempfile
 from pathlib import Path
@@ -20,7 +21,16 @@ os.environ.setdefault("STATE_DIR", tempfile.mkdtemp(prefix="housecup-vcc-"))
 os.environ.pop("DISCORD_TOKEN", None)
 
 from cogs.vcc.book import Book  # noqa: E402
-from cogs.vcc.cards import CARDS, HOUSE_CARD, SPECIALISTS, SPELL_IDS  # noqa: E402
+from cogs.vcc.cards import CARDS, HOUSE_CARD, SPECIALISTS, SPELL_IDS, card as card_of  # noqa: E402
+from cogs.vcc.cpu import (  # noqa: E402
+    CPU_ID,
+    DEFEND_CHANCE,
+    END_EARLY,
+    TUTOR_NAME,
+    choose_card,
+    legal_card_ids,
+    run_cpu,
+)
 from cogs.vcc.engine import HAND_LIMIT, Game  # noqa: E402
 from cogs.vcc.scoring import (  # noqa: E402
     collectible_kind,
@@ -93,6 +103,7 @@ def test_catalog() -> None:
     page = (ROOT / "cogs" / "vcc" / "page.html").read_text(encoding="utf-8")
     script = (ROOT / "cogs" / "vcc" / "static" / "game.js").read_text(encoding="utf-8")
     check("Play" in script and "Back" in script, "card popup needs Play and Back")
+    check("Practice — easy Tutor" in script, "practice label on the page")
     check("Velmora Curse" in page, "page title")
 
 
@@ -598,6 +609,205 @@ def test_wager_night_and_spell_album() -> None:
     check(reloaded.games[challenge.id].mode == "wager", "wager mode survives a restart")
 
 
+def _human_step(game: Game, rng: random.Random):
+    pid = game.current_id
+    if game.pending and game.pending.get("type") == "stash":
+        return game.choose(pid, game.pending["options"][0])
+    if game.pending and game.pending.get("type") == "discard":
+        need = int(game.pending["need"])
+        return game.discard(pid, list(game.player(pid).hand)[:need])
+    legal = legal_card_ids(game, pid)
+    attacks = [cid for cid in legal if card_of(cid).tag == "Attack"]
+    pool = attacks or legal
+    if pool:
+        return game.play(pid, rng.choice(pool))
+    return game.end_turn(pid)
+
+
+def test_cpu_only_legal_moves() -> None:
+    ends = attacks = defenses = 0
+    for i in range(400):
+        choice = choose_card(
+            ["ember-lance", "frostveil"],
+            my_ward=6,
+            opp_ward=20,
+            rng=random.Random(i),
+        )
+        if choice is None:
+            ends += 1
+        elif choice == "ember-lance":
+            attacks += 1
+        elif choice == "frostveil":
+            defenses += 1
+        else:
+            check(False, "tutor picked a card that was not legal")
+    check(choose_card([], my_ward=20, opp_ward=20, rng=random.Random(0)) is None, "no legal card means end")
+    check(DEFEND_CHANCE < 0.25 and END_EARLY > 0.2, "tutor stays easy")
+    check(attacks > 60, "most plays are random, so the attack still comes out")
+    check(defenses < 200, "the tutor does not block every time it is losing")
+    check(ends > 100, "tutor often ends without spending its mana")
+
+    try:
+        Game.new(
+            challenger_id=5,
+            challenger_name="Gon",
+            challenger_house="nope",
+            opponent_id=8,
+            opponent_name="Sky",
+            opponent_house="caldrin",
+        )
+        check(False, "a real duel still needs two houses")
+    except ValueError:
+        pass
+
+    for seed in range(12):
+        game = Game.new(
+            challenger_id=5,
+            challenger_name="Gon",
+            challenger_house="caldrin",
+            opponent_id=CPU_ID,
+            opponent_name=TUTOR_NAME,
+            opponent_house="moonveil",
+            seed=seed,
+            practice=True,
+            cpu_id=CPU_ID,
+        )
+        rng = random.Random(1000 + seed)
+        guard = 0
+        while game.winner is None and guard < 500:
+            guard += 1
+            if game.current_id == CPU_ID:
+                steps = run_cpu(game)
+                check(bool(steps), f"tutor acted in seed {seed}")
+                check(
+                    all(step.was_legal and step.move.ok for step in steps),
+                    f"tutor made an illegal move in seed {seed}",
+                )
+                check(
+                    all(step.kind != "forfeit" for step in steps),
+                    f"tutor yielded instead of playing in seed {seed}",
+                )
+                check(
+                    game.winner is not None or game.current_id != CPU_ID,
+                    f"tutor kept the turn in seed {seed}",
+                )
+            else:
+                move = _human_step(game, rng)
+                check(move.ok, f"human step failed in seed {seed}: {move.error}")
+        check(game.winner is not None, f"practice game did not finish in seed {seed}")
+        check(game.practice and game.cpu_id == CPU_ID, "practice flag stays on the game")
+
+    trapped = Game.new(
+        challenger_id=5,
+        challenger_name="Gon",
+        challenger_house="caldrin",
+        opponent_id=CPU_ID,
+        opponent_name=TUTOR_NAME,
+        opponent_house="vashara",
+        seed=4,
+        practice=True,
+        cpu_id=CPU_ID,
+    )
+    trapped.current_index = 1
+    tutor = trapped.player(CPU_ID)
+    tutor.hand = ["shade-step"]
+    tutor.mana = 8
+    tutor.turns_played = 1
+    tutor.specialists_played = 0
+    steps = run_cpu(trapped)
+    check(all(step.was_legal and step.move.ok for step in steps), "specialist trap stayed legal")
+    check(not tutor.shade_step, "tutor did not play a specialist off-turn")
+    check("shade-step" in tutor.hand or "shade-step" in tutor.discard, "unplayed specialist stayed in the tutor's cards")
+    restored = Game.from_dict(trapped.to_dict())
+    check(restored.practice and restored.cpu_id == CPU_ID, "practice survives a save")
+
+
+def test_practice_awards_nothing() -> None:
+    from cogs.vcc_game import Vcc
+
+    path = Path(tempfile.mkdtemp(prefix="vcc-practice-")) / "vcc_state.json"
+    book = Book(path, turn_timeout=240, accept_timeout=60)
+    book.begin_wager_night(by=7, channel_id=9, guild_id=3, minutes=None, now=50)
+    raw = book.start_practice(
+        channel_id=9,
+        guild_id=3,
+        player_id=5,
+        player_name="Gon",
+        player_house="",
+        now=60,
+        seed=2,
+    )
+    saved = path.read_text(encoding="utf-8")
+    check(raw not in saved, "practice token was written to disk")
+    table = next(iter(book.games.values()))
+    check(table.mode == "practice" and table.wager == 0, "practice is not a wager")
+    check(list(table.tokens.values()) == [5], "only the human gets a link")
+    check(CPU_ID not in book.by_user, "the tutor is not a player account")
+    game = table.game
+    human = game.player(5)
+    tutor = game.player(CPU_ID)
+    check(tutor.name == TUTOR_NAME, "opponent is the tutor")
+    check(
+        len(human.hand) + len(human.deck) + len(human.discard) == 30,
+        "a player with no house practices with the shared spells",
+    )
+    check(
+        len(tutor.hand) + len(tutor.deck) + len(tutor.discard) == 31,
+        "the tutor still has a house card",
+    )
+    view = game.view_for(5)
+    check(view["practice"] is True, "the page is told this is practice")
+    check("hand" not in view["opponent"], "practice still hides the other hand")
+    while len(human.hand) > HAND_LIMIT:
+        human.discard.append(human.hand.pop())
+    action = book.end_turn(raw, now=61)
+    check(action.status == 200, "ending a practice turn is accepted")
+    check(action.view["practice"] is True, "the reply is still labeled practice")
+    check("hand" not in action.view["opponent"], "the tutor's hand stays hidden after it plays")
+    check(action.view["over"] or action.view["your_turn"], "the tutor finished before the reply")
+    spells_before = book.spells_of(5)
+
+    class Ledger:
+        def __init__(self):
+            self.user = type("User", (), {"id": 1})()
+            self.records = []
+            self.frogs = []
+
+        def get_cog(self, _name):
+            return self
+
+        def record(self, **kwargs):
+            self.records.append(kwargs)
+            return {"id": "nope"}
+
+        def add_card(self, *args, **kwargs):
+            self.frogs.append(args)
+            return 1, True
+
+        def roll(self):
+            return "lumen"
+
+        def season_active(self):
+            return True
+
+        def house_totals(self, scope="season"):
+            return [("caldrin", 40)]
+
+    ledger = Ledger()
+    table.game.winner = 5
+    table.game.reason = "ward"
+    table.points_applied = False
+    points, note = Vcc(ledger)._award(table)
+    label, text = Vcc(ledger)._reward_lines(table)
+    check(points == 0 and note == "practice", "practice pays nothing")
+    check(table.prize is None, "practice grants no card")
+    check(not ledger.records and not ledger.frogs, "practice does not touch the ledger or the frog album")
+    check(book.spells_of(5) == spells_before, "practice does not add a spell card")
+    check(book.wager_night_on(70), "practice does not close a wager night")
+    check(label == "Practice" and "No house points" in text, "the Discord result says practice and no points")
+    check("wager night" in text and "records" in text, "the result says it is not counted")
+
+
 def test_illegal_does_not_mutate() -> None:
     game = sandbox()
     hand = list(game.player(1).hand)
@@ -692,6 +902,8 @@ def main() -> int:
     test_star_and_house()
     test_privacy_end_and_roundtrip()
     test_wager_night_and_spell_album()
+    test_cpu_only_legal_moves()
+    test_practice_awards_nothing()
     test_illegal_does_not_mutate()
     asyncio.run(test_http())
     if FAILURES:

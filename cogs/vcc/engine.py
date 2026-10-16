@@ -147,6 +147,8 @@ class Game:
         self.events: list[str] = []
         self.last_shadow: dict | None = None
         self.rng = random.Random()
+        self.practice: bool = False
+        self.cpu_id: int | None = None
 
     # ---------------------------------------------------------------- build
 
@@ -162,10 +164,19 @@ class Game:
         opponent_house: str,
         seed: int | None = None,
         decks: dict[int, list[str]] | None = None,
+        practice: bool = False,
+        cpu_id: int | None = None,
     ) -> "Game":
-        if challenger_house not in HOUSE_CARD or opponent_house not in HOUSE_CARD:
+        if practice:
+            if opponent_house not in HOUSE_CARD:
+                raise ValueError("the practice tutor needs a known house")
+            if challenger_house not in HOUSE_CARD:
+                challenger_house = ""
+        elif challenger_house not in HOUSE_CARD or opponent_house not in HOUSE_CARD:
             raise ValueError("both players need a known house")
         game = cls()
+        game.practice = practice
+        game.cpu_id = cpu_id
         game.rng.seed(seed if seed is not None else random.randrange(1 << 30))
         game.order = [challenger_id, opponent_id]
         for pid, name, house in (
@@ -195,6 +206,8 @@ class Game:
             "pending": self.pending,
             "events": list(self.events),
             "last_shadow": self.last_shadow,
+            "practice": self.practice,
+            "cpu_id": self.cpu_id,
             "rng": {
                 "version": state[0],
                 "state": list(state[1]),
@@ -216,6 +229,8 @@ class Game:
         game.pending = data.get("pending")
         game.events = list(data.get("events") or [])
         game.last_shadow = data.get("last_shadow")
+        game.practice = bool(data.get("practice"))
+        game.cpu_id = int(data["cpu_id"]) if data.get("cpu_id") is not None else None
         rng = data.get("rng")
         if rng:
             game.rng.setstate((
@@ -427,6 +442,9 @@ class Game:
         winner_name = self.players[self.winner].name if self.winner is not None else None
         loser_id = self.other_id(self.winner) if self.winner is not None else None
         loser_name = self.players[loser_id].name if loser_id is not None else None
+        summary = _summary(self, winner_name, loser_name)
+        if self.practice and summary:
+            summary = "Practice. " + summary
         return {
             "over": self.winner is not None,
             "reason": self.reason,
@@ -434,7 +452,8 @@ class Game:
             "winner_name": winner_name,
             "loser_name": loser_name,
             "you_won": (self.winner == pid) if self.winner is not None else None,
-            "summary": _summary(self, winner_name, loser_name),
+            "summary": summary,
+            "practice": bool(self.practice),
             "your_turn": pid == self.current_id and self.winner is None,
             "active_name": self.current.name,
             "round": self.round,
@@ -947,7 +966,9 @@ class Game:
 
 def _build_deck(house: str, rng: random.Random) -> list[str]:
     ids = [cid for cid, spec in CARDS.items() if spec.school != "house"]
-    ids.append(HOUSE_CARD[house])
+    extra = HOUSE_CARD.get(house)
+    if extra:
+        ids.append(extra)
     rng.shuffle(ids)
     return ids
 
