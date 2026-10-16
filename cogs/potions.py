@@ -608,7 +608,11 @@ class Potions(commands.Cog):
         return int(self.record(user_id)["brew_day"].get("count") or 0)
 
     def try_award_brew_completion(self, member: discord.Member) -> int:
-        """Count a successful brew; return points awarded (0 or BREW_COMPLETION_POINTS)."""
+        """Count a successful real brew toward the daily potion challenge.
+
+        Practice brews must not call this. Returns points awarded
+        (0 or BREW_COMPLETION_POINTS).
+        """
         rec = self.record(member.id)
         day = rec["brew_day"]
         day["count"] = int(day.get("count") or 0) + 1
