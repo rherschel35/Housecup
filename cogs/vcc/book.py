@@ -179,6 +179,7 @@ class Book:
         self.raw_memory: dict[tuple[str, int], str] = {}
         self.tombstones: dict[str, dict] = {}
         self.spellbook: dict[str, dict[str, int]] = {}
+        self.records: dict[str, dict[str, int]] = {}
         self.wager_night: dict | None = None
         self.load()
 
@@ -214,6 +215,7 @@ class Book:
                 self.by_digest[token_hash] = table.id
         self.tombstones = dict(data.get("tombstones") or {})
         self.spellbook = _clean_spellbook(data.get("spellbook") or {})
+        self.records = _clean_records(data.get("records") or {})
         night = data.get("wager_night")
         self.wager_night = dict(night) if isinstance(night, dict) else None
 
@@ -224,6 +226,7 @@ class Book:
             "games": {gid: g.to_dict() for gid, g in self.games.items()},
             "tombstones": self.tombstones,
             "spellbook": self.spellbook,
+            "records": self.records,
             "wager_night": self.wager_night,
         }
         try:
@@ -632,6 +635,24 @@ class Book:
 
     # --------------------------------------------------------------- rewards
 
+    def record_of(self, user_id: int) -> tuple[int, int]:
+        """``(wins, losses)`` for finished real duels. Practice is not stored."""
+        row = self.records.get(str(int(user_id))) or {}
+        return int(row.get("wins") or 0), int(row.get("losses") or 0)
+
+    def add_result(self, winner_id: int, loser_id: int) -> None:
+        """Count one finished real duel. The caller saves, and only once."""
+        winner_id = int(winner_id)
+        loser_id = int(loser_id)
+        if winner_id <= 0 or loser_id <= 0 or winner_id == loser_id:
+            return
+        self._bump_record(winner_id, "wins")
+        self._bump_record(loser_id, "losses")
+
+    def _bump_record(self, user_id: int, field_name: str) -> None:
+        row = self.records.setdefault(str(user_id), {"wins": 0, "losses": 0})
+        row[field_name] = int(row.get(field_name) or 0) + 1
+
     def spells_of(self, user_id: int) -> dict[str, int]:
         return dict(self.spellbook.get(str(user_id)) or {})
 
@@ -725,6 +746,25 @@ def _tombstone_view(stone: dict) -> dict:
         "log": [],
         "pending": None,
     }
+
+
+def _clean_records(raw: dict) -> dict[str, dict[str, int]]:
+    cleaned: dict[str, dict[str, int]] = {}
+    if not isinstance(raw, dict):
+        return cleaned
+    for user_id, row in raw.items():
+        if not isinstance(row, dict):
+            continue
+        try:
+            key = str(int(user_id))
+            wins = max(0, int(row.get("wins") or 0))
+            losses = max(0, int(row.get("losses") or 0))
+        except (TypeError, ValueError):
+            continue
+        if int(key) <= 0:
+            continue
+        cleaned[key] = {"wins": wins, "losses": losses}
+    return cleaned
 
 
 def _clean_spellbook(raw: dict) -> dict[str, dict[str, int]]:
