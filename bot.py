@@ -80,6 +80,7 @@ INITIAL_COGS = (
     "cogs.brooms",
     "cogs.broom_race",
     "cogs.duels",
+    "cogs.vcc_game",
     "cogs.beans",
     "cogs.triwizard",
     "cogs.profile",

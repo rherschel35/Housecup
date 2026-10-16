@@ -27,6 +27,7 @@ HELP = {
         "staff": False,
         "entries": [
             ("duel", "Challenge someone. Best of 3 = 1 win; best of 5/7/9/51 = series of first-to-2 sets banking 3/4/5/26 wins (sets you take still fill your daily duel checklist/points even if you lose the series). During Duel Night, cross-house wins tally for an end-of-night pool instead of paying on the spot."),
+            ("vcc challenge", "Challenge someone to Velmora Curse & Crown. They accept in Discord; each of you gets a private link to the table. The winner's house earns 3 points, up to 3 wins a day."),
             ("trio scramble", "Open a casual 3v3 trio duel — any houses, join either side. House points: 5 wins/day for the house → +5 once."),
             ("trio housematch", "Open a house-vs-house 3v3 trio duel (house role gated). Same house daily set: 5 wins → +5."),
             ("grand", "Challenge someone to a Grand Duel (both need 50+ 1v1 wins)."),

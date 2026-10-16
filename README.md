@@ -5,7 +5,7 @@ Housecup is the Velmora House Cup Discord bot. It keeps the house-points ledger 
 ## Layout
 
 - `bot.py` - process entry, cog load order, and slash-command sync.
-- `cogs/` - one module per feature (points, duels, world, dementors, and so on), plus shared helpers such as `staff_groups.py`.
+- `cogs/` - one module per feature (points, duels, world, dementors, and so on), plus shared helpers such as `staff_groups.py`. Curse & Crown lives in `cogs/vcc_game.py` and `cogs/vcc/`.
 - `data/` - static writing shipped in git (places, quests, fonts, course lists). Runtime state defaults to this directory when `STATE_DIR` is unset.
 - `scripts/` - local checks: module import, the 100-command slash budget, and each command's JSON payload size.
 - `compendium_site/` - the separate compendium site. It is not part of the bot process.
@@ -77,16 +77,32 @@ Names only. Set them in the shell, a local `.env` that stays untracked, or the R
 | `ANIMAGUS_FORCE_ART` | Optional forced Animagus art filename. |
 | `DUEL_FAVORED_USER_ID` | Optional duel setting. |
 | `DUEL_FAVORED_BIAS` | Optional duel setting. |
+| `PORT` | Port the Curse & Crown web table binds. Railway sets this. Local runs default to `8080`. |
+| `VCC_PUBLIC_URL` | Public `https://…` origin for private table links, no trailing slash. If unset, a Railway public domain in `RAILWAY_PUBLIC_DOMAIN` is used. |
+| `VCC_TURN_TIMEOUT_SECONDS` | Optional. Seconds of silence on a turn before that player loses. Default `240`. |
+| `VCC_ACCEPT_TIMEOUT_SECONDS` | Optional. Seconds to accept a challenge. Default `120`. |
 
 ## Railway
 
-Railway builds this repo and deploys on every push to `main`. The service start command is `python bot.py`.
+Railway builds this repo and deploys on every push to `main`. The service start command is `python bot.py`. That process is the Discord bot and the Curse & Crown web table, bound to `0.0.0.0:$PORT`.
 
 Put `DISCORD_TOKEN` and any other variables above in the Railway service variables, not in git.
 
 `/gonsomethingbroke` forwards the ticket only when `TICKET_WEBHOOK_URL` is set. Railway injects `RAILWAY_GIT_COMMIT_SHA` on each git deploy; the forwarder includes it as `commit_sha` when that variable is present. Do not put the webhook secret in git.
 
 Attach a volume and set `STATE_DIR` to that volume's mount path. The points ledger, game progress, and command-sync fingerprint live there. A redeploy without a volume (or with `STATE_DIR` left at the default `data/` directory inside the container) starts from empty state.
+
+### Curse & Crown domain
+
+`/vcc challenge` deals a private table link for each duelist. The bot builds that link from `VCC_PUBLIC_URL`, or from `RAILWAY_PUBLIC_DOMAIN` when the public URL is unset. The process listens on `0.0.0.0:$PORT` (Railway injects `PORT`).
+
+On the Velmora-House-Points service:
+
+1. Open the service → **Settings** → **Networking** → **Generate Domain**. Railway assigns one `*.up.railway.app` hostname. The target port is the service `PORT` (the same port the bot binds).
+2. Set `VCC_PUBLIC_URL` to `https://` plus that hostname, with no path and no trailing slash. Generating the domain also fills `RAILWAY_PUBLIC_DOMAIN`, which the bot uses if `VCC_PUBLIC_URL` is empty.
+3. Redeploy so the new variable is in the environment. A challenge accepted after that posts each player a link of the form `https://<domain>/play/<token>`.
+
+Table tokens are per player. They are not Discord tokens, they are not logged, and they stop working when the duel ends. A custom domain is optional: `railway domain add <name> --service Velmora-House-Points`, then point `VCC_PUBLIC_URL` at `https://` that name after DNS verifies.
 
 Slash-command sync talks to Discord only when the command tree actually changed. Restarts from a new deploy skip the upload when the fingerprint matches, so they do not burn Discord's daily command-create budget. `FORCE_COMMAND_SYNC=1` forces a sync anyway.
 
@@ -102,6 +118,7 @@ Runtime files are written under `STATE_DIR`. The bot creates a file when that fe
 - `world_state.json` - satchels, place reputation, academy flags
 - `dementors.json` - wild threats and Attack schedule
 - `duels.json` - duel records and Duel Night
+- `vcc_state.json` - Curse & Crown challenges, live tables (token hashes only), and the daily points cap
 - `descent_state.json` - Descent progress
 - `descent_restore_claims.json` - pending Descent restore claims
 - `descent_state.corrupt.*.json` - backups kept when a Descent save could not be read
