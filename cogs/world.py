@@ -32,6 +32,7 @@ from cogs.velmora_channels import (
     RESTRICTED_OPEN_LOUNGE_CHANNEL_IDS,
     STUDY_HALL_CHANNEL_ID,
 )
+from cogs.potions import RECIPES
 from cogs.world_engine import (HOUSE_NAMES, RARITY_LABEL, RARITY_ORDER, Ctx, Place, World,
                                blank_student, tone_for)
 
@@ -83,6 +84,20 @@ PLACES_SECRET_NOTE = (
     "`/secrets` shows what you've found."
 )
 GREEN, NIGHT_COLOR = 0x3E8E5A, 0x2B3A2E
+# World items that any potion recipe spends. Everything else in the satchel
+# is just something you're carrying.
+POTION_INGREDIENT_IDS = frozenset(
+    item_id for recipe in RECIPES.values() for item_id in recipe["ingredients"]
+)
+
+
+def _positive_count(n) -> bool:
+    try:
+        return n > 0
+    except TypeError:
+        return False
+
+
 EVENT_CHOICES = [
     app_commands.Choice(name="Door behind roses", value="door"),
     app_commands.Choice(name="Flowers turn black", value="black_flowers"),
@@ -444,21 +459,80 @@ class WorldCog(commands.Cog, name="World"):
         embed.set_footer(text=f"Searches left today: {left}")
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="satchel", description="Look inside your satchel. Only you can see it.")
-    async def satchel(self, interaction: discord.Interaction):
-        s = self.student(interaction.user)
-        items = s.get("items", {})
-        if not items:
-            return await interaction.response.send_message(
-                "🎒 Your satchel is empty. Go and explore somewhere.", ephemeral=True)
+    def _brewed_inventory(self, user_id: int) -> dict:
+        """Brewed-potion counts from the same store /potions reads. Read-only."""
+        potions = self.bot.get_cog("Potions")
+        if potions is None:
+            return {}
+        state = getattr(potions, "state", None) or {}
+        players = state.get("players") or {}
+        rec = players.get(str(user_id)) or {}
+        inventory = rec.get("inventory") or {}
+        return inventory if isinstance(inventory, dict) else {}
+
+    def potion_satchel_lines(self, user_id: int) -> list[str]:
+        """Potion name and count, in the same order and shape as /potions' Satchel."""
+        lines = []
+        for key, n in self._brewed_inventory(user_id).items():
+            recipe = RECIPES.get(key)
+            if not recipe or not _positive_count(n):
+                continue
+            lines.append(f"{recipe['emoji']} {recipe['name']} ×{n}")
+        return lines
+
+    def _carried_section(self, items: dict, *, ingredients: bool) -> list[str]:
         lines = []
         for rarity in RARITY_ORDER:
-            group = sorted((i, n) for i, n in items.items() if self.world.items.get(i, {}).get("rarity") == rarity)
-            if group:
-                lines.append(f"**{RARITY_LABEL[rarity]}**")
-                lines += [f"{self.world.item_line(i, n)} - *{self.world.items[i]['desc']}*" for i, n in group]
-        embed = self.embed("\n".join(lines), f"🎒 {interaction.user.display_name}'s satchel")
-        embed.set_footer(text=f"{sum(items.values())} things carried · /use or /offer them where you are.")
+            group = sorted(
+                (i, n) for i, n in items.items()
+                if (i in POTION_INGREDIENT_IDS) == ingredients
+                and self.world.items.get(i, {}).get("rarity") == rarity
+                and _positive_count(n)
+            )
+            if not group:
+                continue
+            lines.append(f"**{RARITY_LABEL[rarity]}**")
+            for item_id, n in group:
+                it = self.world.items[item_id]
+                lines.append(f"{it['emoji']} **{it['name']}** ×{n} - *{it['desc']}*")
+        return lines
+
+    def satchel_blocks(self, user) -> Optional[list]:
+        """Potions, then Ingredients, then Items. None when nothing is carried."""
+        items = self.student(user).get("items", {})
+        potion_lines = self.potion_satchel_lines(user.id)
+        ingredient_lines = self._carried_section(items, ingredients=True)
+        item_lines = self._carried_section(items, ingredients=False)
+        if not potion_lines and not ingredient_lines and not item_lines:
+            return None
+        blocks = ["**Potions**\n" + "\n".join(potion_lines or ["*Nothing brewed yet.*"])]
+        if ingredient_lines:
+            blocks.append("**Ingredients**\n" + "\n".join(ingredient_lines))
+        if item_lines:
+            blocks.append("**Items**\n" + "\n".join(item_lines))
+        return blocks
+
+    def satchel_carried_count(self, user) -> int:
+        items = self.student(user).get("items", {})
+        item_total = sum(n for n in items.values() if _positive_count(n))
+        potion_total = sum(
+            n for key, n in self._brewed_inventory(user.id).items()
+            if key in RECIPES and _positive_count(n)
+        )
+        return item_total + potion_total
+
+    @app_commands.command(name="satchel", description="Look inside your satchel. Only you can see it.")
+    async def satchel(self, interaction: discord.Interaction):
+        blocks = self.satchel_blocks(interaction.user)
+        if not blocks:
+            return await interaction.response.send_message(
+                "🎒 Your satchel is empty. Go and explore somewhere.", ephemeral=True)
+        embed = self.embed(
+            "\n\n".join(blocks),
+            f"🎒 {interaction.user.display_name}'s satchel",
+        )
+        carried = self.satchel_carried_count(interaction.user)
+        embed.set_footer(text=f"{carried} things carried · /use or /offer them where you are.")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def _satchel_choices(self, interaction: discord.Interaction, current: str):
