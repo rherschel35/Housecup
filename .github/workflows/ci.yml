@@ -81,3 +81,8 @@ jobs:
         run: python scripts/test_practice_progress.py
         env:
           DISCORD_TOKEN: ""
+
+      - name: Spell clicks answer before slow edits
+        run: python scripts/test_threat_interaction_ack.py
+        env:
+          DISCORD_TOKEN: ""
