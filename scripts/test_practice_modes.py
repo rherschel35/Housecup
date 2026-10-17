@@ -117,12 +117,32 @@ class Channel:
 class Response:
     def __init__(self):
         self.sent: list[dict] = []
+        self.deferred = None
+
+    def is_done(self):
+        return self.deferred is not None or bool(self.sent)
 
     async def send_message(self, content=None, **kwargs):
         self.sent.append({"content": content, **kwargs})
 
     async def edit_message(self, **kwargs):
         self.sent.append(kwargs)
+
+    async def defer(self, *, ephemeral: bool = False, thinking: bool = False):
+        self.deferred = {"ephemeral": ephemeral, "thinking": thinking}
+
+
+class Followup:
+    """A deferred victory is still the reply the older checks read."""
+
+    def __init__(self, response: Response):
+        self.sent: list[dict] = []
+        self._response = response
+
+    async def send(self, content=None, **kwargs):
+        payload = {"content": content, **kwargs}
+        self.sent.append(payload)
+        self._response.sent.append(payload)
 
 
 class User:
@@ -151,6 +171,7 @@ class Interaction:
         self.channel = channel
         self.channel_id = channel.id if channel is not None else None
         self.response = Response()
+        self.followup = Followup(self.response)
         self.message = message
         self._original = None
 

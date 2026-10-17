@@ -525,6 +525,14 @@ def _unknown_interaction(exc: BaseException) -> bool:
     return isinstance(exc, discord.NotFound) and getattr(exc, "code", None) == 10062
 
 
+def _warn_unknown_interaction(spell) -> None:
+    """A dropped click is still a missed reply. Keep it out of the debug log."""
+    log.warning(
+        "Threat spell button skipped; interaction expired or unknown (spell=%s).",
+        spell,
+    )
+
+
 def shuffled_spell_order(rng) -> list[str]:
     """Copy of SPELL_ORDER in a new order. The working spell moves with it."""
     order = list(SPELL_ORDER)
@@ -686,10 +694,7 @@ class ThreatSpellButton(discord.ui.Button):
                 await cog.on_public_spell_click(interaction, self.spell_value)
         except discord.NotFound as exc:
             if _unknown_interaction(exc):
-                log.debug(
-                    "Threat spell button skipped; interaction expired (spell=%s).",
-                    self.spell_value,
-                )
+                _warn_unknown_interaction(self.spell_value)
                 return
             raise
 
@@ -718,10 +723,7 @@ class ThreatSpellView(discord.ui.View):
 
     async def on_error(self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item):
         if _unknown_interaction(error):
-            log.debug(
-                "Threat spell button skipped; interaction expired (spell=%s).",
-                getattr(item, "spell_value", None),
-            )
+            _warn_unknown_interaction(getattr(item, "spell_value", None))
             return
         await super().on_error(interaction, error, item)
 
@@ -1260,10 +1262,10 @@ class Dementors(commands.Cog):
         message_id = getattr(message, "id", None)
         fight = self._practice_fight_for(interaction, message_id, view)
         if fight is None or fight.get("done"):
-            await self._disable_threat_buttons(interaction.channel_id, message_id)
             await interaction.response.send_message(
                 "This practice fight is over.", ephemeral=True,
             )
+            await self._disable_threat_buttons(interaction.channel_id, message_id)
             return
 
         creature_id = fight["creature"]
@@ -1319,11 +1321,6 @@ class Dementors(commands.Cog):
                         reply = self._practice_victory_reply(
                             interaction, fight, creature_id, creature,
                         )
-        if disable:
-            await self._disable_threat_buttons(
-                fight.get("channel_id") or interaction.channel_id,
-                fight.get("message_id") or message_id,
-            )
         if reply is None:
             return
         kwargs: dict = {}
@@ -1335,7 +1332,24 @@ class Dementors(commands.Cog):
             kwargs["file"] = reply["file"]
         if reply.get("ephemeral"):
             kwargs["ephemeral"] = True
+        # Greying the row out fetches and edits the post. Acknowledge first
+        # so that edit cannot eat Discord's three-second window. The victory
+        # line waits until the row is updated; a short note is the ack itself.
+        victory = bool(disable and reply.get("embed") is not None and not reply.get("ephemeral"))
+        if victory:
+            await self._acknowledge_interaction(interaction)
+            await self._disable_threat_buttons(
+                fight.get("channel_id") or interaction.channel_id,
+                fight.get("message_id") or message_id,
+            )
+            await interaction.followup.send(**kwargs)
+            return
         await interaction.response.send_message(**kwargs)
+        if disable:
+            await self._disable_threat_buttons(
+                fight.get("channel_id") or interaction.channel_id,
+                fight.get("message_id") or message_id,
+            )
 
     async def _wander(self, active: dict) -> None:
         """Relocate a wandering creature to a different configured channel."""
@@ -1524,6 +1538,25 @@ class Dementors(commands.Cog):
         except AttributeError:
             return
 
+    async def _acknowledge_interaction(
+        self, interaction: discord.Interaction, *, ephemeral: bool = False,
+    ) -> None:
+        """Claim Discord's three-second window before any slow edit or payout.
+
+        A deferred click with thinking leaves a slot the victory followup
+        fills. Message edits and point awards happen after this returns.
+        """
+        if interaction.response.is_done():
+            return
+        await interaction.response.defer(ephemeral=ephemeral, thinking=True)
+
+    async def _send_interaction_result(self, interaction: discord.Interaction, **kwargs) -> None:
+        """Deliver a spell result. A click already deferred goes out as a followup."""
+        if interaction.response.is_done():
+            await interaction.followup.send(**kwargs)
+            return
+        await interaction.response.send_message(**kwargs)
+
     async def on_public_spell_click(self, interaction: discord.Interaction, spell_value: str) -> None:
         """Resolve one press of a green spell on a solo monster or an Attack wave.
 
@@ -1591,11 +1624,13 @@ class Dementors(commands.Cog):
                         else:
                             chosen = spell
         if stale:
-            await self._disable_threat_buttons(interaction.channel_id, message_id)
+            # The monster is already gone. Answer first, then grey the row.
+            # Fetching and editing that post is what used to blow the window.
             await interaction.response.send_message(
                 self._nothing_here_message(interaction.channel_id),
                 ephemeral=True,
             )
+            await self._disable_threat_buttons(interaction.channel_id, message_id)
             return
         if private is not None:
             await interaction.response.send_message(private, ephemeral=True)
@@ -1873,6 +1908,8 @@ class Dementors(commands.Cog):
                 # Defeated - award every contributor and clear the encounter.
                 # One-person creatures land here on their only hit, so they
                 # still resolve immediately instead of waiting out the clock.
+                # Acknowledge before the clear, the button edit, and the
+                # payout. Those used to run first and miss Discord's window.
                 explore_pay = bool(active.get("pay_explore_points"))
                 spawn_ref = {
                     "channel_id": active.get("channel_id"),
@@ -1880,6 +1917,7 @@ class Dementors(commands.Cog):
                     "spell_buttons": bool(active.get("spell_buttons")),
                 }
                 self._cancel_partial_expiry()
+                await self._acknowledge_interaction(interaction)
                 self.state["active"] = None
                 self.save()
 
@@ -1914,10 +1952,10 @@ class Dementors(commands.Cog):
         if footer:
             embed.set_footer(text=footer)
         file = self._attach_art(embed, creature_id, field="defeat_image")
+        result = {"embed": embed}
         if file:
-            await interaction.response.send_message(embed=embed, file=file)
-        else:
-            await interaction.response.send_message(embed=embed)
+            result["file"] = file
+        await self._send_interaction_result(interaction, **result)
 
     async def _cast_dementor(self, interaction, spell, active):
         """Dementor flow: the Patronus button is the spell. One hit banishes
@@ -1927,6 +1965,10 @@ class Dementors(commands.Cog):
         if spell.value != "patronus":
             await interaction.response.send_message("Nothing happens.", ephemeral=True)
             return
+
+        # Answer before clearing the post, greying the buttons, or paying
+        # points. That work is what made a correct Patronus look unanswered.
+        await self._acknowledge_interaction(interaction)
 
         explore_pay = bool(active.get("pay_explore_points"))
         spawn_ref = {
@@ -1954,10 +1996,10 @@ class Dementors(commands.Cog):
         if footer:
             embed.set_footer(text=footer)
         file = self._dementor_defeat_art(embed, interaction.user.id)
+        result = {"embed": embed}
         if file:
-            await interaction.response.send_message(embed=embed, file=file)
-        else:
-            await interaction.response.send_message(embed=embed)
+            result["file"] = file
+        await self._send_interaction_result(interaction, **result)
 
     # ------------------------------------------------------- event: spell buttons
 
