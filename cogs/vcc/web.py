@@ -66,12 +66,13 @@ class Hub:
             self.subs.pop(token_hash, None)
 
 
-def create_app(book: Book, hub: Hub, lock: asyncio.Lock, on_end=None) -> web.Application:
+def create_app(book: Book, hub: Hub, lock: asyncio.Lock, on_end=None, *, bot=None) -> web.Application:
     app = web.Application()
     app["book"] = book
     app["hub"] = hub
     app["lock"] = lock
     app["on_end"] = on_end
+    app["bot"] = bot
     app.router.add_get("/", home)
     app.router.add_get("/health", health)
     app.router.add_get("/play/{token}", play_page)
@@ -84,6 +85,13 @@ def create_app(book: Book, hub: Hub, lock: asyncio.Lock, on_end=None) -> web.App
     app.router.add_get("/ws/{token}", websocket)
     app.router.add_get("/art/{name}", art)
     app.router.add_static("/static/", STATIC_DIR, show_index=False)
+    # Read-only website routes. A failure here must not take the table down.
+    try:
+        from cogs.web_api import mount_readonly_api
+
+        mount_readonly_api(app)
+    except Exception:
+        log.exception("Read-only website API was not mounted")
     app.middlewares.append(privacy_headers)
     return app
 

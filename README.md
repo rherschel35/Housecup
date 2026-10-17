@@ -81,6 +81,9 @@ Names only. Set them in the shell, a local `.env` that stays untracked, or the R
 | `VCC_PUBLIC_URL` | Public `https://…` origin for private table links, no trailing slash. If unset, a Railway public domain in `RAILWAY_PUBLIC_DOMAIN` is used. |
 | `VCC_TURN_TIMEOUT_SECONDS` | Optional. Seconds of silence on a turn before that player loses. Default `240`. |
 | `VCC_ACCEPT_TIMEOUT_SECONDS` | Optional. Seconds to accept a challenge. Default `120`. |
+| `WEB_API_KEY` | Shared secret for the read-only website API. The site sends it in a header. If unset, that API does not answer. |
+| `WEB_API_KEY_HEADER` | Optional header name for that secret. Default `X-Web-Api-Key`. |
+| `WEB_API_CACHE_SECONDS` | Optional. Seconds to reuse a successful read. Default `3`. `0` reads the files on every request. |
 
 ## Railway
 
@@ -107,6 +110,22 @@ Table tokens are per player. They are not Discord tokens, they are not logged, a
 Slash-command sync talks to Discord only when the command tree actually changed. Restarts from a new deploy skip the upload when the fingerprint matches, so they do not burn Discord's daily command-create budget. `FORCE_COMMAND_SYNC=1` forces a sync anyway.
 
 On boot, if the wizard sprite packs are missing from the volume, the bot can download them into `STATE_DIR/wizard_assets/` using the `WIZARD_PACK_*` URLs. Those packs are not in git.
+
+## Website read API
+
+A separate Velmora site can read house standings, a player's profile, satchel, and Chocolate Frog album, and the events board. The routes live on the same process as Curse & Crown (`0.0.0.0:$PORT`). They only read JSON under `STATE_DIR`. They do not award points, brew, open frogs, or rewrite those files. Place-secret phrases, wand words, brew sequences, duel reputation, and live fight tallies are not in the responses.
+
+The API answers only when `WEB_API_KEY` is set. Callers send that value in `X-Web-Api-Key` (or `WEB_API_KEY_HEADER` if that is set). The site's own server should hold the key. With the variable unset, these paths respond as missing.
+
+| Method | Path | Body |
+| --- | --- | --- |
+| `GET` | `/api/site/standings` | Season, five houses with season and all-time points, leader, last cup |
+| `GET` | `/api/site/events` | Attack and Duel Night schedules, next start, live on/off, House Cup snapshot |
+| `GET` | `/api/site/users/{user_id}/profile` | Points, house, duelling, bestiary, wand, patronus, animagus, broom, familiar, adornments, honours |
+| `GET` | `/api/site/users/{user_id}/satchel` | Brewed potions, ingredients, and other items, each with a count |
+| `GET` | `/api/site/users/{user_id}/frogs` | Chocolate Frog album with counts |
+
+`{user_id}` is a Discord user id. House from a Discord role is included when that member is already in the bot's cache; otherwise the house is the points-ledger override, if one is set. Successful reads are reused for `WEB_API_CACHE_SECONDS` (default 3) so a refresh does not keep re-reading the volume.
 
 ## Data storage
 

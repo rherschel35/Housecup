@@ -261,7 +261,7 @@ class Vcc(commands.Cog):
         if not os.getenv("DISCORD_TOKEN"):
             log.info("Curse & Crown web table not started (DISCORD_TOKEN unset).")
             return
-        app = create_app(self.book, self.hub, self.lock, on_end=self.settle)
+        app = create_app(self.book, self.hub, self.lock, on_end=self.settle, bot=self.bot)
         self.runner = await start_site(app)
         self._watch = asyncio.create_task(self.watch(), name="vcc-watch")
 
