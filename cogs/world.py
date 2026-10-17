@@ -9,8 +9,10 @@ Players:  /explore  /forage  /satchel  /secrets  /use  /offer  /places
 Staff:    /staff world eventstart | eventend | eventstatus | academy | rep | give | channel | reload
 
 Secret interactions are NOT commands: they're typed as plain messages in a
-place's channel. Wrong guesses get silence. That's deliberate - Discord
-shows every slash command to everyone, and secrets have to stay secret.
+place's channel. Wrong guesses, and secrets whose conditions aren't met,
+get silence. That's deliberate - Discord shows every slash command to
+everyone, and secrets have to stay secret. A phrase for a secret already
+found gets a small reaction and nothing else.
 """
 
 import asyncio
@@ -72,6 +74,14 @@ MONSTER_CHANCE = 0.40  # per /explore or /forage in a dangerous place (was 0.20)
 
 DEFAULT_LIMITS = {"explore": 10, "forage": 5}
 HERE_MINUTES = 60          # how long you count as "in" a place after exploring it
+ALREADY_FOUND_EMOJI = "🔁"  # reaction on a secret this student already found
+PLACES_SECRET_NOTE = (
+    "Secrets only work for the place you explored or foraged in during the last hour. "
+    "Some depend on your house, the time of day, your reputation, items you're carrying, "
+    "earlier secrets, or an event. "
+    "A secret you've already found won't trigger again; the bot reacts to your message instead. "
+    "`/secrets` shows what you've found."
+)
 GREEN, NIGHT_COLOR = 0x3E8E5A, 0x2B3A2E
 EVENT_CHOICES = [
     app_commands.Choice(name="Door behind roses", value="door"),
@@ -249,10 +259,29 @@ class WorldCog(commands.Cog, name="World"):
         return True
 
     def where(self, student) -> Optional[str]:
+        place, _minutes = self.here_window(student)
+        return place
+
+    def here_window(self, student, now=None) -> tuple[Optional[str], Optional[int]]:
+        """Place the student is in, and whole minutes left in the hour.
+
+        Same 60-minute window /use, /offer, and typed secrets already use.
+        Minutes are rounded up, so a window that is still open never shows 0.
+        """
+        now = time.time() if now is None else now
         here = student.get("here") or {}
-        if here.get("place") in self.world.places and time.time() - here.get("at", 0) < HERE_MINUTES * 60:
-            return here["place"]
-        return None
+        place = here.get("place")
+        try:
+            at = float(here.get("at") or 0)
+        except (TypeError, ValueError):
+            return None, None
+        if place not in self.world.places:
+            return None, None
+        remaining = HERE_MINUTES * 60 - (now - at)
+        if remaining <= 0:
+            return None, None
+        minutes = (int(remaining) + 59) // 60
+        return place, min(HERE_MINUTES, max(1, minutes))
 
     def gear_finds(self, user_id, student, place, found, exploring: bool) -> list:
         """Extra finds from worn gear (Seeker's Ring, Magpie's Eye). Never
@@ -501,11 +530,69 @@ class WorldCog(commands.Cog, name="World"):
             if ev:
                 bit += " · *something unusual is happening*"
             lines.append(f"**{P.c.get('title', P.name)}**{bit}\n{P.c.get('blurb', '')}")
-        lines.append("\n`/explore` · `/forage` · `/satchel` · `/secrets` · `/use` · `/offer`\n"
-                     "*Not everything you can do is on this list. Some things you'll only learn from classes, "
-                     "books, riddles, rumours - or other students. If you discover something, you decide whether to share it. "
-                     "`/secrets` shows the ones you've already found.*")
+        lines.append(
+            "\n`/explore` · `/forage` · `/satchel` · `/secrets` · `/use` · `/offer`\n"
+            + PLACES_SECRET_NOTE
+        )
         await interaction.response.send_message(embed=self.embed("\n\n".join(lines), "Velmora"))
+
+    @app_commands.command(
+        name="secrets",
+        description="Secrets you've already found in each place. Only you can see this.",
+    )
+    async def secrets(self, interaction: discord.Interaction):
+        s = self.state["students"].get(str(interaction.user.id)) or blank_student()
+        embed = self.secrets_embed(interaction.user, s)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    def secrets_embed(self, user, student: dict) -> discord.Embed:
+        """Private list of found secret names, counts, and the current place.
+
+        Unfound secrets are a count only. Their names and phrases stay out.
+        """
+        place, minutes = self.here_window(student)
+        if place:
+            title = self.world.places[place].c.get("title", self.world.places[place].name)
+            unit = "minute" if minutes == 1 else "minutes"
+            where = f"You're in **{title}**. **{minutes} {unit}** left in this hour."
+        else:
+            where = (
+                "You aren't in a place right now. "
+                "`/explore` or `/forage` puts you there for 60 minutes, and secrets only answer there."
+            )
+        embed = discord.Embed(description=where, color=GREEN)
+        name = getattr(user, "display_name", None) or "Your"
+        possessive = f"{name}'" if name.endswith(("s", "S")) else f"{name}'s"
+        embed.set_author(name=f"🗝️ {possessive} secrets")
+        for key, P in self.world.places.items():
+            secrets = P.c.get("secrets") or []
+            names = P.found_secret_names(student)
+            if names:
+                value = "\n".join(f"• {name}" for name in names)
+            else:
+                value = "*None yet.*"
+            if len(value) > 1024:
+                value = value[:1021] + "…"
+            label = P.c.get("title", P.name)
+            embed.add_field(name=f"{label} · {len(names)}/{len(secrets)}", value=value, inline=False)
+        note = self._talisman_note(user)
+        if note:
+            embed.add_field(name="Keeper's Talisman", value=note[:1024], inline=False)
+        else:
+            embed.set_footer(
+                text="Wear the Keeper's Talisman to also see how many are still hidden in each place."
+            )
+        return embed
+
+    def _talisman_note(self, user) -> Optional[str]:
+        adorn = self.bot.get_cog("Adornments")
+        if adorn is None:
+            return None
+        try:
+            return adorn.keepers_talisman_note(user)
+        except Exception:
+            log.exception("Keeper's Talisman note failed")
+            return None
 
     # ------------------------------------------------------------ secrets, typed wherever you're currently exploring
 
@@ -526,28 +613,37 @@ class WorldCog(commands.Cog, name="World"):
         if not self._place_channel_ok(message.channel.id, place):
             return
         P = self.world.places[place]
+        already = False
         async with self.lock:
             ctx = self.ctx(message.author, place)
             ev = self.event(place)
             sec = P.match_secret(message.content, ctx, self.state, ev)
             if not sec:
-                return
-            if sec["response"] == "FROG_TRADE":
+                already = P.already_found_secret(message.content, ctx, self.state, ev)
+            elif sec["response"] == "FROG_TRADE":
                 res = P.frog_trade(ctx, ev)
                 self.save()
                 await message.reply(embed=self.embed(res["text"]), mention_author=False)
                 return
-            if sec["response"] == "POOL_ANSWER":
-                if ev.get("user_id") != message.author.id:
-                    return   # the Pool wasn't calling you
-                sec = dict(sec, response=(
-                    "💧 You kneel and answer. The whispering stops. Then, very softly, the Pool says something "
-                    "only you can hear - and a single bright drop rises out of the water into your hand."),
-                    reward="dew_diamond", rep=2, points=2)
-            res = P.claim_secret(sec, ctx, self.state, ev)
-            ctx.student["here"] = {"place": place, "at": time.time()}
-            reveal = self.world.reveal_if_new(ctx.student, place)
-            self.save()
+            else:
+                if sec["response"] == "POOL_ANSWER":
+                    if ev.get("user_id") != message.author.id:
+                        return   # the Pool wasn't calling you
+                    sec = dict(sec, response=(
+                        "💧 You kneel and answer. The whispering stops. Then, very softly, the Pool says something "
+                        "only you can hear - and a single bright drop rises out of the water into your hand."),
+                        reward="dew_diamond", rep=2, points=2)
+                res = P.claim_secret(sec, ctx, self.state, ev)
+                ctx.student["here"] = {"place": place, "at": time.time()}
+                reveal = self.world.reveal_if_new(ctx.student, place)
+                self.save()
+        if not sec:
+            if already:
+                try:
+                    await message.add_reaction(ALREADY_FOUND_EMOJI)
+                except discord.HTTPException:
+                    log.debug("Could not react to an already-found secret")
+            return
         text = res["text"]
         if res["item"]:
             text += f"\n\n🎁 You receive: {self.world.item_line(res['item'])}"
