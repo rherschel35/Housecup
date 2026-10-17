@@ -257,6 +257,9 @@ def test_secrets_command_hides_unfound_names_and_phrases() -> None:
     sent = interaction.response.sent[-1]
     _check(sent.get("ephemeral") is True, sent)
     embed = sent["embed"]
+    _check(embed.author.name == "🗝️ Rook's secrets", embed.author.name)
+    james = world.secrets_embed(User(8, "James"), student)
+    _check(james.author.name == "🗝️ James' secrets", james.author.name)
     text = _embed_text(embed)
     _check("45 minutes" in embed.description, embed.description)
     _check("Library" in embed.description, embed.description)

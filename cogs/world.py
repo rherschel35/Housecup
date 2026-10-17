@@ -561,7 +561,9 @@ class WorldCog(commands.Cog, name="World"):
                 "`/explore` or `/forage` puts you there for 60 minutes, and secrets only answer there."
             )
         embed = discord.Embed(description=where, color=GREEN)
-        embed.set_author(name=f"🗝️ {getattr(user, 'display_name', 'Your')} secrets")
+        name = getattr(user, "display_name", None) or "Your"
+        possessive = f"{name}'" if name.endswith(("s", "S")) else f"{name}'s"
+        embed.set_author(name=f"🗝️ {possessive} secrets")
         for key, P in self.world.places.items():
             secrets = P.c.get("secrets") or []
             names = P.found_secret_names(student)
